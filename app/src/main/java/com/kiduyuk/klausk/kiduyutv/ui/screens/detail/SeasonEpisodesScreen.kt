@@ -13,7 +13,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
@@ -45,8 +44,9 @@ fun SeasonEpisodesScreen(
     val uiState by viewModel.uiState.collectAsState()
     var selectedSeasonIndex by remember { mutableIntStateOf(0) }
 
-    // Load first season episodes on init
+    // Load seasons and first season episodes on init
     LaunchedEffect(tvShowId) {
+        viewModel.loadSeasons(tvShowId)
         viewModel.loadSeasonEpisodes(tvShowId, 1)
     }
 
@@ -86,7 +86,7 @@ fun SeasonEpisodesScreen(
                                 .focusable()
                         ) {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                imageVector = Icons.Default.ArrowBack,
                                 contentDescription = "Back",
                                 tint = TextPrimary,
                                 modifier = Modifier.size(32.dp)
