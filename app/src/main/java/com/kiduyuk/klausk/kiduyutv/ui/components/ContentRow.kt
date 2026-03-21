@@ -2,16 +2,22 @@ package com.kiduyuk.klausk.kiduyutv.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.kiduyuk.klausk.kiduyutv.ui.theme.FocusBorder
@@ -28,6 +34,7 @@ fun <T> ContentRow(
 ) {
     var selectedIndex by remember { mutableIntStateOf(0) }
     val listState = rememberLazyListState()
+    val focusRequesters = remember { mutableStateMapOf<Int, FocusRequester>() }
 
     Column(
         modifier = modifier
@@ -49,25 +56,38 @@ fun <T> ContentRow(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            items(items) { item ->
-                val isSelected = items.indexOf(item) == selectedIndex
+            itemsIndexed(items) { index, item ->
+                val isSelected = index == selectedIndex
+                val interactionSource = remember { MutableInteractionSource() }
+                val isFocused by interactionSource.collectIsFocusedAsState()
+
                 Box(
                     modifier = Modifier
-                        .focusable()
                         .then(
-                            if (isSelected) {
-                                Modifier.border(
-                                    width = 3.dp,
-                                    color = FocusBorder,
-                                    shape = RoundedCornerShape(8.dp)
-                                )
+                            if (isSelected || isFocused) {
+                                Modifier
+                                    .border(
+                                        width = 3.dp,
+                                        color = FocusBorder,
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
                             } else {
                                 Modifier
                             }
                         )
+                        .clip(RoundedCornerShape(8.dp))
+                        .focusable(interactionSource = interactionSource)
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null
+                        ) {
+                            selectedIndex = index
+                            onItemClick(item)
+                        },
+                    propagateMinConstraints = true
                 ) {
-                    content(item, isSelected) {
-                        selectedIndex = items.indexOf(item)
+                    content(item, isSelected || isFocused) {
+                        selectedIndex = index
                         onItemClick(item)
                     }
                 }
@@ -106,13 +126,13 @@ fun NetworkRow(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            items(items) { item ->
-                val isSelected = items.indexOf(item) == selectedIndex
+            itemsIndexed(items) { index, item ->
+                val isSelected = index == selectedIndex
                 NetworkCard(
                     item = item,
                     isSelected = isSelected,
                     onClick = {
-                        selectedIndex = items.indexOf(item)
+                        selectedIndex = index
                         onItemClick(item)
                     }
                 )
@@ -127,13 +147,15 @@ private fun NetworkCard(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
     Box(
         modifier = Modifier
             .width(160.dp)
             .height(100.dp)
-            .focusable()
             .then(
-                if (isSelected) {
+                if (isSelected || isFocused) {
                     Modifier.border(
                         width = 3.dp,
                         color = FocusBorder,
@@ -141,17 +163,21 @@ private fun NetworkCard(
                     )
                 } else {
                     Modifier
-                        .background(
-                            color = Color(0xFF333333),
-                            shape = RoundedCornerShape(8.dp)
-                        )
                 }
             )
+            .clip(RoundedCornerShape(8.dp))
             .background(
                 color = Color(0xFF333333),
                 shape = RoundedCornerShape(8.dp)
-            ),
-        contentAlignment = androidx.compose.ui.Alignment.Center
+            )
+            .focusable(interactionSource = interactionSource)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null
+            ) {
+                onClick()
+            },
+        contentAlignment = Alignment.Center
     ) {
         Text(
             text = item.name,
