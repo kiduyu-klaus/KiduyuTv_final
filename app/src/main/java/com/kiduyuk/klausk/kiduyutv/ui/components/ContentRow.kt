@@ -29,6 +29,7 @@ fun <T> ContentRow(
     title: String,
     items: List<T>,
     modifier: Modifier = Modifier,
+    onItemFocus: ((T) -> Unit)? = null,
     onItemClick: (T) -> Unit,
     content: @Composable (T, Boolean, () -> Unit) -> Unit
 ) {
@@ -60,6 +61,12 @@ fun <T> ContentRow(
                 val isSelected = index == selectedIndex
                 val interactionSource = remember { MutableInteractionSource() }
                 val isFocused by interactionSource.collectIsFocusedAsState()
+
+                LaunchedEffect(isFocused) {
+                    if (isFocused) {
+                        onItemFocus?.invoke(item)
+                    }
+                }
 
                 Box(
                     modifier = Modifier
