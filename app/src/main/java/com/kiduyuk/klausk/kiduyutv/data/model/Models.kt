@@ -86,7 +86,9 @@ data class TvShowDetail(
     @SerializedName("number_of_seasons") val numberOfSeasons: Int?,
     @SerializedName("number_of_episodes") val numberOfEpisodes: Int?,
     @SerializedName("genres") val genres: List<Genre>?,
-    @SerializedName("networks") val networks: List<Network>?
+    @SerializedName("networks") val networks: List<Network>?,
+
+    @SerializedName("seasons") val seasons: List<Season>?
 )
 
 data class Season(

@@ -43,10 +43,14 @@ fun SeasonEpisodesScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var selectedSeasonIndex by remember { mutableIntStateOf(0) }
+    var seasonsLoaded by remember { mutableStateOf(false) }
 
     // Load seasons and first season episodes on init
     LaunchedEffect(tvShowId) {
-        viewModel.loadSeasons(tvShowId)
+        if (!seasonsLoaded || uiState.seasons.isEmpty()) {
+            viewModel.loadSeasons(tvShowId, totalSeasons)
+            seasonsLoaded = true
+        }
         viewModel.loadSeasonEpisodes(tvShowId, 1)
     }
 

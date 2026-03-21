@@ -60,14 +60,16 @@ class DetailViewModel : ViewModel() {
             _uiState.value = DetailUiState(isLoading = true)
 
             try {
-                val tvShowDetail = repository.getTvShowDetail(tvId)
-                val seasons = repository.getTvShowSeasons(tvId)
+                val tvShowDetail = repository.getTvShowDetail(tvId).getOrElse { throw it }
                 val similarTvShows = repository.getTrendingTvToday()
+                val seasonList = tvShowDetail.seasons
+                    ?.filter { it.seasonNumber > 0 }
+                    ?: emptyList<Season>()
 
                 _uiState.value = DetailUiState(
                     isLoading = false,
-                    tvShowDetail = tvShowDetail.getOrNull(),
-                    seasons = seasons.getOrNull()?.seasons ?: emptyList(),
+                    tvShowDetail = tvShowDetail,
+                    seasons = seasonList,
                     similarTvShows = similarTvShows.getOrNull()?.take(10) ?: emptyList()
                 )
             } catch (e: Exception) {
@@ -79,19 +81,32 @@ class DetailViewModel : ViewModel() {
         }
     }
 
-    fun loadSeasons(tvId: Int) {
+    fun loadSeasons(tvId: Int, totalSeasons: Int) {
         viewModelScope.launch {
-            Log.i(TAG, "loadSeasons: tvId=$tvId")
+            Log.i(TAG, "loadSeasons: tvId=$tvId, totalSeasons=$totalSeasons")
             try {
-                val seasons = repository.getTvShowSeasons(tvId)
-                val seasonList = seasons.getOrNull()?.seasons ?: emptyList()
-                Log.i(TAG, "loadSeasons: loaded ${seasonList.size} seasons for tvId=$tvId")
-                _uiState.value = _uiState.value.copy(seasons = seasonList)
+                val tvShowDetail = repository.getTvShowDetail(tvId).getOrElse { throw it }
+                val seasonList = tvShowDetail.seasons
+                    ?.filter { it.seasonNumber > 0 }
+                    ?: emptyList<Season>()
+
+                if (seasonList.isNotEmpty()) {
+                    Log.i(TAG, "loadSeasons: loaded ${seasonList.size} seasons for tvId=$tvId")
+                    _uiState.value = _uiState.value.copy(seasons = seasonList)
+                } else {
+                    // Fallback: generate seasons from totalSeasons count
+                    Log.i(TAG, "loadSeasons: API returned no seasons, generating $totalSeasons from totalSeasons")
+                    val fallbackList = (1..totalSeasons).map { n ->
+                        Season(id = n, name = "Season $n", seasonNumber = n, posterPath = null, episodeCount = null)
+                    }
+                    _uiState.value = _uiState.value.copy(seasons = fallbackList)
+                }
             } catch (e: Exception) {
-                Log.i(TAG, "loadSeasons: error loading seasons for tvId=$tvId - ${e.message}", e)
-                _uiState.value = _uiState.value.copy(
-                    error = e.message ?: "Failed to load seasons"
-                )
+                Log.i(TAG, "loadSeasons: error for tvId=$tvId - ${e.message}, falling back to $totalSeasons seasons", e)
+                val fallbackList = (1..totalSeasons).map { n ->
+                    Season(id = n, name = "Season $n", seasonNumber = n, posterPath = null, episodeCount = null)
+                }
+                _uiState.value = _uiState.value.copy(seasons = fallbackList)
             }
         }
     }
