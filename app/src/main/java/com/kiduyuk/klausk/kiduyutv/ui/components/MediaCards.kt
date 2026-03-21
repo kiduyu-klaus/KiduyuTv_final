@@ -4,11 +4,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,12 +34,14 @@ fun MovieCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
     Box(
         modifier = modifier
             .width(160.dp)
-            .focusable()
             .then(
-                if (isSelected) {
+                if (isSelected || isFocused) {
                     Modifier.border(
                         width = 3.dp,
                         color = FocusBorder,
@@ -48,7 +52,13 @@ fun MovieCard(
                 }
             )
             .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
+            .focusable(interactionSource = interactionSource)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null
+            ) {
+                onClick()
+            }
     ) {
         Column {
             Box(
@@ -116,12 +126,14 @@ fun TvShowCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
     Box(
         modifier = modifier
             .width(160.dp)
-            .focusable()
             .then(
-                if (isSelected) {
+                if (isSelected || isFocused) {
                     Modifier.border(
                         width = 3.dp,
                         color = FocusBorder,
@@ -132,7 +144,13 @@ fun TvShowCard(
                 }
             )
             .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
+            .focusable(interactionSource = interactionSource)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null
+            ) {
+                onClick()
+            }
     ) {
         Column {
             Box(
