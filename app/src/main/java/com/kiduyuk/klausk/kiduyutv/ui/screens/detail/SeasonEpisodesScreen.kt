@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -342,6 +343,134 @@ private fun EpisodeListItem(
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondary
                     )
+                }
+            }
+        }
+    }
+}
+
+// Preview for SeasonEpisodesScreen
+@Preview(showBackground = true, backgroundColor = 0xFF141414)
+@Composable
+fun SeasonEpisodesScreenPreview() {
+    KiduyuTvTheme {
+        // Preview with mock data
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(BackgroundDark)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp)
+            ) {
+                // Left Column - Seasons List
+                Column(
+                    modifier = Modifier
+                        .width(300.dp)
+                        .fillMaxHeight()
+                ) {
+                    // Back button and title
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(bottom = 24.dp)
+                    ) {
+                        IconButton(
+                            onClick = { },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .focusable()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "Back",
+                                tint = TextPrimary,
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "Sample TV Show",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = TextPrimary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "3 seasons",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = TextSecondary
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Text(
+                        text = "Seasons",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = TextPrimary
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Mock Seasons list
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(3) { index ->
+                            SeasonListItem(
+                                season = Season(
+                                    id = index + 1,
+                                    name = "Season ${index + 1}",
+                                    seasonNumber = index + 1,
+                                    posterPath = null,
+                                    episodeCount = 10 + index
+                                ),
+                                isSelected = index == 0,
+                                onClick = { }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(32.dp))
+
+                // Right Column - Episodes List
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                ) {
+                    Text(
+                        text = "Episodes",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = TextPrimary
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        items(3) { index ->
+                            EpisodeListItem(
+                                episode = Episode(
+                                    id = index + 1,
+                                    name = "Episode ${index + 1}",
+                                    overview = "This is a sample episode description for preview purposes.",
+                                    stillPath = null,
+                                    episodeNumber = index + 1,
+                                    seasonNumber = 1,
+                                    voteAverage = 8.5
+                                ),
+                                seasonNumber = 1
+                            )
+                        }
+                    }
                 }
             }
         }

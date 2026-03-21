@@ -11,12 +11,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
 import com.kiduyuk.klausk.kiduyutv.ui.components.*
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
+import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
 import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeViewModel
@@ -25,10 +27,12 @@ import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeViewModel
 fun HomeScreen(
     onMovieClick: (Int) -> Unit,
     onTvShowClick: (Int) -> Unit,
+    onNavigate: (String) -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
+    var selectedRoute by remember { mutableStateOf("home") }
 
     Box(
         modifier = Modifier
@@ -59,6 +63,15 @@ fun HomeScreen(
                     .fillMaxSize()
                     .verticalScroll(scrollState)
             ) {
+                // Top Navigation Bar
+                TopBar(
+                    selectedRoute = selectedRoute,
+                    onNavItemClick = { route ->
+                        selectedRoute = route
+                        onNavigate(route)
+                    }
+                )
+
                 // Hero Section with selected item
                 val selectedMovie = uiState.selectedItem as? Movie
                 val selectedTvShow = uiState.selectedItem as? TvShow
@@ -174,6 +187,116 @@ fun HomeScreen(
                         uiState.myList.forEach { item ->
                             // Display my list items
                         }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
+    }
+}
+
+// Preview for HomeScreen
+@Preview(showBackground = true, backgroundColor = 0xFF141414)
+@Composable
+fun HomeScreenPreview() {
+    KiduyuTvTheme {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(BackgroundDark)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+            ) {
+                // Top Navigation Bar
+                TopBar(
+                    selectedRoute = "home",
+                    onNavItemClick = {}
+                )
+
+                // Hero Section
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(400.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Gray)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Trending Now
+                Text(
+                    text = "Trending Now",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = TextPrimary,
+                    modifier = Modifier.padding(horizontal = 48.dp, vertical = 16.dp)
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 48.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    repeat(5) { index ->
+                        MovieCard(
+                            movie = Movie(
+                                id = index + 1,
+                                title = "Movie ${index + 1}",
+                                overview = "Movie description",
+                                posterPath = null,
+                                backdropPath = null,
+                                voteAverage = 8.0 + index * 0.2,
+                                releaseDate = "2023",
+                                genreIds = emptyList(),
+                                popularity = 100.0
+                            ),
+                            isSelected = index == 0,
+                            onClick = { }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // TV Shows
+                Text(
+                    text = "TV Shows",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = TextPrimary,
+                    modifier = Modifier.padding(horizontal = 48.dp, vertical = 16.dp)
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 48.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    repeat(5) { index ->
+                        TvShowCard(
+                            tvShow = TvShow(
+                                id = index + 1,
+                                name = "TV Show ${index + 1}",
+                                overview = "TV show description",
+                                posterPath = null,
+                                backdropPath = null,
+                                voteAverage = 7.5 + index * 0.3,
+                                firstAirDate = "2023",
+                                genreIds = emptyList(),
+                                popularity = 90.0
+                            ),
+                            isSelected = index == 0,
+                            onClick = { }
+                        )
                     }
                 }
 

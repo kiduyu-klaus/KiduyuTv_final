@@ -20,6 +20,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -465,6 +466,241 @@ private fun EpisodeCard(
                 color = TextSecondary,
                 maxLines = 2
             )
+        }
+    }
+}
+
+
+// Preview for TvShowDetailScreen
+@Preview(showBackground = true, backgroundColor = 0xFF141414)
+@Composable
+fun TvShowDetailScreenPreview() {
+    KiduyuTvTheme {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(BackgroundDark)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+            ) {
+                // Hero Section
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(500.dp)
+                ) {
+                    // Gradient Overlay
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        BackgroundDark.copy(alpha = 0.7f),
+                                        BackgroundDark
+                                    )
+                                )
+                            )
+                    )
+
+                    // Back Button
+                    IconButton(
+                        onClick = { },
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(16.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = TextPrimary,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+
+                    // Content
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(48.dp),
+                        verticalArrangement = Arrangement.Bottom
+                    ) {
+                        Text(
+                            text = "Sample TV Show",
+                            style = MaterialTheme.typography.displaySmall,
+                            color = TextPrimary
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Metadata
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Star,
+                                    contentDescription = null,
+                                    tint = PrimaryRed,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = "8.5",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = TextPrimary
+                                )
+                            }
+
+                            Text(
+                                text = "2023",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = TextSecondary
+                            )
+
+                            Text(
+                                text = "3 Seasons",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = TextSecondary
+                            )
+
+                            Text(
+                                text = "24 Episodes",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = TextSecondary
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Genres
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = GenrePill
+                            ) {
+                                Text(
+                                    text = "Drama",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = TextPrimary,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = GenrePill
+                            ) {
+                                Text(
+                                    text = "Thriller",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = TextPrimary,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Overview
+                        Text(
+                            text = "This is a sample TV show description for preview purposes. It showcases the main features of the app.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextSecondary,
+                            maxLines = 4
+                        )
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        // Action Buttons
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Button(
+                                onClick = { },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = PrimaryRed
+                                ),
+                                shape = RoundedCornerShape(4.dp),
+                                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Play Now",
+                                    style = MaterialTheme.typography.labelLarge
+                                )
+                            }
+
+                            OutlinedButton(
+                                onClick = { },
+                                shape = RoundedCornerShape(4.dp),
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = TextPrimary
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.List,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Episodes",
+                                    style = MaterialTheme.typography.labelLarge
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Seasons Section
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 48.dp, vertical = 16.dp)
+                ) {
+                    Text(
+                        text = "Seasons",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = TextPrimary
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        items(3) { index ->
+                            SeasonCard(
+                                season = Season(
+                                    id = index + 1,
+                                    name = "Season ${index + 1}",
+                                    seasonNumber = index + 1,
+                                    posterPath = null,
+                                    episodeCount = 8 + index
+                                ),
+                                onClick = { }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+            }
         }
     }
 }

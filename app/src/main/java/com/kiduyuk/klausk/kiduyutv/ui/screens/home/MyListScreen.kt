@@ -11,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kiduyuk.klausk.kiduyutv.ui.components.TopBar
@@ -110,6 +111,102 @@ private fun MyListItemCard(
                 )
         )
 
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = item.title,
+                style = MaterialTheme.typography.titleMedium,
+                color = TextPrimary
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = if (item.type == "movie") "Movie" else "TV Show",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
+            )
+        }
+
+        IconButton(onClick = onRemove) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "Remove from list",
+                tint = TextPrimary
+            )
+        }
+    }
+}
+
+
+// Preview for MyListScreen
+@Preview(showBackground = true, backgroundColor = 0xFF141414)
+@Composable
+fun MyListScreenPreview() {
+    KiduyuTvTheme {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(BackgroundDark)
+        ) {
+            // Header
+            Text(
+                text = "My List",
+                style = MaterialTheme.typography.headlineLarge,
+                color = TextPrimary,
+                modifier = Modifier.padding(48.dp)
+            )
+
+            // Sample My List Items
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 48.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(5) { index ->
+                    MyListItemRow(
+                        item = MyListItem(
+                            id = index + 1,
+                            title = "My List Item ${index + 1}",
+                            posterPath = null,
+                            type = if (index % 2 == 0) "movie" else "tv"
+                        ),
+                        onRemove = { }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MyListItemRow(
+    item: MyListItem,
+    onRemove: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(120.dp)
+            .background(
+                color = CardDark,
+                shape = RoundedCornerShape(8.dp)
+            )
+            .padding(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        // Poster placeholder
+        Box(
+            modifier = Modifier
+                .width(80.dp)
+                .height(88.dp)
+                .background(
+                    color = SurfaceDark,
+                    shape = RoundedCornerShape(4.dp)
+                )
+        )
+
+        // Info
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.Center
