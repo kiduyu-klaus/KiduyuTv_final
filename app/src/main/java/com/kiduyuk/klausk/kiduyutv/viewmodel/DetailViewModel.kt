@@ -1,5 +1,6 @@
 package com.kiduyuk.klausk.kiduyutv.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kiduyuk.klausk.kiduyutv.data.model.*
@@ -22,20 +23,24 @@ data class DetailUiState(
 )
 
 class DetailViewModel : ViewModel() {
-    
+
     private val repository = TmdbRepository()
-    
+
     private val _uiState = MutableStateFlow(DetailUiState())
     val uiState: StateFlow<DetailUiState> = _uiState.asStateFlow()
+
+    companion object {
+        private const val TAG = "DetailViewModel"
+    }
 
     fun loadMovieDetail(movieId: Int) {
         viewModelScope.launch {
             _uiState.value = DetailUiState(isLoading = true)
-            
+
             try {
                 val movieDetail = repository.getMovieDetail(movieId)
                 val similarMovies = repository.getTrendingMoviesToday()
-                
+
                 _uiState.value = DetailUiState(
                     isLoading = false,
                     movieDetail = movieDetail.getOrNull(),
@@ -53,12 +58,12 @@ class DetailViewModel : ViewModel() {
     fun loadTvShowDetail(tvId: Int) {
         viewModelScope.launch {
             _uiState.value = DetailUiState(isLoading = true)
-            
+
             try {
                 val tvShowDetail = repository.getTvShowDetail(tvId)
                 val seasons = repository.getTvShowSeasons(tvId)
                 val similarTvShows = repository.getTrendingTvToday()
-                
+
                 _uiState.value = DetailUiState(
                     isLoading = false,
                     tvShowDetail = tvShowDetail.getOrNull(),
@@ -74,15 +79,41 @@ class DetailViewModel : ViewModel() {
         }
     }
 
+    fun loadSeasons(tvId: Int) {
+        viewModelScope.launch {
+            Log.i(TAG, "loadSeasons: tvId=$tvId")
+            try {
+                val seasons = repository.getTvShowSeasons(tvId)
+                val seasonList = seasons.getOrNull()?.seasons ?: emptyList()
+                Log.i(TAG, "loadSeasons: loaded ${seasonList.size} seasons for tvId=$tvId")
+                _uiState.value = _uiState.value.copy(seasons = seasonList)
+            } catch (e: Exception) {
+                Log.i(TAG, "loadSeasons: error loading seasons for tvId=$tvId - ${e.message}", e)
+                _uiState.value = _uiState.value.copy(
+                    error = e.message ?: "Failed to load seasons"
+                )
+            }
+        }
+    }
+
     fun loadSeasonEpisodes(tvId: Int, seasonNumber: Int) {
         viewModelScope.launch {
+            Log.i(TAG, "loadSeasonEpisodes: tvId=$tvId, seasonNumber=$seasonNumber")
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
                 val seasonDetail = repository.getSeasonDetail(tvId, seasonNumber)
+                val episodes = seasonDetail.getOrNull()?.episodes ?: emptyList()
+                Log.i(TAG, "loadSeasonEpisodes: loaded ${episodes.size} episodes for season $seasonNumber")
                 _uiState.value = _uiState.value.copy(
-                    episodes = seasonDetail.getOrNull()?.episodes ?: emptyList()
+                    isLoading = false,
+                    episodes = episodes
                 )
             } catch (e: Exception) {
-                // Handle error silently
+                Log.i(TAG, "loadSeasonEpisodes: error loading season $seasonNumber - ${e.message}", e)
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    error = e.message ?: "Failed to load episodes for season $seasonNumber"
+                )
             }
         }
     }
