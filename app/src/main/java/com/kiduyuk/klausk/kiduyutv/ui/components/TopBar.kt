@@ -6,8 +6,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.*
@@ -21,18 +21,34 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 
+/**
+ * Data class representing a navigation item in the top bar.
+ * @param title The display name of the item.
+ * @param icon The icon associated with the item.
+ * @param route The navigation route associated with the item.
+ */
 data class NavItem(
     val title: String,
     val icon: ImageVector,
     val route: String
 )
 
+/**
+ * The top navigation bar component used across the main screens.
+ * Displays the app logo, main navigation items (Home, Movies, TV Shows, My List),
+ * and utility icons like Search and Settings.
+ *
+ * @param selectedRoute The currently active navigation route.
+ * @param onNavItemClick Lambda to handle navigation when an item is clicked.
+ * @param modifier Modifier for the layout.
+ */
 @Composable
 fun TopBar(
     selectedRoute: String,
     onNavItemClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // List of main navigation destinations.
     val navItems = listOf(
         NavItem("Home", Icons.Default.Home, "home"),
         NavItem("Movies", Icons.Default.Movie, "movies"),
@@ -48,7 +64,7 @@ fun TopBar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // App Logo/Title
+        // App Logo and Title Section
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -75,7 +91,7 @@ fun TopBar(
             )
         }
 
-        // Navigation Items
+        // Navigation Items Section
         Row(
             horizontalArrangement = Arrangement.spacedBy(32.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -89,23 +105,25 @@ fun TopBar(
             }
         }
 
-        // Settings and Search icons
+        // Utility Icons Section: Search and Settings
         Row(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Search Icon Button
             IconButton(
-                onClick = { /* Search functionality */ }
+                onClick = { /* TODO: Implement search functionality */ }
             ) {
                 Icon(
-                    imageVector = Icons.Default.Settings,
+                    imageVector = Icons.Default.Search,
                     contentDescription = "Search",
                     tint = TextPrimary,
                     modifier = Modifier.size(28.dp)
                 )
             }
+            // Settings Icon Button
             IconButton(
-                onClick = { /* Settings functionality */ }
+                onClick = { /* TODO: Implement settings functionality */ }
             ) {
                 Icon(
                     imageVector = Icons.Default.Settings,
@@ -118,6 +136,14 @@ fun TopBar(
     }
 }
 
+/**
+ * Individual navigation item component within the TopBar.
+ * Highlights the item if it is currently selected.
+ *
+ * @param item The navigation item data.
+ * @param isSelected Whether this item is the currently active route.
+ * @param onClick Lambda to handle click events.
+ */
 @Composable
 private fun NavBarItem(
     item: NavItem,

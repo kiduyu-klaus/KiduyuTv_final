@@ -24,23 +24,35 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeViewModel
 
+/**
+ * Composable function for the TV Shows screen, displaying various rows of TV show content.
+ * It fetches TV show data from [HomeViewModel] and displays them using [ContentRow] and [TvShowCard].
+ *
+ * @param onTvShowClick Lambda to be invoked when a TV show card is clicked, typically navigating to TV show details.
+ * @param onNavigate Lambda to handle navigation between top-level screens.
+ * @param viewModel The [HomeViewModel] instance providing data for the screen.
+ */
 @Composable
 fun TvShowsScreen(
     onTvShowClick: (Int) -> Unit,
+    onNavigate: (String) -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
+    // Collect UI state from the ViewModel.
     val uiState by viewModel.uiState.collectAsState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundDark)
+            .background(BackgroundDark) // Set background color.
     ) {
+        // Top navigation bar for the TV Shows screen.
         TopBar(
             selectedRoute = "tv_shows",
-            onNavItemClick = { /* Handle navigation */ }
+            onNavItemClick = { route -> onNavigate(route) } // Handle navigation clicks.
         )
 
+        // Display a loading indicator if data is being fetched.
         if (uiState.isLoading) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -48,10 +60,11 @@ fun TvShowsScreen(
             ) {
                 CircularProgressIndicator(color = PrimaryRed)
             }
-        } else {
+        } else { // Display TV show content once data is loaded.
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
+                // Screen title.
                 Text(
                     text = "TV Shows",
                     style = MaterialTheme.typography.headlineLarge,
@@ -59,11 +72,11 @@ fun TvShowsScreen(
                     modifier = Modifier.padding(48.dp)
                 )
 
-                // Trending TV Shows
+                // Content Row for Trending TV Shows.
                 ContentRow(
                     title = "Trending TV Shows",
                     items = uiState.trendingTvShows,
-                    onItemClick = { tvShow -> onTvShowClick(tvShow.id) }
+                    onItemClick = { tvShow -> onTvShowClick(tvShow.id) } // Handle TV show click.
                 ) { tvShow, isSelected, onClick ->
                     TvShowCard(
                         tvShow = tvShow,
@@ -72,11 +85,11 @@ fun TvShowsScreen(
                     )
                 }
 
-                // Top Rated TV Shows
+                // Content Row for Top Rated TV Shows.
                 ContentRow(
                     title = "Top Rated TV Shows",
                     items = uiState.topTvShows,
-                    onItemClick = { tvShow -> onTvShowClick(tvShow.id) }
+                    onItemClick = { tvShow -> onTvShowClick(tvShow.id) } // Handle TV show click.
                 ) { tvShow, isSelected, onClick ->
                     TvShowCard(
                         tvShow = tvShow,
@@ -90,7 +103,9 @@ fun TvShowsScreen(
 }
 
 
-// Preview for TvShowsScreen
+/**
+ * Preview for the [TvShowsScreen] composable.
+ */
 @Preview(showBackground = true, backgroundColor = 0xFF141414)
 @Composable
 fun TvShowsScreenPreview() {
@@ -100,7 +115,7 @@ fun TvShowsScreenPreview() {
                 .fillMaxSize()
                 .background(BackgroundDark)
         ) {
-            // Header
+            // Header for the preview.
             Text(
                 text = "TV Shows",
                 style = MaterialTheme.typography.headlineLarge,
@@ -108,7 +123,7 @@ fun TvShowsScreenPreview() {
                 modifier = Modifier.padding(48.dp)
             )
 
-            // TV Shows Grid
+            // Grid of TV show cards for the preview.
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
                 contentPadding = PaddingValues(horizontal = 48.dp),

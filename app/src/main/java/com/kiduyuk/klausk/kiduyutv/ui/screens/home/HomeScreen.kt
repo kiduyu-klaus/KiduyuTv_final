@@ -23,6 +23,16 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeViewModel
 
+/**
+ * The main home screen of the KiduyuTv application.
+ * Displays a hero section, various content rows for movies and TV shows, and navigation.
+ * It observes the [HomeViewModel] for UI state updates and handles user interactions.
+ *
+ * @param onMovieClick Lambda to navigate to the detail screen of a movie.
+ * @param onTvShowClick Lambda to navigate to the detail screen of a TV show.
+ * @param onNavigate Lambda to handle general navigation events.
+ * @param viewModel The [HomeViewModel] instance providing data for the screen.
+ */
 @Composable
 fun HomeScreen(
     onMovieClick: (Int) -> Unit,
@@ -30,15 +40,20 @@ fun HomeScreen(
     onNavigate: (String) -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
+    // Collect UI state from the ViewModel.
     val uiState by viewModel.uiState.collectAsState()
+    // Remember scroll state for the main content column.
     val scrollState = rememberScrollState()
+    // State to keep track of the currently selected navigation route.
     var selectedRoute by remember { mutableStateOf("home") }
 
+    // Main container for the home screen.
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(BackgroundDark)
     ) {
+        // Display a loading indicator if data is being fetched.
         if (uiState.isLoading) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -46,7 +61,7 @@ fun HomeScreen(
             ) {
                 CircularProgressIndicator(color = PrimaryRed)
             }
-        } else if (uiState.error != null) {
+        } else if (uiState.error != null) { // Display an error message if an error occurred.
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -57,13 +72,13 @@ fun HomeScreen(
                     color = TextPrimary
                 )
             }
-        } else {
+        } else { // Display the main content once data is loaded.
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(scrollState)
+                    .verticalScroll(scrollState) // Make the column vertically scrollable.
             ) {
-                // Top Navigation Bar
+                // Top Navigation Bar component.
                 TopBar(
                     selectedRoute = selectedRoute,
                     onNavItemClick = { route ->
@@ -72,105 +87,108 @@ fun HomeScreen(
                     }
                 )
 
-                // Hero Section with selected item
+                // Hero Section, displaying details of the currently selected item.
                 val selectedMovie = uiState.selectedItem as? Movie
                 val selectedTvShow = uiState.selectedItem as? TvShow
 
                 HeroSection(
-                    movie = if (selectedMovie != null) selectedMovie else uiState.trendingMovies.firstOrNull(),
-                    tvShow = if (selectedTvShow != null) selectedTvShow else uiState.trendingTvShows.firstOrNull()
+                    movie = selectedMovie,
+                    tvShow = selectedTvShow
                 )
 
-                // TV Shows Trending Today
+                // Content Row for TV Shows Trending Today.
                 ContentRow(
                     title = "TV Shows Trending Today",
                     items = uiState.trendingTvShows,
-                    onItemFocus = { tvShow -> viewModel.selectItem(tvShow) },
+                    onItemFocus = { tvShow -> viewModel.selectItem(tvShow) }, // Update selected item on focus.
                     onItemClick = { tvShow ->
                         viewModel.selectItem(tvShow)
                         onTvShowClick(tvShow.id)
                     }
-                ) { tvShow, isSelected, onClick ->
+                ) { tvShow, isFocused, onClick ->
                     TvShowCard(
                         tvShow = tvShow,
-                        isSelected = isSelected,
+                        isSelected = isFocused,
                         onClick = onClick
                     )
                 }
 
-                // Movies Trending Today
+                // Content Row for Movies Trending Today.
                 ContentRow(
                     title = "Movies Trending Today",
                     items = uiState.trendingMovies,
-                    onItemFocus = { movie -> viewModel.selectItem(movie) },
+                    onItemFocus = { movie -> viewModel.selectItem(movie) }, // Update selected item on focus.
                     onItemClick = { movie ->
                         viewModel.selectItem(movie)
                         onMovieClick(movie.id)
                     }
-                ) { movie, isSelected, onClick ->
+                ) { movie, isFocused, onClick ->
                     MovieCard(
                         movie = movie,
-                        isSelected = isSelected,
+                        isSelected = isFocused,
                         onClick = onClick
                     )
                 }
 
-                // Continue Watching
+                // Content Row for Continue Watching, only shown if not empty.
                 if (uiState.continueWatching.isNotEmpty()) {
                     ContentRow(
                         title = "Continue Watching",
                         items = uiState.continueWatching,
+                        onItemFocus = { movie -> viewModel.selectItem(movie) }, // Update selected item on focus.
                         onItemClick = { movie -> onMovieClick(movie.id) }
-                    ) { movie, isSelected, onClick ->
+                    ) { movie, isFocused, onClick ->
                         MovieCard(
                             movie = movie,
-                            isSelected = isSelected,
+                            isSelected = isFocused,
                             onClick = onClick
                         )
                     }
                 }
 
-                // Popular Networks
+                // Content Row for Popular Networks.
                 NetworkRow(
                     title = "Popular Networks",
                     items = uiState.popularNetworks,
-                    onItemClick = { /* Navigate to network content */ }
+                    onItemClick = { /* Navigate to network content */ } // Placeholder for navigation.
                 )
 
-                // Popular Companies
+                // Content Row for Popular Companies.
                 NetworkRow(
                     title = "Popular Companies",
                     items = uiState.popularCompanies,
-                    onItemClick = { /* Navigate to company content */ }
+                    onItemClick = { /* Navigate to company content */ } // Placeholder for navigation.
                 )
 
-                // Latest Movies Last Week
+                // Content Row for Latest Movies Last Week.
                 ContentRow(
                     title = "Latest Movies Last Week",
                     items = uiState.latestMovies,
+                    onItemFocus = { movie -> viewModel.selectItem(movie) }, // Update selected item on focus.
                     onItemClick = { movie -> onMovieClick(movie.id) }
-                ) { movie, isSelected, onClick ->
+                ) { movie, isFocused, onClick ->
                     MovieCard(
                         movie = movie,
-                        isSelected = isSelected,
+                        isSelected = isFocused,
                         onClick = onClick
                     )
                 }
 
-                // Top TV Shows Last Week
+                // Content Row for Top TV Shows Last Week.
                 ContentRow(
                     title = "Top TV Shows Last Week",
                     items = uiState.topTvShows,
+                    onItemFocus = { tvShow -> viewModel.selectItem(tvShow) }, // Update selected item on focus.
                     onItemClick = { tvShow -> onTvShowClick(tvShow.id) }
-                ) { tvShow, isSelected, onClick ->
+                ) { tvShow, isFocused, onClick ->
                     TvShowCard(
                         tvShow = tvShow,
-                        isSelected = isSelected,
+                        isSelected = isFocused,
                         onClick = onClick
                     )
                 }
 
-                // My List
+                // My List section, only shown if not empty.
                 if (uiState.myList.isNotEmpty()) {
                     Text(
                         text = "My List",
@@ -185,18 +203,20 @@ fun HomeScreen(
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         uiState.myList.forEach { item ->
-                            // Display my list items
+                            // TODO: Implement display for my list items.
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(32.dp)) // Bottom spacing.
             }
         }
     }
 }
 
-// Preview for HomeScreen
+/**
+ * Preview for the [HomeScreen] composable.
+ */
 @Preview(showBackground = true, backgroundColor = 0xFF141414)
 @Composable
 fun HomeScreenPreview() {
@@ -211,13 +231,13 @@ fun HomeScreenPreview() {
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
             ) {
-                // Top Navigation Bar
+                // Top Navigation Bar for preview.
                 TopBar(
                     selectedRoute = "home",
                     onNavItemClick = {}
                 )
 
-                // Hero Section
+                // Hero Section placeholder for preview.
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -230,9 +250,9 @@ fun HomeScreenPreview() {
                     )
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(24.dp)) // Vertical spacing.
 
-                // Trending Now
+                // Trending Now section for preview.
                 Text(
                     text = "Trending Now",
                     style = MaterialTheme.typography.titleLarge,
@@ -265,9 +285,9 @@ fun HomeScreenPreview() {
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(24.dp)) // Vertical spacing.
 
-                // TV Shows
+                // TV Shows section for preview.
                 Text(
                     text = "TV Shows",
                     style = MaterialTheme.typography.titleLarge,
@@ -300,7 +320,7 @@ fun HomeScreenPreview() {
                     }
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(32.dp)) // Bottom spacing.
             }
         }
     }

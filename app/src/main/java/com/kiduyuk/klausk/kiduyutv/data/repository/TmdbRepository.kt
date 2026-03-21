@@ -1,146 +1,108 @@
 package com.kiduyuk.klausk.kiduyutv.data.repository
 
+import android.util.Log
 import com.kiduyuk.klausk.kiduyutv.data.api.ApiClient
 import com.kiduyuk.klausk.kiduyutv.data.model.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
+/**
+ * Repository class that handles data operations, specifically fetching data from the TMDB API.
+ * It provides methods for movies, TV shows, genres, and specific content filtered by various criteria.
+ */
 class TmdbRepository {
-    
-    private val apiService = ApiClient.tmdbApiService
+    // Lazy initialization of the TMDB API service.
+    private val api = ApiClient.tmdbApiService
 
-    suspend fun getTrendingTvToday(): Result<List<TvShow>> = withContext(Dispatchers.IO) {
-        try {
-            val response = apiService.getTrendingTvToday()
-            Result.success(response.results)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+    companion object {
+        private const val TAG = "TmdbRepository"
     }
 
-    suspend fun getTrendingMoviesToday(): Result<List<Movie>> = withContext(Dispatchers.IO) {
-        try {
-            val response = apiService.getTrendingMoviesToday()
-            Result.success(response.results)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+    /** Fetches trending TV shows for today. */
+    suspend fun getTrendingTvToday(): Result<List<TvShow>> = runCatching {
+        api.getTrendingTvToday().results
     }
 
-    suspend fun getTrendingTvThisWeek(): Result<List<TvShow>> = withContext(Dispatchers.IO) {
-        try {
-            val response = apiService.getTrendingTvThisWeek()
-            Result.success(response.results)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+    /** Fetches trending movies for today. */
+    suspend fun getTrendingMoviesToday(): Result<List<Movie>> = runCatching {
+        api.getTrendingMoviesToday().results
     }
 
-    suspend fun getTrendingMoviesThisWeek(): Result<List<Movie>> = withContext(Dispatchers.IO) {
-        try {
-            val response = apiService.getTrendingMoviesThisWeek()
-            Result.success(response.results)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+    /** Fetches trending TV shows for the week. */
+    suspend fun getTrendingTvThisWeek(): Result<List<TvShow>> = runCatching {
+        api.getTrendingTvThisWeek().results
     }
 
-    suspend fun getNowPlayingMovies(): Result<List<Movie>> = withContext(Dispatchers.IO) {
-        try {
-            val response = apiService.getNowPlayingMovies()
-            Result.success(response.results)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+    /** Fetches trending movies for the week. */
+    suspend fun getTrendingMoviesThisWeek(): Result<List<Movie>> = runCatching {
+        api.getTrendingMoviesThisWeek().results
     }
 
-    suspend fun getTopRatedMovies(): Result<List<Movie>> = withContext(Dispatchers.IO) {
-        try {
-            val response = apiService.getTopRatedMovies()
-            Result.success(response.results)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+    /** Fetches movies currently playing in theaters. */
+    suspend fun getNowPlayingMovies(): Result<List<Movie>> = runCatching {
+        api.getNowPlayingMovies().results
     }
 
-    suspend fun getTopRatedTvShows(): Result<List<TvShow>> = withContext(Dispatchers.IO) {
-        try {
-            val response = apiService.getTopRatedTvShows()
-            Result.success(response.results)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+    /** Fetches top-rated movies. */
+    suspend fun getTopRatedMovies(): Result<List<Movie>> = runCatching {
+        api.getTopRatedMovies().results
     }
 
-    suspend fun getPopularMovies(): Result<List<Movie>> = withContext(Dispatchers.IO) {
-        try {
-            val response = apiService.getPopularMovies()
-            Result.success(response.results)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+    /** Fetches top-rated TV shows. */
+    suspend fun getTopRatedTvShows(): Result<List<TvShow>> = runCatching {
+        api.getTopRatedTvShows().results
     }
 
-    suspend fun getPopularTvShows(): Result<List<TvShow>> = withContext(Dispatchers.IO) {
-        try {
-            val response = apiService.getPopularTvShows()
-            Result.success(response.results)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+    /** Fetches popular movies. */
+    suspend fun getPopularMovies(): Result<List<Movie>> = runCatching {
+        api.getPopularMovies().results
     }
 
-    suspend fun getMovieDetail(movieId: Int): Result<MovieDetail> = withContext(Dispatchers.IO) {
-        try {
-            val response = apiService.getMovieDetail(movieId)
-            Result.success(response)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+    /** Fetches popular TV shows. */
+    suspend fun getPopularTvShows(): Result<List<TvShow>> = runCatching {
+        api.getPopularTvShows().results
     }
 
-    suspend fun getTvShowDetail(tvId: Int): Result<TvShowDetail> = withContext(Dispatchers.IO) {
-        try {
-            val response = apiService.getTvShowDetail(tvId)
-            Result.success(response)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+    /** Fetches detailed information for a specific movie. */
+    suspend fun getMovieDetail(movieId: Int): Result<MovieDetail> = runCatching {
+        api.getMovieDetail(movieId)
     }
 
-    suspend fun getTvShowSeasons(tvId: Int): Result<TvShowSeasonResponse> = withContext(Dispatchers.IO) {
-        try {
-            val response = apiService.getTvShowSeasons(tvId)
-            Result.success(response)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+    /** Fetches detailed information for a specific TV show. */
+    suspend fun getTvShowDetail(tvId: Int): Result<TvShowDetail> = runCatching {
+        api.getTvShowDetail(tvId)
     }
 
-    suspend fun getSeasonDetail(tvId: Int, seasonNumber: Int): Result<SeasonDetail> = withContext(Dispatchers.IO) {
-        try {
-            val response = apiService.getSeasonDetail(tvId, seasonNumber)
-            Result.success(response)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+    /** Fetches detailed information for a specific season of a TV show. */
+    suspend fun getSeasonDetail(tvId: Int, seasonNumber: Int): Result<SeasonDetail> = runCatching {
+        api.getSeasonDetail(tvId, seasonNumber)
     }
 
-    suspend fun getMovieGenres(): Result<List<Genre>> = withContext(Dispatchers.IO) {
-        try {
-            val response = apiService.getMovieGenres()
-            Result.success(response.genres)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+    /** Fetches the list of available movie genres. */
+    suspend fun getMovieGenres(): Result<List<Genre>> = runCatching {
+        api.getMovieGenres().genres
     }
 
-    suspend fun getTvGenres(): Result<List<Genre>> = withContext(Dispatchers.IO) {
-        try {
-            val response = apiService.getTvGenres()
-            Result.success(response.genres)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+    /** Fetches the list of available TV show genres. */
+    suspend fun getTvGenres(): Result<List<Genre>> = runCatching {
+        api.getTvGenres().genres
+    }
+
+    /** Fetches movies filtered by a specific production company. */
+    suspend fun getMoviesByCompany(companyId: Int): Result<List<Movie>> = runCatching {
+        api.getMoviesByCompany(companyId).results
+    }
+
+    /** Fetches TV shows filtered by a specific network. */
+    suspend fun getTvShowsByNetwork(networkId: Int): Result<List<TvShow>> = runCatching {
+        api.getTvShowsByNetwork(networkId).results
+    }
+
+    /** Fetches videos (trailers, etc.) for a specific movie. */
+    suspend fun getMovieVideos(movieId: Int): Result<List<Video>> = runCatching {
+        api.getMovieVideos(movieId).results
+    }
+
+    /** Fetches videos (trailers, etc.) for a specific TV show. */
+    suspend fun getTvShowVideos(tvId: Int): Result<List<Video>> = runCatching {
+        api.getTvShowVideos(tvId).results
     }
 }

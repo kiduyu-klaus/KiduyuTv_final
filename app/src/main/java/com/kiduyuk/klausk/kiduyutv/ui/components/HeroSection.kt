@@ -22,20 +22,39 @@ import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
-import com.kiduyuk.klausk.kiduyutv.ui.theme.GenrePill
 import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextSecondary
 
+/**
+ * Composable function to display a hero section, typically at the top of the home screen.
+ * It shows details of either a movie or a TV show, prioritizing the movie if both are provided.
+ * The hero section includes a backdrop image, title, overview, rating, year, and action buttons.
+ *
+ * @param movie The [Movie] object to display in the hero section. Can be null.
+ * @param tvShow The [TvShow] object to display in the hero section. Can be null.
+ * @param modifier The modifier to be applied to the hero section.
+ */
 @Composable
 fun HeroSection(
     movie: Movie?,
     tvShow: TvShow?,
     modifier: Modifier = Modifier
 ) {
+    // Extract relevant data, ensuring non-null Strings for Text composables.
+    val title = when {
+        movie != null -> movie.title
+        tvShow != null -> tvShow.name
+        else -> ""
+    }
+    
+    val overview = when {
+        movie != null -> movie.overview
+        tvShow != null -> tvShow.overview
+        else -> ""
+    }
+
     val backdropPath = movie?.backdropPath ?: tvShow?.backdropPath
-    val title = movie?.title ?: tvShow?.name ?: ""
-    val overview = movie?.overview ?: tvShow?.overview ?: ""
     val rating = movie?.voteAverage ?: tvShow?.voteAverage ?: 0.0
     val year = (movie?.releaseDate ?: tvShow?.firstAirDate)?.take(4) ?: ""
 
@@ -64,8 +83,8 @@ fun HeroSection(
                     Brush.verticalGradient(
                         colors = listOf(
                             Color.Transparent,
-                            BackgroundDark.copy(alpha = 0.7f),
-                            BackgroundDark
+                            Color(0xFF141414).copy(alpha = 0.7f),
+                            Color(0xFF141414)
                         )
                     )
                 )
@@ -75,9 +94,10 @@ fun HeroSection(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(48.dp),
+                .padding(horizontal = 24.dp, vertical = 48.dp),
             verticalArrangement = Arrangement.Bottom
         ) {
+            // Title
             Text(
                 text = title,
                 style = MaterialTheme.typography.displaySmall,
@@ -193,5 +213,3 @@ fun HeroSection(
         }
     }
 }
-
-private val BackgroundDark = Color(0xFF141414)

@@ -21,6 +21,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
@@ -34,6 +35,17 @@ import com.kiduyuk.klausk.kiduyutv.data.model.Season
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
 
+/**
+ * Composable function for the Season and Episodes screen.
+ * This screen displays a list of seasons on the left and the episodes for the selected season on the right.
+ * It is accessed from the [TvShowDetailScreen].
+ *
+ * @param tvShowId The ID of the TV show.
+ * @param tvShowName The name of the TV show.
+ * @param totalSeasons The total number of seasons for the TV show.
+ * @param onBackClick Lambda to navigate back to the previous screen.
+ * @param viewModel The [DetailViewModel] instance providing data for the screen.
+ */
 @Composable
 fun SeasonEpisodesScreen(
     tvShowId: Int,
@@ -42,25 +54,31 @@ fun SeasonEpisodesScreen(
     onBackClick: () -> Unit,
     viewModel: DetailViewModel = viewModel()
 ) {
+    // Collect UI state from the ViewModel.
     val uiState by viewModel.uiState.collectAsState()
+    // State to keep track of the currently selected season index.
     var selectedSeasonIndex by remember { mutableIntStateOf(0) }
+    // State to track if seasons have been loaded to prevent redundant loads.
     var seasonsLoaded by remember { mutableStateOf(false) }
 
-    // Load seasons and first season episodes on init
+    // Load seasons and the first season's episodes when the screen is initialized or tvShowId changes.
     LaunchedEffect(tvShowId) {
         if (!seasonsLoaded || uiState.seasons.isEmpty()) {
             viewModel.loadSeasons(tvShowId, totalSeasons)
             seasonsLoaded = true
         }
+        // Initially load episodes for the first season.
         viewModel.loadSeasonEpisodes(tvShowId, 1)
     }
 
+    // Main container for the screen.
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundDark)
+            .background(BackgroundDark) // Set background color.
     ) {
-        if (uiState.isLoading) {
+        // Display a loading indicator if data is being fetched.
+        if (uiState.isLoading && uiState.seasons.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -68,18 +86,19 @@ fun SeasonEpisodesScreen(
                 CircularProgressIndicator(color = PrimaryRed)
             }
         } else {
+            // Main content layout: Two columns.
             Row(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(32.dp)
             ) {
-                // Left Column - Seasons List
+                // Left Column: Seasons List.
                 Column(
                     modifier = Modifier
                         .width(300.dp)
                         .fillMaxHeight()
                 ) {
-                    // Back button and title
+                    // Header: Back button and TV show title.
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(bottom = 24.dp)
@@ -125,26 +144,37 @@ fun SeasonEpisodesScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Seasons list
+                    // LazyColumn for the list of seasons.
                     LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         itemsIndexed(uiState.seasons) { index, season ->
                             SeasonListItem(
                                 season = season,
                                 isSelected = index == selectedSeasonIndex,
+                                onFocused = {
+                                    // Update selected season and load its episodes when focused (Android TV behavior)
+                                    if (selectedSeasonIndex != index) {
+                                        selectedSeasonIndex = index
+                                        viewModel.loadSeasonEpisodes(tvShowId, season.seasonNumber)
+                                    }
+                                },
                                 onClick = {
-                                    selectedSeasonIndex = index
-                                    viewModel.loadSeasonEpisodes(tvShowId, season.seasonNumber)
+                                    // Also handle click for accessibility or touch support
+                                    if (selectedSeasonIndex != index) {
+                                        selectedSeasonIndex = index
+                                        viewModel.loadSeasonEpisodes(tvShowId, season.seasonNumber)
+                                    }
                                 }
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.width(32.dp))
+                Spacer(modifier = Modifier.width(32.dp)) // Horizontal spacing between columns.
 
-                // Right Column - Episodes List
+                // Right Column: Episodes List.
                 Column(
                     modifier = Modifier
                         .weight(1f)
@@ -158,14 +188,26 @@ fun SeasonEpisodesScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        items(uiState.episodes) { episode ->
-                            EpisodeListItem(
-                                episode = episode,
-                                seasonNumber = selectedSeasonIndex + 1
-                            )
+                    if (uiState.isLoading && uiState.episodes.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(color = PrimaryRed)
+                        }
+                    } else {
+                        // LazyColumn for the list of episodes.
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(bottom = 32.dp)
+                        ) {
+                            items(uiState.episodes) { episode ->
+                                EpisodeListItem(
+                                    episode = episode,
+                                    seasonNumber = selectedSeasonIndex + 1
+                                )
+                            }
                         }
                     }
                 }
@@ -174,19 +216,41 @@ fun SeasonEpisodesScreen(
     }
 }
 
+/**
+ * Composable function for a single item in the seasons list.
+ *
+ * @param season The [Season] object to display.
+ * @param isSelected Whether this season is currently selected.
+ * @param onFocused Lambda to be invoked when the season item gains focus.
+ * @param onClick Lambda to be invoked when the season item is clicked.
+ */
 @Composable
 private fun SeasonListItem(
     season: Season,
     isSelected: Boolean,
+    onFocused: () -> Unit,
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
+    // Trigger onFocused when focus state changes to true
+    LaunchedEffect(isFocused) {
+        if (isFocused) {
+            onFocused()
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .onFocusChanged { focusState ->
+                if (focusState.isFocused) {
+                    onFocused()
+                }
+            }
             .then(
+                // Apply focus border if selected or focused.
                 if (isSelected || isFocused) {
                     Modifier.border(
                         width = 3.dp,
@@ -231,6 +295,12 @@ private fun SeasonListItem(
     }
 }
 
+/**
+ * Composable function for a single item in the episodes list.
+ *
+ * @param episode The [Episode] object to display.
+ * @param seasonNumber The number of the season this episode belongs to.
+ */
 @Composable
 private fun EpisodeListItem(
     episode: Episode,
@@ -242,6 +312,18 @@ private fun EpisodeListItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(
+                // Apply focus border if focused.
+                if (isFocused) {
+                    Modifier.border(
+                        width = 3.dp,
+                        color = FocusBorder,
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                } else {
+                    Modifier
+                }
+            )
             .clip(RoundedCornerShape(8.dp))
             .background(CardDark)
             .focusable(interactionSource = interactionSource)
@@ -249,12 +331,13 @@ private fun EpisodeListItem(
                 interactionSource = interactionSource,
                 indication = null
             ) {
-                // Play episode
+                // TODO: Implement playback logic for the selected episode.
             }
             .padding(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        // Episode thumbnail
+        // Episode Thumbnail: Display episode still image with a play button overlay.
         Box(
             modifier = Modifier
                 .width(280.dp)
@@ -272,7 +355,7 @@ private fun EpisodeListItem(
                 )
             }
 
-            // Play button overlay
+            // Play button overlay.
             Box(
                 modifier = Modifier
                     .size(60.dp)
@@ -291,45 +374,29 @@ private fun EpisodeListItem(
             }
         }
 
-        // Episode info
+        // Episode Info: Title, number, rating, and overview.
         Column(
             modifier = Modifier
                 .weight(1f)
-                .height(158.dp),
-            verticalArrangement = Arrangement.SpaceBetween
+                .fillMaxHeight(),
+            verticalArrangement = Arrangement.Center
         ) {
-            Column {
-                Text(
-                    text = episode.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = TextPrimary,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
+            Text(
+                text = "${episode.episodeNumber}. ${episode.name}",
+                style = MaterialTheme.typography.titleMedium,
+                color = TextPrimary
+            )
 
-                Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-                Text(
-                    text = "S${seasonNumber},E${episode.episodeNumber}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = PrimaryRed
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text(
-                    text = episode.overview ?: "No description available",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            // Rating if available
-            if (episode.voteAverage != null && episode.voteAverage > 0) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Episode rating.
                 Row(
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Star,
@@ -337,142 +404,46 @@ private fun EpisodeListItem(
                         tint = PrimaryRed,
                         modifier = Modifier.size(16.dp)
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = String.format("%.1f", episode.voteAverage),
+                        text = String.format("%.1f", episode.voteAverage ?: 0.0),
                         style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
+                        color = TextPrimary
                     )
                 }
+
+                Text(
+                    text = "S${seasonNumber} E${episode.episodeNumber}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Episode overview description.
+            Text(
+                text = episode.overview ?: "No description available.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextSecondary,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }
 
-// Preview for SeasonEpisodesScreen
+/**
+ * Preview for the [SeasonEpisodesScreen] composable.
+ */
 @Preview(showBackground = true, backgroundColor = 0xFF141414)
 @Composable
 fun SeasonEpisodesScreenPreview() {
     KiduyuTvTheme {
-        // Preview with mock data
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(BackgroundDark)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(32.dp)
-            ) {
-                // Left Column - Seasons List
-                Column(
-                    modifier = Modifier
-                        .width(300.dp)
-                        .fillMaxHeight()
-                ) {
-                    // Back button and title
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(bottom = 24.dp)
-                    ) {
-                        IconButton(
-                            onClick = { },
-                            modifier = Modifier
-                                .size(48.dp)
-                                .focusable()
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ArrowBack,
-                                contentDescription = "Back",
-                                tint = TextPrimary,
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
-                    }
-
-                    Text(
-                        text = "Sample TV Show",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = TextPrimary,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "3 seasons",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = TextSecondary
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    Text(
-                        text = "Seasons",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = TextPrimary
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Mock Seasons list
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(3) { index ->
-                            SeasonListItem(
-                                season = Season(
-                                    id = index + 1,
-                                    name = "Season ${index + 1}",
-                                    seasonNumber = index + 1,
-                                    posterPath = null,
-                                    episodeCount = 10 + index
-                                ),
-                                isSelected = index == 0,
-                                onClick = { }
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.width(32.dp))
-
-                // Right Column - Episodes List
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                ) {
-                    Text(
-                        text = "Episodes",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = TextPrimary
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        items(3) { index ->
-                            EpisodeListItem(
-                                episode = Episode(
-                                    id = index + 1,
-                                    name = "Episode ${index + 1}",
-                                    overview = "This is a sample episode description for preview purposes.",
-                                    stillPath = null,
-                                    episodeNumber = index + 1,
-                                    seasonNumber = 1,
-                                    voteAverage = 8.5
-                                ),
-                                seasonNumber = 1
-                            )
-                        }
-                    }
-                }
-            }
-        }
+        SeasonEpisodesScreen(
+            tvShowId = 1,
+            tvShowName = "Sample TV Show",
+            totalSeasons = 3,
+            onBackClick = {}
+        )
     }
 }

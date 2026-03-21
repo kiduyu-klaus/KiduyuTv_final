@@ -1,10 +1,10 @@
 package com.kiduyuk.klausk.kiduyutv.ui.screens.detail
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -20,38 +20,56 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
-import com.kiduyuk.klausk.kiduyutv.data.model.Episode
-import com.kiduyuk.klausk.kiduyutv.data.model.Season
 import com.kiduyuk.klausk.kiduyutv.ui.components.ContentRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.TvShowCard
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
 
+/**
+ * Composable function for displaying the detailed information of a TV show.
+ * It fetches TV show details, recommendations, and similar TV shows using [DetailViewModel].
+ *
+ * @param tvId The ID of the TV show to display.
+ * @param onBackClick Lambda to be invoked when the back button is clicked.
+ * @param onTvShowClick Lambda to be invoked when a recommended or similar TV show is clicked.
+ * @param onEpisodesClick Lambda to be invoked when the "Episodes" button is clicked, navigating to the season episodes screen.
+ * @param onNetworkClick Lambda to be invoked when a network is clicked.
+ * @param viewModel The [DetailViewModel] instance providing data for the screen.
+ */
 @Composable
 fun TvShowDetailScreen(
     tvId: Int,
     onBackClick: () -> Unit,
     onTvShowClick: (Int) -> Unit,
     onEpisodesClick: (tvId: Int, tvShowName: String, totalSeasons: Int) -> Unit = { _, _, _ -> },
+    onNetworkClick: (id: Int, name: String) -> Unit = { _, _ -> },
     viewModel: DetailViewModel = viewModel()
 ) {
+    // Collect UI state from the ViewModel.
     val uiState by viewModel.uiState.collectAsState()
+    // Remember scroll state for the main content column.
     val scrollState = rememberScrollState()
+    // Get the current context for launching intents.
+    val context = LocalContext.current
 
+    // Load TV show details when the tvId changes.
     LaunchedEffect(tvId) {
         viewModel.loadTvShowDetail(tvId)
     }
 
+    // Main container for the TV show detail screen.
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundDark)
+            .background(BackgroundDark) // Set background color.
     ) {
+        // Display a loading indicator if data is being fetched.
         if (uiState.isLoading) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -59,33 +77,33 @@ fun TvShowDetailScreen(
             ) {
                 CircularProgressIndicator(color = PrimaryRed)
             }
-        } else if (uiState.tvShowDetail != null) {
+        } else if (uiState.tvShowDetail != null) { // Display TV show details if available.
             val tvShow = uiState.tvShowDetail!!
 
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(scrollState)
+                    .verticalScroll(scrollState) // Make the column vertically scrollable.
             ) {
-                // Hero Section
+                // Hero Section for the TV show details.
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(500.dp)
+                        .height(500.dp) // Fixed height for the hero section.
                 ) {
-                    // Background Image
+                    // Background Image: Display the backdrop image if available.
                     if (tvShow.backdropPath != null) {
                         AsyncImage(
                             model = "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.BACKDROP_SIZE}${tvShow.backdropPath}",
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
+                            contentDescription = null, // Content description for accessibility.
+                            contentScale = ContentScale.Crop, // Crop to fill the bounds.
                             modifier = Modifier
                                 .fillMaxSize()
-                                .blur(10.dp)
+                                .blur(10.dp) // Apply a blur effect to the background image.
                         )
                     }
 
-                    // Gradient Overlay
+                    // Gradient Overlay: Add a vertical gradient to make text more readable.
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -100,7 +118,7 @@ fun TvShowDetailScreen(
                             )
                     )
 
-                    // Back Button
+                    // Back Button.
                     IconButton(
                         onClick = onBackClick,
                         modifier = Modifier
@@ -115,22 +133,23 @@ fun TvShowDetailScreen(
                         )
                     }
 
-                    // Content
+                    // Content: Arrange title, metadata, genres, overview, and action buttons vertically.
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(48.dp),
-                        verticalArrangement = Arrangement.Bottom
+                            .padding(48.dp), // Padding around the content.
+                        verticalArrangement = Arrangement.Bottom // Align content to the bottom.
                     ) {
+                        // TV show name.
                         Text(
                             text = tvShow.name,
                             style = MaterialTheme.typography.displaySmall,
                             color = TextPrimary
                         )
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(16.dp)) // Vertical spacing.
 
-                        // Metadata
+                        // Metadata: Rating, first air date year, number of seasons and episodes.
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -175,9 +194,9 @@ fun TvShowDetailScreen(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(16.dp)) // Vertical spacing.
 
-                        // Genres
+                        // Genres: Display genre pills.
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
@@ -196,9 +215,9 @@ fun TvShowDetailScreen(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(16.dp)) // Vertical spacing.
 
-                        // Overview
+                        // Overview: Display a brief description.
                         Text(
                             text = tvShow.overview,
                             style = MaterialTheme.typography.bodyMedium,
@@ -206,14 +225,36 @@ fun TvShowDetailScreen(
                             maxLines = 4
                         )
 
-                        Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(16.dp)) // Vertical spacing.
 
-                        // Action Buttons
+                        // Networks: Clickable pills for networks.
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            tvShow.networks?.take(3)?.forEach { network ->
+                                Surface(
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = Color.DarkGray,
+                                    modifier = Modifier.clickable { onNetworkClick(network.id, network.name) }
+                                ) {
+                                    Text(
+                                        text = network.name,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = TextPrimary,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp)) // Vertical spacing.
+
+                        // Action Buttons: Play Now, Watch Trailer, Episodes, and Add to List buttons.
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             Button(
-                                onClick = { /* Play */ },
+                                onClick = { /* Play TV show action */ },
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = PrimaryRed
                                 ),
@@ -232,16 +273,39 @@ fun TvShowDetailScreen(
                                 )
                             }
 
+                            // Watch Trailer Button: Only shown if a trailer key is available.
+                            if (uiState.trailerKey != null) {
+                                Button(
+                                    onClick = {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=${uiState.trailerKey}"))
+                                        context.startActivity(intent)
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = Color.DarkGray
+                                    ),
+                                    shape = RoundedCornerShape(4.dp),
+                                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Movie,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Watch Trailer",
+                                        style = MaterialTheme.typography.labelLarge
+                                    )
+                                }
+                            }
+
                             OutlinedButton(
                                 onClick = {
-                                    onEpisodesClick(
-                                        tvId,
-                                        tvShow.name,
-                                        tvShow.numberOfSeasons ?: 1
-                                    )
+                                    // Navigate to episodes screen.
+                                    onEpisodesClick(tvShow.id, tvShow.name, tvShow.numberOfSeasons ?: 1)
                                 },
                                 shape = RoundedCornerShape(4.dp),
-                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
                                 colors = ButtonDefaults.outlinedButtonColors(
                                     contentColor = TextPrimary
                                 )
@@ -259,7 +323,7 @@ fun TvShowDetailScreen(
                             }
 
                             OutlinedButton(
-                                onClick = { viewModel.toggleMyList() },
+                                onClick = { viewModel.toggleMyList() }, // Toggle item in My List.
                                 shape = RoundedCornerShape(4.dp),
                                 contentPadding = PaddingValues(12.dp),
                                 colors = ButtonDefaults.outlinedButtonColors(
@@ -276,82 +340,30 @@ fun TvShowDetailScreen(
                     }
                 }
 
-                // Seasons Section
-                if (uiState.seasons.isNotEmpty()) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 48.dp, vertical = 16.dp)
-                    ) {
-                        Text(
-                            text = "Seasons",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = TextPrimary
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            items(uiState.seasons) { season ->
-                                SeasonCard(
-                                    season = season,
-                                    onClick = {
-                                        viewModel.loadSeasonEpisodes(tvId, season.seasonNumber)
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Episodes Section
-                if (uiState.episodes.isNotEmpty()) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 48.dp, vertical = 16.dp)
-                    ) {
-                        Text(
-                            text = "Episodes",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = TextPrimary
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        uiState.episodes.forEach { episode ->
-                            EpisodeCard(episode = episode)
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
-                    }
-                }
-
-                // Similar TV Shows
+                // Similar TV Shows section.
                 if (uiState.similarTvShows.isNotEmpty()) {
                     ContentRow(
                         title = "Others Also Watched",
                         items = uiState.similarTvShows,
                         onItemClick = { tvShow -> onTvShowClick(tvShow.id) }
-                    ) { tvShow, isSelected, onClick ->
+                    ) { tvShow, isFocused, onClick ->
                         TvShowCard(
                             tvShow = tvShow,
-                            isSelected = isSelected,
+                            isSelected = isFocused,
                             onClick = onClick
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(32.dp)) // Bottom spacing.
             }
-        } else {
+        } else if (uiState.error != null) { // Display an error message if an error occurred.
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = uiState.error ?: "Failed to load TV show details",
+                    text = uiState.error ?: "An error occurred",
                     style = MaterialTheme.typography.bodyLarge,
                     color = TextPrimary
                 )
@@ -360,347 +372,17 @@ fun TvShowDetailScreen(
     }
 }
 
-@Composable
-private fun SeasonCard(
-    season: Season,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .width(140.dp)
-            .height(80.dp)
-            .background(
-                color = CardDark,
-                shape = RoundedCornerShape(8.dp)
-            )
-            .clickable(onClick = onClick)
-            .padding(12.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = season.name,
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextPrimary
-            )
-            if (season.episodeCount != null) {
-                Text(
-                    text = "${season.episodeCount} Episodes",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun EpisodeCard(
-    episode: Episode
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(100.dp)
-            .background(
-                color = CardDark,
-                shape = RoundedCornerShape(8.dp)
-            )
-            .padding(12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        // Episode thumbnail
-        Box(
-            modifier = Modifier
-                .width(160.dp)
-                .height(76.dp)
-                .background(
-                    color = SurfaceDark,
-                    shape = RoundedCornerShape(4.dp)
-                )
-        ) {
-            if (episode.stillPath != null) {
-                AsyncImage(
-                    model = "${TmdbApiService.IMAGE_BASE_URL}w300${episode.stillPath}",
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-        }
-
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = "${episode.episodeNumber}. ${episode.name}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextPrimary
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            if (episode.voteAverage != null) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Star,
-                        contentDescription = null,
-                        tint = PrimaryRed,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Text(
-                        text = String.format("%.1f", episode.voteAverage),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = episode.overview ?: "",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary,
-                maxLines = 2
-            )
-        }
-    }
-}
-
-
-// Preview for TvShowDetailScreen
+/**
+ * Preview for the [TvShowDetailScreen] composable.
+ */
 @Preview(showBackground = true, backgroundColor = 0xFF141414)
 @Composable
 fun TvShowDetailScreenPreview() {
     KiduyuTvTheme {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(BackgroundDark)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-            ) {
-                // Hero Section
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(500.dp)
-                ) {
-                    // Gradient Overlay
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        BackgroundDark.copy(alpha = 0.7f),
-                                        BackgroundDark
-                                    )
-                                )
-                            )
-                    )
-
-                    // Back Button
-                    IconButton(
-                        onClick = { },
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(16.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = TextPrimary,
-                            modifier = Modifier.size(32.dp)
-                        )
-                    }
-
-                    // Content
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(48.dp),
-                        verticalArrangement = Arrangement.Bottom
-                    ) {
-                        Text(
-                            text = "Sample TV Show",
-                            style = MaterialTheme.typography.displaySmall,
-                            color = TextPrimary
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Metadata
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Star,
-                                    contentDescription = null,
-                                    tint = PrimaryRed,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Text(
-                                    text = "8.5",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = TextPrimary
-                                )
-                            }
-
-                            Text(
-                                text = "2023",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = TextSecondary
-                            )
-
-                            Text(
-                                text = "3 Seasons",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = TextSecondary
-                            )
-
-                            Text(
-                                text = "24 Episodes",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = TextSecondary
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Genres
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(16.dp),
-                                color = GenrePill
-                            ) {
-                                Text(
-                                    text = "Drama",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = TextPrimary,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                                )
-                            }
-                            Surface(
-                                shape = RoundedCornerShape(16.dp),
-                                color = GenrePill
-                            ) {
-                                Text(
-                                    text = "Thriller",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = TextPrimary,
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Overview
-                        Text(
-                            text = "This is a sample TV show description for preview purposes. It showcases the main features of the app.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = TextSecondary,
-                            maxLines = 4
-                        )
-
-                        Spacer(modifier = Modifier.height(24.dp))
-
-                        // Action Buttons
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            Button(
-                                onClick = { },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = PrimaryRed
-                                ),
-                                shape = RoundedCornerShape(4.dp),
-                                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Play Now",
-                                    style = MaterialTheme.typography.labelLarge
-                                )
-                            }
-
-                            OutlinedButton(
-                                onClick = { },
-                                shape = RoundedCornerShape(4.dp),
-                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    contentColor = TextPrimary
-                                )
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.List,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Episodes",
-                                    style = MaterialTheme.typography.labelLarge
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Seasons Section
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 48.dp, vertical = 16.dp)
-                ) {
-                    Text(
-                        text = "Seasons",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = TextPrimary
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        items(3) { index ->
-                            SeasonCard(
-                                season = Season(
-                                    id = index + 1,
-                                    name = "Season ${index + 1}",
-                                    seasonNumber = index + 1,
-                                    posterPath = null,
-                                    episodeCount = 8 + index
-                                ),
-                                onClick = { }
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(32.dp))
-            }
-        }
+        TvShowDetailScreen(
+            tvId = 1,
+            onBackClick = {},
+            onTvShowClick = {}
+        )
     }
 }

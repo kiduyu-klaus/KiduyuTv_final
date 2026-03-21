@@ -24,23 +24,35 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeViewModel
 
+/**
+ * Composable function for the Movies screen, displaying various rows of movie content.
+ * It fetches movie data from [HomeViewModel] and displays them using [ContentRow] and [MovieCard].
+ *
+ * @param onMovieClick Lambda to be invoked when a movie card is clicked, typically navigating to movie details.
+ * @param onNavigate Lambda to handle navigation between top-level screens.
+ * @param viewModel The [HomeViewModel] instance providing data for the screen.
+ */
 @Composable
 fun MoviesScreen(
     onMovieClick: (Int) -> Unit,
+    onNavigate: (String) -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
+    // Collect UI state from the ViewModel.
     val uiState by viewModel.uiState.collectAsState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundDark)
+            .background(BackgroundDark) // Set background color.
     ) {
+        // Top navigation bar for the Movies screen.
         TopBar(
             selectedRoute = "movies",
-            onNavItemClick = { /* Handle navigation */ }
+            onNavItemClick = { route -> onNavigate(route) } // Handle navigation clicks.
         )
 
+        // Display a loading indicator if data is being fetched.
         if (uiState.isLoading) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -48,10 +60,11 @@ fun MoviesScreen(
             ) {
                 CircularProgressIndicator(color = PrimaryRed)
             }
-        } else {
+        } else { // Display movie content once data is loaded.
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
+                // Screen title.
                 Text(
                     text = "Movies",
                     style = MaterialTheme.typography.headlineLarge,
@@ -59,11 +72,11 @@ fun MoviesScreen(
                     modifier = Modifier.padding(48.dp)
                 )
 
-                // Trending Movies
+                // Content Row for Trending Movies.
                 ContentRow(
                     title = "Trending Movies",
                     items = uiState.trendingMovies,
-                    onItemClick = { movie -> onMovieClick(movie.id) }
+                    onItemClick = { movie -> onMovieClick(movie.id) } // Handle movie click.
                 ) { movie, isSelected, onClick ->
                     MovieCard(
                         movie = movie,
@@ -72,11 +85,11 @@ fun MoviesScreen(
                     )
                 }
 
-                // Popular Movies
+                // Content Row for Popular Movies (using latestMovies from UI state).
                 ContentRow(
                     title = "Popular Movies",
                     items = uiState.latestMovies,
-                    onItemClick = { movie -> onMovieClick(movie.id) }
+                    onItemClick = { movie -> onMovieClick(movie.id) } // Handle movie click.
                 ) { movie, isSelected, onClick ->
                     MovieCard(
                         movie = movie,
@@ -85,12 +98,12 @@ fun MoviesScreen(
                     )
                 }
 
-                // Continue Watching Movies
+                // Content Row for Continue Watching Movies, only shown if not empty.
                 if (uiState.continueWatching.isNotEmpty()) {
                     ContentRow(
                         title = "Continue Watching",
                         items = uiState.continueWatching,
-                        onItemClick = { movie -> onMovieClick(movie.id) }
+                        onItemClick = { movie -> onMovieClick(movie.id) } // Handle movie click.
                     ) { movie, isSelected, onClick ->
                         MovieCard(
                             movie = movie,
@@ -105,7 +118,9 @@ fun MoviesScreen(
 }
 
 
-// Preview for MoviesScreen
+/**
+ * Preview for the [MoviesScreen] composable.
+ */
 @Preview(showBackground = true, backgroundColor = 0xFF141414)
 @Composable
 fun MoviesScreenPreview() {
@@ -115,7 +130,7 @@ fun MoviesScreenPreview() {
                 .fillMaxSize()
                 .background(BackgroundDark)
         ) {
-            // Header
+            // Header for the preview.
             Text(
                 text = "Movies",
                 style = MaterialTheme.typography.headlineLarge,
@@ -123,7 +138,7 @@ fun MoviesScreenPreview() {
                 modifier = Modifier.padding(48.dp)
             )
 
-            // Movies Grid
+            // Grid of movie cards for the preview.
             LazyVerticalGrid(
                 columns = GridCells.Fixed(3),
                 contentPadding = PaddingValues(horizontal = 48.dp),

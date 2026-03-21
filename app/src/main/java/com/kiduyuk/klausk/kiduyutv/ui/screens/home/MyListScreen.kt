@@ -19,37 +19,52 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeViewModel
 import com.kiduyuk.klausk.kiduyutv.viewmodel.MyListItem
 
+/**
+ * Composable function for the "My List" screen, displaying items saved by the user.
+ * It observes the [HomeViewModel] for the list of saved items and allows navigation to their details
+ * or removal from the list.
+ *
+ * @param onMovieClick Lambda to navigate to the detail screen of a movie.
+ * @param onTvShowClick Lambda to navigate to the detail screen of a TV show.
+ * @param onNavigate Lambda to handle navigation between top-level screens.
+ * @param viewModel The [HomeViewModel] instance providing data for the screen.
+ */
 @Composable
 fun MyListScreen(
     onMovieClick: (Int) -> Unit,
     onTvShowClick: (Int) -> Unit,
+    onNavigate: (String) -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
+    // Collect UI state from the ViewModel.
     val uiState by viewModel.uiState.collectAsState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundDark)
+            .background(BackgroundDark) // Set background color.
     ) {
+        // Top navigation bar for the My List screen.
         TopBar(
             selectedRoute = "my_list",
-            onNavItemClick = { /* Handle navigation */ }
+            onNavItemClick = { route -> onNavigate(route) } // Handle navigation clicks.
         )
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(48.dp)
+                .padding(48.dp) // Padding for the content area.
         ) {
+            // Screen title.
             Text(
                 text = "My List",
                 style = MaterialTheme.typography.headlineLarge,
                 color = TextPrimary
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(32.dp)) // Vertical spacing.
 
+            // Display a message if the list is empty, otherwise show the list.
             if (uiState.myList.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -62,19 +77,20 @@ fun MyListScreen(
                     )
                 }
             } else {
+                // LazyColumn to efficiently display a scrollable list of MyListItemCard.
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp) // Spacing between list items.
                 ) {
                     items(uiState.myList) { item ->
                         MyListItemCard(
                             item = item,
-                            onClick = {
+                            onClick = { // Handle click on a list item.
                                 when (item.type) {
                                     "movie" -> onMovieClick(item.id)
                                     "tv" -> onTvShowClick(item.id)
                                 }
                             },
-                            onRemove = { viewModel.removeFromMyList(item.id) }
+                            onRemove = { viewModel.removeFromMyList(item.id) } // Handle item removal.
                         )
                     }
                 }
@@ -83,6 +99,14 @@ fun MyListScreen(
     }
 }
 
+/**
+ * Composable function to display a single item in the "My List" screen.
+ * It shows the item's title, type, and provides options to view details or remove it.
+ *
+ * @param item The [MyListItem] data to display.
+ * @param onClick Lambda to be invoked when the card is clicked.
+ * @param onRemove Lambda to be invoked when the remove button is clicked.
+ */
 @Composable
 private fun MyListItemCard(
     item: MyListItem,
@@ -95,32 +119,33 @@ private fun MyListItemCard(
             .height(120.dp)
             .background(
                 color = CardDark,
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(8.dp) // Rounded corners for the card background.
             )
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(16.dp), // Padding inside the card.
+        horizontalArrangement = Arrangement.spacedBy(16.dp) // Spacing between elements in the row.
     ) {
-        // Poster thumbnail
+        // Placeholder for the poster thumbnail.
         Box(
             modifier = Modifier
                 .width(80.dp)
                 .height(88.dp)
                 .background(
                     color = SurfaceDark,
-                    shape = RoundedCornerShape(4.dp)
+                    shape = RoundedCornerShape(4.dp) // Rounded corners for the placeholder.
                 )
         )
 
+        // Column for item title and type.
         Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.Center
+            modifier = Modifier.weight(1f), // Takes available horizontal space.
+            verticalArrangement = Arrangement.Center // Center content vertically.
         ) {
             Text(
                 text = item.title,
                 style = MaterialTheme.typography.titleMedium,
                 color = TextPrimary
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(4.dp)) // Vertical spacing.
             Text(
                 text = if (item.type == "movie") "Movie" else "TV Show",
                 style = MaterialTheme.typography.bodySmall,
@@ -128,6 +153,7 @@ private fun MyListItemCard(
             )
         }
 
+        // Remove button.
         IconButton(onClick = onRemove) {
             Icon(
                 imageVector = Icons.Default.Close,
@@ -139,7 +165,9 @@ private fun MyListItemCard(
 }
 
 
-// Preview for MyListScreen
+/**
+ * Preview for the [MyListScreen] composable.
+ */
 @Preview(showBackground = true, backgroundColor = 0xFF141414)
 @Composable
 fun MyListScreenPreview() {
@@ -149,7 +177,7 @@ fun MyListScreenPreview() {
                 .fillMaxSize()
                 .background(BackgroundDark)
         ) {
-            // Header
+            // Header for the preview.
             Text(
                 text = "My List",
                 style = MaterialTheme.typography.headlineLarge,
@@ -157,79 +185,25 @@ fun MyListScreenPreview() {
                 modifier = Modifier.padding(48.dp)
             )
 
-            // Sample My List Items
+            // Sample My List Items for the preview.
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 48.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(5) { index ->
-                    MyListItemRow(
+                    MyListItemCard(
                         item = MyListItem(
                             id = index + 1,
                             title = "My List Item ${index + 1}",
                             posterPath = null,
                             type = if (index % 2 == 0) "movie" else "tv"
                         ),
+                        onClick = {},
                         onRemove = { }
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun MyListItemRow(
-    item: MyListItem,
-    onRemove: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(120.dp)
-            .background(
-                color = CardDark,
-                shape = RoundedCornerShape(8.dp)
-            )
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Poster placeholder
-        Box(
-            modifier = Modifier
-                .width(80.dp)
-                .height(88.dp)
-                .background(
-                    color = SurfaceDark,
-                    shape = RoundedCornerShape(4.dp)
-                )
-        )
-
-        // Info
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = item.title,
-                style = MaterialTheme.typography.titleMedium,
-                color = TextPrimary
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = if (item.type == "movie") "Movie" else "TV Show",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary
-            )
-        }
-
-        IconButton(onClick = onRemove) {
-            Icon(
-                imageVector = Icons.Default.Close,
-                contentDescription = "Remove from list",
-                tint = TextPrimary
-            )
         }
     }
 }

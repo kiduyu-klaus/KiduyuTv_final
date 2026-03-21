@@ -6,6 +6,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.kiduyuk.klausk.kiduyutv.ui.screens.MediaListScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.MovieDetailScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.SeasonEpisodesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.TvShowDetailScreen
@@ -14,12 +15,19 @@ import com.kiduyuk.klausk.kiduyutv.ui.screens.home.MoviesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.MyListScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.TvShowsScreen
 
+/**
+ * Main navigation graph for the application.
+ * Defines all the screens and their navigation logic using Jetpack Compose Navigation.
+ *
+ * @param navController The [NavHostController] responsible for managing app navigation.
+ */
 @Composable
 fun NavGraph(navController: NavHostController) {
     NavHost(
         navController = navController,
         startDestination = Screen.Home.route
     ) {
+        // Home Screen: The main landing page with hero and mixed content.
         composable(Screen.Home.route) {
             HomeScreen(
                 onMovieClick = { movieId ->
@@ -27,26 +35,44 @@ fun NavGraph(navController: NavHostController) {
                 },
                 onTvShowClick = { tvId ->
                     navController.navigate(Screen.TvShowDetail.createRoute(tvId))
+                },
+                onNavigate = { route ->
+                    if (route != Screen.Home.route) {
+                        navController.navigate(route)
+                    }
                 }
             )
         }
 
+        // Movies Screen: Dedicated screen for browsing movies.
         composable(Screen.Movies.route) {
             MoviesScreen(
                 onMovieClick = { movieId ->
                     navController.navigate(Screen.MovieDetail.createRoute(movieId))
+                },
+                onNavigate = { route ->
+                    if (route != Screen.Movies.route) {
+                        navController.navigate(route)
+                    }
                 }
             )
         }
 
+        // TV Shows Screen: Dedicated screen for browsing TV shows.
         composable(Screen.TvShows.route) {
             TvShowsScreen(
                 onTvShowClick = { tvId ->
                     navController.navigate(Screen.TvShowDetail.createRoute(tvId))
+                },
+                onNavigate = { route ->
+                    if (route != Screen.TvShows.route) {
+                        navController.navigate(route)
+                    }
                 }
             )
         }
 
+        // My List Screen: Screen displaying the user's saved movies and TV shows.
         composable(Screen.MyList.route) {
             MyListScreen(
                 onMovieClick = { movieId ->
@@ -54,10 +80,16 @@ fun NavGraph(navController: NavHostController) {
                 },
                 onTvShowClick = { tvId ->
                     navController.navigate(Screen.TvShowDetail.createRoute(tvId))
+                },
+                onNavigate = { route ->
+                    if (route != Screen.MyList.route) {
+                        navController.navigate(route)
+                    }
                 }
             )
         }
 
+        // Movie Detail Screen: Detailed information about a specific movie.
         composable(
             route = Screen.MovieDetail.route,
             arguments = listOf(navArgument("movieId") { type = NavType.IntType })
@@ -68,10 +100,14 @@ fun NavGraph(navController: NavHostController) {
                 onBackClick = { navController.popBackStack() },
                 onMovieClick = { newMovieId ->
                     navController.navigate(Screen.MovieDetail.createRoute(newMovieId))
+                },
+                onCompanyClick = { id, name ->
+                    navController.navigate("media_list/company/$id/$name")
                 }
             )
         }
 
+        // TV Show Detail Screen: Detailed information about a specific TV show.
         composable(
             route = Screen.TvShowDetail.route,
             arguments = listOf(navArgument("tvId") { type = NavType.IntType })
@@ -85,10 +121,14 @@ fun NavGraph(navController: NavHostController) {
                 },
                 onEpisodesClick = { id, name, totalSeasons ->
                     navController.navigate(Screen.SeasonEpisodes.createRoute(id, name, totalSeasons))
+                },
+                onNetworkClick = { id, name ->
+                    navController.navigate("media_list/network/$id/$name")
                 }
             )
         }
 
+        // Season Episodes Screen: Dedicated screen for viewing episodes of a TV show season.
         composable(
             route = Screen.SeasonEpisodes.route,
             arguments = listOf(
@@ -110,6 +150,32 @@ fun NavGraph(navController: NavHostController) {
                 onBackClick = { navController.popBackStack() }
             )
         }
+
+        // Media List Screen: Generic screen for showing media by company or network.
+        composable(
+            route = "media_list/{type}/{id}/{name}",
+            arguments = listOf(
+                navArgument("type") { type = NavType.StringType },
+                navArgument("id") { type = NavType.IntType },
+                navArgument("name") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val type = backStackEntry.arguments?.getString("type") ?: "company"
+            val id = backStackEntry.arguments?.getInt("id") ?: 0
+            val name = backStackEntry.arguments?.getString("name") ?: ""
+            
+            MediaListScreen(
+                type = type,
+                id = id,
+                name = name,
+                onBackClick = { navController.popBackStack() },
+                onMovieClick = { movieId ->
+                    navController.navigate(Screen.MovieDetail.createRoute(movieId))
+                },
+                onTvShowClick = { tvId ->
+                    navController.navigate(Screen.TvShowDetail.createRoute(tvId))
+                }
+            )
+        }
     }
 }
-

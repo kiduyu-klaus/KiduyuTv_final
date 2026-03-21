@@ -2,6 +2,18 @@ package com.kiduyuk.klausk.kiduyutv.data.model
 
 import com.google.gson.annotations.SerializedName
 
+/**
+ * Data class representing a Movie.
+ * @param id The unique identifier for the movie.
+ * @param title The title of the movie.
+ * @param overview A brief summary of the movie's plot.
+ * @param posterPath The path to the movie's poster image.
+ * @param backdropPath The path to the movie's backdrop image.
+ * @param voteAverage The average vote score for the movie.
+ * @param releaseDate The release date of the movie.
+ * @param genreIds A list of genre IDs associated with the movie.
+ * @param popularity The popularity score of the movie.
+ */
 data class Movie(
     @SerializedName("id") val id: Int,
     @SerializedName("title") val title: String,
@@ -14,6 +26,18 @@ data class Movie(
     @SerializedName("popularity") val popularity: Double?
 )
 
+/**
+ * Data class representing a TV Show.
+ * @param id The unique identifier for the TV show.
+ * @param name The name of the TV show.
+ * @param overview A brief summary of the TV show's plot.
+ * @param posterPath The path to the TV show's poster image.
+ * @param backdropPath The path to the TV show's backdrop image.
+ * @param voteAverage The average vote score for the TV show.
+ * @param firstAirDate The first air date of the TV show.
+ * @param genreIds A list of genre IDs associated with the TV show.
+ * @param popularity The popularity score of the TV show.
+ */
 data class TvShow(
     @SerializedName("id") val id: Int,
     @SerializedName("name") val name: String,
@@ -26,6 +50,13 @@ data class TvShow(
     @SerializedName("popularity") val popularity: Double?
 )
 
+/**
+ * Data class representing a response containing a list of Movies.
+ * @param page The current page number of the results.
+ * @param results The list of [Movie] objects.
+ * @param totalPages The total number of pages available.
+ * @param totalResults The total number of results available.
+ */
 data class MovieResponse(
     @SerializedName("page") val page: Int,
     @SerializedName("results") val results: List<Movie>,
@@ -33,6 +64,13 @@ data class MovieResponse(
     @SerializedName("total_results") val totalResults: Int
 )
 
+/**
+ * Data class representing a response containing a list of TV Shows.
+ * @param page The current page number of the results.
+ * @param results The list of [TvShow] objects.
+ * @param totalPages The total number of pages available.
+ * @param totalResults The total number of results available.
+ */
 data class TvShowResponse(
     @SerializedName("page") val page: Int,
     @SerializedName("results") val results: List<TvShow>,
@@ -40,21 +78,43 @@ data class TvShowResponse(
     @SerializedName("total_results") val totalResults: Int
 )
 
+/**
+ * Data class representing a Genre.
+ * @param id The unique identifier for the genre.
+ * @param name The name of the genre.
+ */
 data class Genre(
     @SerializedName("id") val id: Int,
     @SerializedName("name") val name: String
 )
 
+/**
+ * Data class representing a response containing a list of Genres.
+ * @param genres The list of [Genre] objects.
+ */
 data class GenreResponse(
     @SerializedName("genres") val genres: List<Genre>
 )
 
+/**
+ * Data class representing a Network (e.g., Netflix, HBO).
+ * @param id The unique identifier for the network.
+ * @param name The name of the network.
+ * @param logoPath The path to the network's logo image.
+ */
 data class Network(
     @SerializedName("id") val id: Int,
     @SerializedName("name") val name: String,
     @SerializedName("logo_path") val logoPath: String?
 )
 
+/**
+ * Data class representing a Production Company.
+ * @param id The unique identifier for the production company.
+ * @param name The name of the production company.
+ * @param logoPath The path to the company's logo image.
+ * @param originCountry The country of origin for the production company.
+ */
 data class ProductionCompany(
     @SerializedName("id") val id: Int,
     @SerializedName("name") val name: String,
@@ -62,6 +122,19 @@ data class ProductionCompany(
     @SerializedName("origin_country") val originCountry: String?
 )
 
+/**
+ * Data class representing detailed information for a Movie.
+ * @param id The unique identifier for the movie.
+ * @param title The title of the movie.
+ * @param overview A brief summary of the movie's plot.
+ * @param posterPath The path to the movie's poster image.
+ * @param backdropPath The path to the movie's backdrop image.
+ * @param voteAverage The average vote score for the movie.
+ * @param releaseDate The release date of the movie.
+ * @param runtime The runtime of the movie in minutes.
+ * @param genres A list of [Genre] objects associated with the movie.
+ * @param productionCompanies A list of [ProductionCompany] objects involved in the movie's production.
+ */
 data class MovieDetail(
     @SerializedName("id") val id: Int,
     @SerializedName("title") val title: String,
@@ -75,6 +148,21 @@ data class MovieDetail(
     @SerializedName("production_companies") val productionCompanies: List<ProductionCompany>?
 )
 
+/**
+ * Data class representing detailed information for a TV Show.
+ * @param id The unique identifier for the TV show.
+ * @param name The name of the TV show.
+ * @param overview A brief summary of the TV show's plot.
+ * @param posterPath The path to the TV show's poster image.
+ * @param backdropPath The path to the TV show's backdrop image.
+ * @param voteAverage The average vote score for the TV show.
+ * @param firstAirDate The first air date of the TV show.
+ * @param numberOfSeasons The total number of seasons for the TV show.
+ * @param numberOfEpisodes The total number of episodes for the TV show.
+ * @param genres A list of [Genre] objects associated with the TV show.
+ * @param networks A list of [Network] objects that broadcast the TV show.
+ * @param seasons A list of [Season] objects for the TV show.
+ */
 data class TvShowDetail(
     @SerializedName("id") val id: Int,
     @SerializedName("name") val name: String,
@@ -87,10 +175,17 @@ data class TvShowDetail(
     @SerializedName("number_of_episodes") val numberOfEpisodes: Int?,
     @SerializedName("genres") val genres: List<Genre>?,
     @SerializedName("networks") val networks: List<Network>?,
-
     @SerializedName("seasons") val seasons: List<Season>?
 )
 
+/**
+ * Data class representing a Season of a TV Show.
+ * @param id The unique identifier for the season.
+ * @param name The name of the season.
+ * @param seasonNumber The season number.
+ * @param posterPath The path to the season's poster image.
+ * @param episodeCount The number of episodes in the season.
+ */
 data class Season(
     @SerializedName("id") val id: Int,
     @SerializedName("name") val name: String,
@@ -99,12 +194,28 @@ data class Season(
     @SerializedName("episode_count") val episodeCount: Int?
 )
 
+/**
+ * Data class representing a response containing a list of TV Show Seasons.
+ * @param id The ID of the TV show.
+ * @param name The name of the TV show.
+ * @param seasons The list of [Season] objects.
+ */
 data class TvShowSeasonResponse(
     @SerializedName("id") val id: Int,
     @SerializedName("name") val name: String,
     @SerializedName("seasons") val seasons: List<Season>
 )
 
+/**
+ * Data class representing an Episode of a TV Show.
+ * @param id The unique identifier for the episode.
+ * @param name The name of the episode.
+ * @param overview A brief summary of the episode's plot.
+ * @param stillPath The path to the episode's still image.
+ * @param episodeNumber The episode number within its season.
+ * @param seasonNumber The season number the episode belongs to.
+ * @param voteAverage The average vote score for the episode.
+ */
 data class Episode(
     @SerializedName("id") val id: Int,
     @SerializedName("name") val name: String,
@@ -115,9 +226,35 @@ data class Episode(
     @SerializedName("vote_average") val voteAverage: Double?
 )
 
+/**
+ * Data class representing detailed information for a Season, including its episodes.
+ * @param id The unique identifier for the season.
+ * @param name The name of the season.
+ * @param seasonNumber The season number.
+ * @param episodes The list of [Episode] objects in the season.
+ */
 data class SeasonDetail(
     @SerializedName("id") val id: Int,
     @SerializedName("name") val name: String,
     @SerializedName("season_number") val seasonNumber: Int,
     @SerializedName("episodes") val episodes: List<Episode>
+)
+
+/**
+ * Data class representing a video associated with a movie or TV show (e.g., a trailer).
+ */
+data class Video(
+    @SerializedName("id") val id: String,
+    @SerializedName("key") val key: String, // YouTube video key
+    @SerializedName("name") val name: String,
+    @SerializedName("site") val site: String, // e.g., "YouTube"
+    @SerializedName("type") val type: String // e.g., "Trailer"
+)
+
+/**
+ * Response class for the videos endpoint.
+ */
+data class VideoResponse(
+    @SerializedName("id") val id: Int,
+    @SerializedName("results") val results: List<Video>
 )

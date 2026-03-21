@@ -27,6 +27,15 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.FocusBorder
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextSecondary
 
+/**
+ * Composable function to display a movie card.
+ * This card is designed to be displayed within a [ContentRow] and handles its own click events.
+ *
+ * @param movie The [Movie] data to display.
+ * @param isSelected A boolean indicating if the card is currently selected (focused).
+ * @param onClick Lambda to be invoked when the card is clicked.
+ * @param modifier The modifier to be applied to the card.
+ */
 @Composable
 fun MovieCard(
     movie: Movie,
@@ -34,14 +43,13 @@ fun MovieCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isFocused by interactionSource.collectIsFocusedAsState()
-
+    // Box to hold the movie card content, applying width and conditional border for focus indication.
     Box(
         modifier = modifier
             .width(160.dp)
             .then(
-                if (isSelected || isFocused) {
+                // Apply a border if the card is selected (focused).
+                if (isSelected) {
                     Modifier.border(
                         width = 3.dp,
                         color = FocusBorder,
@@ -51,16 +59,13 @@ fun MovieCard(
                     Modifier
                 }
             )
-            .clip(RoundedCornerShape(8.dp))
-            .focusable(interactionSource = interactionSource)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null
-            ) {
+            .clip(RoundedCornerShape(8.dp)) // Clip content to rounded corners.
+            .clickable { // Handle click events for the card.
                 onClick()
             }
     ) {
-        Column {
+        Column { // Arrange content vertically.
+            // Box for the movie poster and rating badge.
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -70,6 +75,7 @@ fun MovieCard(
                         shape = RoundedCornerShape(8.dp)
                     )
             ) {
+                // Display movie poster if available.
                 if (movie.posterPath != null) {
                     AsyncImage(
                         model = "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.POSTER_SIZE}${movie.posterPath}",
@@ -81,7 +87,7 @@ fun MovieCard(
                     )
                 }
 
-                // Rating badge
+                // Rating badge displayed at the top-end of the poster.
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
@@ -100,8 +106,9 @@ fun MovieCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(8.dp)) // Vertical space.
 
+            // Movie title.
             Text(
                 text = movie.title,
                 style = MaterialTheme.typography.bodyMedium,
@@ -110,6 +117,7 @@ fun MovieCard(
                 overflow = TextOverflow.Ellipsis
             )
 
+            // Movie release year.
             Text(
                 text = movie.releaseDate?.take(4) ?: "",
                 style = MaterialTheme.typography.bodySmall,
@@ -119,6 +127,15 @@ fun MovieCard(
     }
 }
 
+/**
+ * Composable function to display a TV show card.
+ * This card is designed to be displayed within a [ContentRow] and handles its own click events.
+ *
+ * @param tvShow The [TvShow] data to display.
+ * @param isSelected A boolean indicating if the card is currently selected (focused).
+ * @param onClick Lambda to be invoked when the card is clicked.
+ * @param modifier The modifier to be applied to the card.
+ */
 @Composable
 fun TvShowCard(
     tvShow: TvShow,
@@ -126,14 +143,13 @@ fun TvShowCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isFocused by interactionSource.collectIsFocusedAsState()
-
+    // Box to hold the TV show card content, applying width and conditional border for focus indication.
     Box(
         modifier = modifier
             .width(160.dp)
             .then(
-                if (isSelected || isFocused) {
+                // Apply a border if the card is selected (focused).
+                if (isSelected) {
                     Modifier.border(
                         width = 3.dp,
                         color = FocusBorder,
@@ -143,16 +159,13 @@ fun TvShowCard(
                     Modifier
                 }
             )
-            .clip(RoundedCornerShape(8.dp))
-            .focusable(interactionSource = interactionSource)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null
-            ) {
+            .clip(RoundedCornerShape(8.dp)) // Clip content to rounded corners.
+            .clickable { // Handle click events for the card.
                 onClick()
             }
     ) {
-        Column {
+        Column { // Arrange content vertically.
+            // Box for the TV show poster and rating badge.
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -162,6 +175,7 @@ fun TvShowCard(
                         shape = RoundedCornerShape(8.dp)
                     )
             ) {
+                // Display TV show poster if available.
                 if (tvShow.posterPath != null) {
                     AsyncImage(
                         model = "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.POSTER_SIZE}${tvShow.posterPath}",
@@ -173,7 +187,7 @@ fun TvShowCard(
                     )
                 }
 
-                // Rating badge
+                // Rating badge displayed at the top-end of the poster.
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
@@ -192,8 +206,9 @@ fun TvShowCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(8.dp)) // Vertical space.
 
+            // TV show name.
             Text(
                 text = tvShow.name,
                 style = MaterialTheme.typography.bodyMedium,
@@ -202,6 +217,7 @@ fun TvShowCard(
                 overflow = TextOverflow.Ellipsis
             )
 
+            // TV show first air date year.
             Text(
                 text = tvShow.firstAirDate?.take(4) ?: "",
                 style = MaterialTheme.typography.bodySmall,
