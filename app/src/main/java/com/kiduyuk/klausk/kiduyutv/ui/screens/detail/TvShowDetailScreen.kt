@@ -36,6 +36,7 @@ fun TvShowDetailScreen(
     tvId: Int,
     onBackClick: () -> Unit,
     onTvShowClick: (Int) -> Unit,
+    onEpisodesClick: (tvId: Int, tvShowName: String, totalSeasons: Int) -> Unit = { _, _, _ -> },
     viewModel: DetailViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -231,7 +232,13 @@ fun TvShowDetailScreen(
                             }
 
                             OutlinedButton(
-                                onClick = { /* More Episodes */ },
+                                onClick = {
+                                    onEpisodesClick(
+                                        tvId,
+                                        tvShow.name,
+                                        tvShow.numberOfSeasons ?: 1
+                                    )
+                                },
                                 shape = RoundedCornerShape(4.dp),
                                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                                 colors = ButtonDefaults.outlinedButtonColors(
