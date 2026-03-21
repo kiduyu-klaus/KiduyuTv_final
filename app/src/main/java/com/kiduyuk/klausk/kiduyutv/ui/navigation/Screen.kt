@@ -14,4 +14,10 @@ sealed class Screen(val route: String) {
     object SeasonDetail : Screen("tv/{tvId}/season/{seasonNumber}") {
         fun createRoute(tvId: Int, seasonNumber: Int) = "tv/$tvId/season/$seasonNumber"
     }
+    object SeasonEpisodes : Screen("season_episodes/{tvId}/{totalSeasons}?tvShowName={tvShowName}") {
+        fun createRoute(tvId: Int, tvShowName: String, totalSeasons: Int): String {
+            val encodedName = android.net.Uri.encode(tvShowName)
+            return "season_episodes/$tvId/$totalSeasons?tvShowName=$encodedName"
+        }
+    }
 }
