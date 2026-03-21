@@ -107,7 +107,6 @@ fun SeasonEpisodesScreen(
                             onClick = onBackClick,
                             modifier = Modifier
                                 .size(48.dp)
-                                .focusable()
                         ) {
                             Icon(
                                 imageVector = Icons.Default.ArrowBack,
@@ -266,7 +265,6 @@ private fun SeasonListItem(
                 color = if (isSelected || isFocused) CardDark else Color.Transparent,
                 shape = RoundedCornerShape(8.dp)
             )
-            .focusable(interactionSource = interactionSource)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null
@@ -275,20 +273,15 @@ private fun SeasonListItem(
             }
             .padding(16.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Column {
             Text(
-                text = "Season ${season.seasonNumber}",
+                text = season.name,
                 style = MaterialTheme.typography.titleMedium,
-                color = TextPrimary
+                color = if (isSelected || isFocused) PrimaryRed else TextPrimary
             )
-
             Text(
-                text = "${season.episodeCount ?: 0} episodes",
-                style = MaterialTheme.typography.bodyMedium,
+                text = "${season.episodeCount} Episodes",
+                style = MaterialTheme.typography.bodySmall,
                 color = TextSecondary
             )
         }
@@ -299,7 +292,7 @@ private fun SeasonListItem(
  * Composable function for a single item in the episodes list.
  *
  * @param episode The [Episode] object to display.
- * @param seasonNumber The number of the season this episode belongs to.
+ * @param seasonNumber The season number this episode belongs to.
  */
 @Composable
 private fun EpisodeListItem(
@@ -309,7 +302,7 @@ private fun EpisodeListItem(
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
-    Row(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .then(
@@ -325,125 +318,111 @@ private fun EpisodeListItem(
                 }
             )
             .clip(RoundedCornerShape(8.dp))
-            .background(CardDark)
-            .focusable(interactionSource = interactionSource)
+            .background(
+                color = if (isFocused) CardDark else SurfaceDark,
+                shape = RoundedCornerShape(8.dp)
+            )
             .clickable(
                 interactionSource = interactionSource,
                 indication = null
             ) {
-                // TODO: Implement playback logic for the selected episode.
+                // TODO: Implement episode playback
             }
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(16.dp)
     ) {
-        // Episode Thumbnail: Display episode still image with a play button overlay.
-        Box(
-            modifier = Modifier
-                .width(280.dp)
-                .height(158.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(SurfaceDark),
-            contentAlignment = Alignment.Center
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            if (episode.stillPath != null) {
-                AsyncImage(
-                    model = "${TmdbApiService.IMAGE_BASE_URL}w300${episode.stillPath}",
-                    contentDescription = episode.name,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-
-            // Play button overlay.
+            // Episode Thumbnail placeholder
             Box(
                 modifier = Modifier
-                    .size(60.dp)
-                    .background(
-                        color = Color.White.copy(alpha = 0.9f),
-                        shape = CircleShape
-                    ),
-                contentAlignment = Alignment.Center
+                    .width(160.dp)
+                    .height(90.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color.Black)
             ) {
-                Icon(
-                    imageVector = Icons.Default.PlayArrow,
-                    contentDescription = "Play",
-                    tint = PrimaryRed,
-                    modifier = Modifier.size(40.dp)
-                )
-            }
-        }
-
-        // Episode Info: Title, number, rating, and overview.
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight(),
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text(
-                text = "${episode.episodeNumber}. ${episode.name}",
-                style = MaterialTheme.typography.titleMedium,
-                color = TextPrimary
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Episode rating.
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Star,
+                if (episode.stillPath != null) {
+                    AsyncImage(
+                        model = "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.STILL_SIZE}${episode.stillPath}",
                         contentDescription = null,
-                        tint = PrimaryRed,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = String.format("%.1f", episode.voteAverage ?: 0.0),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextPrimary
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
 
-                Text(
-                    text = "S${seasonNumber} E${episode.episodeNumber}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
+                // Play icon overlay
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.8f),
+                    modifier = Modifier
+                        .size(48.dp)
+                        .align(Alignment.Center)
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "${episode.episodeNumber}. ${episode.name}",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
 
-            // Episode overview description.
-            Text(
-                text = episode.overview ?: "No description available.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextSecondary,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis
-            )
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if ((episode.voteAverage ?: 0.0) > 0) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = null,
+                                tint = PrimaryRed,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = String.format("%.1f", episode.voteAverage),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextPrimary
+                            )
+                        }
+                    }
+
+                    if (episode.runtime != null) {
+                        Text(
+                            text = "${episode.runtime}m",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextSecondary
+                        )
+                    }
+
+                    Text(
+                        text = episode.airDate ?: "",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextSecondary
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = episode.overview ?: "",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
-    }
-}
-
-/**
- * Preview for the [SeasonEpisodesScreen] composable.
- */
-@Preview(showBackground = true, backgroundColor = 0xFF141414)
-@Composable
-fun SeasonEpisodesScreenPreview() {
-    KiduyuTvTheme {
-        SeasonEpisodesScreen(
-            tvShowId = 1,
-            tvShowName = "Sample TV Show",
-            totalSeasons = 3,
-            onBackClick = {}
-        )
     }
 }

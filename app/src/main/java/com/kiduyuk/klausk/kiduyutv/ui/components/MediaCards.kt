@@ -2,10 +2,6 @@ package com.kiduyuk.klausk.kiduyutv.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -29,11 +25,13 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.TextSecondary
 
 /**
  * Composable function to display a movie card.
- * This card is designed to be displayed within a [ContentRow] and handles its own click events.
+ * This card is designed to be displayed within a focusable wrapper (like in ContentRow)
+ * or to be made focusable by the caller. It no longer handles its own focus or click
+ * to avoid conflicts with parent focus managers.
  *
  * @param movie The [Movie] data to display.
  * @param isSelected A boolean indicating if the card is currently selected (focused).
- * @param onClick Lambda to be invoked when the card is clicked.
+ * @param onClick Lambda to be invoked when the card is clicked. (Note: The caller should handle the clickable modifier)
  * @param modifier The modifier to be applied to the card.
  */
 @Composable
@@ -43,7 +41,7 @@ fun MovieCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Box to hold the movie card content, applying width and conditional border for focus indication.
+    // Box to hold the movie card content.
     Box(
         modifier = modifier
             .width(160.dp)
@@ -60,9 +58,6 @@ fun MovieCard(
                 }
             )
             .clip(RoundedCornerShape(8.dp)) // Clip content to rounded corners.
-            .clickable { // Handle click events for the card.
-                onClick()
-            }
     ) {
         Column { // Arrange content vertically.
             // Box for the movie poster and rating badge.
@@ -129,11 +124,13 @@ fun MovieCard(
 
 /**
  * Composable function to display a TV show card.
- * This card is designed to be displayed within a [ContentRow] and handles its own click events.
+ * This card is designed to be displayed within a focusable wrapper (like in ContentRow)
+ * or to be made focusable by the caller. It no longer handles its own focus or click
+ * to avoid conflicts with parent focus managers.
  *
  * @param tvShow The [TvShow] data to display.
  * @param isSelected A boolean indicating if the card is currently selected (focused).
- * @param onClick Lambda to be invoked when the card is clicked.
+ * @param onClick Lambda to be invoked when the card is clicked. (Note: The caller should handle the clickable modifier)
  * @param modifier The modifier to be applied to the card.
  */
 @Composable
@@ -143,7 +140,7 @@ fun TvShowCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Box to hold the TV show card content, applying width and conditional border for focus indication.
+    // Box to hold the TV show card content.
     Box(
         modifier = modifier
             .width(160.dp)
@@ -160,9 +157,6 @@ fun TvShowCard(
                 }
             )
             .clip(RoundedCornerShape(8.dp)) // Clip content to rounded corners.
-            .clickable { // Handle click events for the card.
-                onClick()
-            }
     ) {
         Column { // Arrange content vertically.
             // Box for the TV show poster and rating badge.

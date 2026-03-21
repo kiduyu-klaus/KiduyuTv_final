@@ -22,6 +22,7 @@ import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
+import com.kiduyuk.klausk.kiduyutv.ui.theme.GenrePill
 import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextSecondary
@@ -41,41 +42,34 @@ fun HeroSection(
     tvShow: TvShow?,
     modifier: Modifier = Modifier
 ) {
-    // Extract relevant data, ensuring non-null Strings for Text composables.
-    val title = when {
-        movie != null -> movie.title
-        tvShow != null -> tvShow.name
-        else -> ""
-    }
+    // Determine if a movie is available and should be prioritized over a TV show.
+    val isMovie = movie != null
     
-    val overview = when {
-        movie != null -> movie.overview
-        tvShow != null -> tvShow.overview
-        else -> ""
-    }
-
-    val backdropPath = movie?.backdropPath ?: tvShow?.backdropPath
-    val rating = movie?.voteAverage ?: tvShow?.voteAverage ?: 0.0
-    val year = (movie?.releaseDate ?: tvShow?.firstAirDate)?.take(4) ?: ""
+    // Extract relevant data, prioritizing movie data if available.
+    val backdropPath = if (isMovie) movie?.backdropPath else tvShow?.backdropPath
+    val title = (if (isMovie) movie?.title else tvShow?.name) ?: ""
+    val overview = (if (isMovie) movie?.overview else tvShow?.overview) ?: ""
+    val rating = (if (isMovie) movie?.voteAverage else tvShow?.voteAverage) ?: 0.0
+    val year = (if (isMovie) movie?.releaseDate else tvShow?.firstAirDate)?.take(4) ?: ""
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(500.dp)
+            .height(500.dp) // Fixed height for the hero section.
     ) {
-        // Background Image
+        // Background Image: Display the backdrop image if available.
         if (backdropPath != null) {
             AsyncImage(
                 model = "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.BACKDROP_SIZE}$backdropPath",
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
+                contentDescription = null, // Content description for accessibility.
+                contentScale = ContentScale.Crop, // Crop to fill the bounds.
                 modifier = Modifier
                     .fillMaxSize()
-                    .blur(10.dp)
+                    .blur(10.dp) // Apply a blur effect to the background image.
             )
         }
 
-        // Gradient Overlay
+        // Gradient Overlay: Add a vertical gradient to make text more readable over the background.
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -83,21 +77,21 @@ fun HeroSection(
                     Brush.verticalGradient(
                         colors = listOf(
                             Color.Transparent,
-                            Color(0xFF141414).copy(alpha = 0.7f),
-                            Color(0xFF141414)
+                            Color(0xFF141414).copy(alpha = 0.7f), // Semi-transparent dark color.
+                            Color(0xFF141414) // Solid dark color at the bottom.
                         )
                     )
                 )
         )
 
-        // Content
+        // Content: Arrange title, rating, overview, and action buttons vertically.
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 48.dp),
-            verticalArrangement = Arrangement.Bottom
+                .padding(48.dp), // Padding around the content.
+            verticalArrangement = Arrangement.Bottom // Align content to the bottom.
         ) {
-            // Title
+            // Title of the movie or TV show.
             Text(
                 text = title,
                 style = MaterialTheme.typography.displaySmall,
@@ -106,9 +100,9 @@ fun HeroSection(
                 overflow = TextOverflow.Ellipsis
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp)) // Vertical spacing.
 
-            // Rating and Year
+            // Rating and Year: Display rating with a star icon and the release/first air year.
             Row(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -137,26 +131,26 @@ fun HeroSection(
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp)) // Vertical spacing.
 
-            // Overview
+            // Overview: Display a brief description.
             Text(
                 text = overview,
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextSecondary,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = 600.dp)
+                modifier = Modifier.widthIn(max = 600.dp) // Limit width for readability.
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(24.dp)) // Vertical spacing.
 
-            // Action Buttons
+            // Action Buttons: Play Now, Info, and Add to List buttons.
             Row(
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Button(
-                    onClick = { /* Play */ },
+                    onClick = { /* Play */ }, // Placeholder for play action.
                     colors = ButtonDefaults.buttonColors(
                         containerColor = PrimaryRed
                     ),
@@ -176,7 +170,7 @@ fun HeroSection(
                 }
 
                 OutlinedButton(
-                    onClick = { /* Info */ },
+                    onClick = { /* Info */ }, // Placeholder for info action.
                     shape = RoundedCornerShape(4.dp),
                     contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
@@ -196,7 +190,7 @@ fun HeroSection(
                 }
 
                 OutlinedButton(
-                    onClick = { /* Add to List */ },
+                    onClick = { /* Add to List */ }, // Placeholder for add to list action.
                     shape = RoundedCornerShape(4.dp),
                     contentPadding = PaddingValues(12.dp),
                     colors = ButtonDefaults.outlinedButtonColors(

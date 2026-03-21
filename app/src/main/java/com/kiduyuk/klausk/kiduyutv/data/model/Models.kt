@@ -223,7 +223,9 @@ data class Episode(
     @SerializedName("still_path") val stillPath: String?,
     @SerializedName("episode_number") val episodeNumber: Int,
     @SerializedName("season_number") val seasonNumber: Int,
-    @SerializedName("vote_average") val voteAverage: Double?
+    @SerializedName("vote_average") val voteAverage: Double?,
+    @SerializedName("air_date") val airDate: String?,
+    @SerializedName("runtime") val runtime: Int?
 )
 
 /**

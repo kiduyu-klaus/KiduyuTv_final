@@ -89,6 +89,8 @@ fun <T> ContentRow(
                 }
 
                 // Box to wrap each content item, handling focus and clicks.
+                // We rely on the clickable modifier to handle both focus and click events
+                // to avoid the "double-click" issue where the first click only focuses the element.
                 Box(
                     modifier = Modifier
                         // Detect focus changes and update selectedIndex and call onItemFocus.
@@ -98,9 +100,7 @@ fun <T> ContentRow(
                                 onItemFocus?.invoke(item)
                             }
                         }
-                        // Make the item focusable.
-                        .focusable(interactionSource = interactionSource)
-                        // Handle click events.
+                        // Handle click events. This modifier automatically makes the Box focusable.
                         .clickable(
                             interactionSource = interactionSource,
                             indication = null
@@ -112,6 +112,8 @@ fun <T> ContentRow(
                 ) {
                     // Render the actual content of the item using the provided lambda.
                     content(item, isFocused) {
+                        // The card itself no longer handles the click, but we pass the logic
+                        // just in case, though it's now primarily handled by the wrapper Box.
                         selectedIndex = index
                         onItemClick(item)
                     }
@@ -232,9 +234,7 @@ private fun NetworkCard(
             )
             // Detect focus changes and call onFocus.
             .onFocusChanged { if (it.isFocused) onFocus() }
-            // Make the item focusable.
-            .focusable(interactionSource = interactionSource)
-            // Handle click events.
+            // Handle click events. This modifier automatically makes the Box focusable.
             .clickable(
                 interactionSource = interactionSource,
                 indication = null

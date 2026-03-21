@@ -1,6 +1,10 @@
 package com.kiduyuk.klausk.kiduyutv.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -107,19 +111,45 @@ fun MediaListScreen(
                 ) {
                     if (type == "company") {
                         items(uiState.movies) { movie ->
-                            MovieCard(
-                                movie = movie,
-                                isSelected = false, // Selection is handled by focus in TV apps.
-                                onClick = { onMovieClick(movie.id) }
-                            )
+                            val interactionSource = remember { MutableInteractionSource() }
+                            val isFocused by interactionSource.collectIsFocusedAsState()
+                            
+                            Box(
+                                modifier = Modifier
+                                    .clickable(
+                                        interactionSource = interactionSource,
+                                        indication = null
+                                    ) {
+                                        onMovieClick(movie.id)
+                                    }
+                            ) {
+                                MovieCard(
+                                    movie = movie,
+                                    isSelected = isFocused,
+                                    onClick = { onMovieClick(movie.id) }
+                                )
+                            }
                         }
                     } else {
                         items(uiState.tvShows) { tvShow ->
-                            TvShowCard(
-                                tvShow = tvShow,
-                                isSelected = false,
-                                onClick = { onTvShowClick(tvShow.id) }
-                            )
+                            val interactionSource = remember { MutableInteractionSource() }
+                            val isFocused by interactionSource.collectIsFocusedAsState()
+
+                            Box(
+                                modifier = Modifier
+                                    .clickable(
+                                        interactionSource = interactionSource,
+                                        indication = null
+                                    ) {
+                                        onTvShowClick(tvShow.id)
+                                    }
+                            ) {
+                                TvShowCard(
+                                    tvShow = tvShow,
+                                    isSelected = isFocused,
+                                    onClick = { onTvShowClick(tvShow.id) }
+                                )
+                            }
                         }
                     }
                 }

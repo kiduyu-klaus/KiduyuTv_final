@@ -10,7 +10,7 @@ import retrofit2.http.Query
  * It uses Retrofit to handle network requests.
  */
 interface TmdbApiService {
-    
+
     companion object {
         /** Base URL for the TMDB API. */
         const val BASE_URL = "https://api.themoviedb.org/3/"
@@ -22,6 +22,8 @@ interface TmdbApiService {
         const val BACKDROP_SIZE = "w1280"
         /** Standard size for logos. */
         const val LOGO_SIZE = "w200"
+        /** Standard size for episode still images. */
+        const val STILL_SIZE = "w300"
     }
 
     /** Fetches the list of TV shows trending today. */

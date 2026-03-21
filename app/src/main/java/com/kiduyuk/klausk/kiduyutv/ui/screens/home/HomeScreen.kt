@@ -150,14 +150,18 @@ fun HomeScreen(
                 NetworkRow(
                     title = "Popular Networks",
                     items = uiState.popularNetworks,
-                    onItemClick = { /* Navigate to network content */ } // Placeholder for navigation.
+                    onItemClick = { network ->
+                        onNavigate("media_list/network/${network.id}/${network.name}")
+                    }
                 )
 
                 // Content Row for Popular Companies.
                 NetworkRow(
                     title = "Popular Companies",
                     items = uiState.popularCompanies,
-                    onItemClick = { /* Navigate to company content */ } // Placeholder for navigation.
+                    onItemClick = { company ->
+                        onNavigate("media_list/company/${company.id}/${company.name}")
+                    }
                 )
 
                 // Content Row for Latest Movies Last Week.
