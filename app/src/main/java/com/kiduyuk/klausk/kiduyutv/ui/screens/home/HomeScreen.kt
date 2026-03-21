@@ -64,14 +64,15 @@ fun HomeScreen(
                 val selectedTvShow = uiState.selectedItem as? TvShow
 
                 HeroSection(
-                    movie = selectedMovie ?: uiState.trendingMovies.firstOrNull(),
-                    tvShow = selectedTvShow ?: uiState.trendingTvShows.firstOrNull()
+                    movie = if (selectedMovie != null) selectedMovie else uiState.trendingMovies.firstOrNull(),
+                    tvShow = if (selectedTvShow != null) selectedTvShow else uiState.trendingTvShows.firstOrNull()
                 )
 
                 // TV Shows Trending Today
                 ContentRow(
                     title = "TV Shows Trending Today",
                     items = uiState.trendingTvShows,
+                    onItemFocus = { tvShow -> viewModel.selectItem(tvShow) },
                     onItemClick = { tvShow ->
                         viewModel.selectItem(tvShow)
                         onTvShowClick(tvShow.id)
@@ -88,6 +89,7 @@ fun HomeScreen(
                 ContentRow(
                     title = "Movies Trending Today",
                     items = uiState.trendingMovies,
+                    onItemFocus = { movie -> viewModel.selectItem(movie) },
                     onItemClick = { movie ->
                         viewModel.selectItem(movie)
                         onMovieClick(movie.id)
