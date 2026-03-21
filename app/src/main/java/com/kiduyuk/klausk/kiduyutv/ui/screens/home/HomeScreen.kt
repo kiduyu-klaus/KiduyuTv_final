@@ -62,10 +62,10 @@ fun HomeScreen(
                 // Hero Section with selected item
                 val selectedMovie = uiState.selectedItem as? Movie
                 val selectedTvShow = uiState.selectedItem as? TvShow
-                
+
                 HeroSection(
-                    movie = if (selectedMovie != null) selectedMovie else uiState.trendingMovies.firstOrNull(),
-                    tvShow = if (selectedTvShow != null) selectedTvShow else uiState.trendingTvShows.firstOrNull()
+                    movie = selectedMovie ?: uiState.trendingMovies.firstOrNull(),
+                    tvShow = selectedTvShow ?: uiState.trendingTvShows.firstOrNull()
                 )
 
                 // TV Shows Trending Today
