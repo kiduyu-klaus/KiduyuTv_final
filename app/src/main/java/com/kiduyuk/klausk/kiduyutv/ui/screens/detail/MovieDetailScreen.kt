@@ -339,7 +339,7 @@ fun MovieDetailScreen(
 }
 
 /**
- * Preview for the [MovieDetailScreen] composable.
+ * Preview for the Preview for the [MovieDetailScreen] composable.
  */
 @Preview(showBackground = true, backgroundColor = 0xFF141414)
 @Composable
