@@ -41,82 +41,55 @@ fun MovieCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Box to hold the movie card content.
+    // Root container for the card
     Box(
         modifier = modifier
-            .width(160.dp)
+            .size(width = 100.dp, height = 180.dp) // Fixed card size
             .then(
-                // Apply a border if the card is selected (focused).
+                // Apply border only when card is selected (focused)
                 if (isSelected) {
                     Modifier.border(
-                        width = 3.dp,
-                        color = FocusBorder,
-                        shape = RoundedCornerShape(8.dp)
+                        3.dp,
+                        FocusBorder,
+                        RoundedCornerShape(8.dp)
                     )
-                } else {
-                    Modifier
-                }
+                } else Modifier
             )
-            .clip(RoundedCornerShape(8.dp)) // Clip content to rounded corners.
+            .clip(RoundedCornerShape(8.dp)) // Clip content to rounded corners
     ) {
-        Column { // Arrange content vertically.
-            // Box for the movie poster and rating badge.
+
+        // 🔹 Poster Image (fills entire card)
+        if (movie.posterPath != null) {
+            AsyncImage(
+                model = "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.POSTER_SIZE}${movie.posterPath}",
+                contentDescription = movie.title,
+                contentScale = ContentScale.Crop, // Crop to fill without distortion
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            // 🔹 Fallback background if no image
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(240.dp)
-                    .background(
-                        color = CardDark,
-                        shape = RoundedCornerShape(8.dp)
-                    )
-            ) {
-                // Display movie poster if available.
-                if (movie.posterPath != null) {
-                    AsyncImage(
-                        model = "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.POSTER_SIZE}${movie.posterPath}",
-                        contentDescription = movie.title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(RoundedCornerShape(8.dp))
-                    )
-                }
-
-                // Rating badge displayed at the top-end of the poster.
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                        .background(
-                            color = Color.Black.copy(alpha = 0.7f),
-                            shape = RoundedCornerShape(4.dp)
-                        )
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = String.format("%.1f", movie.voteAverage),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextPrimary
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp)) // Vertical space.
-
-            // Movie title.
-            Text(
-                text = movie.title,
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextPrimary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+                    .fillMaxSize()
+                    .background(CardDark)
             )
+        }
 
-            // Movie release year.
+        // ⭐ Rating badge (top-right corner)
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd) // Position at top-right
+                .padding(6.dp)
+                .background(
+                    Color.Black.copy(alpha = 0.7f), // Semi-transparent background
+                    RoundedCornerShape(4.dp)
+                )
+                .padding(horizontal = 6.dp, vertical = 2.dp)
+        ) {
             Text(
-                text = movie.releaseDate?.take(4) ?: "",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary
+                text = String.format("%.1f", movie.voteAverage), // Format rating
+                style = MaterialTheme.typography.labelSmall,
+                color = TextPrimary
             )
         }
     }
@@ -140,82 +113,55 @@ fun TvShowCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Box to hold the TV show card content.
+    // Root container for the card
     Box(
         modifier = modifier
-            .width(160.dp)
+            .size(width = 100.dp, height = 180.dp) // Fixed card size
             .then(
-                // Apply a border if the card is selected (focused).
+                // Apply border when selected (focused)
                 if (isSelected) {
                     Modifier.border(
-                        width = 3.dp,
-                        color = FocusBorder,
-                        shape = RoundedCornerShape(8.dp)
+                        3.dp,
+                        FocusBorder,
+                        RoundedCornerShape(8.dp)
                     )
-                } else {
-                    Modifier
-                }
+                } else Modifier
             )
-            .clip(RoundedCornerShape(8.dp)) // Clip content to rounded corners.
+            .clip(RoundedCornerShape(8.dp)) // Rounded edges
     ) {
-        Column { // Arrange content vertically.
-            // Box for the TV show poster and rating badge.
+
+        // 🔹 Poster Image
+        if (tvShow.posterPath != null) {
+            AsyncImage(
+                model = "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.POSTER_SIZE}${tvShow.posterPath}",
+                contentDescription = tvShow.name,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            // 🔹 Fallback if no poster
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(240.dp)
-                    .background(
-                        color = CardDark,
-                        shape = RoundedCornerShape(8.dp)
-                    )
-            ) {
-                // Display TV show poster if available.
-                if (tvShow.posterPath != null) {
-                    AsyncImage(
-                        model = "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.POSTER_SIZE}${tvShow.posterPath}",
-                        contentDescription = tvShow.name,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(RoundedCornerShape(8.dp))
-                    )
-                }
-
-                // Rating badge displayed at the top-end of the poster.
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                        .background(
-                            color = Color.Black.copy(alpha = 0.7f),
-                            shape = RoundedCornerShape(4.dp)
-                        )
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = String.format("%.1f", tvShow.voteAverage),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextPrimary
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp)) // Vertical space.
-
-            // TV show name.
-            Text(
-                text = tvShow.name,
-                style = MaterialTheme.typography.bodyMedium,
-                color = TextPrimary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+                    .fillMaxSize()
+                    .background(CardDark)
             )
+        }
 
-            // TV show first air date year.
+        // ⭐ Rating badge
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd) // Top-right corner
+                .padding(6.dp)
+                .background(
+                    Color.Black.copy(alpha = 0.7f),
+                    RoundedCornerShape(4.dp)
+                )
+                .padding(horizontal = 6.dp, vertical = 2.dp)
+        ) {
             Text(
-                text = tvShow.firstAirDate?.take(4) ?: "",
-                style = MaterialTheme.typography.bodySmall,
-                color = TextSecondary
+                text = String.format("%.1f", tvShow.voteAverage),
+                style = MaterialTheme.typography.labelSmall,
+                color = TextPrimary
             )
         }
     }
