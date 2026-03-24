@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -71,10 +73,10 @@ data class MyListItem(
  * It exposes a [HomeUiState] to the UI layer.
  */
 class HomeViewModel : ViewModel() {
-    
+
     // Repository for fetching data from TMDB API.
     private val repository = TmdbRepository()
-    
+
     // MutableStateFlow to hold and update the UI state.
     private val _uiState = MutableStateFlow(HomeUiState())
     // Publicly exposed StateFlow for UI observation.
@@ -93,7 +95,7 @@ class HomeViewModel : ViewModel() {
         viewModelScope.launch {
             // Set loading state to true and clear any previous errors.
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
-            
+
             try {
                 // Fetch all data concurrently using the repository.
                 val trendingTvDeferred = repository.getTrendingTvToday()
@@ -111,29 +113,25 @@ class HomeViewModel : ViewModel() {
                 val topRatedTv = topRatedTvDeferred.getOrNull() ?: emptyList()
                 val popularMovies = popularMoviesDeferred.getOrNull() ?: emptyList()
 
-                // Manually create a list of popular networks.
-                val networks = listOf(
-                    NetworkItem(213, "Netflix", null, "network"),
-                    NetworkItem(1024, "Apple TV+", null, "network"),
-                    NetworkItem(1025, "Prime Video", null, "network"),
-                    NetworkItem(158, "Disney+", null, "network"),
-                    NetworkItem(2739, "Hulu", null, "network"),
-                    NetworkItem(4451, "Peacock", null, "network"),
-                    NetworkItem(3284, "Crunchyroll", null, "network"),
-                    NetworkItem(283, "HBO Max", null, "network")
-                )
+                // Fetch popular networks details from TMDB.
+                val networkIds = listOf(213, 1024, 1025, 158, 2739, 4451, 3284, 283)
+                val networks = networkIds.map { id ->
+                    async {
+                        repository.getNetworkDetails(id).getOrNull()?.let {
+                            NetworkItem(it.id, it.name, it.logoPath, "network")
+                        }
+                    }
+                }.awaitAll().filterNotNull()
 
-                // Manually create a list of popular companies.
-                val companies = listOf(
-                    NetworkItem(420, "Marvel Studios", null, "company"),
-                    NetworkItem(109051, "Bad Robot", null, "company"),
-                    NetworkItem(38109, "Legendary Pictures", null, "company"),
-                    NetworkItem(174, "Warner Bros. Pictures", null, "company"),
-                    NetworkItem(2, "Marvel Studios", null, "company"),
-                    NetworkItem(429, "董完整", null, "company"),
-                    NetworkItem(76043, "Revolution Studios", null, "company"),
-                    NetworkItem(11461, "George Lucas", null, "company")
-                )
+                // Fetch popular companies details from TMDB.
+                val companyIds = listOf(420, 3, 174, 4, 33, 5, 2, 1)
+                val companies = companyIds.map { id ->
+                    async {
+                        repository.getCompanyDetails(id).getOrNull()?.let {
+                            NetworkItem(it.id, it.name, it.logoPath, "company")
+                        }
+                    }
+                }.awaitAll().filterNotNull()
 
                 // Update the UI state with the fetched data.
                 _uiState.value = HomeUiState(
