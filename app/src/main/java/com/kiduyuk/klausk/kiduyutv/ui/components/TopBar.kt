@@ -59,7 +59,7 @@ fun TopBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(BackgroundDark.copy(alpha = 0.8f))
+            .background(Color.Transparent)
             .padding(horizontal = 32.dp, vertical = 16.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
