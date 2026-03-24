@@ -2,7 +2,6 @@ package com.kiduyuk.klausk.kiduyutv.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
@@ -15,6 +14,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kiduyuk.klausk.kiduyutv.ui.components.MovieCard
@@ -47,6 +47,15 @@ fun MediaListScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
+    // Calculate dynamic column count based on screen width.
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val horizontalPadding = 24.dp
+    val itemWidth = 160.dp
+    val itemSpacing = 8.dp
+    val availableWidth = screenWidth - horizontalPadding * 2
+    val columnCount = maxOf(2, ((availableWidth + itemSpacing) / (itemWidth + itemSpacing)).toInt())
+
     // Load content when parameters change.
     LaunchedEffect(type, id, name) {
         if (type == "company") {
@@ -68,7 +77,7 @@ fun MediaListScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(horizontal = 24.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBackClick) {
@@ -78,7 +87,7 @@ fun MediaListScreen(
                         tint = TextPrimary
                     )
                 }
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = uiState.title,
                     style = MaterialTheme.typography.headlineMedium,
@@ -103,17 +112,17 @@ fun MediaListScreen(
                 }
             } else {
                 LazyVerticalGrid(
-                    columns = GridCells.Adaptive(160.dp),
+                    columns = GridCells.Fixed(columnCount),
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(24.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     if (type == "company") {
                         items(uiState.movies) { movie ->
                             val interactionSource = remember { MutableInteractionSource() }
                             val isFocused by interactionSource.collectIsFocusedAsState()
-                            
+
                             Box(
                                 modifier = Modifier
                                     .clickable(
