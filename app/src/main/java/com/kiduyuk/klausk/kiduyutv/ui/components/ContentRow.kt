@@ -19,7 +19,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.ui.theme.FocusBorder
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextSecondary
@@ -185,6 +188,7 @@ fun NetworkRow(
 /**
  * Composable function to display a single network card.
  * It handles its own focus and click events, and provides visual feedback for focus.
+ * Displays the network/company logo when available, otherwise shows the name as text.
  *
  * @param item The [NetworkItem] data to display.
  * @param isSelected A boolean indicating if the card is currently selected (focused).
@@ -208,6 +212,11 @@ private fun NetworkCard(
         if (isFocused) {
             onFocus()
         }
+    }
+
+    // Build the full logo URL if logoPath is available
+    val logoUrl = item.logoPath?.let { path ->
+        "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.LOGO_SIZE}$path"
     }
 
     // Box to hold the network card content, applying size, background, and conditional border for focus indication.
@@ -243,11 +252,23 @@ private fun NetworkCard(
             },
         contentAlignment = Alignment.Center
     ) {
-        // Display the network item's name.
-        Text(
-            text = item.name,
-            style = MaterialTheme.typography.titleMedium,
-            color = TextPrimary
-        )
+        // Display the logo if available, otherwise show the network/company name.
+        if (logoUrl != null) {
+            AsyncImage(
+                model = logoUrl,
+                contentDescription = "${item.name} logo",
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(12.dp),
+                contentScale = ContentScale.Fit
+            )
+        } else {
+            // Fallback: Display the network/company name as text.
+            Text(
+                text = item.name,
+                style = MaterialTheme.typography.titleMedium,
+                color = TextPrimary
+            )
+        }
     }
 }
