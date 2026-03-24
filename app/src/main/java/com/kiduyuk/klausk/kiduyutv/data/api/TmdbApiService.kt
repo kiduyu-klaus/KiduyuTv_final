@@ -137,6 +137,18 @@ interface TmdbApiService {
     @GET("genre/tv/list")
     suspend fun getTvGenres(): GenreResponse
 
+    /** Fetches details for a specific network, including its logo. */
+    @GET("network/{network_id}")
+    suspend fun getNetworkDetails(
+        @Path("network_id") networkId: Int
+    ): Network
+
+    /** Fetches details for a specific production company, including its logo. */
+    @GET("company/{company_id}")
+    suspend fun getCompanyDetails(
+        @Path("company_id") companyId: Int
+    ): ProductionCompany
+
     /** Fetches videos (trailers, teasers, etc.) for a specific movie. */
     @GET("movie/{movie_id}/videos")
     suspend fun getMovieVideos(
