@@ -224,11 +224,18 @@ fun TvShowDetailScreen(
                                     )
                                 }
                             }
+
                             tvShow.networks?.take(2)?.forEach { network ->
+                                val networkInteraction = remember { MutableInteractionSource() }
+                                val networkFocused by networkInteraction.collectIsFocusedAsState()
+
                                 Surface(
                                     shape = RoundedCornerShape(12.dp),
-                                    color = Color.DarkGray,
-                                    modifier = Modifier.clickable { onNetworkClick(network.id, network.name) }
+                                    color = if (networkFocused) DarkRed else Color.DarkGray,
+                                    modifier = Modifier.clickable(
+                                        interactionSource = networkInteraction,
+                                        indication = null
+                                    ) { onNetworkClick(network.id, network.name) }
                                 ) {
                                     Text(
                                         text = network.name,
