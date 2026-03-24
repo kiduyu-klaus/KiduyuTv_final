@@ -4,6 +4,8 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -22,6 +24,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
@@ -48,59 +51,60 @@ fun MovieDetailScreen(
     onCompanyClick: (id: Int, name: String) -> Unit = { _, _ -> },
     viewModel: DetailViewModel = viewModel()
 ) {
-    // Collect UI state from the ViewModel.
     val uiState by viewModel.uiState.collectAsState()
-    // Remember scroll state for the main content column.
     val scrollState = rememberScrollState()
-    // Get the current context for launching intents.
     val context = LocalContext.current
 
-    // Load movie details when the movieId changes.
+    // Button interaction sources for focus tracking
+    val playInteraction = remember { MutableInteractionSource() }
+    val playFocused by playInteraction.collectIsFocusedAsState()
+
+    val trailerInteraction = remember { MutableInteractionSource() }
+    val trailerFocused by trailerInteraction.collectIsFocusedAsState()
+
+    val myListInteraction = remember { MutableInteractionSource() }
+    val myListFocused by myListInteraction.collectIsFocusedAsState()
+
     LaunchedEffect(movieId) {
         viewModel.loadMovieDetail(movieId)
     }
 
-    // Main container for the movie detail screen.
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(BackgroundDark) // Set background color.
+            .background(BackgroundDark)
     ) {
-        // Display a loading indicator if data is being fetched.
         if (uiState.isLoading) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = PrimaryRed)
             }
-        } else if (uiState.movieDetail != null) { // Display movie details if available.
+        } else if (uiState.movieDetail != null) {
             val movie = uiState.movieDetail!!
 
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(scrollState) // Make the column vertically scrollable.
+                    .verticalScroll(scrollState)
             ) {
-                // Hero Section for the movie details.
+                // ── Hero Section ─────────────────────────────────────────────
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(500.dp) // Fixed height for the hero section.
+                        .height(300.dp)
                 ) {
-                    // Background Image: Display the backdrop image if available.
+                    // Backdrop image
                     if (movie.backdropPath != null) {
                         AsyncImage(
                             model = "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.BACKDROP_SIZE}${movie.backdropPath}",
-                            contentDescription = null, // Content description for accessibility.
-                            contentScale = ContentScale.Crop, // Crop to fill the bounds.
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
                             modifier = Modifier
                                 .fillMaxSize()
-                                .blur(10.dp) // Apply a blur effect to the background image.
+                                .blur(10.dp)
                         )
                     }
 
-                    // Gradient Overlay: Add a vertical gradient to make text more readable.
+                    // Gradient overlay
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -115,219 +119,212 @@ fun MovieDetailScreen(
                             )
                     )
 
-                    // Back Button.
+                    // Back button
                     IconButton(
                         onClick = onBackClick,
                         modifier = Modifier
                             .align(Alignment.TopStart)
-                            .padding(16.dp)
+                            .padding(8.dp)
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
                             tint = TextPrimary,
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(24.dp)
                         )
                     }
 
-                    // Content: Arrange title, metadata, genres, overview, and action buttons vertically.
+                    // Hero content pinned to bottom
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(48.dp), // Padding around the content.
-                        verticalArrangement = Arrangement.Bottom // Align content to the bottom.
+                            .padding(horizontal = 24.dp)
+                            .padding(top = 40.dp, bottom = 12.dp),
+                        verticalArrangement = Arrangement.Bottom
                     ) {
-                        // Movie title.
+                        // Title
                         Text(
                             text = movie.title,
-                            style = MaterialTheme.typography.displaySmall,
-                            color = TextPrimary
+                            style = MaterialTheme.typography.titleLarge,
+                            color = TextPrimary,
+                            maxLines = 1,
+                            fontSize = 22.sp
                         )
 
-                        Spacer(modifier = Modifier.height(16.dp)) // Vertical spacing.
+                        Spacer(modifier = Modifier.height(4.dp))
 
-                        // Metadata: Rating, release year, and runtime.
+                        // Metadata row: rating · year · runtime
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(3.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Star,
                                     contentDescription = null,
                                     tint = PrimaryRed,
-                                    modifier = Modifier.size(20.dp)
+                                    modifier = Modifier.size(14.dp)
                                 )
                                 Text(
                                     text = String.format("%.1f", movie.voteAverage),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = TextPrimary
+                                    color = TextPrimary,
+                                    fontSize = 12.sp
                                 )
                             }
-
+                            Text("·", color = TextSecondary, fontSize = 12.sp)
                             Text(
                                 text = movie.releaseDate?.take(4) ?: "",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = TextSecondary
+                                color = TextSecondary,
+                                fontSize = 12.sp
                             )
-
                             if (movie.runtime != null) {
+                                Text("·", color = TextSecondary, fontSize = 12.sp)
                                 Text(
-                                    text = "${movie.runtime} min",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = TextSecondary
+                                    text = "${movie.runtime}m",
+                                    color = TextSecondary,
+                                    fontSize = 12.sp
                                 )
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp)) // Vertical spacing.
+                        Spacer(modifier = Modifier.height(6.dp))
 
-                        // Genres: Display genre pills.
+                        // Genres + Production Companies on same row
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            movie.genres?.take(3)?.forEach { genre ->
+                            movie.genres?.take(2)?.forEach { genre ->
                                 Surface(
-                                    shape = RoundedCornerShape(16.dp),
+                                    shape = RoundedCornerShape(12.dp),
                                     color = GenrePill
                                 ) {
                                     Text(
                                         text = genre.name,
-                                        style = MaterialTheme.typography.labelMedium,
                                         color = TextPrimary,
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                        fontSize = 10.sp,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                     )
                                 }
                             }
-                        }
 
-                        Spacer(modifier = Modifier.height(16.dp)) // Vertical spacing.
+                            movie.productionCompanies?.take(2)?.forEach { company ->
+                                val companyInteraction = remember { MutableInteractionSource() }
+                                val companyFocused by companyInteraction.collectIsFocusedAsState()
 
-                        // Overview: Display a brief description.
-                        Text(
-                            text = movie.overview,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = TextSecondary,
-                            maxLines = 4
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp)) // Vertical spacing.
-
-                        // Production Companies: Clickable pills for production companies.
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            movie.productionCompanies?.take(3)?.forEach { company ->
                                 Surface(
-                                    shape = RoundedCornerShape(16.dp),
-                                    color = Color.DarkGray,
-                                    modifier = Modifier.clickable { onCompanyClick(company.id, company.name) }
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (companyFocused) DarkRed else Color.DarkGray,
+                                    modifier = Modifier.clickable(
+                                        interactionSource = companyInteraction,
+                                        indication = null
+                                    ) { onCompanyClick(company.id, company.name) }
                                 ) {
                                     Text(
                                         text = company.name,
-                                        style = MaterialTheme.typography.labelSmall,
                                         color = TextPrimary,
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                        fontSize = 10.sp,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                     )
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(24.dp)) // Vertical spacing.
+                        Spacer(modifier = Modifier.height(6.dp))
 
-                        // Action Buttons: Play Now, Watch Trailer, and Add to List buttons.
+                        // Overview — 2 lines max
+                        Text(
+                            text = movie.overview,
+                            color = TextSecondary,
+                            maxLines = 2,
+                            fontSize = 12.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Action buttons
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            // Play Now
                             Button(
-                                onClick = { /* Play movie action */ },
+                                onClick = { },
+                                interactionSource = playInteraction,
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = PrimaryRed
+                                    containerColor = if (playFocused) DarkRed else PrimaryRed
                                 ),
                                 shape = RoundedCornerShape(4.dp),
-                                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Play Now",
-                                    style = MaterialTheme.typography.labelLarge
-                                )
+                                Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Play", fontSize = 12.sp)
                             }
 
-                            // Watch Trailer Button: Only shown if a trailer key is available.
+                            // Watch Trailer
                             if (uiState.trailerKey != null) {
                                 Button(
                                     onClick = {
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=${uiState.trailerKey}"))
+                                        val intent = Intent(
+                                            Intent.ACTION_VIEW,
+                                            Uri.parse("https://www.youtube.com/watch?v=${uiState.trailerKey}")
+                                        )
                                         context.startActivity(intent)
                                     },
+                                    interactionSource = trailerInteraction,
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = Color.DarkGray
+                                        containerColor = if (trailerFocused) DarkRed else Color.DarkGray
                                     ),
                                     shape = RoundedCornerShape(4.dp),
-                                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Movie,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Watch Trailer",
-                                        style = MaterialTheme.typography.labelLarge
-                                    )
+                                    Icon(Icons.Default.Movie, null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Trailer", fontSize = 12.sp)
                                 }
                             }
 
+                            // My List toggle
                             OutlinedButton(
-                                onClick = { viewModel.toggleMyList() }, // Toggle item in My List.
+                                onClick = { viewModel.toggleMyList() },
+                                interactionSource = myListInteraction,
                                 shape = RoundedCornerShape(4.dp),
-                                contentPadding = PaddingValues(12.dp),
+                                contentPadding = PaddingValues(8.dp),
                                 colors = ButtonDefaults.outlinedButtonColors(
+                                    containerColor = if (myListFocused) DarkRed else Color.Transparent,
                                     contentColor = TextPrimary
                                 )
                             ) {
                                 Icon(
                                     imageVector = if (uiState.isInMyList) Icons.Default.Check else Icons.Default.Add,
                                     contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
                         }
                     }
                 }
+                // ── End Hero Section ─────────────────────────────────────────
 
-                // Similar Movies section.
+                // Similar Movies
                 if (uiState.similarMovies.isNotEmpty()) {
                     ContentRow(
                         title = "Others Also Watched",
                         items = uiState.similarMovies,
                         onItemClick = { movie -> onMovieClick(movie.id) }
                     ) { movie, isSelected, onClick ->
-                        MovieCard(
-                            movie = movie,
-                            isSelected = isSelected,
-                            onClick = onClick
-                        )
+                        MovieCard(movie = movie, isSelected = isSelected, onClick = onClick)
                     }
                 }
 
-                Spacer(modifier = Modifier.height(32.dp)) // Bottom spacing.
+                Spacer(modifier = Modifier.height(32.dp))
             }
-        } else if (uiState.error != null) { // Display an error message if an error occurred.
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
+        } else if (uiState.error != null) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
                     text = uiState.error ?: "An error occurred",
                     style = MaterialTheme.typography.bodyLarge,
@@ -338,9 +335,6 @@ fun MovieDetailScreen(
     }
 }
 
-/**
- * Preview for the Preview for the [MovieDetailScreen] composable.
- */
 @Preview(showBackground = true, backgroundColor = 0xFF141414)
 @Composable
 fun MovieDetailScreenPreview() {
