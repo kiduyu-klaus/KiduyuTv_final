@@ -2,7 +2,6 @@ package com.kiduyuk.klausk.kiduyutv.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
@@ -52,28 +51,11 @@ fun MediaListScreen(
     // Get screen configuration to calculate responsive grid
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
-
-    // Calculate responsive card dimensions and grid columns
-    // Standard TV screen padding
     val horizontalPadding = 48.dp
     val spacing = 16.dp
-
-    // Available width after padding
     val availableWidth = screenWidth - (horizontalPadding * 2)
-
-    // Target card dimensions (maintaining 2:3 aspect ratio)
-    // For TV, we aim for 8 items per row on wide screens
-    val targetColumns = 8
-
-    // Calculate card width: (availableWidth - (spacing * (columns - 1))) / columns
-    val cardWidth = (availableWidth - (spacing * (targetColumns - 1))) / targetColumns
-    val cardHeight = cardWidth * 1.8f // 2:3 aspect ratio with slight adjustment for TV
-
-    // Calculate actual number of columns that fit
     val minCardWidth = 120.dp
     val actualColumns = maxOf(4, minOf(8, ((availableWidth + spacing) / (minCardWidth + spacing)).toInt()))
-
-    // Recalculate card size based on actual columns
     val calculatedCardWidth = (availableWidth - (spacing * (actualColumns - 1))) / actualColumns
     val calculatedCardHeight = calculatedCardWidth * 1.8f
 
@@ -153,13 +135,10 @@ fun MediaListScreen(
                                 modifier = Modifier
                                     .width(calculatedCardWidth)
                                     .height(calculatedCardHeight)
-                                    .focusable(interactionSource = interactionSource)
                                     .clickable(
                                         interactionSource = interactionSource,
                                         indication = null
-                                    ) {
-                                        onMovieClick(movie.id)
-                                    }
+                                    ) { onMovieClick(movie.id) }
                             ) {
                                 MovieCard(
                                     movie = movie,
@@ -178,13 +157,10 @@ fun MediaListScreen(
                                 modifier = Modifier
                                     .width(calculatedCardWidth)
                                     .height(calculatedCardHeight)
-                                    .focusable(interactionSource = interactionSource)
                                     .clickable(
                                         interactionSource = interactionSource,
                                         indication = null
-                                    ) {
-                                        onTvShowClick(tvShow.id)
-                                    }
+                                    ) { onTvShowClick(tvShow.id) }
                             ) {
                                 TvShowCard(
                                     tvShow = tvShow,
