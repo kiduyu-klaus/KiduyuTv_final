@@ -1,56 +1,49 @@
 package com.kiduyuk.klausk.kiduyutv.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.border
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
-import com.kiduyuk.klausk.kiduyutv.ui.theme.GenrePill
-import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
-import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
-import com.kiduyuk.klausk.kiduyutv.ui.theme.TextSecondary
+import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 
-/**
- * Composable function to display a hero section, typically at the top of the home screen.
- * It shows details of either a movie or a TV show, prioritizing the movie if both are provided.
- * The hero section includes a backdrop image, title, overview, rating, year, and action buttons.
- *
- * @param movie The [Movie] object to display in the hero section. Can be null.
- * @param tvShow The [TvShow] object to display in the hero section. Can be null.
- * @param modifier The modifier to be applied to the hero section.
- */
 @Composable
 fun HeroSection(
     movie: Movie?,
     tvShow: TvShow?,
     modifier: Modifier = Modifier
 ) {
-    // Calculate 30% of the current screen height for a responsive hero section.
     val configuration = LocalConfiguration.current
-    val heroHeight = (configuration.screenHeightDp * 0.30f).dp
+    val heroHeight = (configuration.screenHeightDp * 0.50f).dp
 
-    // Determine if a movie is available and should be prioritized over a TV show.
     val isMovie = movie != null
 
-    // Extract relevant data, prioritizing movie data if available.
     val backdropPath = if (isMovie) movie?.backdropPath else tvShow?.backdropPath
     val title = (if (isMovie) movie?.title else tvShow?.name) ?: ""
     val overview = (if (isMovie) movie?.overview else tvShow?.overview) ?: ""
@@ -60,155 +53,188 @@ fun HeroSection(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(heroHeight) // 30% of screen height for uniform display across devices.
+            .height(heroHeight)
     ) {
-        // Background Image: Display the backdrop image if available.
-        if (backdropPath != null) {
+
+        // 🔹 Background Image (safe for preview)
+        if (!backdropPath.isNullOrEmpty()) {
             AsyncImage(
                 model = "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.BACKDROP_SIZE}$backdropPath",
-                contentDescription = null, // Content description for accessibility.
-                contentScale = ContentScale.Crop, // Crop to fill the bounds.
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxSize()
-                    .blur(10.dp) // Apply a blur effect to the background image.
+                    .blur(10.dp)
+            )
+        } else {
+            // Fallback background (for preview / errors)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.DarkGray)
             )
         }
 
-        // Gradient Overlay: Add a vertical gradient to make text more readable over the background.
+        // 🔹 Gradient overlay
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        colors = listOf(
+                        listOf(
                             Color.Transparent,
-                            Color(0xFF141414).copy(alpha = 0.7f), // Semi-transparent dark color.
-                            Color(0xFF141414) // Solid dark color at the bottom.
+                            Color.Black.copy(alpha = 0.5f),
+                            Color.Black.copy(alpha = 0.9f)
                         )
                     )
                 )
         )
 
-        // Content: Arrange title, rating, overview, and action buttons vertically.
+        // 🔹 Content
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(48.dp), // Padding around the content.
-            verticalArrangement = Arrangement.Bottom // Align content to the bottom.
+                .padding(horizontal = 24.dp, vertical = 24.dp)
+                .padding(top = 45.dp), // 🔽 reduced padding
+
+            verticalArrangement = Arrangement.Bottom
         ) {
-            // Title of the movie or TV show.
+
             Text(
                 text = title,
-                style = MaterialTheme.typography.displaySmall,
+                style = MaterialTheme.typography.headlineLarge, // 🔽 smaller than displayLarge
                 color = TextPrimary,
                 maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                fontSize = 32.sp // 🔽 reduced
             )
 
-            Spacer(modifier = Modifier.height(16.dp)) // Vertical spacing.
+            Spacer(modifier = Modifier.height(8.dp)) // 🔽 tighter
 
-            // Rating and Year: Display rating with a star icon and the release/first air year.
             Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Star icon — change tint
                     Icon(
                         imageVector = Icons.Default.Star,
                         contentDescription = null,
-                        tint = PrimaryRed,
-                        modifier = Modifier.size(20.dp)
+                        tint = DarkRed,          // ← was PrimaryRed
+                        modifier = Modifier.size(16.dp)
                     )
                     Text(
                         text = String.format("%.1f", rating),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = TextPrimary
+                        color = TextPrimary,
+                        fontSize = 13.sp
                     )
                 }
+
+                Text("-", color = TextSecondary)
 
                 Text(
                     text = year,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = TextSecondary
+                    color = TextSecondary,
+                    fontSize = 13.sp
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp)) // Vertical spacing.
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Overview: Display a brief description.
             Text(
                 text = overview,
-                style = MaterialTheme.typography.bodyMedium,
                 color = TextSecondary,
-                maxLines = 3,
+                maxLines = 2, // 🔽 reduce lines to fit
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = 600.dp) // Limit width for readability.
+                modifier = Modifier.widthIn(max = 600.dp),
+                fontSize = 13.sp
             )
 
-            Spacer(modifier = Modifier.height(24.dp)) // Vertical spacing.
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // Action Buttons: Play Now, Info, and Add to List buttons.
             Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+
+                // Play button — add focus
+                val playInteraction = remember { MutableInteractionSource() }
+                val playFocused by playInteraction.collectIsFocusedAsState()
+
                 Button(
-                    onClick = { /* Play */ }, // Placeholder for play action.
+                    onClick = { },
+                    interactionSource = playInteraction,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = PrimaryRed
+                        containerColor = if (playFocused) DarkRed else Color.Transparent
                     ),
+                    border = BorderStroke(1.dp, if (playFocused) DarkRed else TextPrimary),
                     shape = RoundedCornerShape(4.dp),
-                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.focusable(interactionSource = playInteraction)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Play Now",
-                        style = MaterialTheme.typography.labelLarge
-                    )
+                    Icon(Icons.Default.PlayArrow, null, tint = TextPrimary, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Play", fontSize = 13.sp, color = TextPrimary)
                 }
 
+                // Info button — add focus
+                val infoInteraction = remember { MutableInteractionSource() }
+                val infoFocused by infoInteraction.collectIsFocusedAsState()
+
                 OutlinedButton(
-                    onClick = { /* Info */ }, // Placeholder for info action.
+                    onClick = { },
+                    interactionSource = infoInteraction,
+                    border = BorderStroke(1.dp, if (infoFocused) DarkRed else TextPrimary),
                     shape = RoundedCornerShape(4.dp),
-                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.focusable(interactionSource = infoInteraction),
                     colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = if (infoFocused) DarkRed.copy(alpha = 0.2f) else Color.Transparent,
                         contentColor = TextPrimary
                     )
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Info",
-                        style = MaterialTheme.typography.labelLarge
-                    )
-                }
-
-                OutlinedButton(
-                    onClick = { /* Add to List */ }, // Placeholder for add to list action.
-                    shape = RoundedCornerShape(4.dp),
-                    contentPadding = PaddingValues(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = TextPrimary
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp)
-                    )
+                    Icon(Icons.Default.Info, null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Info", fontSize = 13.sp)
                 }
             }
         }
     }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF000000)
+@Composable
+fun HeroSectionMoviePreview() {
+    val sampleMovie = Movie(
+        id = 1,
+        title = "Lucky Luke",
+        overview = "Lucky Luke, the lone gunslinger, must team up with Louise, a fearless young woman searching for her missing mother. Together, they face the dangers of the Wild West, ally with old enemies like the Daltons or Billy the Kid - and learn to trust each other.",
+        posterPath = "/path/to/poster.jpg",
+        backdropPath = "/path/to/backdrop.jpg",
+        voteAverage = 6.7,
+        releaseDate = "2026-01-01",
+        genreIds = listOf(28, 35, 80),
+        popularity = 100.0
+    )
+    HeroSection(movie = sampleMovie, tvShow = null)
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF000000)
+@Composable
+fun HeroSectionTvShowPreview() {
+    val sampleTvShow = TvShow(
+        id = 2,
+        name = "The Mandalorian",
+        overview = "The travels of a lone bounty hunter in the outer reaches of the galaxy, far from the authority of the New Republic.",
+        posterPath = "/path/to/poster.jpg",
+        backdropPath = "/path/to/backdrop.jpg",
+        voteAverage = 8.5,
+        firstAirDate = "2019-11-12",
+        genreIds = listOf(10765, 10759),
+        popularity = 200.0
+    )
+    HeroSection(movie = null, tvShow = sampleTvShow)
 }
