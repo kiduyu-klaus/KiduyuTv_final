@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
@@ -42,9 +43,13 @@ fun HeroSection(
     tvShow: TvShow?,
     modifier: Modifier = Modifier
 ) {
+    // Calculate 30% of the current screen height for a responsive hero section.
+    val configuration = LocalConfiguration.current
+    val heroHeight = (configuration.screenHeightDp * 0.30f).dp
+
     // Determine if a movie is available and should be prioritized over a TV show.
     val isMovie = movie != null
-    
+
     // Extract relevant data, prioritizing movie data if available.
     val backdropPath = if (isMovie) movie?.backdropPath else tvShow?.backdropPath
     val title = (if (isMovie) movie?.title else tvShow?.name) ?: ""
@@ -55,7 +60,7 @@ fun HeroSection(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(500.dp) // Fixed height for the hero section.
+            .height(heroHeight) // 30% of screen height for uniform display across devices.
     ) {
         // Background Image: Display the backdrop image if available.
         if (backdropPath != null) {
