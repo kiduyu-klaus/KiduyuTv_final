@@ -10,6 +10,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -73,74 +74,101 @@ fun HomeScreen(
                 )
             }
         } else { // Display the main content once data is loaded.
-            Column(
+            Box(
                 modifier = Modifier.fillMaxSize()
             ) {
-                // Top Navigation Bar — fixed, never scrolls.
-                TopBar(
-                    selectedRoute = selectedRoute,
-                    onNavItemClick = { route ->
-                        selectedRoute = route
-                        onNavigate(route)
-                    }
-                )
-
-                // Hero Section — fixed directly below the TopBar, never scrolls.
+                // Hero Section and scrollable content — TopBar overlays on top.
                 val selectedMovie = uiState.selectedItem as? Movie
                 val selectedTvShow = uiState.selectedItem as? TvShow
 
-                HeroSection(
-                    movie = selectedMovie,
-                    tvShow = selectedTvShow
-                )
-
-                // Scrollable content area — takes all remaining vertical space.
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .weight(1f)
-                        .verticalScroll(scrollState)
+                    modifier = Modifier.fillMaxSize()
                 ) {
+                    HeroSection(
+                        movie = selectedMovie,
+                        tvShow = selectedTvShow
+                    )
 
-                    // Content Row for TV Shows Trending Today.
-                    ContentRow(
-                        title = "TV Shows Trending Today",
-                        items = uiState.trendingTvShows,
-                        onItemFocus = { tvShow -> viewModel.selectItem(tvShow) }, // Update selected item on focus.
-                        onItemClick = { tvShow ->
-                            viewModel.selectItem(tvShow)
-                            onTvShowClick(tvShow.id)
-                        }
-                    ) { tvShow, isFocused, onClick ->
-                        TvShowCard(
-                            tvShow = tvShow,
-                            isSelected = isFocused,
-                            onClick = onClick
-                        )
-                    }
+                    // Scrollable content area — takes all remaining vertical space.
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .weight(1f)
+                            .verticalScroll(scrollState)
+                    ) {
 
-                    // Content Row for Movies Trending Today.
-                    ContentRow(
-                        title = "Movies Trending Today",
-                        items = uiState.trendingMovies,
-                        onItemFocus = { movie -> viewModel.selectItem(movie) }, // Update selected item on focus.
-                        onItemClick = { movie ->
-                            viewModel.selectItem(movie)
-                            onMovieClick(movie.id)
-                        }
-                    ) { movie, isFocused, onClick ->
-                        MovieCard(
-                            movie = movie,
-                            isSelected = isFocused,
-                            onClick = onClick
-                        )
-                    }
-
-                    // Content Row for Continue Watching, only shown if not empty.
-                    if (uiState.continueWatching.isNotEmpty()) {
+                        // Content Row for TV Shows Trending Today.
                         ContentRow(
-                            title = "Continue Watching",
-                            items = uiState.continueWatching,
+                            title = "TV Shows Trending Today",
+                            items = uiState.trendingTvShows,
+                            onItemFocus = { tvShow -> viewModel.selectItem(tvShow) }, // Update selected item on focus.
+                            onItemClick = { tvShow ->
+                                viewModel.selectItem(tvShow)
+                                onTvShowClick(tvShow.id)
+                            }
+                        ) { tvShow, isFocused, onClick ->
+                            TvShowCard(
+                                tvShow = tvShow,
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
+                        }
+
+                        // Content Row for Movies Trending Today.
+                        ContentRow(
+                            title = "Movies Trending Today",
+                            items = uiState.trendingMovies,
+                            onItemFocus = { movie -> viewModel.selectItem(movie) }, // Update selected item on focus.
+                            onItemClick = { movie ->
+                                viewModel.selectItem(movie)
+                                onMovieClick(movie.id)
+                            }
+                        ) { movie, isFocused, onClick ->
+                            MovieCard(
+                                movie = movie,
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
+                        }
+
+                        // Content Row for Continue Watching, only shown if not empty.
+                        if (uiState.continueWatching.isNotEmpty()) {
+                            ContentRow(
+                                title = "Continue Watching",
+                                items = uiState.continueWatching,
+                                onItemFocus = { movie -> viewModel.selectItem(movie) }, // Update selected item on focus.
+                                onItemClick = { movie -> onMovieClick(movie.id) }
+                            ) { movie, isFocused, onClick ->
+                                MovieCard(
+                                    movie = movie,
+                                    isSelected = isFocused,
+                                    onClick = onClick
+                                )
+                            }
+                        }
+
+                        // Content Row for Popular Networks.
+                        NetworkRow(
+                            title = "Popular Networks",
+                            items = uiState.popularNetworks,
+                            onItemClick = { network ->
+                                onNavigate("media_list/network/${network.id}/${network.name}")
+                            }
+                        )
+
+                        // Content Row for Popular Companies.
+                        NetworkRow(
+                            title = "Popular Companies",
+                            items = uiState.popularCompanies,
+                            onItemClick = { company ->
+                                onNavigate("media_list/company/${company.id}/${company.name}")
+                            }
+                        )
+
+                        // Content Row for Latest Movies Last Week.
+                        ContentRow(
+                            title = "Latest Movies Last Week",
+                            items = uiState.latestMovies,
                             onItemFocus = { movie -> viewModel.selectItem(movie) }, // Update selected item on focus.
                             onItemClick = { movie -> onMovieClick(movie.id) }
                         ) { movie, isFocused, onClick ->
@@ -150,77 +178,69 @@ fun HomeScreen(
                                 onClick = onClick
                             )
                         }
-                    }
 
-                    // Content Row for Popular Networks.
-                    NetworkRow(
-                        title = "Popular Networks",
-                        items = uiState.popularNetworks,
-                        onItemClick = { network ->
-                            onNavigate("media_list/network/${network.id}/${network.name}")
+                        // Content Row for Top TV Shows Last Week.
+                        ContentRow(
+                            title = "Top TV Shows Last Week",
+                            items = uiState.topTvShows,
+                            onItemFocus = { tvShow -> viewModel.selectItem(tvShow) }, // Update selected item on focus.
+                            onItemClick = { tvShow -> onTvShowClick(tvShow.id) }
+                        ) { tvShow, isFocused, onClick ->
+                            TvShowCard(
+                                tvShow = tvShow,
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
                         }
-                    )
 
-                    // Content Row for Popular Companies.
-                    NetworkRow(
-                        title = "Popular Companies",
-                        items = uiState.popularCompanies,
-                        onItemClick = { company ->
-                            onNavigate("media_list/company/${company.id}/${company.name}")
-                        }
-                    )
-
-                    // Content Row for Latest Movies Last Week.
-                    ContentRow(
-                        title = "Latest Movies Last Week",
-                        items = uiState.latestMovies,
-                        onItemFocus = { movie -> viewModel.selectItem(movie) }, // Update selected item on focus.
-                        onItemClick = { movie -> onMovieClick(movie.id) }
-                    ) { movie, isFocused, onClick ->
-                        MovieCard(
-                            movie = movie,
-                            isSelected = isFocused,
-                            onClick = onClick
-                        )
-                    }
-
-                    // Content Row for Top TV Shows Last Week.
-                    ContentRow(
-                        title = "Top TV Shows Last Week",
-                        items = uiState.topTvShows,
-                        onItemFocus = { tvShow -> viewModel.selectItem(tvShow) }, // Update selected item on focus.
-                        onItemClick = { tvShow -> onTvShowClick(tvShow.id) }
-                    ) { tvShow, isFocused, onClick ->
-                        TvShowCard(
-                            tvShow = tvShow,
-                            isSelected = isFocused,
-                            onClick = onClick
-                        )
-                    }
-
-                    // My List section, only shown if not empty.
-                    if (uiState.myList.isNotEmpty()) {
-                        Text(
-                            text = "My List",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = TextPrimary,
-                            modifier = Modifier.padding(horizontal = 48.dp, vertical = 16.dp)
-                        )
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 48.dp),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            uiState.myList.forEach { item ->
-                                // TODO: Implement display for my list items.
+                        // My List section, only shown if not empty.
+                        if (uiState.myList.isNotEmpty()) {
+                            Text(
+                                text = "My List",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = TextPrimary,
+                                modifier = Modifier.padding(horizontal = 48.dp, vertical = 16.dp)
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 48.dp),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                uiState.myList.forEach { item ->
+                                    // TODO: Implement display for my list items.
+                                }
                             }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(32.dp)) // Bottom spacing.
-                } // end scrollable Column
-            } // end outer Column
+                        Spacer(modifier = Modifier.height(32.dp)) // Bottom spacing.
+                    } // end scrollable Column
+                } // end content Column
+
+                // Transparent TopBar overlaid on top of all content
+                // A subtle gradient scrim ensures text stays readable over the hero image
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.55f),
+                                    Color.Transparent
+                                )
+                            )
+                        )
+                        .align(Alignment.TopCenter)
+                ) {
+                    TopBar(
+                        selectedRoute = selectedRoute,
+                        onNavItemClick = { route ->
+                            selectedRoute = route
+                            onNavigate(route)
+                        }
+                    )
+                }
+            } // end outer Box
         }
     }
 }
