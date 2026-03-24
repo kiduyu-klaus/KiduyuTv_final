@@ -96,6 +96,16 @@ class TmdbRepository {
         api.getTvShowsByNetwork(networkId).results
     }
 
+    /** Fetches details for a specific network, including its logo. */
+    suspend fun getNetworkDetails(networkId: Int): Result<Network> = runCatching {
+        api.getNetworkDetails(networkId)
+    }
+
+    /** Fetches details for a specific production company, including its logo. */
+    suspend fun getCompanyDetails(companyId: Int): Result<ProductionCompany> = runCatching {
+        api.getCompanyDetails(companyId)
+    }
+
     /** Fetches videos (trailers, etc.) for a specific movie. */
     suspend fun getMovieVideos(movieId: Int): Result<List<Video>> = runCatching {
         api.getMovieVideos(movieId).results
