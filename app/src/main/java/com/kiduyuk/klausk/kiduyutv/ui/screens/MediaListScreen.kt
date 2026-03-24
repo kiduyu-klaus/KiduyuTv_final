@@ -2,6 +2,7 @@ package com.kiduyuk.klausk.kiduyutv.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
@@ -26,6 +27,7 @@ import com.kiduyuk.klausk.kiduyutv.viewmodel.MediaListViewModel
 
 /**
  * Screen that displays a grid of movies or TV shows filtered by a company or network.
+ * Uses a responsive grid layout that adapts to screen width.
  *
  * @param type The type of list to show ("company" or "network").
  * @param id The TMDB ID of the company or network.
@@ -47,14 +49,33 @@ fun MediaListScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    // Calculate dynamic column count based on screen width.
+    // Get screen configuration to calculate responsive grid
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
-    val horizontalPadding = 24.dp
-    val itemWidth = 160.dp
-    val itemSpacing = 8.dp
-    val availableWidth = screenWidth - horizontalPadding * 2
-    val columnCount = maxOf(2, ((availableWidth + itemSpacing) / (itemWidth + itemSpacing)).toInt())
+
+    // Calculate responsive card dimensions and grid columns
+    // Standard TV screen padding
+    val horizontalPadding = 48.dp
+    val spacing = 16.dp
+
+    // Available width after padding
+    val availableWidth = screenWidth - (horizontalPadding * 2)
+
+    // Target card dimensions (maintaining 2:3 aspect ratio)
+    // For TV, we aim for 8 items per row on wide screens
+    val targetColumns = 8
+
+    // Calculate card width: (availableWidth - (spacing * (columns - 1))) / columns
+    val cardWidth = (availableWidth - (spacing * (targetColumns - 1))) / targetColumns
+    val cardHeight = cardWidth * 1.8f // 2:3 aspect ratio with slight adjustment for TV
+
+    // Calculate actual number of columns that fit
+    val minCardWidth = 120.dp
+    val actualColumns = maxOf(4, minOf(8, ((availableWidth + spacing) / (minCardWidth + spacing)).toInt()))
+
+    // Recalculate card size based on actual columns
+    val calculatedCardWidth = (availableWidth - (spacing * (actualColumns - 1))) / actualColumns
+    val calculatedCardHeight = calculatedCardWidth * 1.8f
 
     // Load content when parameters change.
     LaunchedEffect(type, id, name) {
@@ -77,7 +98,7 @@ fun MediaListScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBackClick) {
@@ -87,7 +108,7 @@ fun MediaListScreen(
                         tint = TextPrimary
                     )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(16.dp))
                 Text(
                     text = uiState.title,
                     style = MaterialTheme.typography.headlineMedium,
@@ -95,7 +116,7 @@ fun MediaListScreen(
                 )
             }
 
-            // Main Content: Grid of items
+            // Main Content: Responsive Grid of items
             if (uiState.isLoading) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -112,11 +133,16 @@ fun MediaListScreen(
                 }
             } else {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(columnCount),
+                    columns = GridCells.Fixed(actualColumns),
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    contentPadding = PaddingValues(
+                        start = horizontalPadding,
+                        end = horizontalPadding,
+                        top = 8.dp,
+                        bottom = 32.dp
+                    ),
+                    horizontalArrangement = Arrangement.spacedBy(spacing),
+                    verticalArrangement = Arrangement.spacedBy(spacing)
                 ) {
                     if (type == "company") {
                         items(uiState.movies) { movie ->
@@ -125,6 +151,9 @@ fun MediaListScreen(
 
                             Box(
                                 modifier = Modifier
+                                    .width(calculatedCardWidth)
+                                    .height(calculatedCardHeight)
+                                    .focusable(interactionSource = interactionSource)
                                     .clickable(
                                         interactionSource = interactionSource,
                                         indication = null
@@ -135,7 +164,8 @@ fun MediaListScreen(
                                 MovieCard(
                                     movie = movie,
                                     isSelected = isFocused,
-                                    onClick = { onMovieClick(movie.id) }
+                                    onClick = { onMovieClick(movie.id) },
+                                    modifier = Modifier.fillMaxSize()
                                 )
                             }
                         }
@@ -146,6 +176,9 @@ fun MediaListScreen(
 
                             Box(
                                 modifier = Modifier
+                                    .width(calculatedCardWidth)
+                                    .height(calculatedCardHeight)
+                                    .focusable(interactionSource = interactionSource)
                                     .clickable(
                                         interactionSource = interactionSource,
                                         indication = null
@@ -156,7 +189,8 @@ fun MediaListScreen(
                                 TvShowCard(
                                     tvShow = tvShow,
                                     isSelected = isFocused,
-                                    onClick = { onTvShowClick(tvShow.id) }
+                                    onClick = { onTvShowClick(tvShow.id) },
+                                    modifier = Modifier.fillMaxSize()
                                 )
                             }
                         }
