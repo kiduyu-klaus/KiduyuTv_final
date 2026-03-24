@@ -21,3 +21,5 @@ val TextSecondary = Color(0xFFB3B3B3)
 val TextTertiary = Color(0xFF808080)
 val FocusBorder = Color(0xFFE50914)
 val GenrePill = Color(0xFF333333)
+
+val DarkRed = Color(0xFF8B0000)
