@@ -89,6 +89,7 @@ class HomeViewModel : ViewModel() {
 
     /**
      * Loads all necessary content for the home screen concurrently.
+     * Uses parallel execution with proper error handling for optimal performance.
      * Updates the [HomeUiState] with loading status, fetched data, or error messages.
      */
     fun loadHomeContent() {
@@ -97,41 +98,43 @@ class HomeViewModel : ViewModel() {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
             try {
-                // Fetch all data concurrently using the repository.
-                val trendingTvDeferred = repository.getTrendingTvToday()
-                val trendingMoviesDeferred = repository.getTrendingMoviesToday()
-                val nowPlayingDeferred = repository.getNowPlayingMovies()
-                val topRatedMoviesDeferred = repository.getTopRatedMovies()
-                val topRatedTvDeferred = repository.getTopRatedTvShows()
-                val popularMoviesDeferred = repository.getPopularMovies()
+                // Parallel fetch all independent API calls using async for maximum concurrency
+                val trendingTvDeferred = async { repository.getTrendingTvToday() }
+                val trendingMoviesDeferred = async { repository.getTrendingMoviesToday() }
+                val nowPlayingDeferred = async { repository.getNowPlayingMovies() }
+                val topRatedMoviesDeferred = async { repository.getTopRatedMovies() }
+                val topRatedTvDeferred = async { repository.getTopRatedTvShows() }
+                val popularMoviesDeferred = async { repository.getPopularMovies() }
 
-                // Await results and provide empty lists as fallback.
-                val trendingTv = trendingTvDeferred.getOrNull() ?: emptyList()
-                val trendingMovies = trendingMoviesDeferred.getOrNull() ?: emptyList()
-                val nowPlaying = nowPlayingDeferred.getOrNull() ?: emptyList()
-                val topRatedMovies = topRatedMoviesDeferred.getOrNull() ?: emptyList()
-                val topRatedTv = topRatedTvDeferred.getOrNull() ?: emptyList()
-                val popularMovies = popularMoviesDeferred.getOrNull() ?: emptyList()
-
-                // Fetch popular networks details from TMDB.
+                // Fetch networks and companies in parallel with main content
                 val networkIds = listOf(213, 1024, 1025, 158, 2739, 4451, 3284, 283)
-                val networks = networkIds.map { id ->
-                    async {
-                        repository.getNetworkDetails(id).getOrNull()?.let {
-                            NetworkItem(it.id, it.name, it.logoPath, "network")
-                        }
-                    }
-                }.awaitAll().filterNotNull()
-
-                // Fetch popular companies details from TMDB.
                 val companyIds = listOf(420, 3, 174, 4, 33, 5, 2, 1)
-                val companies = companyIds.map { id ->
-                    async {
-                        repository.getCompanyDetails(id).getOrNull()?.let {
-                            NetworkItem(it.id, it.name, it.logoPath, "company")
-                        }
-                    }
-                }.awaitAll().filterNotNull()
+
+                // Network and company details fetched in parallel
+                val networkDetailsDeferred = networkIds.map { id ->
+                    async { repository.getNetworkDetails(id).getOrNull() }
+                }
+                val companyDetailsDeferred = companyIds.map { id ->
+                    async { repository.getCompanyDetails(id).getOrNull() }
+                }
+
+                // Await all results and provide empty lists as fallback
+                val trendingTv = trendingTvDeferred.await().getOrNull() ?: emptyList()
+                val trendingMovies = trendingMoviesDeferred.await().getOrNull() ?: emptyList()
+                val nowPlaying = nowPlayingDeferred.await().getOrNull() ?: emptyList()
+                val topRatedMovies = topRatedMoviesDeferred.await().getOrNull() ?: emptyList()
+                val topRatedTv = topRatedTvDeferred.await().getOrNull() ?: emptyList()
+
+                // Process network and company details
+                val networks = networkDetailsDeferred.awaitAll()
+                    .filterNotNull()
+                    .filter { it.logoPath != null }
+                    .map { NetworkItem(it.id, it.name, it.logoPath, "network") }
+
+                val companies = companyDetailsDeferred.awaitAll()
+                    .filterNotNull()
+                    .filter { it.logoPath != null }
+                    .map { NetworkItem(it.id, it.name, it.logoPath, "company") }
 
                 // Update the UI state with the fetched data.
                 _uiState.value = HomeUiState(
