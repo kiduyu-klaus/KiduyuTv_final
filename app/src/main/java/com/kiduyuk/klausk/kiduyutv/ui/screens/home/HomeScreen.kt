@@ -126,7 +126,7 @@ private fun LoadingContent() {
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        CircularProgressIndicator(color = PrimaryRed)
+        LottieLoadingView(size = 300.dp)
     }
 }
 
@@ -265,22 +265,26 @@ private fun HomeContent(
                 }
 
                 // Content Row for Popular Networks.
-                NetworkRow(
-                    title = "Popular Networks",
-                    items = popularNetworks,
-                    onItemClick = { network ->
-                        onNavigate("media_list/network/${network.id}/${network.name}")
-                    }
-                )
+                if (popularNetworks.isNotEmpty()) {
+                    NetworkRow(
+                        title = "Popular Networks",
+                        items = popularNetworks,
+                        onItemClick = { network ->
+                            onNavigate("media_list/network/${network.id}/${network.name}")
+                        }
+                    )
+                }
 
                 // Content Row for Popular Companies.
-                NetworkRow(
-                    title = "Popular Companies",
-                    items = popularCompanies,
-                    onItemClick = { company ->
-                        onNavigate("media_list/company/${company.id}/${company.name}")
-                    }
-                )
+                if (popularCompanies.isNotEmpty()) {
+                    NetworkRow(
+                        title = "Popular Companies",
+                        items = popularCompanies,
+                        onItemClick = { company ->
+                            onNavigate("media_list/company/${company.id}/${company.name}")
+                        }
+                    )
+                }
 
                 // Content Row for Latest Movies Last Week.
                 ContentRow(
