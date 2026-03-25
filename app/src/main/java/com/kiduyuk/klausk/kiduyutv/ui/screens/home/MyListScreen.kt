@@ -36,6 +36,7 @@ fun MyListScreen(
     onTvShowClick: (Int) -> Unit,
     onNavigate: (String) -> Unit = {},
     onSearchClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
     // Collect UI state from the ViewModel.
@@ -50,7 +51,8 @@ fun MyListScreen(
         TopBar(
             selectedRoute = "my_list",
             onNavItemClick = { route -> onNavigate(route) }, // Handle navigation clicks.
-            onSearchClick = onSearchClick
+            onSearchClick = onSearchClick,
+            onSettingsClick = onSettingsClick
         )
 
         Column(
