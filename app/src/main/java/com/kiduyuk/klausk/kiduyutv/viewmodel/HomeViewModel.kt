@@ -37,6 +37,8 @@ data class HomeUiState(
     val latestMovies: List<Movie> = emptyList(),
     val topTvShows: List<TvShow> = emptyList(),
     val oscarMovies: List<Movie> = emptyList(),
+    val oscarWinners2026: List<Movie> = emptyList(),
+    val hallmarkMovies: List<Movie> = emptyList(),
     val myList: List<MyListItem> = emptyList(),
     val selectedItem: Any? = null,
     val lastClickedItemId: Int? = null,
@@ -124,6 +126,32 @@ class HomeViewModel : ViewModel() {
                 // Fetch Oscar movies
                 val oscarMoviesDeferred = async { repository.getOscarMovies() }
 
+                // Fetch 2026 Oscar winners from Trakt
+                val oscarWinners2026Deferred = async {
+                    repository.getTraktListMovies(
+                        userSlug = "visualcortex",
+                        listSlug = "2026-oscar-winners",
+                        clientId = "98f8c9590ae29a666942f81c5f86628f0dbe2767d28b88cdedbb7bbbd316e1a0"
+                    )
+                }
+
+//                val hallmarkMoviesDeferred = async {
+//                    repository.getTraktListMovies(
+//                        userSlug = "trakt_kodi_321",
+//                        listSlug = "hallmark-movies",
+//                        clientId = "98f8c9590ae29a666942f81c5f86628f0dbe2767d28b88cdedbb7bbbd316e1a0"
+//                    )
+//                }
+
+                // Fetch Hallmark Movies from Trakt
+                val hallmarkMoviesDeferred = async {
+                    repository.getTraktListMovies(
+                        userSlug = "trakt_kodi_321",
+                        listSlug = "hallmark-movies",
+                        clientId = "98f8c9590ae29a666942f81c5f86628f0dbe2767d28b88cdedbb7bbbd316e1a0"
+                    )
+                }
+
                 // Await all results and provide empty lists as fallback
                 val trendingTv = trendingTvDeferred.await().getOrNull() ?: emptyList()
                 val trendingMovies = trendingMoviesDeferred.await().getOrNull() ?: emptyList()
@@ -153,6 +181,8 @@ class HomeViewModel : ViewModel() {
                     latestMovies = topRatedMovies.take(10),
                     topTvShows = topRatedTv.take(10),
                     oscarMovies = oscarMoviesDeferred.await().getOrNull()?.mapNotNull { it.toMovie() } ?: emptyList(),
+                    oscarWinners2026 = oscarWinners2026Deferred.await().getOrNull() ?: emptyList(),
+                    hallmarkMovies = hallmarkMoviesDeferred.await().getOrNull() ?: emptyList(),
                     myList = emptyList(), // MyList is initially empty.
                     // Set the initial selected item for the hero section.
                     selectedItem = trendingTv.firstOrNull() ?: trendingMovies.firstOrNull()

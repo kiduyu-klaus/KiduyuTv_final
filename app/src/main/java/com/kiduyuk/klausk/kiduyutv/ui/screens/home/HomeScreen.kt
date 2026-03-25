@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -18,28 +17,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
-import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.ui.components.*
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
-import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeViewModel
-import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeUiState
 import com.kiduyuk.klausk.kiduyutv.viewmodel.MyListItem
 
-/**
- * The main home screen of the KiduyuTv application.
- * Displays a hero section, various content rows for movies and TV shows, and navigation.
- * It observes the [HomeViewModel] for UI state updates and handles user interactions.
- * Performance optimized with proper state management to minimize recompositions.
- *
- * @param onMovieClick Lambda to navigate to the detail screen of a movie.
- * @param onTvShowClick Lambda to navigate to the detail screen of a TV show.
- * @param onNavigate Lambda to handle general navigation events.
- * @param onSearchClick Lambda to navigate to the search screen.
- * @param viewModel The [HomeViewModel] instance providing data for the screen.
- */
 @Composable
 fun HomeScreen(
     onMovieClick: (Int) -> Unit,
@@ -49,16 +33,10 @@ fun HomeScreen(
     onSettingsClick: () -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
-    // Collect UI state from the ViewModel.
     val uiState by viewModel.uiState.collectAsState()
-
-    // Remember scroll state for the main content column.
     val scrollState = rememberScrollState()
-
-    // State to keep track of the currently selected navigation route.
     var selectedRoute by remember { mutableStateOf("home") }
 
-    // Memoize selected item derivations to prevent unnecessary recompositions
     val selectedMovie by remember(uiState.selectedItem) {
         derivedStateOf { uiState.selectedItem as? Movie }
     }
@@ -66,8 +44,6 @@ fun HomeScreen(
         derivedStateOf { uiState.selectedItem as? TvShow }
     }
 
-    // Use uiState values directly - they're already immutable data
-    // This avoids unnecessary recompositions when isLoading or error changes
     val trendingTvShows = uiState.trendingTvShows
     val trendingMovies = uiState.trendingMovies
     val continueWatching = uiState.continueWatching
@@ -76,20 +52,20 @@ fun HomeScreen(
     val latestMovies = uiState.latestMovies
     val topTvShows = uiState.topTvShows
     val oscarMovies = uiState.oscarMovies
-    val myList by MyListManager.myList.collectAsState()
+    val oscarWinners2026 = uiState.oscarWinners2026
+    val hallmarkMovies = uiState.hallmarkMovies
+    val myList = uiState.myList
 
-    // Main container for the home screen.
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(BackgroundDark)
     ) {
-        // Display a loading indicator if data is being fetched.
         if (uiState.isLoading) {
             LoadingContent()
-        } else if (uiState.error != null) { // Display an error message if an error occurred.
+        } else if (uiState.error != null) {
             ErrorContent(error = uiState.error!!)
-        } else { // Display the main content once data is loaded.
+        } else {
             HomeContent(
                 selectedMovie = selectedMovie,
                 selectedTvShow = selectedTvShow,
@@ -101,15 +77,19 @@ fun HomeScreen(
                 latestMovies = latestMovies,
                 topTvShows = topTvShows,
                 oscarMovies = oscarMovies,
+                oscarWinners2026 = oscarWinners2026,
+                hallmarkMovies = hallmarkMovies,
                 myList = myList,
                 scrollState = scrollState,
                 selectedRoute = selectedRoute,
                 onMovieClick = onMovieClick,
                 onTvShowClick = onTvShowClick,
-                onNavigate = onNavigate,
                 onSearchClick = onSearchClick,
                 onSettingsClick = onSettingsClick,
-                onRouteChange = { selectedRoute = it },
+                onNavItemClick = { route ->
+                    selectedRoute = route
+                    onNavigate(route)
+                },
                 onSelectItem = { viewModel.selectItem(it) },
                 onSetLastClickedItemId = { viewModel.setLastClickedItemId(it) },
                 lastClickedItemId = uiState.lastClickedItemId
@@ -118,9 +98,6 @@ fun HomeScreen(
     }
 }
 
-/**
- * Loading content composable - displays progress indicator.
- */
 @Composable
 private fun LoadingContent() {
     Box(
@@ -131,9 +108,6 @@ private fun LoadingContent() {
     }
 }
 
-/**
- * Error content composable - displays error message.
- */
 @Composable
 private fun ErrorContent(error: String) {
     Box(
@@ -148,10 +122,6 @@ private fun ErrorContent(error: String) {
     }
 }
 
-/**
- * Home content composable - displays all home screen content.
- * Extracted to separate composable to enable proper memoization.
- */
 @Composable
 private fun HomeContent(
     selectedMovie: Movie?,
@@ -164,15 +134,16 @@ private fun HomeContent(
     latestMovies: List<Movie>,
     topTvShows: List<TvShow>,
     oscarMovies: List<Movie>,
+    oscarWinners2026: List<Movie>,
+    hallmarkMovies: List<Movie>,
     myList: List<MyListItem>,
     scrollState: androidx.compose.foundation.ScrollState,
     selectedRoute: String,
     onMovieClick: (Int) -> Unit,
     onTvShowClick: (Int) -> Unit,
-    onNavigate: (String) -> Unit,
     onSearchClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    onRouteChange: (String) -> Unit,
+    onNavItemClick: (String) -> Unit,
     onSelectItem: (Any) -> Unit,
     onSetLastClickedItemId: (Int?) -> Unit = {},
     lastClickedItemId: Int? = null
@@ -196,14 +167,12 @@ private fun HomeContent(
                 tvShow = selectedTvShow
             )
 
-            // Scrollable content area — takes all remaining vertical space.
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .weight(1f)
                     .verticalScroll(scrollState)
             ) {
-                // Content Row for TV Shows Trending Today.
                 ContentRow(
                     title = "TV Shows Trending Today",
                     items = trendingTvShows,
@@ -224,7 +193,6 @@ private fun HomeContent(
                     )
                 }
 
-                // Content Row for Movies Trending Today.
                 ContentRow(
                     title = "Movies Trending Today",
                     items = trendingMovies,
@@ -244,7 +212,6 @@ private fun HomeContent(
                     )
                 }
 
-                // Content Row for Continue Watching, only shown if not empty.
                 if (continueWatching.isNotEmpty()) {
                     ContentRow(
                         title = "Continue Watching",
@@ -265,31 +232,28 @@ private fun HomeContent(
                     }
                 }
 
-                // Content Row for Popular Networks.
                 if (popularNetworks.isNotEmpty()) {
                     NetworkRow(
                         title = "Popular Networks",
                         items = popularNetworks,
                         onItemClick = { network ->
-                            onNavigate("media_list/network/${network.id}/${network.name}")
+                            onSetLastClickedItemId(network.id)
                         }
                     )
                 }
 
-                // Content Row for Popular Companies.
                 if (popularCompanies.isNotEmpty()) {
                     NetworkRow(
                         title = "Popular Companies",
                         items = popularCompanies,
                         onItemClick = { company ->
-                            onNavigate("media_list/company/${company.id}/${company.name}")
+                            onSetLastClickedItemId(company.id)
                         }
                     )
                 }
 
-                // Content Row for Latest Movies Last Week.
                 ContentRow(
-                    title = "Latest Movies Last Week",
+                    title = "Latest Movies",
                     items = latestMovies,
                     restoreFocusItemId = lastClickedItemId,
                     getItemId = { it.id },
@@ -306,9 +270,8 @@ private fun HomeContent(
                     )
                 }
 
-                // Content Row for Top TV Shows Last Week.
                 ContentRow(
-                    title = "Top TV Shows Last Week",
+                    title = "Top Rated TV Shows",
                     items = topTvShows,
                     restoreFocusItemId = lastClickedItemId,
                     getItemId = { it.id },
@@ -325,7 +288,46 @@ private fun HomeContent(
                     )
                 }
 
-                // Content Row for Oscar Movies (only shown if not empty).
+                if (oscarWinners2026.isNotEmpty()) {
+                    ContentRow(
+                        title = "2026 Oscar winners",
+                        items = oscarWinners2026,
+                        restoreFocusItemId = lastClickedItemId,
+                        getItemId = { it.id },
+                        onItemFocus = { movie -> onSelectItem(movie) },
+                        onItemClick = { movie ->
+                            onSetLastClickedItemId(movie.id)
+                            onMovieClick(movie.id)
+                        }
+                    ) { movie, isFocused, onClick ->
+                        MovieCard(
+                            movie = movie,
+                            isSelected = isFocused,
+                            onClick = onClick
+                        )
+                    }
+                }
+
+                if (hallmarkMovies.isNotEmpty()) {
+                    ContentRow(
+                        title = "Hallmark Movies",
+                        items = hallmarkMovies,
+                        restoreFocusItemId = lastClickedItemId,
+                        getItemId = { it.id },
+                        onItemFocus = { movie -> onSelectItem(movie) },
+                        onItemClick = { movie ->
+                            onSetLastClickedItemId(movie.id)
+                            onMovieClick(movie.id)
+                        }
+                    ) { movie, isFocused, onClick ->
+                        MovieCard(
+                            movie = movie,
+                            isSelected = isFocused,
+                            onClick = onClick
+                        )
+                    }
+                }
+
                 if (oscarMovies.isNotEmpty()) {
                     ContentRow(
                         title = "Oscar Movies",
@@ -346,195 +348,59 @@ private fun HomeContent(
                     }
                 }
 
-                // My List section, only shown if not empty.
                 if (myList.isNotEmpty()) {
-                    ContentRow(
-                        title = "My List",
-                        items = myList,
-                        getItemId = { it.id },
-                        onItemClick = { item ->
-                            when (item.type) {
-                                "movie" -> onMovieClick(item.id)
-                                "tv" -> onTvShowClick(item.id)
-                            }
-                        }
-                    ) { item, isFocused, onClick ->
-                        if (item.type == "movie") {
-                            MovieCard(
-                                movie = Movie(
-                                    id = item.id,
-                                    title = item.title,
-                                    posterPath = item.posterPath,
-                                    overview = "",
-                                    backdropPath = null,
-                                    voteAverage = 0.0,
-                                    releaseDate = "",
-                                    genreIds = emptyList(),
-                                    popularity = 0.0
-                                ),
-                                isSelected = isFocused,
-                                onClick = onClick
-                            )
-                        } else {
-                            TvShowCard(
-                                tvShow = TvShow(
-                                    id = item.id,
-                                    name = item.title,
-                                    posterPath = item.posterPath,
-                                    overview = "",
-                                    backdropPath = null,
-                                    voteAverage = 0.0,
-                                    firstAirDate = "",
-                                    genreIds = emptyList(),
-                                    popularity = 0.0
-                                ),
-                                isSelected = isFocused,
-                                onClick = onClick
-                            )
+                    Text(
+                        text = "My List",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = TextPrimary,
+                        modifier = Modifier.padding(horizontal = 48.dp, vertical = 16.dp)
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 48.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        myList.forEach { item ->
+                            // TODO: Implement display for my list items.
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(32.dp)) // Bottom spacing.
-            } // end scrollable Column
-        } // end content Column
+                Spacer(modifier = Modifier.height(32.dp))
+            }
+        }
 
-        // Transparent TopBar overlaid on top of all content
-        // A subtle gradient scrim ensures text stays readable over the hero image
         Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .height(120.dp)
                 .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.55f),
-                            Color.Transparent
-                        )
+                    brush = Brush.verticalGradient(
+                        colors = listOf(BackgroundDark, Color.Transparent)
                     )
                 )
-                .align(Alignment.TopCenter)
-        ) {
-            TopBar(
-                selectedRoute = selectedRoute,
-                onNavItemClick = { route ->
-                    onRouteChange(route)
-                    onNavigate(route)
-                },
-                onSearchClick = onSearchClick,
-                onSettingsClick = onSettingsClick
-            )
-        }
-    } // end outer Box
+        )
+
+        TopBar(
+            selectedRoute = selectedRoute,
+            onNavItemClick = onNavItemClick,
+            onSearchClick = onSearchClick,
+            onSettingsClick = onSettingsClick
+        )
+    }
 }
 
-/**
- * Preview for the [HomeScreen] composable.
- */
-@Preview(showBackground = true, backgroundColor = 0xFF141414)
+@Preview(showBackground = true)
 @Composable
 fun HomeScreenPreview() {
     KiduyuTvTheme {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(BackgroundDark)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-            ) {
-                // Top Navigation Bar for preview.
-                TopBar(
-                    selectedRoute = "home",
-                    onNavItemClick = {}
-                )
-
-                // Hero Section placeholder for preview.
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(400.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Gray)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(24.dp)) // Vertical spacing.
-
-                // Trending Now section for preview.
-                Text(
-                    text = "Trending Now",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = TextPrimary,
-                    modifier = Modifier.padding(horizontal = 48.dp, vertical = 16.dp)
-                )
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 48.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    repeat(5) { index ->
-                        MovieCard(
-                            movie = Movie(
-                                id = index + 1,
-                                title = "Movie ${index + 1}",
-                                overview = "Movie description",
-                                posterPath = null,
-                                backdropPath = null,
-                                voteAverage = 8.0 + index * 0.2,
-                                releaseDate = "2023",
-                                genreIds = emptyList(),
-                                popularity = 100.0
-                            ),
-                            isSelected = index == 0,
-                            onClick = { }
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp)) // Vertical spacing.
-
-                // TV Shows section for preview.
-                Text(
-                    text = "TV Shows",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = TextPrimary,
-                    modifier = Modifier.padding(horizontal = 48.dp, vertical = 16.dp)
-                )
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 48.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    repeat(5) { index ->
-                        TvShowCard(
-                            tvShow = TvShow(
-                                id = index + 1,
-                                name = "TV Show ${index + 1}",
-                                overview = "TV show description",
-                                posterPath = null,
-                                backdropPath = null,
-                                voteAverage = 7.5 + index * 0.3,
-                                firstAirDate = "2023",
-                                genreIds = emptyList(),
-                                popularity = 90.0
-                            ),
-                            isSelected = index == 0,
-                            onClick = { }
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(32.dp)) // Bottom spacing.
-            }
-        }
+        HomeScreen(
+            onMovieClick = {},
+            onTvShowClick = {},
+            onNavigate = {},
+            onSearchClick = {},
+            onSettingsClick = {}
+        )
     }
 }

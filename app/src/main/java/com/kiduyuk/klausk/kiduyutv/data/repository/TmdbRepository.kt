@@ -145,6 +145,64 @@ class TmdbRepository {
      * @param fromYear The starting year to filter movies (default 2025).
      * @return Result containing list of OscarMovie objects.
      */
+    /**
+     * Fetches movies from a Trakt list and gets their details from TMDB.
+     * @param userSlug The Trakt user slug.
+     * @param listSlug The Trakt list slug.
+     * @param clientId The Trakt API client ID.
+     * @return Result containing list of Movie objects.
+     */
+    suspend fun getTraktListMovies(userSlug: String, listSlug: String, clientId: String): Result<List<Movie>> = withContext(Dispatchers.IO) {
+        runCatching {
+            val url = URL("https://api.trakt.tv/users/$userSlug/lists/$listSlug/items/movies")
+            Log.i(TAG, "Fetching Trakt list: $url")
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 15000
+            connection.readTimeout = 15000
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("trakt-api-version", "2")
+            connection.setRequestProperty("trakt-api-key", clientId)
+
+            val responseCode = connection.responseCode
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                throw Exception("Failed to fetch Trakt list: HTTP $responseCode")
+            }
+
+            val reader = BufferedReader(InputStreamReader(connection.inputStream))
+            val response = reader.readText()
+            Log.i(TAG, "Trakt list response: $response")
+            reader.close()
+
+            // Simple manual JSON parsing for TMDB IDs since we don't want to add new dependencies
+            val tmdbIds = mutableListOf<Int>()
+            val regex = "\"tmdb\":\\s*(\\d+)".toRegex()
+            regex.findAll(response).forEach { match ->
+                match.groupValues.getOrNull(1)?.toIntOrNull()?.let { tmdbIds.add(it) }
+            }
+            Log.i(TAG, "TMDB IDs: $tmdbIds")
+
+
+            // Fetch details for each movie from TMDB
+            val movies = tmdbIds.distinct().mapNotNull { id ->
+                api.getMovieDetail(id).let { detail ->
+                    Movie(
+                        id = detail.id,
+                        title = detail.title,
+                        overview = detail.overview,
+                        posterPath = detail.posterPath,
+                        backdropPath = detail.backdropPath,
+                        voteAverage = detail.voteAverage,
+                        releaseDate = detail.releaseDate,
+                        genreIds = detail.genres?.map { it.id },
+                        popularity = 0.0 // Default popularity
+                    )
+                }
+            }
+            movies
+        }
+    }
+
     suspend fun getOscarMovies(fromYear: Int = 2023): Result<List<OscarMovie>> = withContext(Dispatchers.IO) {
         runCatching {
             val csvUrl = "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/the_oscar_tmdb.csv"
