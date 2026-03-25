@@ -178,27 +178,87 @@ class TmdbRepository {
 
 
             // Fetch details for each movie from TMDB
-            val movies = tmdbIds.distinct().take(20).mapNotNull { id ->
-                runCatching { // Wrap the API call in runCatching
-                    val detail = api.getMovieDetail(id) // Get the MovieDetail
-                    // Ensure all required fields for Movie are non-null or provide defaults
-                    Log.i(TAG, "Movie detail: $detail")
-                    Movie(
-                        id = detail.id,
-                        title = detail.title ?: "Unknown Title", // Provide default if title can be null
-                        overview = detail.overview ?: "No overview available.", // Provide default if overview can be null
-                        posterPath = detail.posterPath,
-                        backdropPath = detail.backdropPath,
-                        voteAverage = detail.voteAverage ?: 0.0, // Provide default if voteAverage can be null
-                        releaseDate = detail.releaseDate,
-                        genreIds = detail.genres?.map { it.id },
-                        popularity = 0.0 // Default popularity
-                    )
-                }.getOrNull() // If runCatching fails, getOrNull will return null, and mapNotNull will filter it out
-            }
-            Log.i(TAG, "Movies: $movies")
+            val movies = tmdbIds.distinct()
+                .take(20) // Limit to 20 movies for performance
+                .mapNotNull { id ->
+                    runCatching {
+                        api.getMovieDetail(id).let { detail ->
+                            Movie(
+                                id = detail.id,
+                                title = detail.title,
+                                overview = detail.overview,
+                                posterPath = detail.posterPath,
+                                backdropPath = detail.backdropPath,
+                                voteAverage = detail.voteAverage,
+                                releaseDate = detail.releaseDate,
+                                genreIds = detail.genres?.map { it.id },
+                                popularity = 0.0 // Default popularity
+                            )
+                        }
+                    }.getOrNull()
+                }
             movies
+        }
+    }
 
+    /**
+     * Fetches TV shows from a Trakt list and gets their details from TMDB.
+     * @param userSlug The Trakt user slug.
+     * @param listSlug The Trakt list slug.
+     * @param clientId The Trakt API client ID.
+     * @return Result containing list of TvShow objects.
+     */
+    suspend fun getTraktListTvShows(userSlug: String, listSlug: String, clientId: String): Result<List<TvShow>> = withContext(Dispatchers.IO) {
+        runCatching {
+            val url = URL("https://api.trakt.tv/users/$userSlug/lists/$listSlug/items/shows")
+            Log.i(TAG, "Fetching Trakt list: $url")
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 15000
+            connection.readTimeout = 15000
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.setRequestProperty("trakt-api-version", "2")
+            connection.setRequestProperty("trakt-api-key", clientId)
+
+            val responseCode = connection.responseCode
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                throw Exception("Failed to fetch Trakt list: HTTP $responseCode")
+            }
+
+            val reader = BufferedReader(InputStreamReader(connection.inputStream))
+            val response = reader.readText()
+            Log.i(TAG, "Trakt list response: $response")
+            reader.close()
+
+            // Simple manual JSON parsing for TMDB IDs
+            val tmdbIds = mutableListOf<Int>()
+            val regex = "\"tmdb\":\\s*(\\d+)".toRegex()
+            regex.findAll(response).forEach { match ->
+                match.groupValues.getOrNull(1)?.toIntOrNull()?.let { tmdbIds.add(it) }
+            }
+            Log.i(TAG, "TMDB IDs: $tmdbIds")
+
+            // Fetch details for each TV show from TMDB
+            val tvShows = tmdbIds.distinct()
+                .take(20) // Limit to 20 shows for performance
+                .mapNotNull { id ->
+                    runCatching {
+                        api.getTvShowDetail(id).let { detail ->
+                            TvShow(
+                                id = detail.id,
+                                name = detail.name,
+                                overview = detail.overview,
+                                posterPath = detail.posterPath,
+                                backdropPath = detail.backdropPath,
+                                voteAverage = detail.voteAverage,
+                                firstAirDate = detail.firstAirDate,
+                                genreIds = detail.genres?.map { it.id },
+                                popularity = 0.0 // Default popularity
+                            )
+                        }
+                    }.getOrNull()
+                }
+            tvShows
         }
     }
 
