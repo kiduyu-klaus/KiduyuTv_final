@@ -21,4 +21,5 @@ sealed class Screen(val route: String) {
             return "season_episodes/$tvId/$totalSeasons?tvShowName=$encodedName"
         }
     }
+    object Settings : Screen("settings")
 }
