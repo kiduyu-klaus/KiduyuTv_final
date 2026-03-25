@@ -1,9 +1,9 @@
 package com.kiduyuk.klausk.kiduyutv.ui.player.webview
-
-
 import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.os.Bundle
+import android.os.Message
+import android.view.KeyEvent
 import android.view.View
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -93,6 +93,7 @@ class PlayerActivity : ComponentActivity() {
                     // 1. Setting volume to max
                     // 2. Removing potential ad overlays or popunder scripts
                     // 3. Overriding window.open to prevent popups
+                    // 4. Custom D-pad navigation helper
                     val js = """
                         (function() {
                             // 1. Volume Control
@@ -124,6 +125,30 @@ class PlayerActivity : ComponentActivity() {
                                 });
                             }
 
+                            // 4. Media Key Helper Functions
+                            window.playerPlay = function() {
+                                var videos = document.getElementsByTagName('video');
+                                for (var i = 0; i < videos.length; i++) {
+                                    videos[i].play();
+                                }
+                            };
+                            window.playerPause = function() {
+                                var videos = document.getElementsByTagName('video');
+                                for (var i = 0; i < videos.length; i++) {
+                                    videos[i].pause();
+                                }
+                            };
+                            window.playerToggle = function() {
+                                var videos = document.getElementsByTagName('video');
+                                for (var i = 0; i < videos.length; i++) {
+                                    if (videos[i].paused) {
+                                        videos[i].play();
+                                    } else {
+                                        videos[i].pause();
+                                    }
+                                }
+                            };
+
                             setMaxVolume();
                             removeAds();
                             
@@ -140,11 +165,12 @@ class PlayerActivity : ComponentActivity() {
 
             webChromeClient = object : WebChromeClient() {
                 // Prevent any new windows from being created (additional popup layer)
-                override fun onCreateWindow(view: WebView?, isDialog: Boolean, isUserGesture: Boolean, resultMsg: android.os.Message?): Boolean {
+                override fun onCreateWindow(view: WebView?, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message?): Boolean {
                     return false
                 }
             }
 
+            // Enable mouse support/touch events for navigation
             isFocusable = true
             isFocusableInTouchMode = true
 
@@ -166,6 +192,32 @@ class PlayerActivity : ComponentActivity() {
                 showExitConfirmationDialog()
             }
         })
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        when (keyCode) {
+            // Media Key Handling
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                webView.evaluateJavascript("window.playerToggle();", null)
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_PLAY -> {
+                webView.evaluateJavascript("window.playerPlay();", null)
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_PAUSE -> {
+                webView.evaluateJavascript("window.playerPause();", null)
+                return true
+            }
+            // D-pad navigation for WebView
+            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                // Pass these keys to the WebView for spatial navigation
+                return super.onKeyDown(keyCode, event)
+            }
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     private fun showExitConfirmationDialog() {
