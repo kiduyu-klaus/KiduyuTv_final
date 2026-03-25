@@ -40,6 +40,7 @@ data class HomeUiState(
     val oscarWinners2026: List<Movie> = emptyList(),
     val hallmarkMovies: List<Movie> = emptyList(),
     val trueStoryMovies: List<Movie> = emptyList(),
+    val bestSitcoms: List<TvShow> = emptyList(),
     val myList: List<MyListItem> = emptyList(),
     val selectedItem: Any? = null,
     val lastClickedItemId: Int? = null,
@@ -162,6 +163,15 @@ class HomeViewModel : ViewModel() {
                     )
                 }
 
+                // Fetch Best Sitcoms from Trakt
+                val bestSitcomsDeferred = async {
+                    repository.getTraktListTvShows(
+                        userSlug = "fidel-cb",
+                        listSlug = "best-sitcoms",
+                        clientId = "98f8c9590ae29a666942f81c5f86628f0dbe2767d28b88cdedbb7bbbd316e1a0"
+                    )
+                }
+
                 // Await all results and provide empty lists as fallback
                 val trendingTv = trendingTvDeferred.await().getOrNull() ?: emptyList()
                 val trendingMovies = trendingMoviesDeferred.await().getOrNull() ?: emptyList()
@@ -194,6 +204,7 @@ class HomeViewModel : ViewModel() {
                     oscarWinners2026 = oscarWinners2026Deferred.await().getOrNull() ?: emptyList(),
                     hallmarkMovies = hallmarkMoviesDeferred.await().getOrNull() ?: emptyList(),
                     trueStoryMovies = trueStoryMoviesDeferred.await().getOrNull() ?: emptyList(),
+                    bestSitcoms = bestSitcomsDeferred.await().getOrNull() ?: emptyList(),
                     myList = emptyList(), // MyList is initially empty.
                     // Set the initial selected item for the hero section.
                     selectedItem = trendingTv.firstOrNull() ?: trendingMovies.firstOrNull()
