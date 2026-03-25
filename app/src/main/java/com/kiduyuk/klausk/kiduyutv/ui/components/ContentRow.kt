@@ -17,6 +17,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -46,6 +48,9 @@ fun <T> ContentRow(
     title: String,
     items: List<T>,
     modifier: Modifier = Modifier,
+    initialFocusRequester: FocusRequester? = null,
+    restoreFocusItemId: Int? = null,
+    getItemId: (T) -> Int = { 0 },
     onItemFocus: ((T) -> Unit)? = null,
     onItemClick: (T) -> Unit,
     content: @Composable (T, Boolean, () -> Unit) -> Unit
@@ -83,6 +88,15 @@ fun <T> ContentRow(
                 // Collect the focus state as a State.
                 val isFocused by interactionSource.collectIsFocusedAsState()
 
+                val itemFocusRequester = remember { FocusRequester() }
+                val itemId = getItemId(item)
+
+                LaunchedEffect(restoreFocusItemId) {
+                    if (restoreFocusItemId != null && itemId == restoreFocusItemId) {
+                        itemFocusRequester.requestFocus()
+                    }
+                }
+
                 // Effect to trigger onItemFocus when the item gains focus.
                 LaunchedEffect(isFocused) {
                     if (isFocused) {
@@ -96,6 +110,9 @@ fun <T> ContentRow(
                 // to avoid the "double-click" issue where the first click only focuses the element.
                 Box(
                     modifier = Modifier
+                        // Apply focus requester if it's the first item and a requester is provided.
+                        .then(if (index == 0 && initialFocusRequester != null) Modifier.focusRequester(initialFocusRequester) else Modifier)
+                        .focusRequester(itemFocusRequester)
                         // Detect focus changes and update selectedIndex and call onItemFocus.
                         .onFocusChanged { focusState ->
                             if (focusState.isFocused) {
