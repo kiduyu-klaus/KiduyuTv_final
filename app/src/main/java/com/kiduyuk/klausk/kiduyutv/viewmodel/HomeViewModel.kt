@@ -39,6 +39,7 @@ data class HomeUiState(
     val oscarMovies: List<Movie> = emptyList(),
     val myList: List<MyListItem> = emptyList(),
     val selectedItem: Any? = null,
+    val lastClickedItemId: Int? = null,
     val error: String? = null
 )
 
@@ -172,6 +173,14 @@ class HomeViewModel : ViewModel() {
      */
     fun selectItem(item: Any) {
         _uiState.value = _uiState.value.copy(selectedItem = item)
+    }
+
+    /**
+     * Sets the ID of the last clicked item to restore focus later.
+     * @param id The ID of the clicked movie or TV show.
+     */
+    fun setLastClickedItemId(id: Int?) {
+        _uiState.value = _uiState.value.copy(lastClickedItemId = id)
     }
 
     /**
