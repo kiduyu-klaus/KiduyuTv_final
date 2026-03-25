@@ -54,6 +54,7 @@ fun HomeScreen(
     val oscarMovies = uiState.oscarMovies
     val oscarWinners2026 = uiState.oscarWinners2026
     val hallmarkMovies = uiState.hallmarkMovies
+    val trueStoryMovies = uiState.trueStoryMovies
     val myList = uiState.myList
 
     Box(
@@ -79,6 +80,7 @@ fun HomeScreen(
                 oscarMovies = oscarMovies,
                 oscarWinners2026 = oscarWinners2026,
                 hallmarkMovies = hallmarkMovies,
+                trueStoryMovies = trueStoryMovies,
                 myList = myList,
                 scrollState = scrollState,
                 selectedRoute = selectedRoute,
@@ -136,6 +138,7 @@ private fun HomeContent(
     oscarMovies: List<Movie>,
     oscarWinners2026: List<Movie>,
     hallmarkMovies: List<Movie>,
+    trueStoryMovies: List<Movie>,
     myList: List<MyListItem>,
     scrollState: androidx.compose.foundation.ScrollState,
     selectedRoute: String,
@@ -312,6 +315,26 @@ private fun HomeContent(
                     ContentRow(
                         title = "Hallmark Movies",
                         items = hallmarkMovies,
+                        restoreFocusItemId = lastClickedItemId,
+                        getItemId = { it.id },
+                        onItemFocus = { movie -> onSelectItem(movie) },
+                        onItemClick = { movie ->
+                            onSetLastClickedItemId(movie.id)
+                            onMovieClick(movie.id)
+                        }
+                    ) { movie, isFocused, onClick ->
+                        MovieCard(
+                            movie = movie,
+                            isSelected = isFocused,
+                            onClick = onClick
+                        )
+                    }
+                }
+
+                if (trueStoryMovies.isNotEmpty()) {
+                    ContentRow(
+                        title = "Movies Based on True Stories",
+                        items = trueStoryMovies,
                         restoreFocusItemId = lastClickedItemId,
                         getItemId = { it.id },
                         onItemFocus = { movie -> onSelectItem(movie) },
