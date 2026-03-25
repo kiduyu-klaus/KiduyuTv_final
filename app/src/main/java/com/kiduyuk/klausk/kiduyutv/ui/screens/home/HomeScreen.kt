@@ -55,6 +55,7 @@ fun HomeScreen(
     val oscarWinners2026 = uiState.oscarWinners2026
     val hallmarkMovies = uiState.hallmarkMovies
     val trueStoryMovies = uiState.trueStoryMovies
+    val bestSitcoms = uiState.bestSitcoms
     val myList = uiState.myList
 
     Box(
@@ -81,6 +82,7 @@ fun HomeScreen(
                 oscarWinners2026 = oscarWinners2026,
                 hallmarkMovies = hallmarkMovies,
                 trueStoryMovies = trueStoryMovies,
+                bestSitcoms = bestSitcoms,
                 myList = myList,
                 scrollState = scrollState,
                 selectedRoute = selectedRoute,
@@ -139,6 +141,7 @@ private fun HomeContent(
     oscarWinners2026: List<Movie>,
     hallmarkMovies: List<Movie>,
     trueStoryMovies: List<Movie>,
+    bestSitcoms: List<TvShow>,
     myList: List<MyListItem>,
     scrollState: androidx.compose.foundation.ScrollState,
     selectedRoute: String,
@@ -345,6 +348,26 @@ private fun HomeContent(
                     ) { movie, isFocused, onClick ->
                         MovieCard(
                             movie = movie,
+                            isSelected = isFocused,
+                            onClick = onClick
+                        )
+                    }
+                }
+
+                if (bestSitcoms.isNotEmpty()) {
+                    ContentRow(
+                        title = "Best Sitcoms Ever",
+                        items = bestSitcoms,
+                        restoreFocusItemId = lastClickedItemId,
+                        getItemId = { it.id },
+                        onItemFocus = { tvShow -> onSelectItem(tvShow) },
+                        onItemClick = { tvShow ->
+                            onSetLastClickedItemId(tvShow.id)
+                            onTvShowClick(tvShow.id)
+                        }
+                    ) { tvShow, isFocused, onClick ->
+                        TvShowCard(
+                            tvShow = tvShow,
                             isSelected = isFocused,
                             onClick = onClick
                         )
