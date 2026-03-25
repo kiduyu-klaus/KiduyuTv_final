@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
@@ -59,12 +60,38 @@ fun MediaListScreen(
     val calculatedCardWidth = (availableWidth - (spacing * (actualColumns - 1))) / actualColumns
     val calculatedCardHeight = calculatedCardWidth * 1.8f
 
+    // Remember grid state for scroll detection
+    val gridState = rememberLazyGridState()
+
     // Load content when parameters change.
     LaunchedEffect(type, id, name) {
         if (type == "company") {
             viewModel.loadMoviesByCompany(id, name)
         } else {
             viewModel.loadTvShowsByNetwork(id, name)
+        }
+    }
+
+    // Detect when user scrolls to the last row and trigger pagination
+    LaunchedEffect(gridState, uiState, type) {
+        snapshotFlow {
+            val layoutInfo = gridState.layoutInfo
+            val totalItemsNumber = layoutInfo.totalItemsCount
+            val lastVisibleItemIndex = (layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0) + 1
+
+            // Check if we're near the end (within 2 rows of the end)
+            val visibleRows = layoutInfo.visibleItemsInfo.size
+            val threshold = maxOf(1, visibleRows / 2)
+
+            lastVisibleItemIndex >= (totalItemsNumber - (actualColumns * threshold)) && totalItemsNumber > 0
+        }.collect { shouldLoadMore ->
+            if (shouldLoadMore && !uiState.isLoading && !uiState.isLoadingMore) {
+                if (type == "company") {
+                    viewModel.loadMoreMovies()
+                } else {
+                    viewModel.loadMoreTvShows()
+                }
+            }
         }
     }
 
@@ -116,6 +143,7 @@ fun MediaListScreen(
             } else {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(actualColumns),
+                    state = gridState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
                         start = horizontalPadding,
@@ -170,6 +198,21 @@ fun MediaListScreen(
                                 )
                             }
                         }
+                    }
+                }
+
+                // Loading more indicator
+                if (uiState.isLoadingMore) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = PrimaryRed,
+                            modifier = Modifier.size(32.dp)
+                        )
                     }
                 }
             }
