@@ -138,13 +138,7 @@ class TmdbRepository {
         response.results.mapNotNull { it.toSearchResult() }
     }
 
-    /**
-     * Fetches Oscar movies from the CSV data source.
-     * Filters by year_film starting from the specified year (default 2025).
-     * Only returns movies that have a valid TMDB ID.
-     * @param fromYear The starting year to filter movies (default 2025).
-     * @return Result containing list of OscarMovie objects.
-     */
+
     /**
      * Fetches movies from a Trakt list and gets their details from TMDB.
      * @param userSlug The Trakt user slug.
@@ -184,25 +178,37 @@ class TmdbRepository {
 
 
             // Fetch details for each movie from TMDB
-            val movies = tmdbIds.distinct().mapNotNull { id ->
-                api.getMovieDetail(id).let { detail ->
+            val movies = tmdbIds.distinct().take(20).mapNotNull { id ->
+                runCatching { // Wrap the API call in runCatching
+                    val detail = api.getMovieDetail(id) // Get the MovieDetail
+                    // Ensure all required fields for Movie are non-null or provide defaults
+                    Log.i(TAG, "Movie detail: $detail")
                     Movie(
                         id = detail.id,
-                        title = detail.title,
-                        overview = detail.overview,
+                        title = detail.title ?: "Unknown Title", // Provide default if title can be null
+                        overview = detail.overview ?: "No overview available.", // Provide default if overview can be null
                         posterPath = detail.posterPath,
                         backdropPath = detail.backdropPath,
-                        voteAverage = detail.voteAverage,
+                        voteAverage = detail.voteAverage ?: 0.0, // Provide default if voteAverage can be null
                         releaseDate = detail.releaseDate,
                         genreIds = detail.genres?.map { it.id },
                         popularity = 0.0 // Default popularity
                     )
-                }
+                }.getOrNull() // If runCatching fails, getOrNull will return null, and mapNotNull will filter it out
             }
+            Log.i(TAG, "Movies: $movies")
             movies
+
         }
     }
 
+    /**
+     * Fetches Oscar movies from the CSV data source.
+     * Filters by year_film starting from the specified year (default 2025).
+     * Only returns movies that have a valid TMDB ID.
+     * @param fromYear The starting year to filter movies (default 2025).
+     * @return Result containing list of OscarMovie objects.
+     */
     suspend fun getOscarMovies(fromYear: Int = 2023): Result<List<OscarMovie>> = withContext(Dispatchers.IO) {
         runCatching {
             val csvUrl = "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/the_oscar_tmdb.csv"
