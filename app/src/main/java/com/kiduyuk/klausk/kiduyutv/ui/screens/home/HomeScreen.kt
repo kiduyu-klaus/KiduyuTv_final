@@ -10,6 +10,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
@@ -108,7 +109,9 @@ fun HomeScreen(
                 onSearchClick = onSearchClick,
                 onSettingsClick = onSettingsClick,
                 onRouteChange = { selectedRoute = it },
-                onSelectItem = { viewModel.selectItem(it) }
+                onSelectItem = { viewModel.selectItem(it) },
+                onSetLastClickedItemId = { viewModel.setLastClickedItemId(it) },
+                lastClickedItemId = uiState.lastClickedItemId
             )
         }
     }
@@ -169,8 +172,18 @@ private fun HomeContent(
     onSearchClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onRouteChange: (String) -> Unit,
-    onSelectItem: (Any) -> Unit
+    onSelectItem: (Any) -> Unit,
+    onSetLastClickedItemId: (Int?) -> Unit = {},
+    lastClickedItemId: Int? = null
 ) {
+    val firstItemFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        if (lastClickedItemId == null) {
+            firstItemFocusRequester.requestFocus()
+        }
+    }
+
     Box(
         modifier = Modifier.fillMaxSize()
     ) {
@@ -193,9 +206,13 @@ private fun HomeContent(
                 ContentRow(
                     title = "TV Shows Trending Today",
                     items = trendingTvShows,
+                    initialFocusRequester = firstItemFocusRequester,
+                    restoreFocusItemId = lastClickedItemId,
+                    getItemId = { it.id },
                     onItemFocus = { tvShow -> onSelectItem(tvShow) },
                     onItemClick = { tvShow ->
                         onSelectItem(tvShow)
+                        onSetLastClickedItemId(tvShow.id)
                         onTvShowClick(tvShow.id)
                     }
                 ) { tvShow, isFocused, onClick ->
@@ -210,9 +227,12 @@ private fun HomeContent(
                 ContentRow(
                     title = "Movies Trending Today",
                     items = trendingMovies,
+                    restoreFocusItemId = lastClickedItemId,
+                    getItemId = { it.id },
                     onItemFocus = { movie -> onSelectItem(movie) },
                     onItemClick = { movie ->
                         onSelectItem(movie)
+                        onSetLastClickedItemId(movie.id)
                         onMovieClick(movie.id)
                     }
                 ) { movie, isFocused, onClick ->
@@ -228,8 +248,13 @@ private fun HomeContent(
                     ContentRow(
                         title = "Continue Watching",
                         items = continueWatching,
+                        restoreFocusItemId = lastClickedItemId,
+                        getItemId = { it.id },
                         onItemFocus = { movie -> onSelectItem(movie) },
-                        onItemClick = { movie -> onMovieClick(movie.id) }
+                        onItemClick = { movie ->
+                            onSetLastClickedItemId(movie.id)
+                            onMovieClick(movie.id)
+                        }
                     ) { movie, isFocused, onClick ->
                         MovieCard(
                             movie = movie,
@@ -261,8 +286,13 @@ private fun HomeContent(
                 ContentRow(
                     title = "Latest Movies Last Week",
                     items = latestMovies,
+                    restoreFocusItemId = lastClickedItemId,
+                    getItemId = { it.id },
                     onItemFocus = { movie -> onSelectItem(movie) },
-                    onItemClick = { movie -> onMovieClick(movie.id) }
+                    onItemClick = { movie ->
+                        onSetLastClickedItemId(movie.id)
+                        onMovieClick(movie.id)
+                    }
                 ) { movie, isFocused, onClick ->
                     MovieCard(
                         movie = movie,
@@ -275,8 +305,13 @@ private fun HomeContent(
                 ContentRow(
                     title = "Top TV Shows Last Week",
                     items = topTvShows,
+                    restoreFocusItemId = lastClickedItemId,
+                    getItemId = { it.id },
                     onItemFocus = { tvShow -> onSelectItem(tvShow) },
-                    onItemClick = { tvShow -> onTvShowClick(tvShow.id) }
+                    onItemClick = { tvShow ->
+                        onSetLastClickedItemId(tvShow.id)
+                        onTvShowClick(tvShow.id)
+                    }
                 ) { tvShow, isFocused, onClick ->
                     TvShowCard(
                         tvShow = tvShow,
@@ -290,8 +325,13 @@ private fun HomeContent(
                     ContentRow(
                         title = "Oscar Movies",
                         items = oscarMovies,
+                        restoreFocusItemId = lastClickedItemId,
+                        getItemId = { it.id },
                         onItemFocus = { movie -> onSelectItem(movie) },
-                        onItemClick = { movie -> onMovieClick(movie.id) }
+                        onItemClick = { movie ->
+                            onSetLastClickedItemId(movie.id)
+                            onMovieClick(movie.id)
+                        }
                     ) { movie, isFocused, onClick ->
                         MovieCard(
                             movie = movie,
