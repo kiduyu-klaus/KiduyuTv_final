@@ -7,7 +7,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.CircularProgressIndicator
+import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -65,7 +65,7 @@ fun TvShowsScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(color = PrimaryRed)
+                LottieLoadingView(size = 300.dp)
             }
         } else { // Display TV show content once data is loaded.
             // Scrollable content area
