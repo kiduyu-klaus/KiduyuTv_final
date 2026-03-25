@@ -18,6 +18,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -56,6 +58,7 @@ fun MovieDetailScreen(
     val context = LocalContext.current
 
     // Button interaction sources for focus tracking
+    val playFocusRequester = remember { FocusRequester() }
     val playInteraction = remember { MutableInteractionSource() }
     val playFocused by playInteraction.collectIsFocusedAsState()
 
@@ -67,6 +70,7 @@ fun MovieDetailScreen(
 
     LaunchedEffect(movieId) {
         viewModel.loadMovieDetail(movieId)
+        playFocusRequester.requestFocus()
     }
 
     Box(
@@ -253,6 +257,7 @@ fun MovieDetailScreen(
                             // Play Now
                             Button(
                                 onClick = { },
+                                modifier = Modifier.focusRequester(playFocusRequester),
                                 interactionSource = playInteraction,
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (playFocused) DarkRed else PrimaryRed
