@@ -1,7 +1,9 @@
 package com.kiduyuk.klausk.kiduyutv
 
+import android.app.AlertDialog
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -72,6 +74,22 @@ class MainActivity : ComponentActivity(), ImageLoaderFactory {
                     }
                 }
 
+                // Handle back press for exit confirmation
+                DisposableEffect(navController) {
+                    val callback = object : OnBackPressedCallback(true) {
+                        override fun handleOnBackPressed() {
+                            // If we can pop back stack, do it. Otherwise, show exit dialog.
+                            if (navController.previousBackStackEntry != null) {
+                                navController.popBackStack()
+                            } else {
+                                showExitConfirmationDialog()
+                            }
+                        }
+                    }
+                    onBackPressedDispatcher.addCallback(callback)
+                    onDispose { callback.remove() }
+                }
+
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -81,5 +99,16 @@ class MainActivity : ComponentActivity(), ImageLoaderFactory {
                 }
             }
         }
+    }
+
+    private fun showExitConfirmationDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Exit App")
+            .setMessage("Are you sure you want to exit KiduyuTv?")
+            .setPositiveButton("Exit") { _, _ ->
+                finish()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 }
