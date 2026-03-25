@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
+import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.ui.components.*
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
@@ -75,7 +76,7 @@ fun HomeScreen(
     val latestMovies = uiState.latestMovies
     val topTvShows = uiState.topTvShows
     val oscarMovies = uiState.oscarMovies
-    val myList = uiState.myList
+    val myList by MyListManager.myList.collectAsState()
 
     // Main container for the home screen.
     Box(
@@ -347,20 +348,49 @@ private fun HomeContent(
 
                 // My List section, only shown if not empty.
                 if (myList.isNotEmpty()) {
-                    Text(
-                        text = "My List",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = TextPrimary,
-                        modifier = Modifier.padding(horizontal = 48.dp, vertical = 16.dp)
-                    )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 48.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        myList.forEach { item ->
-                            // TODO: Implement display for my list items.
+                    ContentRow(
+                        title = "My List",
+                        items = myList,
+                        getItemId = { it.id },
+                        onItemClick = { item ->
+                            when (item.type) {
+                                "movie" -> onMovieClick(item.id)
+                                "tv" -> onTvShowClick(item.id)
+                            }
+                        }
+                    ) { item, isFocused, onClick ->
+                        if (item.type == "movie") {
+                            MovieCard(
+                                movie = Movie(
+                                    id = item.id,
+                                    title = item.title,
+                                    posterPath = item.posterPath,
+                                    overview = "",
+                                    backdropPath = null,
+                                    voteAverage = 0.0,
+                                    releaseDate = "",
+                                    genreIds = emptyList(),
+                                    popularity = 0.0
+                                ),
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
+                        } else {
+                            TvShowCard(
+                                tvShow = TvShow(
+                                    id = item.id,
+                                    name = item.title,
+                                    posterPath = item.posterPath,
+                                    overview = "",
+                                    backdropPath = null,
+                                    voteAverage = 0.0,
+                                    firstAirDate = "",
+                                    genreIds = emptyList(),
+                                    popularity = 0.0
+                                ),
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
                         }
                     }
                 }

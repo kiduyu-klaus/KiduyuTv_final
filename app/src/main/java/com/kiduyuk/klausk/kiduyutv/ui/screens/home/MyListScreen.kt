@@ -1,6 +1,7 @@
 package com.kiduyuk.klausk.kiduyutv.ui.screens.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,9 +12,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
+import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.ui.components.TopBar
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeViewModel
@@ -39,8 +46,9 @@ fun MyListScreen(
     onSettingsClick: () -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
-    // Collect UI state from the ViewModel.
-    val uiState by viewModel.uiState.collectAsState()
+    // Collect My List from the global manager.
+    val myList by MyListManager.myList.collectAsState()
+    val context = LocalContext.current
 
     Column(
         modifier = Modifier
@@ -70,7 +78,7 @@ fun MyListScreen(
             Spacer(modifier = Modifier.height(32.dp)) // Vertical spacing.
 
             // Display a message if the list is empty, otherwise show the list.
-            if (uiState.myList.isEmpty()) {
+            if (myList.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
@@ -86,7 +94,7 @@ fun MyListScreen(
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(16.dp) // Spacing between list items.
                 ) {
-                    items(uiState.myList) { item ->
+                    items(myList) { item ->
                         MyListItemCard(
                             item = item,
                             onClick = { // Handle click on a list item.
@@ -95,7 +103,7 @@ fun MyListScreen(
                                     "tv" -> onTvShowClick(item.id)
                                 }
                             },
-                            onRemove = { viewModel.removeFromMyList(item.id) } // Handle item removal.
+                            onRemove = { MyListManager.removeItem(item.id, item.type, context) } // Handle item removal.
                         )
                     }
                 }
@@ -126,18 +134,23 @@ private fun MyListItemCard(
                 color = CardDark,
                 shape = RoundedCornerShape(8.dp) // Rounded corners for the card background.
             )
+            .clickable { onClick() }
             .padding(16.dp), // Padding inside the card.
         horizontalArrangement = Arrangement.spacedBy(16.dp) // Spacing between elements in the row.
     ) {
-        // Placeholder for the poster thumbnail.
-        Box(
+        // Poster thumbnail.
+        AsyncImage(
+            model = "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.POSTER_SIZE}${item.posterPath}",
+            contentDescription = item.title,
+            contentScale = ContentScale.Crop,
             modifier = Modifier
                 .width(80.dp)
                 .height(88.dp)
                 .background(
                     color = SurfaceDark,
-                    shape = RoundedCornerShape(4.dp) // Rounded corners for the placeholder.
+                    shape = RoundedCornerShape(4.dp)
                 )
+                .clip(RoundedCornerShape(4.dp))
         )
 
         // Column for item title and type.

@@ -333,7 +333,7 @@ fun TvShowDetailScreen(
 
                             // My List toggle
                             OutlinedButton(
-                                onClick = { viewModel.toggleMyList() },
+                                onClick = { viewModel.toggleMyList(context) },
                                 interactionSource = myListInteraction,
                                 shape = RoundedCornerShape(4.dp),
                                 contentPadding = PaddingValues(8.dp),

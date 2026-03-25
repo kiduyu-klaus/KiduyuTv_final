@@ -1,9 +1,11 @@
 package com.kiduyuk.klausk.kiduyutv.viewmodel
 
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kiduyuk.klausk.kiduyutv.data.model.*
+import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -72,19 +74,23 @@ class DetailViewModel : ViewModel() {
                 val movieDetail = movieDetailResult.getOrNull()
                 val similarMovies = similarMoviesResult.getOrNull()?.take(10) ?: emptyList()
                 val videos = videosResult.getOrNull() ?: emptyList()
-                
+
                 // Find the first YouTube trailer.
-                val trailerKey = videos.firstOrNull { 
-                    it.site.equals("YouTube", ignoreCase = true) && 
-                    it.type.equals("Trailer", ignoreCase = true) 
+                val trailerKey = videos.firstOrNull {
+                    it.site.equals("YouTube", ignoreCase = true) &&
+                            it.type.equals("Trailer", ignoreCase = true)
                 }?.key ?: videos.firstOrNull { it.site.equals("YouTube", ignoreCase = true) }?.key
+
+                // Check if in My List
+                val isInMyList = MyListManager.isInList(movieId, "movie")
 
                 // Update UI state with fetched data.
                 _uiState.value = DetailUiState(
                     isLoading = false,
                     movieDetail = movieDetail,
                     similarMovies = similarMovies,
-                    trailerKey = trailerKey
+                    trailerKey = trailerKey,
+                    isInMyList = isInMyList
                 )
             } catch (e: Exception) {
                 // Handle errors.
@@ -110,14 +116,14 @@ class DetailViewModel : ViewModel() {
                 val tvShowDetail = repository.getTvShowDetail(tvId).getOrElse { throw it }
                 val similarTvShowsResult = repository.getTrendingTvToday()
                 val videosResult = repository.getTvShowVideos(tvId)
-                
+
                 val similarTvShows = similarTvShowsResult.getOrNull()?.take(10) ?: emptyList()
                 val videos = videosResult.getOrNull() ?: emptyList()
-                
+
                 // Find the first YouTube trailer.
-                val trailerKey = videos.firstOrNull { 
-                    it.site.equals("YouTube", ignoreCase = true) && 
-                    it.type.equals("Trailer", ignoreCase = true) 
+                val trailerKey = videos.firstOrNull {
+                    it.site.equals("YouTube", ignoreCase = true) &&
+                            it.type.equals("Trailer", ignoreCase = true)
                 }?.key ?: videos.firstOrNull { it.site.equals("YouTube", ignoreCase = true) }?.key
 
                 // Filter out season 0 (usually specials) for the main season list.
@@ -125,13 +131,17 @@ class DetailViewModel : ViewModel() {
                     ?.filter { it.seasonNumber > 0 }
                     ?: emptyList<Season>()
 
+                // Check if in My List
+                val isInMyList = MyListManager.isInList(tvId, "tv")
+
                 // Update UI state with fetched data.
                 _uiState.value = DetailUiState(
                     isLoading = false,
                     tvShowDetail = tvShowDetail,
                     seasons = seasonList,
                     similarTvShows = similarTvShows,
-                    trailerKey = trailerKey
+                    trailerKey = trailerKey,
+                    isInMyList = isInMyList
                 )
             } catch (e: Exception) {
                 // Handle errors.
@@ -195,7 +205,7 @@ class DetailViewModel : ViewModel() {
                 val seasonDetail = repository.getSeasonDetail(tvId, seasonNumber)
                 val episodes = seasonDetail.getOrNull()?.episodes ?: emptyList()
                 Log.i(TAG, "loadSeasonEpisodes: loaded ${episodes.size} episodes for season $seasonNumber")
-                
+
                 // Update UI state with fetched episodes.
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -215,7 +225,36 @@ class DetailViewModel : ViewModel() {
     /**
      * Toggles the "in my list" status for the current item.
      */
-    fun toggleMyList() {
-        _uiState.value = _uiState.value.copy(isInMyList = !_uiState.value.isInMyList)
+    fun toggleMyList(context: Context) {
+        val currentState = _uiState.value
+        val newState = !currentState.isInMyList
+
+        if (newState) {
+            // Add to list
+            val item = if (currentState.movieDetail != null) {
+                MyListItem(
+                    id = currentState.movieDetail.id,
+                    title = currentState.movieDetail.title,
+                    posterPath = currentState.movieDetail.posterPath,
+                    type = "movie"
+                )
+            } else if (currentState.tvShowDetail != null) {
+                MyListItem(
+                    id = currentState.tvShowDetail.id,
+                    title = currentState.tvShowDetail.name,
+                    posterPath = currentState.tvShowDetail.posterPath,
+                    type = "tv"
+                )
+            } else null
+
+            item?.let { MyListManager.addItem(it, context) }
+        } else {
+            // Remove from list
+            val id = currentState.movieDetail?.id ?: currentState.tvShowDetail?.id
+            val type = if (currentState.movieDetail != null) "movie" else "tv"
+            id?.let { MyListManager.removeItem(it, type, context) }
+        }
+
+        _uiState.value = _uiState.value.copy(isInMyList = newState)
     }
 }
