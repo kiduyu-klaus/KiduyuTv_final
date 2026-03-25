@@ -145,7 +145,7 @@ class TmdbRepository {
      * @param fromYear The starting year to filter movies (default 2025).
      * @return Result containing list of OscarMovie objects.
      */
-    suspend fun getOscarMovies(fromYear: Int = 2025): Result<List<OscarMovie>> = withContext(Dispatchers.IO) {
+    suspend fun getOscarMovies(fromYear: Int = 2023): Result<List<OscarMovie>> = withContext(Dispatchers.IO) {
         runCatching {
             val csvUrl = "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/the_oscar_tmdb.csv"
             val url = URL(csvUrl)
