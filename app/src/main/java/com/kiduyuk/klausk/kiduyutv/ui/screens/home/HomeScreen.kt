@@ -296,7 +296,7 @@ private fun HomeContent(
 
                 if (oscarWinners2026.isNotEmpty()) {
                     ContentRow(
-                        title = "2026 Oscar winners",
+                        title = "Road to 2026 Oscars",
                         items = oscarWinners2026,
                         restoreFocusItemId = lastClickedItemId,
                         getItemId = { it.id },
@@ -316,7 +316,7 @@ private fun HomeContent(
 
                 if (hallmarkMovies.isNotEmpty()) {
                     ContentRow(
-                        title = "Hallmark Movies",
+                        title = "Top Hallmark Movies",
                         items = hallmarkMovies,
                         restoreFocusItemId = lastClickedItemId,
                         getItemId = { it.id },
@@ -336,7 +336,7 @@ private fun HomeContent(
 
                 if (trueStoryMovies.isNotEmpty()) {
                     ContentRow(
-                        title = "Movies Based on True Stories",
+                        title = "Top Movies Based on True Stories",
                         items = trueStoryMovies,
                         restoreFocusItemId = lastClickedItemId,
                         getItemId = { it.id },
@@ -376,7 +376,7 @@ private fun HomeContent(
 
                 if (oscarMovies.isNotEmpty()) {
                     ContentRow(
-                        title = "Oscar Movies",
+                        title = "Best Oscar Movie Nominations",
                         items = oscarMovies,
                         restoreFocusItemId = lastClickedItemId,
                         getItemId = { it.id },
