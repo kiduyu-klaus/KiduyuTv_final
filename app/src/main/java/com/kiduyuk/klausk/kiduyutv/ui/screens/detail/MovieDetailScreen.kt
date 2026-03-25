@@ -32,6 +32,7 @@ import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.ui.components.ContentRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.MovieCard
+import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
 
@@ -256,7 +257,12 @@ fun MovieDetailScreen(
                         ) {
                             // Play Now
                             Button(
-                                onClick = { },
+                                onClick = {
+                                    val intent = Intent(context, PlayerActivity::class.java).apply {
+                                        putExtra("TMDB_ID", movieId)
+                                    }
+                                    context.startActivity(intent)
+                                },
                                 modifier = Modifier.focusRequester(playFocusRequester),
                                 interactionSource = playInteraction,
                                 colors = ButtonDefaults.buttonColors(
