@@ -40,6 +40,7 @@ fun MoviesScreen(
     onMovieClick: (Int) -> Unit,
     onNavigate: (String) -> Unit = {},
     onSearchClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
     // Collect UI state from the ViewModel.
@@ -54,7 +55,8 @@ fun MoviesScreen(
         TopBar(
             selectedRoute = "movies",
             onNavItemClick = { route -> onNavigate(route) }, // Handle navigation clicks.
-            onSearchClick = onSearchClick
+            onSearchClick = onSearchClick,
+            onSettingsClick = onSettingsClick
         )
 
         // Display a loading indicator if data is being fetched.
