@@ -2,9 +2,11 @@ package com.kiduyuk.klausk.kiduyutv.ui.screens.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -30,12 +32,14 @@ import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeViewModel
  *
  * @param onMovieClick Lambda to be invoked when a movie card is clicked, typically navigating to movie details.
  * @param onNavigate Lambda to handle navigation between top-level screens.
+ * @param onSearchClick Lambda to navigate to the search screen.
  * @param viewModel The [HomeViewModel] instance providing data for the screen.
  */
 @Composable
 fun MoviesScreen(
     onMovieClick: (Int) -> Unit,
     onNavigate: (String) -> Unit = {},
+    onSearchClick: () -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
     // Collect UI state from the ViewModel.
@@ -49,7 +53,8 @@ fun MoviesScreen(
         // Top navigation bar for the Movies screen.
         TopBar(
             selectedRoute = "movies",
-            onNavItemClick = { route -> onNavigate(route) } // Handle navigation clicks.
+            onNavItemClick = { route -> onNavigate(route) }, // Handle navigation clicks.
+            onSearchClick = onSearchClick
         )
 
         // Display a loading indicator if data is being fetched.
@@ -61,48 +66,26 @@ fun MoviesScreen(
                 CircularProgressIndicator(color = PrimaryRed)
             }
         } else { // Display movie content once data is loaded.
-            Column(
-                modifier = Modifier.fillMaxSize()
+            // Scrollable content area
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 32.dp)
             ) {
                 // Screen title.
-                Text(
-                    text = "Movies",
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = TextPrimary,
-                    modifier = Modifier.padding(48.dp)
-                )
+                item {
+                    Text(
+                        text = "Movies",
+                        style = MaterialTheme.typography.headlineLarge,
+                        color = TextPrimary,
+                        modifier = Modifier.padding(48.dp)
+                    )
+                }
 
                 // Content Row for Trending Movies.
-                ContentRow(
-                    title = "Trending Movies",
-                    items = uiState.trendingMovies,
-                    onItemClick = { movie -> onMovieClick(movie.id) } // Handle movie click.
-                ) { movie, isSelected, onClick ->
-                    MovieCard(
-                        movie = movie,
-                        isSelected = isSelected,
-                        onClick = onClick
-                    )
-                }
-
-                // Content Row for Popular Movies (using latestMovies from UI state).
-                ContentRow(
-                    title = "Popular Movies",
-                    items = uiState.latestMovies,
-                    onItemClick = { movie -> onMovieClick(movie.id) } // Handle movie click.
-                ) { movie, isSelected, onClick ->
-                    MovieCard(
-                        movie = movie,
-                        isSelected = isSelected,
-                        onClick = onClick
-                    )
-                }
-
-                // Content Row for Continue Watching Movies, only shown if not empty.
-                if (uiState.continueWatching.isNotEmpty()) {
+                item {
                     ContentRow(
-                        title = "Continue Watching",
-                        items = uiState.continueWatching,
+                        title = "Trending Movies",
+                        items = uiState.trendingMovies,
                         onItemClick = { movie -> onMovieClick(movie.id) } // Handle movie click.
                     ) { movie, isSelected, onClick ->
                         MovieCard(
@@ -110,6 +93,38 @@ fun MoviesScreen(
                             isSelected = isSelected,
                             onClick = onClick
                         )
+                    }
+                }
+
+                // Content Row for Popular Movies (using latestMovies from UI state).
+                item {
+                    ContentRow(
+                        title = "Popular Movies",
+                        items = uiState.latestMovies,
+                        onItemClick = { movie -> onMovieClick(movie.id) } // Handle movie click.
+                    ) { movie, isSelected, onClick ->
+                        MovieCard(
+                            movie = movie,
+                            isSelected = isSelected,
+                            onClick = onClick
+                        )
+                    }
+                }
+
+                // Content Row for Continue Watching Movies, only shown if not empty.
+                if (uiState.continueWatching.isNotEmpty()) {
+                    item {
+                        ContentRow(
+                            title = "Continue Watching",
+                            items = uiState.continueWatching,
+                            onItemClick = { movie -> onMovieClick(movie.id) } // Handle movie click.
+                        ) { movie, isSelected, onClick ->
+                            MovieCard(
+                                movie = movie,
+                                isSelected = isSelected,
+                                onClick = onClick
+                            )
+                        }
                     }
                 }
             }

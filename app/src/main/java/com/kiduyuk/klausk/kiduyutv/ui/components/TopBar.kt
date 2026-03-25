@@ -29,6 +29,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 fun TopBar(
     selectedRoute: String,
     onNavItemClick: (String) -> Unit,
+    onSearchClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val navItems = listOf("Movies", "TV Shows", "My List")
@@ -122,7 +123,7 @@ fun TopBar(
             FocusableIconButton(
                 icon = Icons.Default.Search,
                 contentDescription = "Search",
-                onClick = { /* TODO */ }
+                onClick = onSearchClick
             )
             FocusableIconButton(
                 icon = Icons.Default.Settings,

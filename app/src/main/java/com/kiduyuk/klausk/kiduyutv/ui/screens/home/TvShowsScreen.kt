@@ -2,9 +2,11 @@ package com.kiduyuk.klausk.kiduyutv.ui.screens.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -30,12 +32,14 @@ import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeViewModel
  *
  * @param onTvShowClick Lambda to be invoked when a TV show card is clicked, typically navigating to TV show details.
  * @param onNavigate Lambda to handle navigation between top-level screens.
+ * @param onSearchClick Lambda to navigate to the search screen.
  * @param viewModel The [HomeViewModel] instance providing data for the screen.
  */
 @Composable
 fun TvShowsScreen(
     onTvShowClick: (Int) -> Unit,
     onNavigate: (String) -> Unit = {},
+    onSearchClick: () -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
     // Collect UI state from the ViewModel.
@@ -49,7 +53,8 @@ fun TvShowsScreen(
         // Top navigation bar for the TV Shows screen.
         TopBar(
             selectedRoute = "tv_shows",
-            onNavItemClick = { route -> onNavigate(route) } // Handle navigation clicks.
+            onNavItemClick = { route -> onNavigate(route) }, // Handle navigation clicks.
+            onSearchClick = onSearchClick
         )
 
         // Display a loading indicator if data is being fetched.
@@ -61,41 +66,49 @@ fun TvShowsScreen(
                 CircularProgressIndicator(color = PrimaryRed)
             }
         } else { // Display TV show content once data is loaded.
-            Column(
-                modifier = Modifier.fillMaxSize()
+            // Scrollable content area
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 32.dp)
             ) {
                 // Screen title.
-                Text(
-                    text = "TV Shows",
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = TextPrimary,
-                    modifier = Modifier.padding(48.dp)
-                )
-
-                // Content Row for Trending TV Shows.
-                ContentRow(
-                    title = "Trending TV Shows",
-                    items = uiState.trendingTvShows,
-                    onItemClick = { tvShow -> onTvShowClick(tvShow.id) } // Handle TV show click.
-                ) { tvShow, isSelected, onClick ->
-                    TvShowCard(
-                        tvShow = tvShow,
-                        isSelected = isSelected,
-                        onClick = onClick
+                item {
+                    Text(
+                        text = "TV Shows",
+                        style = MaterialTheme.typography.headlineLarge,
+                        color = TextPrimary,
+                        modifier = Modifier.padding(48.dp)
                     )
                 }
 
+                // Content Row for Trending TV Shows.
+                item {
+                    ContentRow(
+                        title = "Trending TV Shows",
+                        items = uiState.trendingTvShows,
+                        onItemClick = { tvShow -> onTvShowClick(tvShow.id) } // Handle TV show click.
+                    ) { tvShow, isSelected, onClick ->
+                        TvShowCard(
+                            tvShow = tvShow,
+                            isSelected = isSelected,
+                            onClick = onClick
+                        )
+                    }
+                }
+
                 // Content Row for Top Rated TV Shows.
-                ContentRow(
-                    title = "Top Rated TV Shows",
-                    items = uiState.topTvShows,
-                    onItemClick = { tvShow -> onTvShowClick(tvShow.id) } // Handle TV show click.
-                ) { tvShow, isSelected, onClick ->
-                    TvShowCard(
-                        tvShow = tvShow,
-                        isSelected = isSelected,
-                        onClick = onClick
-                    )
+                item {
+                    ContentRow(
+                        title = "Top Rated TV Shows",
+                        items = uiState.topTvShows,
+                        onItemClick = { tvShow -> onTvShowClick(tvShow.id) } // Handle TV show click.
+                    ) { tvShow, isSelected, onClick ->
+                        TvShowCard(
+                            tvShow = tvShow,
+                            isSelected = isSelected,
+                            onClick = onClick
+                        )
+                    }
                 }
             }
         }

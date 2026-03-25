@@ -27,6 +27,7 @@ import com.kiduyuk.klausk.kiduyutv.viewmodel.MyListItem
  * @param onMovieClick Lambda to navigate to the detail screen of a movie.
  * @param onTvShowClick Lambda to navigate to the detail screen of a TV show.
  * @param onNavigate Lambda to handle navigation between top-level screens.
+ * @param onSearchClick Lambda to navigate to the search screen.
  * @param viewModel The [HomeViewModel] instance providing data for the screen.
  */
 @Composable
@@ -34,6 +35,7 @@ fun MyListScreen(
     onMovieClick: (Int) -> Unit,
     onTvShowClick: (Int) -> Unit,
     onNavigate: (String) -> Unit = {},
+    onSearchClick: () -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
     // Collect UI state from the ViewModel.
@@ -47,7 +49,8 @@ fun MyListScreen(
         // Top navigation bar for the My List screen.
         TopBar(
             selectedRoute = "my_list",
-            onNavItemClick = { route -> onNavigate(route) } // Handle navigation clicks.
+            onNavItemClick = { route -> onNavigate(route) }, // Handle navigation clicks.
+            onSearchClick = onSearchClick
         )
 
         Column(

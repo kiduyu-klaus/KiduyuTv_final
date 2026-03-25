@@ -7,6 +7,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.kiduyuk.klausk.kiduyutv.ui.screens.MediaListScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.SearchScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.MovieDetailScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.SeasonEpisodesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.TvShowDetailScreen
@@ -40,6 +41,9 @@ fun NavGraph(navController: NavHostController) {
                     if (route != Screen.Home.route) {
                         navController.navigate(route)
                     }
+                },
+                onSearchClick = {
+                    navController.navigate(Screen.Search.route)
                 }
             )
         }
@@ -54,6 +58,9 @@ fun NavGraph(navController: NavHostController) {
                     if (route != Screen.Movies.route) {
                         navController.navigate(route)
                     }
+                },
+                onSearchClick = {
+                    navController.navigate(Screen.Search.route)
                 }
             )
         }
@@ -68,6 +75,9 @@ fun NavGraph(navController: NavHostController) {
                     if (route != Screen.TvShows.route) {
                         navController.navigate(route)
                     }
+                },
+                onSearchClick = {
+                    navController.navigate(Screen.Search.route)
                 }
             )
         }
@@ -85,6 +95,22 @@ fun NavGraph(navController: NavHostController) {
                     if (route != Screen.MyList.route) {
                         navController.navigate(route)
                     }
+                },
+                onSearchClick = {
+                    navController.navigate(Screen.Search.route)
+                }
+            )
+        }
+
+        // Search Screen: Screen for searching movies and TV shows.
+        composable(Screen.Search.route) {
+            SearchScreen(
+                onBackClick = { navController.popBackStack() },
+                onMovieClick = { movieId ->
+                    navController.navigate(Screen.MovieDetail.createRoute(movieId))
+                },
+                onTvShowClick = { tvId ->
+                    navController.navigate(Screen.TvShowDetail.createRoute(tvId))
                 }
             )
         }

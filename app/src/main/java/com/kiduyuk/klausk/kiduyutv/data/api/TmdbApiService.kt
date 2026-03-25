@@ -160,4 +160,25 @@ interface TmdbApiService {
     suspend fun getTvShowVideos(
         @Path("tv_id") tvId: Int
     ): VideoResponse
+
+    /** Searches for movies matching a query string. */
+    @GET("search/movie")
+    suspend fun searchMovies(
+        @Query("query") query: String,
+        @Query("page") page: Int = 1
+    ): MovieResponse
+
+    /** Searches for TV shows matching a query string. */
+    @GET("search/tv")
+    suspend fun searchTvShows(
+        @Query("query") query: String,
+        @Query("page") Int: Int = 1
+    ): TvShowResponse
+
+    /** Searches for both movies and TV shows matching a query string. */
+    @GET("search/multi")
+    suspend fun searchMulti(
+        @Query("query") query: String,
+        @Query("page") page: Int = 1
+    ): MultiSearchResponse
 }

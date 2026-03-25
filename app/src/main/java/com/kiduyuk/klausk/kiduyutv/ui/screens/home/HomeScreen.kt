@@ -35,6 +35,7 @@ import com.kiduyuk.klausk.kiduyutv.viewmodel.MyListItem
  * @param onMovieClick Lambda to navigate to the detail screen of a movie.
  * @param onTvShowClick Lambda to navigate to the detail screen of a TV show.
  * @param onNavigate Lambda to handle general navigation events.
+ * @param onSearchClick Lambda to navigate to the search screen.
  * @param viewModel The [HomeViewModel] instance providing data for the screen.
  */
 @Composable
@@ -42,6 +43,7 @@ fun HomeScreen(
     onMovieClick: (Int) -> Unit,
     onTvShowClick: (Int) -> Unit,
     onNavigate: (String) -> Unit = {},
+    onSearchClick: () -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
     // Collect UI state from the ViewModel.
@@ -100,6 +102,7 @@ fun HomeScreen(
                 onMovieClick = onMovieClick,
                 onTvShowClick = onTvShowClick,
                 onNavigate = onNavigate,
+                onSearchClick = onSearchClick,
                 onRouteChange = { selectedRoute = it },
                 onSelectItem = { viewModel.selectItem(it) }
             )
@@ -158,6 +161,7 @@ private fun HomeContent(
     onMovieClick: (Int) -> Unit,
     onTvShowClick: (Int) -> Unit,
     onNavigate: (String) -> Unit,
+    onSearchClick: () -> Unit,
     onRouteChange: (String) -> Unit,
     onSelectItem: (Any) -> Unit
 ) {
@@ -319,7 +323,8 @@ private fun HomeContent(
                 onNavItemClick = { route ->
                     onRouteChange(route)
                     onNavigate(route)
-                }
+                },
+                onSearchClick = onSearchClick
             )
         }
     } // end outer Box

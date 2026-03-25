@@ -260,3 +260,95 @@ data class VideoResponse(
     @SerializedName("id") val id: Int,
     @SerializedName("results") val results: List<Video>
 )
+
+/**
+ * Sealed class representing search results that can be either a Movie or a TV Show.
+ * This allows for unified handling of multi-search results from TMDB API.
+ */
+sealed class SearchResult {
+    abstract val id: Int
+    abstract val title: String
+    abstract val overview: String
+    abstract val posterPath: String?
+    abstract val backdropPath: String?
+    abstract val voteAverage: Double
+    abstract val mediaType: String
+
+    data class MovieResult(
+        override val id: Int,
+        override val title: String,
+        override val overview: String,
+        override val posterPath: String?,
+        override val backdropPath: String?,
+        override val voteAverage: Double,
+        override val mediaType: String = "movie"
+    ) : SearchResult()
+
+    data class TvResult(
+        override val id: Int,
+        override val title: String,
+        override val overview: String,
+        override val posterPath: String?,
+        override val backdropPath: String?,
+        override val voteAverage: Double,
+        override val mediaType: String = "tv"
+    ) : SearchResult()
+}
+
+/**
+ * Data class representing a response from multi-search endpoint.
+ * @param page The current page number of the results.
+ * @param results The list of search results (can be movies or TV shows).
+ * @param totalPages The total number of pages available.
+ * @param totalResults The total number of results available.
+ */
+data class MultiSearchResponse(
+    @SerializedName("page") val page: Int,
+    @SerializedName("results") val results: List<MultiSearchItem>,
+    @SerializedName("total_pages") val totalPages: Int,
+    @SerializedName("total_results") val totalResults: Int
+)
+
+/**
+ * Data class representing a single item from multi-search results.
+ * @param id The unique identifier for the item.
+ * @param title The title of the movie or name of the TV show.
+ * @param name Alternative name field (used for TV shows).
+ * @param overview A brief summary of the item's plot.
+ * @param posterPath The path to the item's poster image.
+ * @param backdropPath The path to the item's backdrop image.
+ * @param voteAverage The average vote score for the item.
+ * @param mediaType The type of media ("movie", "tv", or "person").
+ */
+data class MultiSearchItem(
+    @SerializedName("id") val id: Int,
+    @SerializedName("title") val title: String?,
+    @SerializedName("name") val name: String?,
+    @SerializedName("overview") val overview: String?,
+    @SerializedName("poster_path") val posterPath: String?,
+    @SerializedName("backdrop_path") val backdropPath: String?,
+    @SerializedName("vote_average") val voteAverage: Double?,
+    @SerializedName("media_type") val mediaType: String?
+) {
+    fun toSearchResult(): SearchResult? {
+        return when (mediaType) {
+            "movie" -> SearchResult.MovieResult(
+                id = id,
+                title = title ?: "",
+                overview = overview ?: "",
+                posterPath = posterPath,
+                backdropPath = backdropPath,
+                voteAverage = voteAverage ?: 0.0
+            )
+            "tv" -> SearchResult.TvResult(
+                id = id,
+                title = name ?: "",
+                overview = overview ?: "",
+                posterPath = posterPath,
+                backdropPath = backdropPath,
+                voteAverage = voteAverage ?: 0.0
+            )
+            else -> null
+        }
+    }
+}

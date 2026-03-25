@@ -115,4 +115,20 @@ class TmdbRepository {
     suspend fun getTvShowVideos(tvId: Int): Result<List<Video>> = runCatching {
         api.getTvShowVideos(tvId).results
     }
+
+    /** Searches for movies matching a query string. */
+    suspend fun searchMovies(query: String): Result<List<Movie>> = runCatching {
+        api.searchMovies(query).results
+    }
+
+    /** Searches for TV shows matching a query string. */
+    suspend fun searchTvShows(query: String): Result<List<TvShow>> = runCatching {
+        api.searchTvShows(query).results
+    }
+
+    /** Searches for both movies and TV shows matching a query string. */
+    suspend fun searchMulti(query: String): Result<List<SearchResult>> = runCatching {
+        val response = api.searchMulti(query)
+        response.results.mapNotNull { it.toSearchResult() }
+    }
 }
