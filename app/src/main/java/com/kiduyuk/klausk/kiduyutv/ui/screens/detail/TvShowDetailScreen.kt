@@ -33,6 +33,7 @@ import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.ui.components.ContentRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.TvShowCard
+import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
 
@@ -270,7 +271,13 @@ fun TvShowDetailScreen(
                         ) {
                             // Play Now
                             Button(
-                                onClick = { },
+                                onClick = {
+                                    val intent = Intent(context, PlayerActivity::class.java).apply {
+                                        putExtra("TMDB_ID", tvId)
+                                        putExtra("IS_TV", true)
+                                    }
+                                    context.startActivity(intent)
+                                },
                                 modifier = Modifier.focusRequester(playFocusRequester),
                                 interactionSource = playInteraction,
                                 colors = ButtonDefaults.buttonColors(
