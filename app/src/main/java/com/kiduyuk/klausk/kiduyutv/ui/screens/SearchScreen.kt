@@ -15,7 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.CircularProgressIndicator
+import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -249,10 +249,7 @@ private fun SearchContent(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(
-                        color = DarkRed,
-                        modifier = Modifier.size(64.dp)
-                    )
+                    LottieLoadingView(size = 300.dp)
                 }
             }
 
@@ -466,7 +463,7 @@ private fun SearchResultRow(
                 modifier = Modifier
                     .background(
                         color = if (result.mediaType == "movie") PrimaryRed.copy(alpha = 0.2f)
-                               else DarkRed.copy(alpha = 0.2f),
+                        else DarkRed.copy(alpha = 0.2f),
                         shape = RoundedCornerShape(8.dp)
                     )
                     .padding(horizontal = 12.dp, vertical = 4.dp)
