@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.MovieCard
 import com.kiduyuk.klausk.kiduyutv.ui.components.TvShowCard
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
@@ -131,7 +132,7 @@ fun MediaListScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = PrimaryRed)
+                    LottieLoadingView(size = 300.dp)
                 }
             } else if (uiState.error != null) {
                 Box(
@@ -209,10 +210,7 @@ fun MediaListScreen(
                             .padding(16.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(
-                            color = PrimaryRed,
-                            modifier = Modifier.size(32.dp)
-                        )
+                        LottieLoadingView(size = 100.dp)
                     }
                 }
             }
