@@ -8,6 +8,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.kiduyuk.klausk.kiduyutv.ui.screens.MediaListScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.SearchScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.SettingsScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.MovieDetailScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.SeasonEpisodesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.TvShowDetailScreen
@@ -44,6 +45,9 @@ fun NavGraph(navController: NavHostController) {
                 },
                 onSearchClick = {
                     navController.navigate(Screen.Search.route)
+                },
+                onSettingsClick = {
+                    navController.navigate(Screen.Settings.route)
                 }
             )
         }
@@ -61,6 +65,9 @@ fun NavGraph(navController: NavHostController) {
                 },
                 onSearchClick = {
                     navController.navigate(Screen.Search.route)
+                },
+                onSettingsClick = {
+                    navController.navigate(Screen.Settings.route)
                 }
             )
         }
@@ -78,6 +85,9 @@ fun NavGraph(navController: NavHostController) {
                 },
                 onSearchClick = {
                     navController.navigate(Screen.Search.route)
+                },
+                onSettingsClick = {
+                    navController.navigate(Screen.Settings.route)
                 }
             )
         }
@@ -98,6 +108,9 @@ fun NavGraph(navController: NavHostController) {
                 },
                 onSearchClick = {
                     navController.navigate(Screen.Search.route)
+                },
+                onSettingsClick = {
+                    navController.navigate(Screen.Settings.route)
                 }
             )
         }
@@ -189,7 +202,7 @@ fun NavGraph(navController: NavHostController) {
             val type = backStackEntry.arguments?.getString("type") ?: "company"
             val id = backStackEntry.arguments?.getInt("id") ?: 0
             val name = backStackEntry.arguments?.getString("name") ?: ""
-            
+
             MediaListScreen(
                 type = type,
                 id = id,
@@ -201,6 +214,13 @@ fun NavGraph(navController: NavHostController) {
                 onTvShowClick = { tvId ->
                     navController.navigate(Screen.TvShowDetail.createRoute(tvId))
                 }
+            )
+        }
+
+        // Settings Screen: Screen for app settings, information, and version details.
+        composable(Screen.Settings.route) {
+            SettingsScreen(
+                onBackClick = { navController.popBackStack() }
             )
         }
     }
