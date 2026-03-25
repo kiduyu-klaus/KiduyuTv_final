@@ -73,6 +73,7 @@ fun HomeScreen(
     val popularCompanies = uiState.popularCompanies
     val latestMovies = uiState.latestMovies
     val topTvShows = uiState.topTvShows
+    val oscarMovies = uiState.oscarMovies
     val myList = uiState.myList
 
     // Main container for the home screen.
@@ -97,6 +98,7 @@ fun HomeScreen(
                 popularCompanies = popularCompanies,
                 latestMovies = latestMovies,
                 topTvShows = topTvShows,
+                oscarMovies = oscarMovies,
                 myList = myList,
                 scrollState = scrollState,
                 selectedRoute = selectedRoute,
@@ -157,6 +159,7 @@ private fun HomeContent(
     popularCompanies: List<com.kiduyuk.klausk.kiduyutv.viewmodel.NetworkItem>,
     latestMovies: List<Movie>,
     topTvShows: List<TvShow>,
+    oscarMovies: List<Movie>,
     myList: List<MyListItem>,
     scrollState: androidx.compose.foundation.ScrollState,
     selectedRoute: String,
@@ -280,6 +283,22 @@ private fun HomeContent(
                         isSelected = isFocused,
                         onClick = onClick
                     )
+                }
+
+                // Content Row for Oscar Movies (only shown if not empty).
+                if (oscarMovies.isNotEmpty()) {
+                    ContentRow(
+                        title = "Oscar Movies",
+                        items = oscarMovies,
+                        onItemFocus = { movie -> onSelectItem(movie) },
+                        onItemClick = { movie -> onMovieClick(movie.id) }
+                    ) { movie, isFocused, onClick ->
+                        MovieCard(
+                            movie = movie,
+                            isSelected = isFocused,
+                            onClick = onClick
+                        )
+                    }
                 }
 
                 // My List section, only shown if not empty.

@@ -352,3 +352,52 @@ data class MultiSearchItem(
         }
     }
 }
+
+/**
+ * Data class representing an Oscar movie from CSV data.
+ * @param film The title of the movie.
+ * @param yearFilm The release year of the film.
+ * @param idTmdb The TMDB ID of the movie.
+ * @param originalTitle The original title of the movie.
+ * @param overview The overview/synopsis of the movie.
+ * @param popularity The popularity score.
+ * @param posterPath The path to the poster image.
+ * @param backdropPath The path to the backdrop image.
+ * @param releaseDate The release date.
+ * @param voteAverage The average vote score.
+ * @param oscarsWon The number of Oscars won.
+ * @param genres The genre names.
+ */
+data class OscarMovie(
+    val film: String,
+    val yearFilm: Int,
+    val idTmdb: Int?,
+    val originalTitle: String?,
+    val overview: String?,
+    val popularity: Double?,
+    val posterPath: String?,
+    val backdropPath: String?,
+    val releaseDate: String?,
+    val voteAverage: Double?,
+    val oscarsWon: Int,
+    val genres: String?
+) {
+    /**
+     * Converts OscarMovie to a standard Movie object for display.
+     * Only converts if TMDB ID is available.
+     */
+    fun toMovie(): Movie? {
+        val tmdbId = idTmdb ?: return null
+        return Movie(
+            id = tmdbId,
+            title = originalTitle ?: film,
+            overview = overview ?: "",
+            posterPath = posterPath,
+            backdropPath = backdropPath,
+            voteAverage = voteAverage ?: 0.0,
+            releaseDate = releaseDate,
+            genreIds = emptyList(),
+            popularity = popularity
+        )
+    }
+}

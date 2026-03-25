@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
  * @param popularCompanies List of popular companies.
  * @param latestMovies List of latest movies.
  * @param topTvShows List of top-rated TV shows.
+ * @param oscarMovies List of Oscar-nominated/winning movies.
  * @param myList List of items added to the user's personal list.
  * @param selectedItem The currently selected movie or TV show, used for the hero section.
  * @param error An error message if data loading fails.
@@ -35,6 +36,7 @@ data class HomeUiState(
     val popularCompanies: List<NetworkItem> = emptyList(),
     val latestMovies: List<Movie> = emptyList(),
     val topTvShows: List<TvShow> = emptyList(),
+    val oscarMovies: List<Movie> = emptyList(),
     val myList: List<MyListItem> = emptyList(),
     val selectedItem: Any? = null,
     val error: String? = null
@@ -118,6 +120,9 @@ class HomeViewModel : ViewModel() {
                     async { repository.getCompanyDetails(id).getOrNull() }
                 }
 
+                // Fetch Oscar movies
+                val oscarMoviesDeferred = async { repository.getOscarMovies() }
+
                 // Await all results and provide empty lists as fallback
                 val trendingTv = trendingTvDeferred.await().getOrNull() ?: emptyList()
                 val trendingMovies = trendingMoviesDeferred.await().getOrNull() ?: emptyList()
@@ -146,6 +151,7 @@ class HomeViewModel : ViewModel() {
                     popularCompanies = companies,
                     latestMovies = topRatedMovies.take(10),
                     topTvShows = topRatedTv.take(10),
+                    oscarMovies = oscarMoviesDeferred.await().getOrNull()?.mapNotNull { it.toMovie() } ?: emptyList(),
                     myList = emptyList(), // MyList is initially empty.
                     // Set the initial selected item for the hero section.
                     selectedItem = trendingTv.firstOrNull() ?: trendingMovies.firstOrNull()
