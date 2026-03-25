@@ -110,8 +110,8 @@ class HomeViewModel : ViewModel() {
                 val popularMoviesDeferred = async { repository.getPopularMovies() }
 
                 // Fetch networks and companies in parallel with main content
-                val networkIds = listOf(213, 1024, 1025, 158, 2739, 4451, 3284, 283)
-                val companyIds = listOf(420, 3, 174, 4, 33, 5, 2, 1)
+                val networkIds = listOf(213, 2739, 1024, 49, 4330, 2552, 453, 3353, 174, 88, 67, 4, 6, 2, 16, 19, 71, 26, 214)
+                val companyIds = listOf(2, 420, 174, 33, 3, 1, 34, 5, 4, 521, 6704, 923, 25, 12, 9383)
 
                 // Network and company details fetched in parallel
                 val networkDetailsDeferred = networkIds.map { id ->
