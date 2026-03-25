@@ -7,19 +7,21 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
-import com.kiduyuk.klausk.kiduyutv.ui.components.ContentRow
-import com.kiduyuk.klausk.kiduyutv.ui.components.TopBar
-import com.kiduyuk.klausk.kiduyutv.ui.components.TvShowCard
+import com.kiduyuk.klausk.kiduyutv.ui.components.*
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
 import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
@@ -45,20 +47,17 @@ fun TvShowsScreen(
 ) {
     // Collect UI state from the ViewModel.
     val uiState by viewModel.uiState.collectAsState()
+    val scrollState = rememberScrollState()
 
-    Column(
+    val selectedTvShow by remember(uiState.selectedItem) {
+        derivedStateOf { uiState.selectedItem as? TvShow }
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(BackgroundDark) // Set background color.
     ) {
-        // Top navigation bar for the TV Shows screen.
-        TopBar(
-            selectedRoute = "tv_shows",
-            onNavItemClick = { route -> onNavigate(route) }, // Handle navigation clicks.
-            onSearchClick = onSearchClick,
-            onSettingsClick = onSettingsClick
-        )
-
         // Display a loading indicator if data is being fetched.
         if (uiState.isLoading) {
             Box(
@@ -68,26 +67,32 @@ fun TvShowsScreen(
                 LottieLoadingView(size = 300.dp)
             }
         } else { // Display TV show content once data is loaded.
-            // Scrollable content area
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 32.dp)
+            Column(
+                modifier = Modifier.fillMaxSize()
             ) {
-                // Screen title.
-                item {
+                HeroSection(
+                    movie = null,
+                    tvShow = selectedTvShow
+                )
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .weight(1f)
+                        .verticalScroll(scrollState)
+                ) {
                     Text(
                         text = "TV Shows",
                         style = MaterialTheme.typography.headlineLarge,
                         color = TextPrimary,
-                        modifier = Modifier.padding(48.dp)
+                        modifier = Modifier.padding(horizontal = 48.dp, vertical = 16.dp)
                     )
-                }
 
-                // Content Row for Trending TV Shows.
-                item {
+                    // Content Row for Trending TV Shows.
                     ContentRow(
                         title = "Trending TV Shows",
                         items = uiState.trendingTvShows,
+                        onItemFocus = { tvShow -> viewModel.selectItem(tvShow) },
                         onItemClick = { tvShow -> onTvShowClick(tvShow.id) } // Handle TV show click.
                     ) { tvShow, isSelected, onClick ->
                         TvShowCard(
@@ -96,13 +101,12 @@ fun TvShowsScreen(
                             onClick = onClick
                         )
                     }
-                }
 
-                // Content Row for Top Rated TV Shows.
-                item {
+                    // Content Row for Top Rated TV Shows.
                     ContentRow(
                         title = "Top Rated TV Shows",
                         items = uiState.topTvShows,
+                        onItemFocus = { tvShow -> viewModel.selectItem(tvShow) },
                         onItemClick = { tvShow -> onTvShowClick(tvShow.id) } // Handle TV show click.
                     ) { tvShow, isSelected, onClick ->
                         TvShowCard(
@@ -111,9 +115,30 @@ fun TvShowsScreen(
                             onClick = onClick
                         )
                     }
+
+                    Spacer(modifier = Modifier.height(32.dp))
                 }
             }
         }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(BackgroundDark, Color.Transparent)
+                    )
+                )
+        )
+
+        // Top navigation bar for the TV Shows screen.
+        TopBar(
+            selectedRoute = "tv_shows",
+            onNavItemClick = { route -> onNavigate(route) }, // Handle navigation clicks.
+            onSearchClick = onSearchClick,
+            onSettingsClick = onSettingsClick
+        )
     }
 }
 
