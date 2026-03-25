@@ -19,8 +19,10 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import android.content.Intent
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -33,6 +35,7 @@ import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.data.model.Episode
 import com.kiduyuk.klausk.kiduyutv.data.model.Season
+import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
 
@@ -55,6 +58,7 @@ fun SeasonEpisodesScreen(
     onBackClick: () -> Unit,
     viewModel: DetailViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     // Collect UI state from the ViewModel.
     val uiState by viewModel.uiState.collectAsState()
     // State to keep track of the currently selected season index.
@@ -205,7 +209,16 @@ fun SeasonEpisodesScreen(
                             items(uiState.episodes) { episode ->
                                 EpisodeListItem(
                                     episode = episode,
-                                    seasonNumber = selectedSeasonIndex + 1
+                                    seasonNumber = selectedSeasonIndex + 1,
+                                    onEpisodeClick = { sNum, eNum ->
+                                        val intent = Intent(context, PlayerActivity::class.java).apply {
+                                            putExtra("TMDB_ID", tvShowId)
+                                            putExtra("IS_TV", true)
+                                            putExtra("SEASON_NUMBER", sNum)
+                                            putExtra("EPISODE_NUMBER", eNum)
+                                        }
+                                        context.startActivity(intent)
+                                    }
                                 )
                             }
                         }
@@ -298,7 +311,8 @@ private fun SeasonListItem(
 @Composable
 private fun EpisodeListItem(
     episode: Episode,
-    seasonNumber: Int
+    seasonNumber: Int,
+    onEpisodeClick: (Int, Int) -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
@@ -327,7 +341,7 @@ private fun EpisodeListItem(
                 interactionSource = interactionSource,
                 indication = null
             ) {
-                // TODO: Implement episode playback
+                onEpisodeClick(seasonNumber, episode.episodeNumber)
             }
             .padding(16.dp)
     ) {
