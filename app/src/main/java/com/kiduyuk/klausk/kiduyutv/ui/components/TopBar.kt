@@ -30,6 +30,7 @@ fun TopBar(
     selectedRoute: String,
     onNavItemClick: (String) -> Unit,
     onSearchClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val navItems = listOf("Movies", "TV Shows", "My List")
@@ -128,7 +129,7 @@ fun TopBar(
             FocusableIconButton(
                 icon = Icons.Default.Settings,
                 contentDescription = "Settings",
-                onClick = { /* TODO */ }
+                onClick = onSettingsClick
             )
         }
     }
