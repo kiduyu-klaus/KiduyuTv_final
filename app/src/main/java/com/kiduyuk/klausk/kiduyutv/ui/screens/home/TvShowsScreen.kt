@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
@@ -48,9 +49,14 @@ fun TvShowsScreen(
     // Collect UI state from the ViewModel.
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
+    val firstItemFocusRequester = remember { FocusRequester() }
 
     val selectedTvShow by remember(uiState.selectedItem) {
         derivedStateOf { uiState.selectedItem as? TvShow }
+    }
+
+    LaunchedEffect(Unit) {
+        firstItemFocusRequester.requestFocus()
     }
 
     Box(
@@ -92,6 +98,7 @@ fun TvShowsScreen(
                     ContentRow(
                         title = "Trending TV Shows",
                         items = uiState.trendingTvShows,
+                        initialFocusRequester = firstItemFocusRequester,
                         onItemFocus = { tvShow -> viewModel.selectItem(tvShow) },
                         onItemClick = { tvShow -> onTvShowClick(tvShow.id) } // Handle TV show click.
                     ) { tvShow, isSelected, onClick ->
