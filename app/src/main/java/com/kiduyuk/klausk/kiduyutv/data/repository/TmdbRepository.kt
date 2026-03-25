@@ -138,6 +138,16 @@ class TmdbRepository {
         response.results.mapNotNull { it.toSearchResult() }
     }
 
+    /** Fetches similar movies for a specific movie. */
+    suspend fun getSimilarMovies(movieId: Int): Result<List<Movie>> = runCatching {
+        api.getSimilarMovies(movieId).results
+    }
+
+    /** Fetches similar TV shows for a specific TV show. */
+    suspend fun getSimilarTvShows(tvId: Int): Result<List<TvShow>> = runCatching {
+        api.getSimilarTvShows(tvId).results
+    }
+
 
     /**
      * Fetches movies from a Trakt list and gets their details from TMDB.
