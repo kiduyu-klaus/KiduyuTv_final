@@ -40,6 +40,7 @@ fun TvShowsScreen(
     onTvShowClick: (Int) -> Unit,
     onNavigate: (String) -> Unit = {},
     onSearchClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
     // Collect UI state from the ViewModel.
@@ -54,7 +55,8 @@ fun TvShowsScreen(
         TopBar(
             selectedRoute = "tv_shows",
             onNavItemClick = { route -> onNavigate(route) }, // Handle navigation clicks.
-            onSearchClick = onSearchClick
+            onSearchClick = onSearchClick,
+            onSettingsClick = onSettingsClick
         )
 
         // Display a loading indicator if data is being fetched.
