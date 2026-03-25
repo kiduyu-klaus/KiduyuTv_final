@@ -87,13 +87,13 @@ class TmdbRepository {
     }
 
     /** Fetches movies filtered by a specific production company. */
-    suspend fun getMoviesByCompany(companyId: Int): Result<List<Movie>> = runCatching {
-        api.getMoviesByCompany(companyId).results
+    suspend fun getMoviesByCompany(companyId: Int, page: Int = 1): Result<MovieResponse> = runCatching {
+        api.getMoviesByCompany(companyId, page = page)
     }
 
     /** Fetches TV shows filtered by a specific network. */
-    suspend fun getTvShowsByNetwork(networkId: Int): Result<List<TvShow>> = runCatching {
-        api.getTvShowsByNetwork(networkId).results
+    suspend fun getTvShowsByNetwork(networkId: Int, page: Int = 1): Result<TvShowResponse> = runCatching {
+        api.getTvShowsByNetwork(networkId, page = page)
     }
 
     /** Fetches details for a specific network, including its logo. */
