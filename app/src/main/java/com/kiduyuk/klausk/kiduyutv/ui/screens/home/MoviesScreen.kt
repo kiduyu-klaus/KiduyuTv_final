@@ -15,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
@@ -48,9 +49,14 @@ fun MoviesScreen(
     // Collect UI state from the ViewModel.
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
+    val firstItemFocusRequester = remember { FocusRequester() }
 
     val selectedMovie by remember(uiState.selectedItem) {
         derivedStateOf { uiState.selectedItem as? Movie }
+    }
+
+    LaunchedEffect(Unit) {
+        firstItemFocusRequester.requestFocus()
     }
 
     Box(
@@ -92,6 +98,7 @@ fun MoviesScreen(
                     ContentRow(
                         title = "Trending Movies",
                         items = uiState.trendingMovies,
+                        initialFocusRequester = firstItemFocusRequester,
                         onItemFocus = { movie -> viewModel.selectItem(movie) },
                         onItemClick = { movie -> onMovieClick(movie.id) } // Handle movie click.
                     ) { movie, isSelected, onClick ->
