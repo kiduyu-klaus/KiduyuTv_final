@@ -91,6 +91,9 @@ dependencies {
     implementation 'androidx.constraintlayout:constraintlayout:2.2.1'
     annotationProcessor 'com.github.bumptech.glide:compiler:4.16.0'
 
+    // Lottie for animations
+    implementation 'com.airbnb.android:lottie-compose:6.6.2'
+
     // Testing
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.3.0'
