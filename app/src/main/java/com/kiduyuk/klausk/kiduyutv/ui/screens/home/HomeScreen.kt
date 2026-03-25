@@ -44,6 +44,7 @@ fun HomeScreen(
     onTvShowClick: (Int) -> Unit,
     onNavigate: (String) -> Unit = {},
     onSearchClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
     // Collect UI state from the ViewModel.
@@ -103,6 +104,7 @@ fun HomeScreen(
                 onTvShowClick = onTvShowClick,
                 onNavigate = onNavigate,
                 onSearchClick = onSearchClick,
+                onSettingsClick = onSettingsClick,
                 onRouteChange = { selectedRoute = it },
                 onSelectItem = { viewModel.selectItem(it) }
             )
@@ -162,6 +164,7 @@ private fun HomeContent(
     onTvShowClick: (Int) -> Unit,
     onNavigate: (String) -> Unit,
     onSearchClick: () -> Unit,
+    onSettingsClick: () -> Unit,
     onRouteChange: (String) -> Unit,
     onSelectItem: (Any) -> Unit
 ) {
@@ -324,7 +327,8 @@ private fun HomeContent(
                     onRouteChange(route)
                     onNavigate(route)
                 },
-                onSearchClick = onSearchClick
+                onSearchClick = onSearchClick,
+                onSettingsClick = onSettingsClick
             )
         }
     } // end outer Box
