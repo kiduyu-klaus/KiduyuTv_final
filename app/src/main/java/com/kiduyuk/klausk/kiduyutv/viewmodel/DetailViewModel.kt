@@ -66,13 +66,13 @@ class DetailViewModel : ViewModel() {
             _uiState.value = DetailUiState(isLoading = true)
 
             try {
-                // Fetch movie details and similar movies.
+                // Fetch movie details and recommended movies.
                 val movieDetailResult = repository.getMovieDetail(movieId)
-                val similarMoviesResult = repository.getSimilarMovies(movieId)
+                val recommendedMoviesResult = repository.getRecommendedMovies(movieId)
                 val videosResult = repository.getMovieVideos(movieId)
 
                 val movieDetail = movieDetailResult.getOrNull()
-                val similarMovies = similarMoviesResult.getOrNull()?.take(10) ?: repository.getTrendingMoviesToday().getOrNull()?.take(10) ?: emptyList()
+                val similarMovies = recommendedMoviesResult.getOrNull()?.take(10) ?: repository.getTrendingMoviesToday().getOrNull()?.take(10) ?: emptyList()
                 val videos = videosResult.getOrNull() ?: emptyList()
 
                 // Find the first YouTube trailer.
@@ -112,12 +112,12 @@ class DetailViewModel : ViewModel() {
             _uiState.value = DetailUiState(isLoading = true)
 
             try {
-                // Fetch TV show details and similar TV shows.
+                // Fetch TV show details and recommended TV shows.
                 val tvShowDetail = repository.getTvShowDetail(tvId).getOrElse { throw it }
-                val similarTvShowsResult = repository.getSimilarTvShows(tvId)
+                val recommendedTvShowsResult = repository.getRecommendedTvShows(tvId)
                 val videosResult = repository.getTvShowVideos(tvId)
 
-                val similarTvShows = similarTvShowsResult.getOrNull()?.take(10) ?: repository.getTrendingTvToday().getOrNull()?.take(10) ?: emptyList()
+                val similarTvShows = recommendedTvShowsResult.getOrNull()?.take(10) ?: repository.getTrendingTvToday().getOrNull()?.take(10) ?: emptyList()
                 val videos = videosResult.getOrNull() ?: emptyList()
 
                 // Find the first YouTube trailer.
