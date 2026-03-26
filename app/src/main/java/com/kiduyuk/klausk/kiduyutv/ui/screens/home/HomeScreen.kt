@@ -56,6 +56,7 @@ fun HomeScreen(
     val hallmarkMovies = uiState.hallmarkMovies
     val trueStoryMovies = uiState.trueStoryMovies
     val bestSitcoms = uiState.bestSitcoms
+    val bestClassics = uiState.bestClassics
     val myList = uiState.myList
 
     Box(
@@ -83,6 +84,7 @@ fun HomeScreen(
                 hallmarkMovies = hallmarkMovies,
                 trueStoryMovies = trueStoryMovies,
                 bestSitcoms = bestSitcoms,
+                bestClassics = bestClassics,
                 myList = myList,
                 scrollState = scrollState,
                 selectedRoute = selectedRoute,
@@ -142,6 +144,7 @@ private fun HomeContent(
     hallmarkMovies: List<Movie>,
     trueStoryMovies: List<Movie>,
     bestSitcoms: List<TvShow>,
+    bestClassics: List<Movie>,
     myList: List<MyListItem>,
     scrollState: androidx.compose.foundation.ScrollState,
     selectedRoute: String,
@@ -296,7 +299,7 @@ private fun HomeContent(
 
                 if (oscarWinners2026.isNotEmpty()) {
                     ContentRow(
-                        title = "Road to 2026 Oscars",
+                        title = "2026 Oscar winners",
                         items = oscarWinners2026,
                         restoreFocusItemId = lastClickedItemId,
                         getItemId = { it.id },
@@ -316,7 +319,7 @@ private fun HomeContent(
 
                 if (hallmarkMovies.isNotEmpty()) {
                     ContentRow(
-                        title = "Top Hallmark Movies",
+                        title = "Hallmark Movies",
                         items = hallmarkMovies,
                         restoreFocusItemId = lastClickedItemId,
                         getItemId = { it.id },
@@ -336,7 +339,7 @@ private fun HomeContent(
 
                 if (trueStoryMovies.isNotEmpty()) {
                     ContentRow(
-                        title = "Top Movies Based on True Stories",
+                        title = "Movies Based on True Stories",
                         items = trueStoryMovies,
                         restoreFocusItemId = lastClickedItemId,
                         getItemId = { it.id },
@@ -374,9 +377,29 @@ private fun HomeContent(
                     }
                 }
 
+                if (bestClassics.isNotEmpty()) {
+                    ContentRow(
+                        title = "Best movie classics",
+                        items = bestClassics,
+                        restoreFocusItemId = lastClickedItemId,
+                        getItemId = { it.id },
+                        onItemFocus = { movie -> onSelectItem(movie) },
+                        onItemClick = { movie ->
+                            onSetLastClickedItemId(movie.id)
+                            onMovieClick(movie.id)
+                        }
+                    ) { movie, isFocused, onClick ->
+                        MovieCard(
+                            movie = movie,
+                            isSelected = isFocused,
+                            onClick = onClick
+                        )
+                    }
+                }
+
                 if (oscarMovies.isNotEmpty()) {
                     ContentRow(
-                        title = "Best Oscar Movie Nominations",
+                        title = "Oscar Movies",
                         items = oscarMovies,
                         restoreFocusItemId = lastClickedItemId,
                         getItemId = { it.id },
