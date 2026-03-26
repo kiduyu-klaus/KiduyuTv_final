@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.os.Message
 import android.view.KeyEvent
 import android.view.View
+import android.view.WindowManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -52,6 +53,8 @@ class PlayerActivity : ComponentActivity() {
             finish()
             return
         }
+        // Keep screen on while watching
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         val baseUrl = if (isTv) {
             "https://vidlink.pro/tv/$tmdbId/$seasonNumber/$episodeNumber"
@@ -71,9 +74,21 @@ class PlayerActivity : ComponentActivity() {
                 // Block popups natively
                 setSupportMultipleWindows(false)
                 javaScriptCanOpenWindowsAutomatically = false
+                allowContentAccess         = true
+                allowFileAccess            = false            // not needed, reduce attack surface
+                databaseEnabled            = true
+                mediaPlaybackRequiresUserGesture = false
+                mixedContentMode           = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                setSupportMultipleWindows(true)               // required to intercept window.open()
+                useWideViewPort            = true
+                loadWithOverviewMode       = true
+                builtInZoomControls        = false
+                displayZoomControls        = false
+                cacheMode                  = WebSettings.LOAD_DEFAULT
             }
 
             webViewClient = object : WebViewClient() {
+
                 // Block ad requests based on domain
                 override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
                     val requestUrl = request?.url?.toString() ?: ""
@@ -165,9 +180,9 @@ class PlayerActivity : ComponentActivity() {
 
             webChromeClient = object : WebChromeClient() {
                 // Prevent any new windows from being created (additional popup layer)
-                override fun onCreateWindow(view: WebView?, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message?): Boolean {
-                    return false
-                }
+                override fun onCreateWindow(
+                    view: WebView, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message
+                ): Boolean = false  // false = block the window
             }
 
             // Enable mouse support/touch events for navigation
@@ -194,31 +209,7 @@ class PlayerActivity : ComponentActivity() {
         })
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        when (keyCode) {
-            // Media Key Handling
-            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
-                webView.evaluateJavascript("window.playerToggle();", null)
-                return true
-            }
-            KeyEvent.KEYCODE_MEDIA_PLAY -> {
-                webView.evaluateJavascript("window.playerPlay();", null)
-                return true
-            }
-            KeyEvent.KEYCODE_MEDIA_PAUSE -> {
-                webView.evaluateJavascript("window.playerPause();", null)
-                return true
-            }
-            // D-pad navigation for WebView
-            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
-            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
-            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                // Pass these keys to the WebView for spatial navigation
-                return super.onKeyDown(keyCode, event)
-            }
-        }
-        return super.onKeyDown(keyCode, event)
-    }
+
 
     private fun showExitConfirmationDialog() {
         AlertDialog.Builder(this)
