@@ -138,14 +138,14 @@ class TmdbRepository {
         response.results.mapNotNull { it.toSearchResult() }
     }
 
-    /** Fetches similar movies for a specific movie. */
-    suspend fun getSimilarMovies(movieId: Int): Result<List<Movie>> = runCatching {
-        api.getSimilarMovies(movieId).results
+    /** Fetches recommended movies for a specific movie. */
+    suspend fun getRecommendedMovies(movieId: Int): Result<List<Movie>> = runCatching {
+        api.getRecommendedMovies(movieId).results
     }
 
-    /** Fetches similar TV shows for a specific TV show. */
-    suspend fun getSimilarTvShows(tvId: Int): Result<List<TvShow>> = runCatching {
-        api.getSimilarTvShows(tvId).results
+    /** Fetches recommended TV shows for a specific TV show. */
+    suspend fun getRecommendedTvShows(tvId: Int): Result<List<TvShow>> = runCatching {
+        api.getRecommendedTvShows(tvId).results
     }
 
 
@@ -189,7 +189,7 @@ class TmdbRepository {
 
             // Fetch details for each movie from TMDB
             val movies = tmdbIds.distinct()
-                .take(20) // Limit to 20 movies for performance
+                .take(30) // Limit to 20 movies for performance
                 .mapNotNull { id ->
                     runCatching {
                         api.getMovieDetail(id).let { detail ->
