@@ -182,16 +182,16 @@ interface TmdbApiService {
         @Query("page") page: Int = 1
     ): MultiSearchResponse
 
-    /** Fetches a list of similar movies for a specific movie. */
-    @GET("movie/{movie_id}/similar")
-    suspend fun getSimilarMovies(
+    /** Fetches a list of recommended movies for a specific movie. */
+    @GET("movie/{movie_id}/recommendations")
+    suspend fun getRecommendedMovies(
         @Path("movie_id") movieId: Int,
         @Query("page") page: Int = 1
     ): MovieResponse
 
-    /** Fetches a list of similar TV shows for a specific TV show. */
-    @GET("tv/{tv_id}/similar")
-    suspend fun getSimilarTvShows(
+    /** Fetches a list of recommended TV shows for a specific TV show. */
+    @GET("tv/{tv_id}/recommendations")
+    suspend fun getRecommendedTvShows(
         @Path("tv_id") tvId: Int,
         @Query("page") page: Int = 1
     ): TvShowResponse
