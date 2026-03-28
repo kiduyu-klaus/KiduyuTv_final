@@ -148,6 +148,11 @@ class TmdbRepository {
         api.getRecommendedTvShows(tvId).results
     }
 
+    /** Fetches detailed information for a movie collection. */
+    suspend fun getCollectionDetails(collectionId: Int): Result<CollectionDetail> = runCatching {
+        api.getCollectionDetails(collectionId)
+    }
+
 
     /**
      * Fetches movies from a Trakt list and gets their details from TMDB.
@@ -193,7 +198,7 @@ class TmdbRepository {
 
             // Fetch details for each movie from TMDB
             val movies = tmdbIds.distinct()
-                .take(2) // Limit to 20 movies for performance
+                .take(20) // Limit to 20 movies for performance
                 .mapNotNull { id ->
                     runCatching {
                         api.getMovieDetail(id).let { detail ->
