@@ -174,22 +174,26 @@ class TmdbRepository {
             }
 
             val reader = BufferedReader(InputStreamReader(connection.inputStream))
-            val response = reader.readText()
-            Log.i(TAG, "Trakt list response: $response")
-            reader.close()
-
-            // Simple manual JSON parsing for TMDB IDs since we don't want to add new dependencies
             val tmdbIds = mutableListOf<Int>()
             val regex = "\"tmdb\":\\s*(\\d+)".toRegex()
-            regex.findAll(response).forEach { match ->
-                match.groupValues.getOrNull(1)?.toIntOrNull()?.let { tmdbIds.add(it) }
+
+            // Read line by line to avoid loading massive JSON into memory
+            reader.forEachLine { line ->
+                regex.findAll(line).forEach { match ->
+                    match.groupValues.getOrNull(1)?.toIntOrNull()?.let {
+                        if (!tmdbIds.contains(it)) tmdbIds.add(it)
+                    }
+                }
+                // Stop early if we have enough IDs to process (e.g., 50) to save memory/time
+                if (tmdbIds.size >= 50) return@forEachLine
             }
-            Log.i(TAG, "TMDB IDs: $tmdbIds")
+            reader.close()
+            Log.i(TAG, "Found ${tmdbIds.size} TMDB IDs")
 
 
             // Fetch details for each movie from TMDB
             val movies = tmdbIds.distinct()
-                .take(30) // Limit to 20 movies for performance
+                .take(20) // Limit to 20 movies for performance
                 .mapNotNull { id ->
                     runCatching {
                         api.getMovieDetail(id).let { detail ->
@@ -236,17 +240,21 @@ class TmdbRepository {
             }
 
             val reader = BufferedReader(InputStreamReader(connection.inputStream))
-            val response = reader.readText()
-            Log.i(TAG, "Trakt list response: $response")
-            reader.close()
-
-            // Simple manual JSON parsing for TMDB IDs
             val tmdbIds = mutableListOf<Int>()
             val regex = "\"tmdb\":\\s*(\\d+)".toRegex()
-            regex.findAll(response).forEach { match ->
-                match.groupValues.getOrNull(1)?.toIntOrNull()?.let { tmdbIds.add(it) }
+
+            // Read line by line to avoid loading massive JSON into memory
+            reader.forEachLine { line ->
+                regex.findAll(line).forEach { match ->
+                    match.groupValues.getOrNull(1)?.toIntOrNull()?.let {
+                        if (!tmdbIds.contains(it)) tmdbIds.add(it)
+                    }
+                }
+                // Stop early if we have enough IDs to process
+                if (tmdbIds.size >= 50) return@forEachLine
             }
-            Log.i(TAG, "TMDB IDs: $tmdbIds")
+            reader.close()
+            Log.i(TAG, "Found ${tmdbIds.size} TMDB IDs")
 
             // Fetch details for each TV show from TMDB
             val tvShows = tmdbIds.distinct()
