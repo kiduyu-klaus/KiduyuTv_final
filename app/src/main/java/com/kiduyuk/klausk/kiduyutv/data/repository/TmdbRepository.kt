@@ -176,8 +176,9 @@ class TmdbRepository {
             val response = reader.readText()
             reader.close()
 
+            val gson = com.google.gson.Gson()
             val type = object : com.google.gson.reflect.TypeToken<List<Movie>>() {}.type
-            val movies: List<Movie> = com.google.gson.Gson().fromJson(response, type)
+            val movies: List<Movie> = gson.fromJson(response, type)
             movies
         }
     }
@@ -204,8 +205,9 @@ class TmdbRepository {
             val response = reader.readText()
             reader.close()
 
+            val gson = com.google.gson.Gson()
             val type = object : com.google.gson.reflect.TypeToken<List<TvShow>>() {}.type
-            val tvShows: List<TvShow> = com.google.gson.Gson().fromJson(response, type)
+            val tvShows: List<TvShow> = gson.fromJson(response, type)
             tvShows
         }
     }
