@@ -35,6 +35,7 @@ data class DetailUiState(
     val similarTvShows: List<TvShow> = emptyList(),
     val collectionDetail: CollectionDetail? = null,
     val isInMyList: Boolean = false,
+    val watchHistoryItem: WatchHistoryItem? = null,
     val trailerKey: String? = null,
     val error: String? = null
 )
@@ -61,10 +62,11 @@ class DetailViewModel : ViewModel() {
      * Loads detailed information for a specific movie.
      * @param movieId The ID of the movie to load.
      */
-    fun loadMovieDetail(movieId: Int) {
+    fun loadMovieDetail(context: Context, movieId: Int) {
         viewModelScope.launch {
             // Set loading state to true.
             _uiState.value = DetailUiState(isLoading = true)
+            val historyItem = repository.getWatchHistoryItem(context, movieId, false)
 
             try {
                 // Fetch movie details and recommended movies.
@@ -97,7 +99,8 @@ class DetailViewModel : ViewModel() {
                     similarMovies = similarMovies,
                     collectionDetail = collectionDetail,
                     trailerKey = trailerKey,
-                    isInMyList = isInMyList
+                    isInMyList = isInMyList,
+                    watchHistoryItem = historyItem
                 )
             } catch (e: Exception) {
                 // Handle errors.
@@ -113,10 +116,11 @@ class DetailViewModel : ViewModel() {
      * Loads detailed information for a specific TV show.
      * @param tvId The ID of the TV show to load.
      */
-    fun loadTvShowDetail(tvId: Int) {
+    fun loadTvShowDetail(context: Context, tvId: Int) {
         viewModelScope.launch {
             // Set loading state to true.
             _uiState.value = DetailUiState(isLoading = true)
+            val historyItem = repository.getWatchHistoryItem(context, tvId, true)
 
             try {
                 // Fetch TV show details and recommended TV shows.
@@ -148,7 +152,8 @@ class DetailViewModel : ViewModel() {
                     seasons = seasonList,
                     similarTvShows = similarTvShows,
                     trailerKey = trailerKey,
-                    isInMyList = isInMyList
+                    isInMyList = isInMyList,
+                    watchHistoryItem = historyItem
                 )
             } catch (e: Exception) {
                 // Handle errors.
