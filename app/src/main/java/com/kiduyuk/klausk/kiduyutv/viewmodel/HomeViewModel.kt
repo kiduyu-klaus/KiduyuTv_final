@@ -103,45 +103,47 @@ class HomeViewModel : ViewModel() {
                     selectedItem = trendingTv.firstOrNull() ?: trendingMovies.firstOrNull()
                 )
 
-                // Load secondary content sequentially or in smaller batches to avoid OOM
-                val oscarWinners2026 = repository.getGitHubMovieList("https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/oscar_winners_2026.json").getOrNull() ?: emptyList()
-                _uiState.value = _uiState.value.copy(oscarWinners2026 = oscarWinners2026)
+                // Load secondary content in background to avoid blocking the UI
+                viewModelScope.launch {
+                    val oscarWinners2026 = repository.getGitHubMovieList("https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/oscar_winners_2026.json").getOrNull() ?: emptyList()
+                    _uiState.value = _uiState.value.copy(oscarWinners2026 = oscarWinners2026)
 
-                val hallmarkMovies = repository.getGitHubMovieList("https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/hallmark_movies.json").getOrNull() ?: emptyList()
-                _uiState.value = _uiState.value.copy(hallmarkMovies = hallmarkMovies)
+                    val hallmarkMovies = repository.getGitHubMovieList("https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/hallmark_movies.json").getOrNull() ?: emptyList()
+                    _uiState.value = _uiState.value.copy(hallmarkMovies = hallmarkMovies)
 
-                val trueStoryMovies = repository.getGitHubMovieList("https://raw.githubusercontent.com/kiduyu-klein/KiduyuTv_final/refs/heads/main/lists/true_story_movies.json").getOrNull() ?: emptyList()
-                _uiState.value = _uiState.value.copy(trueStoryMovies = trueStoryMovies)
+                    val trueStoryMovies = repository.getGitHubMovieList("https://raw.githubusercontent.com/kiduyu-klein/KiduyuTv_final/refs/heads/main/lists/true_story_movies.json").getOrNull() ?: emptyList()
+                    _uiState.value = _uiState.value.copy(trueStoryMovies = trueStoryMovies)
 
-                val bestSitcoms = repository.getGitHubTvShowList("https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/best_sitcoms.json").getOrNull() ?: emptyList()
-                _uiState.value = _uiState.value.copy(bestSitcoms = bestSitcoms)
+                    val bestSitcoms = repository.getGitHubTvShowList("https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/best_sitcoms.json").getOrNull() ?: emptyList()
+                    _uiState.value = _uiState.value.copy(bestSitcoms = bestSitcoms)
 
-                val bestClassics = repository.getGitHubMovieList("https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/best_classics.json").getOrNull() ?: emptyList()
-                _uiState.value = _uiState.value.copy(bestClassics = bestClassics)
+                    val bestClassics = repository.getGitHubMovieList("https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/best_classics.json").getOrNull() ?: emptyList()
+                    _uiState.value = _uiState.value.copy(bestClassics = bestClassics)
 
-                val spyMovies = repository.getGitHubMovieList("https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/cia_mossad_spies.json").getOrNull() ?: emptyList()
-                _uiState.value = _uiState.value.copy(spyMovies = spyMovies)
+                    val spyMovies = repository.getGitHubMovieList("https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/cia_mossad_spies.json").getOrNull() ?: emptyList()
+                    _uiState.value = _uiState.value.copy(spyMovies = spyMovies)
 
-                val stathamMovies = repository.getGitHubMovieList("https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/jason_statham_movies.json").getOrNull() ?: emptyList()
-                _uiState.value = _uiState.value.copy(stathamMovies = stathamMovies)
+                    val stathamMovies = repository.getGitHubMovieList("https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/jason_statham_movies.json").getOrNull() ?: emptyList()
+                    _uiState.value = _uiState.value.copy(stathamMovies = stathamMovies)
 
-                val timeTravelMovies = repository.getGitHubMovieList("https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/time_travel_movies.json").getOrNull() ?: emptyList()
-                _uiState.value = _uiState.value.copy(timeTravelMovies = timeTravelMovies)
+                    val timeTravelMovies = repository.getGitHubMovieList("https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/time_travel_movies.json").getOrNull() ?: emptyList()
+                    _uiState.value = _uiState.value.copy(timeTravelMovies = timeTravelMovies)
 
-                // Load networks and companies last
-                val networkIds = listOf(213, 2739, 1024, 49, 4330, 2552, 453, 3353, 174, 88, 67, 4, 6, 2, 16, 19, 71, 26, 214)
-                val networks = networkIds.map { id -> repository.getNetworkDetails(id).getOrNull() }
-                    .filterNotNull()
-                    .filter { it.logoPath != null }
-                    .map { NetworkItem(it.id, it.name, it.logoPath, "network") }
-                _uiState.value = _uiState.value.copy(popularNetworks = networks)
+                    // Load networks and companies last
+                    val networkIds = listOf(213, 2739, 1024, 49, 4330, 2552, 453, 3353, 174, 88, 67, 4, 6, 2, 16, 19, 71, 26, 214)
+                    val networks = networkIds.map { id -> repository.getNetworkDetails(id).getOrNull() }
+                        .filterNotNull()
+                        .filter { it.logoPath != null }
+                        .map { NetworkItem(it.id, it.name, it.logoPath, "network") }
+                    _uiState.value = _uiState.value.copy(popularNetworks = networks)
 
-                val companyIds = listOf(2, 420, 174, 33, 3, 1, 34, 5, 4, 521, 6704, 923, 25, 12, 9383)
-                val companies = companyIds.map { id -> repository.getCompanyDetails(id).getOrNull() }
-                    .filterNotNull()
-                    .filter { it.logoPath != null }
-                    .map { NetworkItem(it.id, it.name, it.logoPath, "company") }
-                _uiState.value = _uiState.value.copy(popularCompanies = companies)
+                    val companyIds = listOf(2, 420, 174, 33, 3, 1, 34, 5, 4, 521, 6704, 923, 25, 12, 9383)
+                    val companies = companyIds.map { id -> repository.getCompanyDetails(id).getOrNull() }
+                        .filterNotNull()
+                        .filter { it.logoPath != null }
+                        .map { NetworkItem(it.id, it.name, it.logoPath, "company") }
+                    _uiState.value = _uiState.value.copy(popularCompanies = companies)
+                }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
