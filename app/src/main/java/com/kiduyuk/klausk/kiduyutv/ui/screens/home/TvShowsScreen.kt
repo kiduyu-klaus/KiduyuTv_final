@@ -2,14 +2,10 @@ package com.kiduyuk.klausk.kiduyutv.ui.screens.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -25,7 +21,6 @@ import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
 import com.kiduyuk.klausk.kiduyutv.ui.components.*
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
-import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeViewModel
 
@@ -99,7 +94,7 @@ fun TvShowsScreen(
                         title = "Trending TV Shows",
                         items = uiState.trendingTvShows,
                         initialFocusRequester = firstItemFocusRequester,
-                        onItemFocus = { tvShow -> viewModel.selectItem(tvShow) },
+                        onItemFocus = { tvShow -> viewModel.onItemSelected(tvShow) },
                         onItemClick = { tvShow -> onTvShowClick(tvShow.id) } // Handle TV show click.
                     ) { tvShow, isSelected, onClick ->
                         TvShowCard(
@@ -113,7 +108,7 @@ fun TvShowsScreen(
                     ContentRow(
                         title = "Top Rated TV Shows",
                         items = uiState.topTvShows,
-                        onItemFocus = { tvShow -> viewModel.selectItem(tvShow) },
+                        onItemFocus = { tvShow -> viewModel.onItemSelected(tvShow) },
                         onItemClick = { tvShow -> onTvShowClick(tvShow.id) } // Handle TV show click.
                     ) { tvShow, isSelected, onClick ->
                         TvShowCard(
