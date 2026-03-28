@@ -45,6 +45,11 @@ fun MoviesScreen(
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
     val firstItemFocusRequester = remember { FocusRequester() }
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    LaunchedEffect(Unit) {
+        viewModel.loadHomeContent(context)
+    }
 
     val selectedMovie by remember(uiState.selectedItem) {
         derivedStateOf { uiState.selectedItem as? Movie }
