@@ -76,9 +76,15 @@ fun TvShowDetailScreen(
     val myListInteraction = remember { MutableInteractionSource() }
     val myListFocused by myListInteraction.collectIsFocusedAsState()
 
+    //val context = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(tvId) {
-        viewModel.loadTvShowDetail(tvId)
-        playFocusRequester.requestFocus()
+        viewModel.loadTvShowDetail(context, tvId)
+    }
+
+    LaunchedEffect(uiState.isLoading) {
+        if (!uiState.isLoading && uiState.tvShowDetail != null) {
+            playFocusRequester.requestFocus()
+        }
     }
 
     Box(
@@ -276,6 +282,13 @@ fun TvShowDetailScreen(
                                     val intent = Intent(context, PlayerActivity::class.java).apply {
                                         putExtra("TMDB_ID", tvId)
                                         putExtra("IS_TV", true)
+                                        putExtra("TITLE", tvShow.name)
+                                        putExtra("POSTER_PATH", tvShow.posterPath)
+                                        putExtra("BACKDROP_PATH", tvShow.backdropPath)
+                                        uiState.watchHistoryItem?.let {
+                                            putExtra("SEASON_NUMBER", it.seasonNumber ?: 1)
+                                            putExtra("EPISODE_NUMBER", it.episodeNumber ?: 1)
+                                        }
                                     }
                                     context.startActivity(intent)
                                 },
@@ -289,7 +302,7 @@ fun TvShowDetailScreen(
                             ) {
                                 Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("Play", fontSize = 12.sp)
+                                Text(if (uiState.watchHistoryItem != null) "Continue" else "Play", fontSize = 12.sp)
                             }
 
                             // Watch Trailer
