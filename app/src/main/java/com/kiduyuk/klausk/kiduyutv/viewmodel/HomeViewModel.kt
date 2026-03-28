@@ -2,8 +2,10 @@ package com.kiduyuk.klausk.kiduyutv.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.content.Context
 import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
+import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,7 +20,7 @@ data class HomeUiState(
     val isLoading: Boolean = true,
     val trendingTvShows: List<TvShow> = emptyList(),
     val trendingMovies: List<Movie> = emptyList(),
-    val continueWatching: List<Movie> = emptyList(),
+    val continueWatching: List<WatchHistoryItem> = emptyList(),
     val popularNetworks: List<NetworkItem> = emptyList(),
     val popularCompanies: List<NetworkItem> = emptyList(),
     val latestMovies: List<Movie> = emptyList(),
@@ -67,10 +69,10 @@ class HomeViewModel : ViewModel() {
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     init {
-        loadHomeContent()
+        // loadHomeContent will be called from the UI with context
     }
 
-    fun loadHomeContent() {
+    fun loadHomeContent(context: Context) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
@@ -87,12 +89,15 @@ class HomeViewModel : ViewModel() {
                 val topRatedMovies = topRatedMoviesDeferred.await().getOrNull() ?: emptyList()
                 val topRatedTv = topRatedTvDeferred.await().getOrNull() ?: emptyList()
 
+                // Get watch history
+                val watchHistory = repository.getWatchHistory(context)
+
                 // Update initial state with primary content first to free up the UI thread
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     trendingTvShows = trendingTv,
                     trendingMovies = trendingMovies,
-                    continueWatching = nowPlaying.take(10),
+                    continueWatching = watchHistory,
                     latestMovies = topRatedMovies.take(10),
                     topTvShows = topRatedTv.take(10),
                     selectedItem = trendingTv.firstOrNull() ?: trendingMovies.firstOrNull()
