@@ -322,6 +322,18 @@ fun MovieDetailScreen(
                 }
                 // ── End Hero Section ─────────────────────────────────────────
 
+                // Collection Movies
+                if (uiState.collectionDetail != null) {
+                    val collection = uiState.collectionDetail!!
+                    ContentRow(
+                        title = collection.name.uppercase(),
+                        items = collection.parts,
+                        onItemClick = { movie -> onMovieClick(movie.id) }
+                    ) { movie, isSelected, onClick ->
+                        MovieCard(movie = movie, isSelected = isSelected, onClick = onClick)
+                    }
+                }
+
                 // Similar Movies
                 if (uiState.similarMovies.isNotEmpty()) {
                     ContentRow(
