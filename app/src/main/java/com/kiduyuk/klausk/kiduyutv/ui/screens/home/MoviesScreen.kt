@@ -2,14 +2,10 @@ package com.kiduyuk.klausk.kiduyutv.ui.screens.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -25,7 +21,6 @@ import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.ui.components.*
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
-import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeViewModel
 
@@ -87,19 +82,19 @@ fun MoviesScreen(
                         .weight(1f)
                         .verticalScroll(scrollState)
                 ) {
-                    Text(
-                        text = "Movies",
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = TextPrimary,
-                        modifier = Modifier.padding(horizontal = 48.dp, vertical = 16.dp)
-                    )
+//                    Text(
+//                        text = "Movies",
+//                        style = MaterialTheme.typography.headlineLarge,
+//                        color = TextPrimary,
+//                        modifier = Modifier.padding(horizontal = 48.dp, vertical = 16.dp)
+//                    )
 
                     // Content Row for Trending Movies.
                     ContentRow(
                         title = "Trending Movies",
                         items = uiState.trendingMovies,
                         initialFocusRequester = firstItemFocusRequester,
-                        onItemFocus = { movie -> viewModel.selectItem(movie) },
+                        onItemFocus = { movie -> viewModel.onItemSelected(movie) },
                         onItemClick = { movie -> onMovieClick(movie.id) } // Handle movie click.
                     ) { movie, isSelected, onClick ->
                         MovieCard(
@@ -113,7 +108,7 @@ fun MoviesScreen(
                     ContentRow(
                         title = "Popular Movies",
                         items = uiState.latestMovies,
-                        onItemFocus = { movie -> viewModel.selectItem(movie) },
+                        onItemFocus = { movie -> viewModel.onItemSelected(movie) },
                         onItemClick = { movie -> onMovieClick(movie.id) } // Handle movie click.
                     ) { movie, isSelected, onClick ->
                         MovieCard(
@@ -128,7 +123,7 @@ fun MoviesScreen(
                         ContentRow(
                             title = "Continue Watching",
                             items = uiState.continueWatching,
-                            onItemFocus = { movie -> viewModel.selectItem(movie) },
+                            onItemFocus = { movie -> viewModel.onItemSelected(movie) },
                             onItemClick = { movie -> onMovieClick(movie.id) } // Handle movie click.
                         ) { movie, isSelected, onClick ->
                             MovieCard(
