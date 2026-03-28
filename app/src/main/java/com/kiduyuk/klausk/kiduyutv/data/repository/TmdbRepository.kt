@@ -7,6 +7,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import android.content.Context
+import com.google.gson.reflect.TypeToken
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -151,6 +153,46 @@ class TmdbRepository {
     /** Fetches detailed information for a movie collection. */
     suspend fun getCollectionDetails(collectionId: Int): Result<CollectionDetail> = runCatching {
         api.getCollectionDetails(collectionId)
+    }
+
+    /**
+     * Saves a media item to the watch history using SharedPreferences.
+     */
+    fun saveToWatchHistory(context: Context, item: WatchHistoryItem) {
+        val sharedPrefs = context.getSharedPreferences("watch_history", Context.MODE_PRIVATE)
+        val gson = com.google.gson.Gson()
+        val historyJson = sharedPrefs.getString("history", "[]")
+        val type = object : TypeToken<MutableList<WatchHistoryItem>>() {}.type
+        val history: MutableList<WatchHistoryItem> = gson.fromJson(historyJson, type)
+
+        // Remove existing entry for the same media item
+        history.removeAll { it.id == item.id && it.isTv == item.isTv }
+
+        // Add new entry at the beginning
+        history.add(0, item)
+
+        // Limit history to 20 items
+        val limitedHistory = history.take(20)
+
+        sharedPrefs.edit().putString("history", gson.toJson(limitedHistory)).apply()
+    }
+
+    /**
+     * Retrieves the watch history from SharedPreferences.
+     */
+    fun getWatchHistory(context: Context): List<WatchHistoryItem> {
+        val sharedPrefs = context.getSharedPreferences("watch_history", Context.MODE_PRIVATE)
+        val gson = com.google.gson.Gson()
+        val historyJson = sharedPrefs.getString("history", "[]")
+        val type = object : TypeToken<List<WatchHistoryItem>>() {}.type
+        return gson.fromJson(historyJson, type)
+    }
+
+    /**
+     * Checks if a media item is in the watch history.
+     */
+    fun getWatchHistoryItem(context: Context, id: Int, isTv: Boolean): WatchHistoryItem? {
+        return getWatchHistory(context).find { it.id == id && it.isTv == isTv }
     }
 
 
