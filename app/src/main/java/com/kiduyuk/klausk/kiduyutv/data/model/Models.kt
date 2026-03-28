@@ -123,6 +123,28 @@ data class ProductionCompany(
 )
 
 /**
+ * Data class representing a movie collection (e.g., "Harry Potter Collection").
+ */
+data class MovieCollection(
+    @SerializedName("id") val id: Int,
+    @SerializedName("name") val name: String,
+    @SerializedName("poster_path") val posterPath: String?,
+    @SerializedName("backdrop_path") val backdropPath: String?
+)
+
+/**
+ * Data class representing detailed information for a movie collection.
+ */
+data class CollectionDetail(
+    @SerializedName("id") val id: Int,
+    @SerializedName("name") val name: String,
+    @SerializedName("overview") val overview: String?,
+    @SerializedName("poster_path") val posterPath: String?,
+    @SerializedName("backdrop_path") val backdropPath: String?,
+    @SerializedName("parts") val parts: List<Movie>
+)
+
+/**
  * Data class representing detailed information for a Movie.
  * @param id The unique identifier for the movie.
  * @param title The title of the movie.
@@ -134,6 +156,7 @@ data class ProductionCompany(
  * @param runtime The runtime of the movie in minutes.
  * @param genres A list of [Genre] objects associated with the movie.
  * @param productionCompanies A list of [ProductionCompany] objects involved in the movie's production.
+ * @param belongsToCollection The collection this movie belongs to, if any.
  */
 data class MovieDetail(
     @SerializedName("id") val id: Int,
@@ -145,7 +168,8 @@ data class MovieDetail(
     @SerializedName("release_date") val releaseDate: String?,
     @SerializedName("runtime") val runtime: Int?,
     @SerializedName("genres") val genres: List<Genre>?,
-    @SerializedName("production_companies") val productionCompanies: List<ProductionCompany>?
+    @SerializedName("production_companies") val productionCompanies: List<ProductionCompany>?,
+    @SerializedName("belongs_to_collection") val belongsToCollection: MovieCollection?
 )
 
 /**
