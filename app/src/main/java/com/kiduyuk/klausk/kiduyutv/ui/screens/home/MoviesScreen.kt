@@ -53,6 +53,8 @@ fun MoviesScreen(
     LaunchedEffect(uiState.isLoading) {
         if (!uiState.isLoading && uiState.trendingMovies.isNotEmpty()) {
             firstItemFocusRequester.requestFocus()
+            // Also ensure the first item is selected in the ViewModel so the HeroSection displays it
+            viewModel.onItemSelected(uiState.trendingMovies.first())
         }
     }
 
