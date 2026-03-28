@@ -86,12 +86,12 @@ fun MoviesScreen(
                         .weight(1f)
                         .verticalScroll(scrollState)
                 ) {
-//                    Text(
-//                        text = "Movies",
-//                        style = MaterialTheme.typography.headlineLarge,
-//                        color = TextPrimary,
-//                        modifier = Modifier.padding(horizontal = 48.dp, vertical = 16.dp)
-//                    )
+                    Text(
+                        text = "Movies",
+                        style = MaterialTheme.typography.headlineLarge,
+                        color = TextPrimary,
+                        modifier = Modifier.padding(horizontal = 48.dp, vertical = 16.dp)
+                    )
 
                     // Content Row for Trending Movies.
                     ContentRow(
@@ -124,17 +124,30 @@ fun MoviesScreen(
 
                     // Content Row for Continue Watching Movies, only shown if not empty.
                     if (uiState.continueWatching.isNotEmpty()) {
-                        ContentRow(
-                            title = "Continue Watching",
-                            items = uiState.continueWatching,
-                            onItemFocus = { movie -> viewModel.onItemSelected(movie) },
-                            onItemClick = { movie -> onMovieClick(movie.id) } // Handle movie click.
-                        ) { movie, isSelected, onClick ->
-                            MovieCard(
-                                movie = movie,
-                                isSelected = isSelected,
-                                onClick = onClick
-                            )
+                        val movieHistory = uiState.continueWatching.filter { !it.isTv }
+                        if (movieHistory.isNotEmpty()) {
+                            ContentRow(
+                                title = "Continue Watching",
+                                items = movieHistory,
+                                onItemFocus = { historyItem -> viewModel.onItemSelected(historyItem) },
+                                onItemClick = { historyItem -> onMovieClick(historyItem.id) }
+                            ) { historyItem, isSelected, onClick ->
+                                MovieCard(
+                                    movie = Movie(
+                                        id = historyItem.id,
+                                        title = historyItem.title,
+                                        overview = "",
+                                        posterPath = historyItem.posterPath,
+                                        backdropPath = historyItem.backdropPath,
+                                        voteAverage = 0.0,
+                                        releaseDate = "",
+                                        genreIds = emptyList(),
+                                        popularity = 0.0
+                                    ),
+                                    isSelected = isSelected,
+                                    onClick = onClick
+                                )
+                            }
                         }
                     }
 
