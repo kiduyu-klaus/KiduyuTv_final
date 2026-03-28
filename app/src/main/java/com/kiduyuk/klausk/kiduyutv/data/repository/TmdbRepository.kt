@@ -155,266 +155,60 @@ class TmdbRepository {
 
 
     /**
-     * Fetches movies from a Trakt list and gets their details from TMDB.
-     * @param userSlug The Trakt user slug.
-     * @param listSlug The Trakt list slug.
-     * @param clientId The Trakt API client ID.
+     * Fetches movies from a GitHub JSON list.
+     * @param urlString The GitHub raw URL.
      * @return Result containing list of Movie objects.
      */
-    suspend fun getTraktListMovies(userSlug: String, listSlug: String, clientId: String): Result<List<Movie>> = withContext(Dispatchers.IO) {
+    suspend fun getGitHubMovieList(urlString: String): Result<List<Movie>> = withContext(Dispatchers.IO) {
         runCatching {
-            val url = URL("https://api.trakt.tv/users/$userSlug/lists/$listSlug/items/movies")
-            Log.i(TAG, "Fetching Trakt list: $url")
+            val url = URL(urlString)
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
             connection.connectTimeout = 15000
             connection.readTimeout = 15000
-            connection.setRequestProperty("Content-Type", "application/json")
-            connection.setRequestProperty("trakt-api-version", "2")
-            connection.setRequestProperty("trakt-api-key", clientId)
 
             val responseCode = connection.responseCode
             if (responseCode != HttpURLConnection.HTTP_OK) {
-                throw Exception("Failed to fetch Trakt list: HTTP $responseCode")
+                throw Exception("Failed to fetch GitHub list: HTTP $responseCode")
             }
 
             val reader = BufferedReader(InputStreamReader(connection.inputStream))
-            val tmdbIds = mutableListOf<Int>()
-            val regex = "\"tmdb\":\\s*(\\d+)".toRegex()
-
-            // Read line by line to avoid loading massive JSON into memory
-            reader.forEachLine { line ->
-                regex.findAll(line).forEach { match ->
-                    match.groupValues.getOrNull(1)?.toIntOrNull()?.let {
-                        if (!tmdbIds.contains(it)) tmdbIds.add(it)
-                    }
-                }
-                // Stop early if we have enough IDs to process (e.g., 50) to save memory/time
-                if (tmdbIds.size >= 50) return@forEachLine
-            }
+            val response = reader.readText()
             reader.close()
-            Log.i(TAG, "Found ${tmdbIds.size} TMDB IDs")
 
-
-            // Fetch details for each movie from TMDB
-            val movies = tmdbIds.distinct()
-                .take(20) // Limit to 20 movies for performance
-                .mapNotNull { id ->
-                    runCatching {
-                        api.getMovieDetail(id).let { detail ->
-                            Movie(
-                                id = detail.id,
-                                title = detail.title,
-                                overview = detail.overview,
-                                posterPath = detail.posterPath,
-                                backdropPath = detail.backdropPath,
-                                voteAverage = detail.voteAverage,
-                                releaseDate = detail.releaseDate,
-                                genreIds = detail.genres?.map { it.id },
-                                popularity = 0.0 // Default popularity
-                            )
-                        }
-                    }.getOrNull()
-                }
+            val type = object : com.google.gson.reflect.TypeToken<List<Movie>>() {}.type
+            val movies: List<Movie> = com.google.gson.Gson().fromJson(response, type)
             movies
         }
     }
 
     /**
-     * Fetches TV shows from a Trakt list and gets their details from TMDB.
-     * @param userSlug The Trakt user slug.
-     * @param listSlug The Trakt list slug.
-     * @param clientId The Trakt API client ID.
+     * Fetches TV shows from a GitHub JSON list.
+     * @param urlString The GitHub raw URL.
      * @return Result containing list of TvShow objects.
      */
-    suspend fun getTraktListTvShows(userSlug: String, listSlug: String, clientId: String): Result<List<TvShow>> = withContext(Dispatchers.IO) {
+    suspend fun getGitHubTvShowList(urlString: String): Result<List<TvShow>> = withContext(Dispatchers.IO) {
         runCatching {
-            val url = URL("https://api.trakt.tv/users/$userSlug/lists/$listSlug/items/shows")
-            Log.i(TAG, "Fetching Trakt list: $url")
+            val url = URL(urlString)
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
             connection.connectTimeout = 15000
             connection.readTimeout = 15000
-            connection.setRequestProperty("Content-Type", "application/json")
-            connection.setRequestProperty("trakt-api-version", "2")
-            connection.setRequestProperty("trakt-api-key", clientId)
 
             val responseCode = connection.responseCode
             if (responseCode != HttpURLConnection.HTTP_OK) {
-                throw Exception("Failed to fetch Trakt list: HTTP $responseCode")
+                throw Exception("Failed to fetch GitHub list: HTTP $responseCode")
             }
 
             val reader = BufferedReader(InputStreamReader(connection.inputStream))
-            val tmdbIds = mutableListOf<Int>()
-            val regex = "\"tmdb\":\\s*(\\d+)".toRegex()
-
-            // Read line by line to avoid loading massive JSON into memory
-            reader.forEachLine { line ->
-                regex.findAll(line).forEach { match ->
-                    match.groupValues.getOrNull(1)?.toIntOrNull()?.let {
-                        if (!tmdbIds.contains(it)) tmdbIds.add(it)
-                    }
-                }
-                // Stop early if we have enough IDs to process
-                if (tmdbIds.size >= 50) return@forEachLine
-            }
+            val response = reader.readText()
             reader.close()
-            Log.i(TAG, "Found ${tmdbIds.size} TMDB IDs")
 
-            // Fetch details for each TV show from TMDB
-            val tvShows = tmdbIds.distinct()
-                .take(20) // Limit to 20 shows for performance
-                .mapNotNull { id ->
-                    runCatching {
-                        api.getTvShowDetail(id).let { detail ->
-                            TvShow(
-                                id = detail.id,
-                                name = detail.name,
-                                overview = detail.overview,
-                                posterPath = detail.posterPath,
-                                backdropPath = detail.backdropPath,
-                                voteAverage = detail.voteAverage,
-                                firstAirDate = detail.firstAirDate,
-                                genreIds = detail.genres?.map { it.id },
-                                popularity = 0.0 // Default popularity
-                            )
-                        }
-                    }.getOrNull()
-                }
+            val type = object : com.google.gson.reflect.TypeToken<List<TvShow>>() {}.type
+            val tvShows: List<TvShow> = com.google.gson.Gson().fromJson(response, type)
             tvShows
         }
     }
 
-    /**
-     * Fetches Oscar movies from the CSV data source.
-     * Filters by year_film starting from the specified year (default 2025).
-     * Only returns movies that have a valid TMDB ID.
-     * @param fromYear The starting year to filter movies (default 2025).
-     * @return Result containing list of OscarMovie objects.
-     */
-    suspend fun getOscarMovies(fromYear: Int = 2023): Result<List<OscarMovie>> = withContext(Dispatchers.IO) {
-        runCatching {
-            val csvUrl = "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/the_oscar_tmdb.csv"
-            val url = URL(csvUrl)
-            val connection = url.openConnection() as HttpURLConnection
-            connection.requestMethod = "GET"
-            connection.connectTimeout = 15000
-            connection.readTimeout = 15000
-            connection.setRequestProperty("Accept", "text/csv")
 
-            try {
-                val responseCode = connection.responseCode
-                if (responseCode != HttpURLConnection.HTTP_OK) {
-                    throw Exception("Failed to fetch CSV: HTTP $responseCode")
-                }
-
-                val reader = BufferedReader(InputStreamReader(connection.inputStream))
-                val lines = mutableListOf<String>()
-                var line: String?
-
-                while (reader.readLine().also { line = it } != null) {
-                    lines.add(line!!)
-                }
-                reader.close()
-
-                if (lines.isEmpty()) {
-                    return@runCatching emptyList<OscarMovie>()
-                }
-
-                // Parse CSV (skip header)
-                val movies = lines.drop(1).mapNotNull { csvLine ->
-                    parseOscarMovieCsvLine(csvLine)
-                }.filter { it.yearFilm >= fromYear && it.idTmdb != null && it.idTmdb > 0 }
-                    .sortedByDescending { it.yearFilm }
-                    .take(20) // Limit to top 20 movies
-
-                movies
-            } finally {
-                connection.disconnect()
-            }
-        }
-    }
-
-    /**
-     * Parses a single CSV line into an OscarMovie object.
-     * Handles quoted fields and escaped commas.
-     */
-    private fun parseOscarMovieCsvLine(line: String): OscarMovie? {
-        return try {
-            val fields = parseCsvLine(line)
-
-            if (fields.size < 19) return null
-
-            OscarMovie(
-                film = fields.getOrNull(0)?.trim() ?: "",
-                yearFilm = fields.getOrNull(1)?.trim()?.toIntOrNull() ?: 0,
-                idTmdb = fields.getOrNull(7)?.trim()?.let {
-                    if (it == "NA" || it.isBlank()) null else it.toIntOrNull()
-                },
-                originalTitle = fields.getOrNull(9)?.trim()?.let {
-                    if (it == "NA" || it.isBlank()) null else it
-                },
-                overview = fields.getOrNull(10)?.trim()?.let {
-                    if (it == "NA" || it.isBlank()) null else it
-                },
-                popularity = fields.getOrNull(11)?.trim()?.let {
-                    if (it == "NA" || it.isBlank()) null else it.toDoubleOrNull()
-                },
-                posterPath = fields.getOrNull(12)?.trim()?.let {
-                    if (it == "NA" || it.isBlank()) null else it
-                },
-                backdropPath = fields.getOrNull(6)?.trim()?.let {
-                    if (it == "NA" || it.isBlank()) null else it
-                },
-                releaseDate = fields.getOrNull(13)?.trim()?.let {
-                    if (it == "NA" || it.isBlank()) null else it
-                },
-                voteAverage = fields.getOrNull(15)?.trim()?.let {
-                    if (it == "NA" || it.isBlank()) null else it.toDoubleOrNull()
-                },
-                oscarsWon = fields.getOrNull(4)?.trim()?.toIntOrNull() ?: 0,
-                genres = fields.getOrNull(18)?.trim()?.let {
-                    if (it == "NA" || it.isBlank()) null else it
-                }
-            )
-        } catch (e: Exception) {
-            Log.e(TAG, "Error parsing CSV line: ${e.message}")
-            null
-        }
-    }
-
-    /**
-     * Parses a CSV line handling quoted fields.
-     */
-    private fun parseCsvLine(line: String): List<String> {
-        val result = mutableListOf<String>()
-        var current = StringBuilder()
-        var inQuotes = false
-        var i = 0
-
-        while (i < line.length) {
-            val c = line[i]
-
-            when {
-                c == '"' -> {
-                    if (inQuotes && i + 1 < line.length && line[i + 1] == '"') {
-                        current.append('"')
-                        i++
-                    } else {
-                        inQuotes = !inQuotes
-                    }
-                }
-                c == ',' && !inQuotes -> {
-                    result.add(current.toString())
-                    current = StringBuilder()
-                }
-                else -> {
-                    current.append(c)
-                }
-            }
-            i++
-        }
-        result.add(current.toString())
-        return result
-    }
 }
