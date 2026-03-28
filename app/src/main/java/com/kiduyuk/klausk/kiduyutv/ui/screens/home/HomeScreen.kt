@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
+import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
 import com.kiduyuk.klausk.kiduyutv.ui.components.*
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
@@ -36,12 +37,49 @@ fun HomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
     var selectedRoute by remember { mutableStateOf("home") }
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    LaunchedEffect(Unit) {
+        viewModel.loadHomeContent(context)
+    }
 
     val selectedMovie by remember(uiState.selectedItem) {
-        derivedStateOf { uiState.selectedItem as? Movie }
+        derivedStateOf {
+            when (val item = uiState.selectedItem) {
+                is Movie -> item
+                is WatchHistoryItem -> if (!item.isTv) Movie(
+                    id = item.id,
+                    title = item.title,
+                    overview = "",
+                    posterPath = item.posterPath,
+                    backdropPath = item.backdropPath,
+                    voteAverage = 0.0,
+                    releaseDate = "",
+                    genreIds = emptyList(),
+                    popularity = 0.0
+                ) else null
+                else -> null
+            }
+        }
     }
     val selectedTvShow by remember(uiState.selectedItem) {
-        derivedStateOf { uiState.selectedItem as? TvShow }
+        derivedStateOf {
+            when (val item = uiState.selectedItem) {
+                is TvShow -> item
+                is WatchHistoryItem -> if (item.isTv) TvShow(
+                    id = item.id,
+                    name = item.title,
+                    overview = "",
+                    posterPath = item.posterPath,
+                    backdropPath = item.backdropPath,
+                    voteAverage = 0.0,
+                    firstAirDate = "",
+                    genreIds = emptyList(),
+                    popularity = 0.0
+                ) else null
+                else -> null
+            }
+        }
     }
 
     Box(
@@ -49,9 +87,9 @@ fun HomeScreen(
             .fillMaxSize()
             .background(BackgroundDark)
     ) {
-        if (uiState.isLoading) {
+        if (uiState.isLoading && uiState.trendingTvShows.isEmpty()) {
             LoadingContent()
-        } else if (uiState.error != null) {
+        } else if (uiState.error != null && uiState.trendingTvShows.isEmpty()) {
             ErrorContent(error = uiState.error!!)
         } else {
             HomeContent(
@@ -188,17 +226,45 @@ private fun HomeContent(
                         items = uiState.continueWatching,
                         restoreFocusItemId = lastClickedItemId,
                         getItemId = { it.id },
-                        onItemFocus = { movie -> onSelectItem(movie) },
-                        onItemClick = { movie ->
-                            onSetLastClickedItemId(movie.id)
-                            onMovieClick(movie.id)
+                        onItemFocus = { item -> onSelectItem(item) },
+                        onItemClick = { item ->
+                            onSetLastClickedItemId(item.id)
+                            if (item.isTv) onTvShowClick(item.id) else onMovieClick(item.id)
                         }
-                    ) { movie, isFocused, onClick ->
-                        MovieCard(
-                            movie = movie,
-                            isSelected = isFocused,
-                            onClick = onClick
-                        )
+                    ) { item, isFocused, onClick ->
+                        if (item.isTv) {
+                            TvShowCard(
+                                tvShow = TvShow(
+                                    id = item.id,
+                                    name = item.title,
+                                    overview = "",
+                                    posterPath = item.posterPath,
+                                    backdropPath = item.backdropPath,
+                                    voteAverage = 0.0,
+                                    firstAirDate = "",
+                                    genreIds = emptyList(),
+                                    popularity = 0.0
+                                ),
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
+                        } else {
+                            MovieCard(
+                                movie = Movie(
+                                    id = item.id,
+                                    title = item.title,
+                                    overview = "",
+                                    posterPath = item.posterPath,
+                                    backdropPath = item.backdropPath,
+                                    voteAverage = 0.0,
+                                    releaseDate = "",
+                                    genreIds = emptyList(),
+                                    popularity = 0.0
+                                ),
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
+                        }
                     }
                 }
 
