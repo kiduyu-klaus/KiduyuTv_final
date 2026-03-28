@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.os.Message
 import android.view.KeyEvent
 import android.view.View
-import android.view.WindowManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -14,6 +13,8 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
+import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
 import java.io.ByteArrayInputStream
 
 class PlayerActivity : ComponentActivity() {
@@ -48,13 +49,29 @@ class PlayerActivity : ComponentActivity() {
         val isTv = intent.getBooleanExtra("IS_TV", false)
         val seasonNumber = intent.getIntExtra("SEASON_NUMBER", 1)
         val episodeNumber = intent.getIntExtra("EPISODE_NUMBER", 1)
+        val title = intent.getStringExtra("TITLE") ?: "Unknown"
+        val posterPath = intent.getStringExtra("POSTER_PATH")
+        val backdropPath = intent.getStringExtra("BACKDROP_PATH")
 
         if (tmdbId == -1) {
             finish()
             return
         }
-        // Keep screen on while watching
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+        // Save to watch history
+        val repository = TmdbRepository()
+        repository.saveToWatchHistory(
+            this,
+            WatchHistoryItem(
+                id = tmdbId,
+                title = title,
+                posterPath = posterPath,
+                backdropPath = backdropPath,
+                isTv = isTv,
+                seasonNumber = if (isTv) seasonNumber else null,
+                episodeNumber = if (isTv) episodeNumber else null
+            )
+        )
 
         val baseUrl = if (isTv) {
             "https://vidlink.pro/tv/$tmdbId/$seasonNumber/$episodeNumber"
@@ -74,21 +91,9 @@ class PlayerActivity : ComponentActivity() {
                 // Block popups natively
                 setSupportMultipleWindows(false)
                 javaScriptCanOpenWindowsAutomatically = false
-                allowContentAccess         = true
-                allowFileAccess            = false            // not needed, reduce attack surface
-                databaseEnabled            = true
-                mediaPlaybackRequiresUserGesture = false
-                mixedContentMode           = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                setSupportMultipleWindows(true)               // required to intercept window.open()
-                useWideViewPort            = true
-                loadWithOverviewMode       = true
-                builtInZoomControls        = false
-                displayZoomControls        = false
-                cacheMode                  = WebSettings.LOAD_DEFAULT
             }
 
             webViewClient = object : WebViewClient() {
-
                 // Block ad requests based on domain
                 override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
                     val requestUrl = request?.url?.toString() ?: ""
@@ -180,9 +185,9 @@ class PlayerActivity : ComponentActivity() {
 
             webChromeClient = object : WebChromeClient() {
                 // Prevent any new windows from being created (additional popup layer)
-                override fun onCreateWindow(
-                    view: WebView, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message
-                ): Boolean = false  // false = block the window
+                override fun onCreateWindow(view: WebView?, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message?): Boolean {
+                    return false
+                }
             }
 
             // Enable mouse support/touch events for navigation
