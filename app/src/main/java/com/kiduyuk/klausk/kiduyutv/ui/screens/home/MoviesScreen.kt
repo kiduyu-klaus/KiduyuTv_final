@@ -50,8 +50,10 @@ fun MoviesScreen(
         derivedStateOf { uiState.selectedItem as? Movie }
     }
 
-    LaunchedEffect(Unit) {
-        firstItemFocusRequester.requestFocus()
+    LaunchedEffect(uiState.isLoading) {
+        if (!uiState.isLoading && uiState.trendingMovies.isNotEmpty()) {
+            firstItemFocusRequester.requestFocus()
+        }
     }
 
     Box(
