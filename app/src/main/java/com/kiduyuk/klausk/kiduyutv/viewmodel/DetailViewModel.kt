@@ -33,6 +33,7 @@ data class DetailUiState(
     val episodes: List<Episode> = emptyList(),
     val similarMovies: List<Movie> = emptyList(),
     val similarTvShows: List<TvShow> = emptyList(),
+    val collectionDetail: CollectionDetail? = null,
     val isInMyList: Boolean = false,
     val trailerKey: String? = null,
     val error: String? = null
@@ -75,6 +76,11 @@ class DetailViewModel : ViewModel() {
                 val similarMovies = recommendedMoviesResult.getOrNull()?.take(10) ?: repository.getTrendingMoviesToday().getOrNull()?.take(10) ?: emptyList()
                 val videos = videosResult.getOrNull() ?: emptyList()
 
+                // Fetch collection details if the movie belongs to one.
+                val collectionDetail = movieDetail?.belongsToCollection?.id?.let { collectionId ->
+                    repository.getCollectionDetails(collectionId).getOrNull()
+                }
+
                 // Find the first YouTube trailer.
                 val trailerKey = videos.firstOrNull {
                     it.site.equals("YouTube", ignoreCase = true) &&
@@ -89,6 +95,7 @@ class DetailViewModel : ViewModel() {
                     isLoading = false,
                     movieDetail = movieDetail,
                     similarMovies = similarMovies,
+                    collectionDetail = collectionDetail,
                     trailerKey = trailerKey,
                     isInMyList = isInMyList
                 )
