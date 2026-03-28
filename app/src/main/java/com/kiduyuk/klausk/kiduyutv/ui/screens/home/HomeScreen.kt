@@ -297,25 +297,25 @@ private fun HomeContent(
                     )
                 }
 
-                if (oscarWinners2026.isNotEmpty()) {
-                    ContentRow(
-                        title = "2026 Oscar winners",
-                        items = oscarWinners2026,
-                        restoreFocusItemId = lastClickedItemId,
-                        getItemId = { it.id },
-                        onItemFocus = { movie -> onSelectItem(movie) },
-                        onItemClick = { movie ->
-                            onSetLastClickedItemId(movie.id)
-                            onMovieClick(movie.id)
-                        }
-                    ) { movie, isFocused, onClick ->
-                        MovieCard(
-                            movie = movie,
-                            isSelected = isFocused,
-                            onClick = onClick
-                        )
-                    }
-                }
+//                if (oscarWinners2026.isNotEmpty()) {
+//                    ContentRow(
+//                        title = "2026 Oscar winners",
+//                        items = oscarWinners2026,
+//                        restoreFocusItemId = lastClickedItemId,
+//                        getItemId = { it.id },
+//                        onItemFocus = { movie -> onSelectItem(movie) },
+//                        onItemClick = { movie ->
+//                            onSetLastClickedItemId(movie.id)
+//                            onMovieClick(movie.id)
+//                        }
+//                    ) { movie, isFocused, onClick ->
+//                        MovieCard(
+//                            movie = movie,
+//                            isSelected = isFocused,
+//                            onClick = onClick
+//                        )
+//                    }
+//                }
 
                 if (hallmarkMovies.isNotEmpty()) {
                     ContentRow(
@@ -337,25 +337,25 @@ private fun HomeContent(
                     }
                 }
 
-                if (trueStoryMovies.isNotEmpty()) {
-                    ContentRow(
-                        title = "Movies Based on True Stories",
-                        items = trueStoryMovies,
-                        restoreFocusItemId = lastClickedItemId,
-                        getItemId = { it.id },
-                        onItemFocus = { movie -> onSelectItem(movie) },
-                        onItemClick = { movie ->
-                            onSetLastClickedItemId(movie.id)
-                            onMovieClick(movie.id)
-                        }
-                    ) { movie, isFocused, onClick ->
-                        MovieCard(
-                            movie = movie,
-                            isSelected = isFocused,
-                            onClick = onClick
-                        )
-                    }
-                }
+//                if (trueStoryMovies.isNotEmpty()) {
+//                    ContentRow(
+//                        title = "Movies Based on True Stories",
+//                        items = trueStoryMovies,
+//                        restoreFocusItemId = lastClickedItemId,
+//                        getItemId = { it.id },
+//                        onItemFocus = { movie -> onSelectItem(movie) },
+//                        onItemClick = { movie ->
+//                            onSetLastClickedItemId(movie.id)
+//                            onMovieClick(movie.id)
+//                        }
+//                    ) { movie, isFocused, onClick ->
+//                        MovieCard(
+//                            movie = movie,
+//                            isSelected = isFocused,
+//                            onClick = onClick
+//                        )
+//                    }
+//                }
 
                 if (bestSitcoms.isNotEmpty()) {
                     ContentRow(
@@ -377,25 +377,25 @@ private fun HomeContent(
                     }
                 }
 
-                if (bestClassics.isNotEmpty()) {
-                    ContentRow(
-                        title = "Best movie classics",
-                        items = bestClassics,
-                        restoreFocusItemId = lastClickedItemId,
-                        getItemId = { it.id },
-                        onItemFocus = { movie -> onSelectItem(movie) },
-                        onItemClick = { movie ->
-                            onSetLastClickedItemId(movie.id)
-                            onMovieClick(movie.id)
-                        }
-                    ) { movie, isFocused, onClick ->
-                        MovieCard(
-                            movie = movie,
-                            isSelected = isFocused,
-                            onClick = onClick
-                        )
-                    }
-                }
+//                if (bestClassics.isNotEmpty()) {
+//                    ContentRow(
+//                        title = "Best movie classics",
+//                        items = bestClassics,
+//                        restoreFocusItemId = lastClickedItemId,
+//                        getItemId = { it.id },
+//                        onItemFocus = { movie -> onSelectItem(movie) },
+//                        onItemClick = { movie ->
+//                            onSetLastClickedItemId(movie.id)
+//                            onMovieClick(movie.id)
+//                        }
+//                    ) { movie, isFocused, onClick ->
+//                        MovieCard(
+//                            movie = movie,
+//                            isSelected = isFocused,
+//                            onClick = onClick
+//                        )
+//                    }
+//                }
 
                 if (oscarMovies.isNotEmpty()) {
                     ContentRow(
@@ -417,24 +417,24 @@ private fun HomeContent(
                     }
                 }
 
-                if (myList.isNotEmpty()) {
-                    Text(
-                        text = "My List",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = TextPrimary,
-                        modifier = Modifier.padding(horizontal = 48.dp, vertical = 16.dp)
-                    )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 48.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        myList.forEach { item ->
-                            // TODO: Implement display for my list items.
-                        }
-                    }
-                }
+//                if (myList.isNotEmpty()) {
+//                    Text(
+//                        text = "My List",
+//                        style = MaterialTheme.typography.titleLarge,
+//                        color = TextPrimary,
+//                        modifier = Modifier.padding(horizontal = 48.dp, vertical = 16.dp)
+//                    )
+//                    Row(
+//                        modifier = Modifier
+//                            .fillMaxWidth()
+//                            .padding(horizontal = 48.dp),
+//                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+//                    ) {
+//                        myList.forEach { item ->
+//                            // TODO: Implement display for my list items.
+//                        }
+//                    }
+//                }
 
                 Spacer(modifier = Modifier.height(32.dp))
             }

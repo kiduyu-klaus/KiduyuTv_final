@@ -81,81 +81,61 @@ class HomeViewModel : ViewModel() {
                 val topRatedMoviesDeferred = async { repository.getTopRatedMovies() }
                 val topRatedTvDeferred = async { repository.getTopRatedTvShows() }
 
-                val networkIds = listOf(213, 2739, 1024, 49, 4330, 2552, 453, 3353, 174, 88, 67, 4, 6, 2, 16, 19, 71, 26, 214)
-                val companyIds = listOf(2, 420, 174, 33, 3, 1, 34, 5, 4, 521, 6704, 923, 25, 12, 9383)
-
-                val networkDetailsDeferred = networkIds.map { id ->
-                    async { repository.getNetworkDetails(id).getOrNull() }
-                }
-                val companyDetailsDeferred = companyIds.map { id ->
-                    async { repository.getCompanyDetails(id).getOrNull() }
-                }
-
-                val oscarMoviesDeferred = async { repository.getOscarMovies() }
-
-                val oscarWinners2026Deferred = async {
-                    repository.getTraktListMovies("visualcortex", "2026-oscar-winners",
-                        clientId = "98f8c9590ae29a666942f81c5f86628f0dbe2767d28b88cdedbb7bbbd316e1a0"
-                    )
-                }
-
-                val hallmarkMoviesDeferred = async {
-                    repository.getTraktListMovies("trakt_kodi_321", "hallmark-movies",
-                        clientId = "98f8c9590ae29a666942f81c5f86628f0dbe2767d28b88cdedbb7bbbd316e1a0"
-                    )
-                }
-
-                val trueStoryMoviesDeferred = async {
-                    repository.getTraktListMovies("benfranklin", "based-on-a-true-story",
-                        clientId = "98f8c9590ae29a666942f81c5f86628f0dbe2767d28b88cdedbb7bbbd316e1a0"
-                    )
-                }
-
-                val bestSitcomsDeferred = async {
-                    repository.getTraktListTvShows("fidel-cb", "best-sitcoms",
-                        clientId = "98f8c9590ae29a666942f81c5f86628f0dbe2767d28b88cdedbb7bbbd316e1a0"
-                    )
-                }
-
-                val bestClassicsDeferred = async {
-                    repository.getTraktListMovies("captainnapalm", "1001-greatest-movies-of-all-time",
-                        clientId = "98f8c9590ae29a666942f81c5f86628f0dbe2767d28b88cdedbb7bbbd316e1a0"
-                    )
-                }
-
                 val trendingTv = trendingTvDeferred.await().getOrNull() ?: emptyList()
                 val trendingMovies = trendingMoviesDeferred.await().getOrNull() ?: emptyList()
                 val nowPlaying = nowPlayingDeferred.await().getOrNull() ?: emptyList()
                 val topRatedMovies = topRatedMoviesDeferred.await().getOrNull() ?: emptyList()
                 val topRatedTv = topRatedTvDeferred.await().getOrNull() ?: emptyList()
 
-                val networks = networkDetailsDeferred.awaitAll()
-                    .filterNotNull()
-                    .filter { it.logoPath != null }
-                    .map { NetworkItem(it.id, it.name, it.logoPath, "network") }
-
-                val companies = companyDetailsDeferred.awaitAll()
-                    .filterNotNull()
-                    .filter { it.logoPath != null }
-                    .map { NetworkItem(it.id, it.name, it.logoPath, "company") }
-
-                _uiState.value = HomeUiState(
+                // Update initial state with primary content first to free up the UI thread
+                _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     trendingTvShows = trendingTv,
                     trendingMovies = trendingMovies,
                     continueWatching = nowPlaying.take(10),
-                    popularNetworks = networks,
-                    popularCompanies = companies,
                     latestMovies = topRatedMovies.take(10),
                     topTvShows = topRatedTv.take(10),
-                    oscarMovies = oscarMoviesDeferred.await().getOrNull()?.mapNotNull { it.toMovie() } ?: emptyList(),
-                    oscarWinners2026 = oscarWinners2026Deferred.await().getOrNull() ?: emptyList(),
-                    hallmarkMovies = hallmarkMoviesDeferred.await().getOrNull() ?: emptyList(),
-                    trueStoryMovies = trueStoryMoviesDeferred.await().getOrNull() ?: emptyList(),
-                    bestSitcoms = bestSitcomsDeferred.await().getOrNull() ?: emptyList(),
-                    bestClassics = bestClassicsDeferred.await().getOrNull() ?: emptyList(),
                     selectedItem = trendingTv.firstOrNull() ?: trendingMovies.firstOrNull()
                 )
+
+                // Load secondary content sequentially or in smaller batches to avoid OOM
+                val oscarMovies = repository.getOscarMovies().getOrNull()?.mapNotNull { it.toMovie() } ?: emptyList()
+                _uiState.value = _uiState.value.copy(oscarMovies = oscarMovies)
+
+//                val oscarWinners2026 = repository.getTraktListMovies("visualcortex", "2026-oscar-winners",
+//                    clientId = "98f8c9590ae29a666942f81c5f86628f0dbe2767d28b88cdedbb7bbbd316e1a0").getOrNull() ?: emptyList()
+//                _uiState.value = _uiState.value.copy(oscarWinners2026 = oscarWinners2026)
+
+                val hallmarkMovies = repository.getTraktListMovies("trakt_kodi_321", "hallmark-movies",
+                    clientId = "98f8c9590ae29a666942f81c5f86628f0dbe2767d28b88cdedbb7bbbd316e1a0").getOrNull() ?: emptyList()
+                _uiState.value = _uiState.value.copy(hallmarkMovies = hallmarkMovies)
+
+//                val trueStoryMovies = repository.getTraktListMovies("benfranklin", "based-on-a-true-story",
+//                    clientId = "98f8c9590ae29a666942f81c5f86628f0dbe2767d28b88cdedbb7bbbd316e1a0").getOrNull() ?: emptyList()
+//                _uiState.value = _uiState.value.copy(trueStoryMovies = trueStoryMovies)
+
+//                val bestSitcoms = repository.getTraktListTvShows("fidel-cb", "best-sitcoms",
+//                    clientId = "98f8c9590ae29a666942f81c5f86628f0dbe2767d28b88cdedbb7bbbd316e1a0").getOrNull() ?: emptyList()
+//                _uiState.value = _uiState.value.copy(bestSitcoms = bestSitcoms)
+
+//                val bestClassics = repository.getTraktListMovies("captainnapalm", "1001-greatest-movies-of-all-time",
+//                    clientId = "98f8c9590ae29a666942f81c5f86628f0dbe2767d28b88cdedbb7bbbd316e1a0").getOrNull() ?: emptyList()
+//                _uiState.value = _uiState.value.copy(bestClassics = bestClassics)
+
+                // Load networks and companies last
+                val networkIds = listOf(213, 2739, 1024, 49, 4330, 2552, 453, 3353, 174, 88, 67, 4, 6, 2, 16, 19, 71, 26, 214)
+                val networks = networkIds.map { id -> repository.getNetworkDetails(id).getOrNull() }
+                    .filterNotNull()
+                    .filter { it.logoPath != null }
+                    .map { NetworkItem(it.id, it.name, it.logoPath, "network") }
+                _uiState.value = _uiState.value.copy(popularNetworks = networks)
+
+                val companyIds = listOf(2, 420, 174, 33, 3, 1, 34, 5, 4, 521, 6704, 923, 25, 12, 9383)
+                val companies = companyIds.map { id -> repository.getCompanyDetails(id).getOrNull() }
+                    .filterNotNull()
+                    .filter { it.logoPath != null }
+                    .map { NetworkItem(it.id, it.name, it.logoPath, "company") }
+                _uiState.value = _uiState.value.copy(popularCompanies = companies)
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,

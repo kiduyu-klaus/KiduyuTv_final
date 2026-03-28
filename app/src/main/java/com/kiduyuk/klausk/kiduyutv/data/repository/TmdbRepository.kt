@@ -193,7 +193,7 @@ class TmdbRepository {
 
             // Fetch details for each movie from TMDB
             val movies = tmdbIds.distinct()
-                .take(20) // Limit to 20 movies for performance
+                .take(2) // Limit to 20 movies for performance
                 .mapNotNull { id ->
                     runCatching {
                         api.getMovieDetail(id).let { detail ->
