@@ -18,11 +18,11 @@ data class Movie(
     @SerializedName("id") val id: Int,
     @SerializedName("title") val title: String,
     @SerializedName("overview") val overview: String,
-    @SerializedName("poster_path") val posterPath: String?,
-    @SerializedName("backdrop_path") val backdropPath: String?,
-    @SerializedName("vote_average") val voteAverage: Double,
-    @SerializedName("release_date") val releaseDate: String?,
-    @SerializedName("genre_ids") val genreIds: List<Int>?,
+    @SerializedName("poster_path", alternate = ["posterPath"]) val posterPath: String?,
+    @SerializedName("backdrop_path", alternate = ["backdropPath"]) val backdropPath: String?,
+    @SerializedName("vote_average", alternate = ["voteAverage"]) val voteAverage: Double,
+    @SerializedName("release_date", alternate = ["releaseDate"]) val releaseDate: String?,
+    @SerializedName("genre_ids", alternate = ["genreIds"]) val genreIds: List<Int>?,
     @SerializedName("popularity") val popularity: Double?
 )
 
@@ -42,11 +42,11 @@ data class TvShow(
     @SerializedName("id") val id: Int,
     @SerializedName("name") val name: String,
     @SerializedName("overview") val overview: String,
-    @SerializedName("poster_path") val posterPath: String?,
-    @SerializedName("backdrop_path") val backdropPath: String?,
-    @SerializedName("vote_average") val voteAverage: Double,
-    @SerializedName("first_air_date") val firstAirDate: String?,
-    @SerializedName("genre_ids") val genreIds: List<Int>?,
+    @SerializedName("poster_path", alternate = ["posterPath"]) val posterPath: String?,
+    @SerializedName("backdrop_path", alternate = ["backdropPath"]) val backdropPath: String?,
+    @SerializedName("vote_average", alternate = ["voteAverage"]) val voteAverage: Double,
+    @SerializedName("first_air_date", alternate = ["firstAirDate"]) val firstAirDate: String?,
+    @SerializedName("genre_ids", alternate = ["genreIds"]) val genreIds: List<Int>?,
     @SerializedName("popularity") val popularity: Double?
 )
 
