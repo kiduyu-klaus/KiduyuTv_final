@@ -267,6 +267,20 @@ data class SeasonDetail(
 )
 
 /**
+ * Data class representing an item in the watch history.
+ */
+data class WatchHistoryItem(
+    val id: Int,
+    val title: String,
+    val posterPath: String?,
+    val backdropPath: String?,
+    val isTv: Boolean,
+    val seasonNumber: Int? = null,
+    val episodeNumber: Int? = null,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+/**
  * Data class representing a video associated with a movie or TV show (e.g., a trailer).
  */
 data class Video(
