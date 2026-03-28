@@ -36,6 +36,7 @@ import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.data.model.Episode
 import com.kiduyuk.klausk.kiduyutv.data.model.Season
+import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
@@ -57,6 +58,7 @@ fun SeasonEpisodesScreen(
     tvShowName: String,
     totalSeasons: Int,
     onBackClick: () -> Unit,
+    onPlayClick: (String) -> Unit,
     viewModel: DetailViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -212,13 +214,17 @@ fun SeasonEpisodesScreen(
                                     episode = episode,
                                     seasonNumber = selectedSeasonIndex + 1,
                                     onEpisodeClick = { sNum, eNum ->
-                                        val intent = Intent(context, PlayerActivity::class.java).apply {
-                                            putExtra("TMDB_ID", tvShowId)
-                                            putExtra("IS_TV", true)
-                                            putExtra("SEASON_NUMBER", sNum)
-                                            putExtra("EPISODE_NUMBER", eNum)
-                                        }
-                                        context.startActivity(intent)
+                                        onPlayClick(
+                                            Screen.StreamLinks.createRoute(
+                                                tmdbId = tvShowId,
+                                                isTv = true,
+                                                season = sNum,
+                                                episode = eNum,
+                                                title = tvShowName,
+                                                posterPath = episode.stillPath,
+                                                backdropPath = uiState.tvShowDetail?.backdropPath
+                                            )
+                                        )
                                     }
                                 )
                             }

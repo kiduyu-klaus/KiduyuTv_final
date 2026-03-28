@@ -34,6 +34,7 @@ import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.ui.components.ContentRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.TvShowCard
+import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
@@ -56,11 +57,14 @@ fun TvShowDetailScreen(
     onTvShowClick: (Int) -> Unit,
     onEpisodesClick: (tvId: Int, tvShowName: String, totalSeasons: Int) -> Unit = { _, _, _ -> },
     onNetworkClick: (id: Int, name: String) -> Unit = { _, _ -> },
+    onPlayClick: (String) -> Unit,
     viewModel: DetailViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
     val context = LocalContext.current
+
+
 
     // Button interaction sources for focus tracking
     val playFocusRequester = remember { FocusRequester() }
@@ -76,7 +80,7 @@ fun TvShowDetailScreen(
     val myListInteraction = remember { MutableInteractionSource() }
     val myListFocused by myListInteraction.collectIsFocusedAsState()
 
-    //val context = androidx.compose.ui.platform.LocalContext.current
+
     LaunchedEffect(tvId) {
         viewModel.loadTvShowDetail(context, tvId)
     }
@@ -279,18 +283,17 @@ fun TvShowDetailScreen(
                             // Play Now
                             Button(
                                 onClick = {
-                                    val intent = Intent(context, PlayerActivity::class.java).apply {
-                                        putExtra("TMDB_ID", tvId)
-                                        putExtra("IS_TV", true)
-                                        putExtra("TITLE", tvShow.name)
-                                        putExtra("POSTER_PATH", tvShow.posterPath)
-                                        putExtra("BACKDROP_PATH", tvShow.backdropPath)
-                                        uiState.watchHistoryItem?.let {
-                                            putExtra("SEASON_NUMBER", it.seasonNumber ?: 1)
-                                            putExtra("EPISODE_NUMBER", it.episodeNumber ?: 1)
-                                        }
-                                    }
-                                    context.startActivity(intent)
+                                    onPlayClick(
+                                        Screen.StreamLinks.createRoute(
+                                            tmdbId = tvShow.id,
+                                            isTv = true,
+                                            season = uiState.watchHistoryItem?.seasonNumber ?: 1,
+                                            episode = uiState.watchHistoryItem?.episodeNumber ?: 1,
+                                            title = tvShow.name,
+                                            posterPath = tvShow.posterPath,
+                                            backdropPath = tvShow.backdropPath
+                                        )
+                                    )
                                 },
                                 modifier = Modifier.focusRequester(playFocusRequester),
                                 interactionSource = playInteraction,
@@ -398,7 +401,8 @@ fun TvShowDetailScreenPreview() {
         TvShowDetailScreen(
             tvId = 1,
             onBackClick = {},
-            onTvShowClick = {}
+            onTvShowClick = {},
+            onPlayClick = {}
         )
     }
 }

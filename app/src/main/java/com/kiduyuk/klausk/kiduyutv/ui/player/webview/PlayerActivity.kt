@@ -52,6 +52,7 @@ class PlayerActivity : ComponentActivity() {
         val title = intent.getStringExtra("TITLE") ?: "Unknown"
         val posterPath = intent.getStringExtra("POSTER_PATH")
         val backdropPath = intent.getStringExtra("BACKDROP_PATH")
+        val streamUrl = intent.getStringExtra("STREAM_URL")
 
         if (tmdbId == -1) {
             finish()
@@ -73,12 +74,12 @@ class PlayerActivity : ComponentActivity() {
             )
         )
 
-        val baseUrl = if (isTv) {
-            "https://vidlink.pro/tv/$tmdbId/$seasonNumber/$episodeNumber"
+        // Use the provided stream URL or fallback to default
+        val url = streamUrl ?: if (isTv) {
+            "https://vidlink.pro/tv/$tmdbId/$seasonNumber/$episodeNumber?autoplay=true"
         } else {
-            "https://vidlink.pro/movie/$tmdbId"
+            "https://vidlink.pro/movie/$tmdbId?autoplay=true"
         }
-        val url = "$baseUrl?autoplay=true"
 
         webView = WebView(this).apply {
             settings.apply {
@@ -214,7 +215,31 @@ class PlayerActivity : ComponentActivity() {
         })
     }
 
-
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        when (keyCode) {
+            // Media Key Handling
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                webView.evaluateJavascript("window.playerToggle();", null)
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_PLAY -> {
+                webView.evaluateJavascript("window.playerPlay();", null)
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_PAUSE -> {
+                webView.evaluateJavascript("window.playerPause();", null)
+                return true
+            }
+            // D-pad navigation for WebView
+            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                // Pass these keys to the WebView for spatial navigation
+                return super.onKeyDown(keyCode, event)
+            }
+        }
+        return super.onKeyDown(keyCode, event)
+    }
 
     private fun showExitConfirmationDialog() {
         AlertDialog.Builder(this)

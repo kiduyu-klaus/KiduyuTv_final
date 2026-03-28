@@ -11,7 +11,9 @@ import com.kiduyuk.klausk.kiduyutv.ui.screens.SearchScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.SettingsScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.MovieDetailScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.SeasonEpisodesScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.StreamLinksScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.TvShowDetailScreen
+import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen.StreamLinks
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.HomeScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.MoviesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.MyListScreen
@@ -142,6 +144,9 @@ fun NavGraph(navController: NavHostController) {
                 },
                 onCompanyClick = { id, name ->
                     navController.navigate("media_list/company/$id/$name")
+                },
+                onPlayClick = { route ->
+                    navController.navigate(route)
                 }
             )
         }
@@ -163,7 +168,43 @@ fun NavGraph(navController: NavHostController) {
                 },
                 onNetworkClick = { id, name ->
                     navController.navigate("media_list/network/$id/$name")
+                },
+                onPlayClick = { route ->
+                    navController.navigate(route)
                 }
+            )
+        }
+
+        // Stream Links Screen: Screen for selecting a streaming provider.
+        composable(
+            route = Screen.StreamLinks.route,
+            arguments = listOf(
+                navArgument("tmdbId") { type = NavType.IntType },
+                navArgument("isTv") { type = NavType.BoolType },
+                navArgument("season") { type = NavType.IntType; defaultValue = 0 },
+                navArgument("episode") { type = NavType.IntType; defaultValue = 0 },
+                navArgument("title") { type = NavType.StringType; defaultValue = "" },
+                navArgument("posterPath") { type = NavType.StringType; defaultValue = "" },
+                navArgument("backdropPath") { type = NavType.StringType; defaultValue = "" }
+            )
+        ) { backStackEntry ->
+            val tmdbId = backStackEntry.arguments?.getInt("tmdbId") ?: 0
+            val isTv = backStackEntry.arguments?.getBoolean("isTv") ?: false
+            val season = backStackEntry.arguments?.getInt("season")
+            val episode = backStackEntry.arguments?.getInt("episode")
+            val title = backStackEntry.arguments?.getString("title") ?: ""
+            val posterPath = backStackEntry.arguments?.getString("posterPath")
+            val backdropPath = backStackEntry.arguments?.getString("backdropPath")
+
+            StreamLinksScreen(
+                tmdbId = tmdbId,
+                isTv = isTv,
+                title = title,
+                posterPath = posterPath,
+                backdropPath = backdropPath,
+                season = if (season == 0) null else season,
+                episode = if (episode == 0) null else episode,
+                onBackClick = { navController.popBackStack() }
             )
         }
 
@@ -186,7 +227,10 @@ fun NavGraph(navController: NavHostController) {
                 tvShowId = tvId,
                 tvShowName = tvShowName,
                 totalSeasons = totalSeasons,
-                onBackClick = { navController.popBackStack() }
+                onBackClick = { navController.popBackStack() },
+                onPlayClick = { route ->
+                    navController.navigate(route)
+                }
             )
         }
 

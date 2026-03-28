@@ -22,4 +22,20 @@ sealed class Screen(val route: String) {
         }
     }
     object Settings : Screen("settings")
+    object StreamLinks : Screen("stream_links/{tmdbId}/{isTv}?season={season}&episode={episode}&title={title}&posterPath={posterPath}&backdropPath={backdropPath}") {
+        fun createRoute(
+            tmdbId: Int,
+            isTv: Boolean,
+            title: String,
+            posterPath: String?,
+            backdropPath: String?,
+            season: Int? = null,
+            episode: Int? = null
+        ): String {
+            val encodedTitle = android.net.Uri.encode(title)
+            val encodedPoster = android.net.Uri.encode(posterPath ?: "")
+            val encodedBackdrop = android.net.Uri.encode(backdropPath ?: "")
+            return "stream_links/$tmdbId/$isTv?season=${season ?: 0}&episode=${episode ?: 0}&title=$encodedTitle&posterPath=$encodedPoster&backdropPath=$encodedBackdrop"
+        }
+    }
 }

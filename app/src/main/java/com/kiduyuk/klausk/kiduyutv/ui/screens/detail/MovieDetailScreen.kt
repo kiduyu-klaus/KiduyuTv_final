@@ -33,6 +33,7 @@ import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.ui.components.ContentRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.MovieCard
+import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
@@ -53,6 +54,7 @@ fun MovieDetailScreen(
     onBackClick: () -> Unit,
     onMovieClick: (Int) -> Unit,
     onCompanyClick: (id: Int, name: String) -> Unit = { _, _ -> },
+    onPlayClick: (String) -> Unit,
     viewModel: DetailViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -70,7 +72,6 @@ fun MovieDetailScreen(
     val myListInteraction = remember { MutableInteractionSource() }
     val myListFocused by myListInteraction.collectIsFocusedAsState()
 
-    //val context = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(movieId) {
         viewModel.loadMovieDetail(context, movieId)
     }
@@ -265,14 +266,15 @@ fun MovieDetailScreen(
                             // Play Now
                             Button(
                                 onClick = {
-                                    val intent = Intent(context, PlayerActivity::class.java).apply {
-                                        putExtra("TMDB_ID", movieId)
-                                        putExtra("IS_TV", false)
-                                        putExtra("TITLE", movie.title)
-                                        putExtra("POSTER_PATH", movie.posterPath)
-                                        putExtra("BACKDROP_PATH", movie.backdropPath)
-                                    }
-                                    context.startActivity(intent)
+                                    onPlayClick(
+                                        Screen.StreamLinks.createRoute(
+                                            tmdbId = movie.id,
+                                            isTv = false,
+                                            title = movie.title,
+                                            posterPath = movie.posterPath,
+                                            backdropPath = movie.backdropPath
+                                        )
+                                    )
                                 },
                                 modifier = Modifier.focusRequester(playFocusRequester),
                                 interactionSource = playInteraction,
@@ -369,14 +371,16 @@ fun MovieDetailScreen(
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF141414)
+@Preview(showBackground = true)
 @Composable
 fun MovieDetailScreenPreview() {
     KiduyuTvTheme {
         MovieDetailScreen(
             movieId = 1,
             onBackClick = {},
-            onMovieClick = {}
+            onMovieClick = {},
+            onCompanyClick = { _, _ -> },
+            onPlayClick = {}
         )
     }
 }

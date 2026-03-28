@@ -291,7 +291,7 @@ private fun HomeContent(
                 }
 
                 ContentRow(
-                    title = "Latest Movies",
+                    title = "Top Rated Movies",
                     items = uiState.latestMovies,
                     restoreFocusItemId = lastClickedItemId,
                     getItemId = { it.id },
