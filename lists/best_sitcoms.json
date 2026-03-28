@@ -1,0 +1,334 @@
+[
+    {
+        "id": 18347,
+        "title": "Community",
+        "overview": "Follow the lives of a group of students at what is possibly the world’s worst community college in the fictional locale of Greendale, Colorado.",
+        "posterPath": "/3KUjDt8XY7w2Ku70UE0SECmv1zP.jpg",
+        "backdropPath": "/7rCWwphuhIDx98sBflpnyq3N603.jpg",
+        "voteAverage": 8.0,
+        "releaseDate": "2009-09-17",
+        "genreIds": [
+            35
+        ],
+        "popularity": 195.6282
+    },
+    {
+        "id": 2316,
+        "title": "The Office",
+        "overview": "The everyday lives of office employees in the Scranton, Pennsylvania branch of the fictional Dunder Mifflin Paper Company.",
+        "posterPath": "/7DJKHzAi83BmQrWLrYYOqcoKfhR.jpg",
+        "backdropPath": "/mLyW3UTgi2lsMdtueYODcfAB9Ku.jpg",
+        "voteAverage": 8.592,
+        "releaseDate": "2005-03-24",
+        "genreIds": [
+            35
+        ],
+        "popularity": 163.651
+    },
+    {
+        "id": 1668,
+        "title": "Friends",
+        "overview": "Six young people from New York City, on their own and struggling to survive in the real world, find the companionship, comfort and support they get from each other to be the perfect antidote to the pressures of life.",
+        "posterPath": "/2koX1xLkpTQM4IZebYvKysFW1Nh.jpg",
+        "backdropPath": "/ykDYy50mHU52PqYEu4xiFFOw5mw.jpg",
+        "voteAverage": 8.415,
+        "releaseDate": "1994-09-22",
+        "genreIds": [
+            35
+        ],
+        "popularity": 170.3018
+    },
+    {
+        "id": 1400,
+        "title": "Seinfeld",
+        "overview": "A stand-up comedian and his three offbeat friends weather the pitfalls and payoffs of life in New York City in the '90s. It's a show about nothing.",
+        "posterPath": "/aCw8ONfyz3AhngVQa1E2Ss4KSUQ.jpg",
+        "backdropPath": "/tMRdEsMg9MyXAkcufK9YJEeIaNW.jpg",
+        "voteAverage": 8.3,
+        "releaseDate": "1989-07-05",
+        "genreIds": [
+            35
+        ],
+        "popularity": 140.8474
+    },
+    {
+        "id": 849,
+        "title": "Monty Python's Flying Circus",
+        "overview": "A British sketch comedy series with the shows being composed of surreality, risqué or innuendo-laden humour, sight gags and observational sketches without punchlines.",
+        "posterPath": "/hZtMtL8Pqv9FAMljN9911U4qBhI.jpg",
+        "backdropPath": "/9GybuKLYceOhgV09BQ60MKTT5nN.jpg",
+        "voteAverage": 8.3,
+        "releaseDate": "1969-10-05",
+        "genreIds": [
+            35
+        ],
+        "popularity": 14.9437
+    },
+    {
+        "id": 52,
+        "title": "That '70s Show",
+        "overview": "Crank up the 8-track and flash back to a time when platform shoes and puka shells were all the rage in this hilarious retro-sitcom. For Eric, Kelso, Jackie, Hyde, Donna and Fez, a group of high school teens who spend most of their time hanging out in Eric’s basement, life in the ‘70s isn’t always so groovy. But between trying to figure out the meaning of life, avoiding their parents, and dealing with out-of-control hormones, they’ve learned one thing for sure: they’ll always get by with a little help from their friends.",
+        "posterPath": "/laEZvTqM80UaplUaDSCCbWhlyEV.jpg",
+        "backdropPath": "/rf2uHKzPniVL5LvSVxg5ACxv4cS.jpg",
+        "voteAverage": 7.937,
+        "releaseDate": "1998-08-23",
+        "genreIds": [
+            35,
+            10751,
+            18
+        ],
+        "popularity": 48.4936
+    },
+    {
+        "id": 8592,
+        "title": "Parks and Recreation",
+        "overview": "In an attempt to beautify her town — and advance her career — Leslie Knope, a mid-level bureaucrat in the Parks and Recreation Department of Pawnee, Indiana, takes on bureaucrats, cranky neighbors, and single-issue fanatics whose weapons are lawsuits, the jumble of city codes, and the democratic process she loves so much.",
+        "posterPath": "/5IOj62y2Eb2ngyYmEn1IJ7bFhzH.jpg",
+        "backdropPath": "/frwl2zBNAl5ZbFDJGoJv0mYo0rF.jpg",
+        "voteAverage": 8.034,
+        "releaseDate": "2009-04-09",
+        "genreIds": [
+            35
+        ],
+        "popularity": 54.8024
+    },
+    {
+        "id": 48891,
+        "title": "Brooklyn Nine-Nine",
+        "overview": "A single-camera ensemble comedy following the lives of an eclectic group of detectives in a New York precinct, including one slacker who is forced to shape up when he gets a new boss.",
+        "posterPath": "/A3SymGlOHefSKbz1bCOz56moupS.jpg",
+        "backdropPath": "/wyspZaGs7CXceV3Ct7NJhcKNDkn.jpg",
+        "voteAverage": 8.213,
+        "releaseDate": "2013-09-17",
+        "genreIds": [
+            35,
+            80
+        ],
+        "popularity": 78.7191
+    },
+    {
+        "id": 1421,
+        "title": "Modern Family",
+        "overview": "The Pritchett-Dunphy-Tucker clan is a wonderfully large and blended family. They give us an honest and often hilarious look into the sometimes warm, sometimes twisted, embrace of the modern family.",
+        "posterPath": "/k5Qg5rgPoKdh3yTJJrLtyoyYGwC.jpg",
+        "backdropPath": "/nO7EzksrBzlNpAg5rgv8HzaBIkx.jpg",
+        "voteAverage": 7.901,
+        "releaseDate": "2009-09-23",
+        "genreIds": [
+            35
+        ],
+        "popularity": 175.5523
+    },
+    {
+        "id": 1100,
+        "title": "How I Met Your Mother",
+        "overview": "A father recounts to his children - through a series of flashbacks - the journey he and his four best friends took leading up to him meeting their mother.",
+        "posterPath": "/b34jPzmB0wZy7EjUZoleXOl2RRI.jpg",
+        "backdropPath": "/gvEisYtZ0iBMjnO3zqFU2oM26oM.jpg",
+        "voteAverage": 8.133,
+        "releaseDate": "2005-09-19",
+        "genreIds": [
+            35
+        ],
+        "popularity": 119.8902
+    },
+    {
+        "id": 64254,
+        "title": "Master of None",
+        "overview": "30-year-old New York actor Dev takes on such pillars of maturity as the first big job, a serious relationship, and busting sex offenders on the subway.",
+        "posterPath": "/AcJM86PhgHAfbrF4dMKBaqO3cHV.jpg",
+        "backdropPath": "/yYnxld9hgTLCOFORequmOK6paj2.jpg",
+        "voteAverage": 7.373,
+        "releaseDate": "2015-11-06",
+        "genreIds": [
+            35,
+            18
+        ],
+        "popularity": 15.5718
+    },
+    {
+        "id": 1892,
+        "title": "The Fresh Prince of Bel-Air",
+        "overview": "Will, a street-smart teenager, moves from the tough streets of West Philly to posh Bel-Air to live with his Uncle Philip, Aunt Vivian, his cousins — spoiled Hilary, preppy Carlton and young Ashley — and their sophisticated British butler, Geoffrey. Though Will’s antics and upbringing contrast greatly with the upper-class lifestyle of his extended relatives, he soon finds himself right at home as a loved part of the family.",
+        "posterPath": "/fJXzwxCVr2TEkhhKRKcih9o5DYK.jpg",
+        "backdropPath": "/uyB27Tx3KtczuSo4tDfmiXhfuCp.jpg",
+        "voteAverage": 7.912,
+        "releaseDate": "1990-09-10",
+        "genreIds": [
+            35,
+            10751
+        ],
+        "popularity": 30.224
+    },
+    {
+        "id": 4327,
+        "title": "Mr. Bean",
+        "overview": "Mr Bean turns simple everyday tasks into chaotic situations and will leave you in stitches as he creates havoc wherever he goes.",
+        "posterPath": "/pUNQV35kDaKuejnXGNiUeEBurNE.jpg",
+        "backdropPath": "/lHSLW9lihnuRMs1yYarmMJX4phK.jpg",
+        "voteAverage": 7.988,
+        "releaseDate": "1990-01-01",
+        "genreIds": [
+            35
+        ],
+        "popularity": 23.067
+    },
+    {
+        "id": 252,
+        "title": "Everybody Hates Chris",
+        "overview": "Chris is a teenager growing up as the eldest of three children in Brooklyn, New York during the early 1980s. Uprooted to a new neighborhood and bused to a predominantly white middle school two-hours away by his strict, hard-working parents, Chris struggles to find his place while keeping his siblings in line at home and surmounting the challenges of junior high.",
+        "posterPath": "/zX0xZnyReJxtGAqDOS3WcsgpOgx.jpg",
+        "backdropPath": "/qji729gwCW88RpIIWidlaLTul3V.jpg",
+        "voteAverage": 8.066,
+        "releaseDate": "2005-09-22",
+        "genreIds": [
+            35
+        ],
+        "popularity": 25.4693
+    },
+    {
+        "id": 62649,
+        "title": "Superstore",
+        "overview": "A hilarious workplace comedy about a unique family of employees at a super-sized mega store. From the bright-eyed newbies and the seen-it-all veterans to the clueless summer hires and the in-it-for-life managers, together they hilariously tackle the day-to-day grind of rabid bargain hunters, riot-causing sales and nap-worthy training sessions.",
+        "posterPath": "/2tpY5qIYwH85njvjI5BnH4VNA6p.jpg",
+        "backdropPath": "/gwy5pUl8EH1vROVWfEo1TAmqHNK.jpg",
+        "voteAverage": 7.551,
+        "releaseDate": "2015-11-30",
+        "genreIds": [
+            35
+        ],
+        "popularity": 38.4753
+    },
+    {
+        "id": 61888,
+        "title": "The Last Man on Earth",
+        "overview": "The year is 2022, and after an unlikely event, only one man is left on earth: Phil Miller, who used to be just an average guy who loved his family and hated his job at the bank. Now, in his RV, Phil searches the country for other survivors.",
+        "posterPath": "/vONS5oceFmM93hsS3q3mvQ1iBC3.jpg",
+        "backdropPath": "/6g6NdCgFxO8qVp0cosVOm4xdjQG.jpg",
+        "voteAverage": 6.9,
+        "releaseDate": "2015-03-01",
+        "genreIds": [
+            18,
+            35
+        ],
+        "popularity": 12.9382
+    },
+    {
+        "id": 4608,
+        "title": "30 Rock",
+        "overview": "Liz Lemon, the head writer for a late-night TV variety show in New York, tries to juggle all the egos around her while chasing her own dream.",
+        "posterPath": "/eYYQWACx7ttUzRwTNYuo6zveqpE.jpg",
+        "backdropPath": "/cK5AbLFBY2JDoqEdVXk0697e2SV.jpg",
+        "voteAverage": 7.473,
+        "releaseDate": "2006-10-11",
+        "genreIds": [
+            35
+        ],
+        "popularity": 170.6189
+    },
+    {
+        "id": 2691,
+        "title": "Two and a Half Men",
+        "overview": "A hedonistic jingle writer's free-wheeling life comes to an abrupt halt when his brother and 10-year-old nephew move into his beach-front house.",
+        "posterPath": "/xgfjxyV3g1S68opzuvG6G87muDp.jpg",
+        "backdropPath": "/2pOmuq4nkWZzwZbOfZq7CyyQAsM.jpg",
+        "voteAverage": 7.445,
+        "releaseDate": "2003-09-22",
+        "genreIds": [
+            35
+        ],
+        "popularity": 115.8499
+    },
+    {
+        "id": 36994,
+        "title": "Workaholics",
+        "overview": "The misadventures of three recent college dropouts, roommates, and co-workers at a telemarketing company and their drug dealer.",
+        "posterPath": "/kXg4tFUHN7h7bNdBTeLIIKqw9UJ.jpg",
+        "backdropPath": "/zDSvUcCR2nkrGhLUTIgqQ18P27U.jpg",
+        "voteAverage": 7.4,
+        "releaseDate": "2011-04-06",
+        "genreIds": [
+            35
+        ],
+        "popularity": 31.376
+    },
+    {
+        "id": 4589,
+        "title": "Arrested Development",
+        "overview": "The story of a wealthy family that lost everything, and the one son who had no choice but to keep them all together.",
+        "posterPath": "/p4r4RD7RsNcJVoz0H6z3dBoTBtW.jpg",
+        "backdropPath": "/8qn0u64JXSgnGKe2KkKqrfH7V84.jpg",
+        "voteAverage": 7.927,
+        "releaseDate": "2003-11-02",
+        "genreIds": [
+            35
+        ],
+        "popularity": 47.5329
+    },
+    {
+        "id": 141,
+        "title": "Cheers",
+        "overview": "The story about a blue-collar Boston bar run by former sports star Sam Malone and the quirky and wonderful people who worked and drank there.",
+        "posterPath": "/nD1ZQBKbgKSmKcrAkWTofohsScj.jpg",
+        "backdropPath": "/5U7NIuRK836GutAlo7TLPfmVtGW.jpg",
+        "voteAverage": 7.6,
+        "releaseDate": "1982-09-30",
+        "genreIds": [
+            35
+        ],
+        "popularity": 227.2747
+    },
+    {
+        "id": 4556,
+        "title": "Scrubs",
+        "overview": "In the unreal world of Sacred Heart Hospital, John \"J.D.\" Dorian learns the ways of medicine, friendship and life.",
+        "posterPath": "/w7ri7byEYLdciSZOwWHj6TUAX7j.jpg",
+        "backdropPath": "/vIqDfrp6ApLxM9yRg3xDnQqXy0T.jpg",
+        "voteAverage": 7.919,
+        "releaseDate": "2001-10-02",
+        "genreIds": [
+            35
+        ],
+        "popularity": 114.0042
+    },
+    {
+        "id": 60573,
+        "title": "Silicon Valley",
+        "overview": "In the high-tech gold rush of modern Silicon Valley, the people most qualified to succeed are the least capable of handling success. Partially inspired by Mike Judge’s own experiences as a Silicon Valley engineer in the late ‘80s, Silicon Valley is an American sitcom that centers around six programmers who are living together and trying to make it big in the Silicon Valley.",
+        "posterPath": "/4ptpmWBVD9HY9hMh8Cbs6SMiy7p.jpg",
+        "backdropPath": "/4pfXAnWxOfEJsUgDPW0zqzs5UWv.jpg",
+        "voteAverage": 8.1,
+        "releaseDate": "2014-04-06",
+        "genreIds": [
+            35
+        ],
+        "popularity": 34.3442
+    },
+    {
+        "id": 2947,
+        "title": "Veep",
+        "overview": "A look into American politics, revolving around former Senator Selina Meyer who finds being Vice President of the United States is nothing like she expected and everything everyone ever warned her about.",
+        "posterPath": "/cdd78fGdaA3EbK2ToZRWcaaB1fx.jpg",
+        "backdropPath": "/vKaDMLbdLrThldFj9Vavo6suTS2.jpg",
+        "voteAverage": 7.5,
+        "releaseDate": "2012-04-22",
+        "genreIds": [
+            35
+        ],
+        "popularity": 40.0116
+    },
+    {
+        "id": 66573,
+        "title": "The Good Place",
+        "overview": "Eleanor Shellstrop, an ordinary woman who, through an extraordinary string of events, enters the afterlife where she comes to realize that she hasn't been a very good person. With the help of her wise afterlife mentor, she's determined to shed her old way of living and discover the awesome (or at least the pretty good) person within.",
+        "posterPath": "/qIhsuhoIYR5yTnDta0IL4senbeN.jpg",
+        "backdropPath": "/tZmlWeFEMvxrjJhBJJcLNXpSRiG.jpg",
+        "voteAverage": 7.974,
+        "releaseDate": "2016-09-19",
+        "genreIds": [
+            10765,
+            35
+        ],
+        "popularity": 31.3041
+    }
+]
