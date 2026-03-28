@@ -1,10 +1,15 @@
 package com.kiduyuk.klausk.kiduyutv
 
+import android.Manifest
 import android.app.AlertDialog
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -61,9 +66,19 @@ class MainActivity : ComponentActivity(), ImageLoaderFactory {
             .build()
     }
 
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val allGranted = permissions.entries.all { it.value }
+        if (!allGranted) {
+            showPermissionDeniedDialog()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         MyListManager.init(this)
+        checkAndRequestStoragePermissions()
         setContent {
             KiduyuTvTheme {
                 val navController = rememberNavController()
@@ -111,6 +126,65 @@ class MainActivity : ComponentActivity(), ImageLoaderFactory {
                 finish()
             }
             .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun checkAndRequestStoragePermissions() {
+        val permissionsToRequest = mutableListOf<String>()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Android 13+
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.READ_MEDIA_IMAGES)
+            }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VIDEO) != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.READ_MEDIA_VIDEO)
+            }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.READ_MEDIA_AUDIO)
+            }
+        } else {
+            // Android 12 and below
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+            }
+            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                    permissionsToRequest.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                }
+            }
+        }
+
+        if (permissionsToRequest.isNotEmpty()) {
+            showPermissionExplanationDialog(permissionsToRequest.toTypedArray())
+        }
+    }
+
+    private fun showPermissionExplanationDialog(permissions: Array<String>) {
+        AlertDialog.Builder(this)
+            .setTitle("Storage Permission Required")
+            .setMessage("KiduyuTv needs storage access to cache images and provide a smoother experience. Please grant the following permissions.")
+            .setPositiveButton("Grant") { _, _ ->
+                requestPermissionLauncher.launch(permissions)
+            }
+            .setNegativeButton("Exit App") { _, _ ->
+                finish()
+            }
+            .setCancelable(false)
+            .show()
+    }
+
+    private fun showPermissionDeniedDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Permissions Denied")
+            .setMessage("Storage permissions are essential for KiduyuTv to function correctly. Would you like to try again or exit the app?")
+            .setPositiveButton("Try Again") { _, _ ->
+                checkAndRequestStoragePermissions()
+            }
+            .setNegativeButton("Exit App") { _, _ ->
+                finish()
+            }
+            .setCancelable(false)
             .show()
     }
 }
