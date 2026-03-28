@@ -285,12 +285,12 @@ fun MyListScreenPreview() {
                 .background(BackgroundDark)
         ) {
             // Header for the preview.
-            Text(
-                text = "My List",
-                style = MaterialTheme.typography.headlineLarge,
-                color = TextPrimary,
-                modifier = Modifier.padding(48.dp)
-            )
+//            Text(
+//                text = "My List",
+//                style = MaterialTheme.typography.headlineLarge,
+//                color = TextPrimary,
+//                modifier = Modifier.padding(48.dp)
+//            )
 
             // Sample My List Items for the preview.
             LazyColumn(
