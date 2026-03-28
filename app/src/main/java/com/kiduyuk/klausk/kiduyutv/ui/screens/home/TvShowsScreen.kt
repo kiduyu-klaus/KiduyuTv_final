@@ -50,8 +50,12 @@ fun TvShowsScreen(
         derivedStateOf { uiState.selectedItem as? TvShow }
     }
 
-    LaunchedEffect(Unit) {
-        firstItemFocusRequester.requestFocus()
+    LaunchedEffect(uiState.isLoading) {
+        if (!uiState.isLoading && uiState.trendingTvShows.isNotEmpty()) {
+            firstItemFocusRequester.requestFocus()
+            // Also ensure the first item is selected in the ViewModel so the HeroSection displays it
+            viewModel.onItemSelected(uiState.trendingTvShows.first())
+        }
     }
 
     Box(
@@ -116,6 +120,35 @@ fun TvShowsScreen(
                             isSelected = isSelected,
                             onClick = onClick
                         )
+                    }
+
+                    // Content Row for Continue Watching TV Shows, only shown if not empty.
+                    if (uiState.continueWatching.isNotEmpty()) {
+                        val tvHistory = uiState.continueWatching.filter { it.isTv }
+                        if (tvHistory.isNotEmpty()) {
+                            ContentRow(
+                                title = "Continue Watching",
+                                items = tvHistory,
+                                onItemFocus = { historyItem -> viewModel.onItemSelected(historyItem) },
+                                onItemClick = { historyItem -> onTvShowClick(historyItem.id) }
+                            ) { historyItem, isSelected, onClick ->
+                                TvShowCard(
+                                    tvShow = TvShow(
+                                        id = historyItem.id,
+                                        name = historyItem.title,
+                                        overview = "",
+                                        posterPath = historyItem.posterPath,
+                                        backdropPath = historyItem.backdropPath,
+                                        voteAverage = 0.0,
+                                        firstAirDate = "",
+                                        genreIds = emptyList(),
+                                        popularity = 0.0
+                                    ),
+                                    isSelected = isSelected,
+                                    onClick = onClick
+                                )
+                            }
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(32.dp))
