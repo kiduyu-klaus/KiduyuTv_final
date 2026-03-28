@@ -70,8 +70,9 @@ fun MovieDetailScreen(
     val myListInteraction = remember { MutableInteractionSource() }
     val myListFocused by myListInteraction.collectIsFocusedAsState()
 
+    //val context = androidx.compose.ui.platform.LocalContext.current
     LaunchedEffect(movieId) {
-        viewModel.loadMovieDetail(movieId)
+        viewModel.loadMovieDetail(context, movieId)
     }
 
     LaunchedEffect(uiState.isLoading) {
@@ -266,6 +267,10 @@ fun MovieDetailScreen(
                                 onClick = {
                                     val intent = Intent(context, PlayerActivity::class.java).apply {
                                         putExtra("TMDB_ID", movieId)
+                                        putExtra("IS_TV", false)
+                                        putExtra("TITLE", movie.title)
+                                        putExtra("POSTER_PATH", movie.posterPath)
+                                        putExtra("BACKDROP_PATH", movie.backdropPath)
                                     }
                                     context.startActivity(intent)
                                 },
@@ -279,7 +284,7 @@ fun MovieDetailScreen(
                             ) {
                                 Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("Play", fontSize = 12.sp)
+                                Text(if (uiState.watchHistoryItem != null) "Continue" else "Play", fontSize = 12.sp)
                             }
 
                             // Watch Trailer
