@@ -195,4 +195,10 @@ interface TmdbApiService {
         @Path("tv_id") tvId: Int,
         @Query("page") page: Int = 1
     ): TvShowResponse
+
+    /** Fetches detailed information for a movie collection. */
+    @GET("collection/{collection_id}")
+    suspend fun getCollectionDetails(
+        @Path("collection_id") collectionId: Int
+    ): CollectionDetail
 }
