@@ -68,6 +68,7 @@ fun HomeScreen(
                     selectedRoute = route
                     onNavigate(route)
                 },
+                onNavigate = onNavigate,
                 onSelectItem = { viewModel.onItemSelected(it) },
                 onSetLastClickedItemId = { viewModel.onItemClicked(it ?: 0) },
                 lastClickedItemId = uiState.lastClickedItemId
@@ -112,6 +113,7 @@ private fun HomeContent(
     onSearchClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onNavItemClick: (String) -> Unit,
+    onNavigate: (String) -> Unit,
     onSelectItem: (Any?) -> Unit,
     onSetLastClickedItemId: (Int?) -> Unit = {},
     lastClickedItemId: Int? = null
@@ -206,6 +208,7 @@ private fun HomeContent(
                         items = uiState.popularNetworks,
                         onItemClick = { network ->
                             onSetLastClickedItemId(network.id)
+                            onNavigate("media_list/network/${network.id}/${network.name}")
                         }
                     )
                 }
@@ -216,6 +219,7 @@ private fun HomeContent(
                         items = uiState.popularCompanies,
                         onItemClick = { company ->
                             onSetLastClickedItemId(company.id)
+                            onNavigate("media_list/company/${company.id}/${company.name}")
                         }
                     )
                 }
