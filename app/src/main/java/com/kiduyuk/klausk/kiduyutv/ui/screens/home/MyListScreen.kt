@@ -261,13 +261,13 @@ private fun MyListItemCard(
         }
 
         // Remove button.
-        IconButton(onClick = onRemove) {
-            Icon(
-                imageVector = Icons.Default.Close,
-                contentDescription = "Remove from list",
-                tint = TextPrimary
-            )
-        }
+//        IconButton(onClick = onRemove) {
+//            Icon(
+//                imageVector = Icons.Default.Close,
+//                contentDescription = "Remove from list",
+//                tint = TextPrimary
+//            )
+//        }
     }
 }
 
