@@ -72,7 +72,12 @@ fun MovieDetailScreen(
 
     LaunchedEffect(movieId) {
         viewModel.loadMovieDetail(movieId)
-        playFocusRequester.requestFocus()
+    }
+
+    LaunchedEffect(uiState.isLoading) {
+        if (!uiState.isLoading && uiState.movieDetail != null) {
+            playFocusRequester.requestFocus()
+        }
     }
 
     Box(
