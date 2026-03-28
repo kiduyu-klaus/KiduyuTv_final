@@ -6,7 +6,6 @@ import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,13 +23,14 @@ data class HomeUiState(
     val popularCompanies: List<NetworkItem> = emptyList(),
     val latestMovies: List<Movie> = emptyList(),
     val topTvShows: List<TvShow> = emptyList(),
-    val oscarMovies: List<Movie> = emptyList(),
     val oscarWinners2026: List<Movie> = emptyList(),
     val hallmarkMovies: List<Movie> = emptyList(),
     val trueStoryMovies: List<Movie> = emptyList(),
     val bestSitcoms: List<TvShow> = emptyList(),
     val bestClassics: List<Movie> = emptyList(),
-    val myList: List<MyListItem> = emptyList(),
+    val spyMovies: List<Movie> = emptyList(),
+    val stathamMovies: List<Movie> = emptyList(),
+    val timeTravelMovies: List<Movie> = emptyList(),
     val selectedItem: Any? = null,
     val lastClickedItemId: Int? = null,
     val error: String? = null
@@ -99,28 +99,29 @@ class HomeViewModel : ViewModel() {
                 )
 
                 // Load secondary content sequentially or in smaller batches to avoid OOM
-                val oscarMovies = repository.getOscarMovies().getOrNull()?.mapNotNull { it.toMovie() } ?: emptyList()
-                _uiState.value = _uiState.value.copy(oscarMovies = oscarMovies)
+                val oscarWinners2026 = repository.getGitHubMovieList("https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/oscar_winners_2026.json").getOrNull() ?: emptyList()
+                _uiState.value = _uiState.value.copy(oscarWinners2026 = oscarWinners2026)
 
-//                val oscarWinners2026 = repository.getTraktListMovies("visualcortex", "2026-oscar-winners",
-//                    clientId = "98f8c9590ae29a666942f81c5f86628f0dbe2767d28b88cdedbb7bbbd316e1a0").getOrNull() ?: emptyList()
-//                _uiState.value = _uiState.value.copy(oscarWinners2026 = oscarWinners2026)
-
-                val hallmarkMovies = repository.getTraktListMovies("trakt_kodi_321", "hallmark-movies",
-                    clientId = "98f8c9590ae29a666942f81c5f86628f0dbe2767d28b88cdedbb7bbbd316e1a0").getOrNull() ?: emptyList()
+                val hallmarkMovies = repository.getGitHubMovieList("https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/hallmark_movies.json").getOrNull() ?: emptyList()
                 _uiState.value = _uiState.value.copy(hallmarkMovies = hallmarkMovies)
 
-//                val trueStoryMovies = repository.getTraktListMovies("benfranklin", "based-on-a-true-story",
-//                    clientId = "98f8c9590ae29a666942f81c5f86628f0dbe2767d28b88cdedbb7bbbd316e1a0").getOrNull() ?: emptyList()
-//                _uiState.value = _uiState.value.copy(trueStoryMovies = trueStoryMovies)
+                val trueStoryMovies = repository.getGitHubMovieList("https://raw.githubusercontent.com/kiduyu-klein/KiduyuTv_final/refs/heads/main/lists/true_story_movies.json").getOrNull() ?: emptyList()
+                _uiState.value = _uiState.value.copy(trueStoryMovies = trueStoryMovies)
 
-//                val bestSitcoms = repository.getTraktListTvShows("fidel-cb", "best-sitcoms",
-//                    clientId = "98f8c9590ae29a666942f81c5f86628f0dbe2767d28b88cdedbb7bbbd316e1a0").getOrNull() ?: emptyList()
-//                _uiState.value = _uiState.value.copy(bestSitcoms = bestSitcoms)
+                val bestSitcoms = repository.getGitHubTvShowList("https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/best_sitcoms.json").getOrNull() ?: emptyList()
+                _uiState.value = _uiState.value.copy(bestSitcoms = bestSitcoms)
 
-//                val bestClassics = repository.getTraktListMovies("captainnapalm", "1001-greatest-movies-of-all-time",
-//                    clientId = "98f8c9590ae29a666942f81c5f86628f0dbe2767d28b88cdedbb7bbbd316e1a0").getOrNull() ?: emptyList()
-//                _uiState.value = _uiState.value.copy(bestClassics = bestClassics)
+                val bestClassics = repository.getGitHubMovieList("https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/best_classics.json").getOrNull() ?: emptyList()
+                _uiState.value = _uiState.value.copy(bestClassics = bestClassics)
+
+                val spyMovies = repository.getGitHubMovieList("https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/cia_mossad_spies.json").getOrNull() ?: emptyList()
+                _uiState.value = _uiState.value.copy(spyMovies = spyMovies)
+
+                val stathamMovies = repository.getGitHubMovieList("https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/jason_statham_movies.json").getOrNull() ?: emptyList()
+                _uiState.value = _uiState.value.copy(stathamMovies = stathamMovies)
+
+                val timeTravelMovies = repository.getGitHubMovieList("https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/time_travel_movies.json").getOrNull() ?: emptyList()
+                _uiState.value = _uiState.value.copy(timeTravelMovies = timeTravelMovies)
 
                 // Load networks and companies last
                 val networkIds = listOf(213, 2739, 1024, 49, 4330, 2552, 453, 3353, 174, 88, 67, 4, 6, 2, 16, 19, 71, 26, 214)
@@ -145,11 +146,11 @@ class HomeViewModel : ViewModel() {
         }
     }
 
-    fun selectItem(item: Any) {
+    fun onItemSelected(item: Any?) {
         _uiState.value = _uiState.value.copy(selectedItem = item)
     }
 
-    fun setLastClickedItemId(id: Int?) {
-        _uiState.value = _uiState.value.copy(lastClickedItemId = id)
+    fun onItemClicked(itemId: Int) {
+        _uiState.value = _uiState.value.copy(lastClickedItemId = itemId)
     }
 }
