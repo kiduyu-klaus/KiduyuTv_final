@@ -24,7 +24,7 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var cursorView: MouseCursorView
     private var cursorX = 0f
     private var cursorY = 0f
-    private val moveSpeed = 40f
+    private val moveSpeed = 50f
     private var screenWidth = 0
     private var screenHeight = 0
 
