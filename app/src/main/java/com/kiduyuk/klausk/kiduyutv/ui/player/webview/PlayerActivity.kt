@@ -50,8 +50,11 @@ class PlayerActivity : ComponentActivity() {
         val seasonNumber = intent.getIntExtra("SEASON_NUMBER", 1)
         val episodeNumber = intent.getIntExtra("EPISODE_NUMBER", 1)
         val title = intent.getStringExtra("TITLE") ?: "Unknown"
+        val overview = intent.getStringExtra("OVERVIEW")
         val posterPath = intent.getStringExtra("POSTER_PATH")
         val backdropPath = intent.getStringExtra("BACKDROP_PATH")
+        val voteAverage = intent.getDoubleExtra("VOTE_AVERAGE", 0.0)
+        val releaseDate = intent.getStringExtra("RELEASE_DATE")
         val streamUrl = intent.getStringExtra("STREAM_URL")
 
         if (tmdbId == -1) {
@@ -66,8 +69,11 @@ class PlayerActivity : ComponentActivity() {
             WatchHistoryItem(
                 id = tmdbId,
                 title = title,
+                overview = overview,
                 posterPath = posterPath,
                 backdropPath = backdropPath,
+                voteAverage = voteAverage,
+                releaseDate = releaseDate,
                 isTv = isTv,
                 seasonNumber = if (isTv) seasonNumber else null,
                 episodeNumber = if (isTv) episodeNumber else null
@@ -214,6 +220,7 @@ class PlayerActivity : ComponentActivity() {
             }
         })
     }
+
 
 
     private fun showExitConfirmationDialog() {
