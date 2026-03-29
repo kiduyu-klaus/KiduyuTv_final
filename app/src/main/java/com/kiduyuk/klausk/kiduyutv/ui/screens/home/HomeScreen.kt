@@ -50,11 +50,11 @@ fun HomeScreen(
                 is WatchHistoryItem -> if (!item.isTv) Movie(
                     id = item.id,
                     title = item.title,
-                    overview = "",
+                    overview = item.overview ?: "",
                     posterPath = item.posterPath,
                     backdropPath = item.backdropPath,
-                    voteAverage = 0.0,
-                    releaseDate = "",
+                    voteAverage = item.voteAverage,
+                    releaseDate = item.releaseDate ?: "",
                     genreIds = emptyList(),
                     popularity = 0.0
                 ) else null
@@ -69,11 +69,11 @@ fun HomeScreen(
                 is WatchHistoryItem -> if (item.isTv) TvShow(
                     id = item.id,
                     name = item.title,
-                    overview = "",
+                    overview = item.overview ?: "",
                     posterPath = item.posterPath,
                     backdropPath = item.backdropPath,
-                    voteAverage = 0.0,
-                    firstAirDate = "",
+                    voteAverage = item.voteAverage,
+                    firstAirDate = item.releaseDate ?: "",
                     genreIds = emptyList(),
                     popularity = 0.0
                 ) else null
@@ -237,11 +237,11 @@ private fun HomeContent(
                                 tvShow = TvShow(
                                     id = item.id,
                                     name = item.title,
-                                    overview = "",
+                                    overview = item.overview ?: "",
                                     posterPath = item.posterPath,
                                     backdropPath = item.backdropPath,
-                                    voteAverage = 0.0,
-                                    firstAirDate = "",
+                                    voteAverage = item.voteAverage,
+                                    firstAirDate = item.releaseDate ?: "",
                                     genreIds = emptyList(),
                                     popularity = 0.0
                                 ),
@@ -253,11 +253,11 @@ private fun HomeContent(
                                 movie = Movie(
                                     id = item.id,
                                     title = item.title,
-                                    overview = "",
+                                    overview = item.overview ?: "",
                                     posterPath = item.posterPath,
                                     backdropPath = item.backdropPath,
-                                    voteAverage = 0.0,
-                                    releaseDate = "",
+                                    voteAverage = item.voteAverage,
+                                    releaseDate = item.releaseDate ?: "",
                                     genreIds = emptyList(),
                                     popularity = 0.0
                                 ),
