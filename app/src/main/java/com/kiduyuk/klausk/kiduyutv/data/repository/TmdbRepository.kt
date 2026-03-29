@@ -3,6 +3,7 @@ package com.kiduyuk.klausk.kiduyutv.data.repository
 import android.util.Log
 import com.kiduyuk.klausk.kiduyutv.data.api.ApiClient
 import com.kiduyuk.klausk.kiduyutv.data.model.*
+import com.kiduyuk.klausk.kiduyutv.data.model.CompaniesNetworksResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
@@ -251,6 +252,34 @@ class TmdbRepository {
             val type = object : com.google.gson.reflect.TypeToken<List<TvShow>>() {}.type
             val tvShows: List<TvShow> = gson.fromJson(response, type)
             tvShows
+        }
+    }
+
+    /**
+     * Fetches companies and networks from a GitHub JSON list.
+     * @param urlString The GitHub raw URL for companies_networks.json.
+     * @return Result containing CompaniesNetworksResponse with companies and networks.
+     */
+    suspend fun getGitHubCompaniesNetworks(urlString: String): Result<CompaniesNetworksResponse> = withContext(Dispatchers.IO) {
+        runCatching {
+            val url = URL(urlString)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 15000
+            connection.readTimeout = 15000
+
+            val responseCode = connection.responseCode
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                throw Exception("Failed to fetch GitHub list: HTTP $responseCode")
+            }
+
+            val reader = BufferedReader(InputStreamReader(connection.inputStream))
+            val response = reader.readText()
+            reader.close()
+
+            val gson = com.google.gson.Gson()
+            val result: CompaniesNetworksResponse = gson.fromJson(response, CompaniesNetworksResponse::class.java)
+            result
         }
     }
 
