@@ -152,29 +152,7 @@ class PlayerActivity : ComponentActivity() {
                                 });
                             }
 
-                            // 4. Media Key Helper Functions
-                            window.playerPlay = function() {
-                                var videos = document.getElementsByTagName('video');
-                                for (var i = 0; i < videos.length; i++) {
-                                    videos[i].play();
-                                }
-                            };
-                            window.playerPause = function() {
-                                var videos = document.getElementsByTagName('video');
-                                for (var i = 0; i < videos.length; i++) {
-                                    videos[i].pause();
-                                }
-                            };
-                            window.playerToggle = function() {
-                                var videos = document.getElementsByTagName('video');
-                                for (var i = 0; i < videos.length; i++) {
-                                    if (videos[i].paused) {
-                                        videos[i].play();
-                                    } else {
-                                        videos[i].pause();
-                                    }
-                                }
-                            };
+                            
 
                             setMaxVolume();
                             removeAds();
