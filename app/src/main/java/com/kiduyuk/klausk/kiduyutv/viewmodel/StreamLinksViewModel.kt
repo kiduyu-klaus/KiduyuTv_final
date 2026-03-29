@@ -24,17 +24,17 @@ class StreamLinksViewModel : ViewModel() {
                     name = "VidLink",
                     urlTemplate = if (isTv) "https://vidlink.pro/tv/${tmdbId}/${season}/${episode}?autoPlay=true" else "https://vidlink.pro/movie/${tmdbId}?autoPlay=true",
                     type = if (isTv) "tv" else "movie"
-                ),/**
+                ),
                 StreamProvider(
                     name = "VidKing",
                     urlTemplate = if (isTv) "https://www.vidking.net/embed/tv/${tmdbId}/${season}/${episode}?autoPlay=true&nextEpisode=true" else "https://www.vidking.net/embed/movie/${tmdbId}?autoPlay=true",
                     type = if (isTv) "tv" else "movie"
-                ), **/
+                ),
                 StreamProvider(
                     name = "Videasy",
                     urlTemplate = if (isTv) "https://player.videasy.net/tv/${tmdbId}/${season}/${episode}?autoPlay=true" else "https://player.videasy.net/movie/${tmdbId}?autoPlay=true",
                     type = if (isTv) "tv" else "movie"
-                ) /** ,
+                ),
                 StreamProvider(
                     name = "Mapple",
                     urlTemplate = if (isTv) "https://mapple.uk/watch/tv/${tmdbId}-${season}-${episode}" else "https://mapple.uk/watch/movie/${tmdbId}",
@@ -44,7 +44,12 @@ class StreamLinksViewModel : ViewModel() {
                     name = "Flixer",
                     urlTemplate = if (isTv) "https://flixer.su/watch/tv/${tmdbId}/${season}/${episode}" else "https://flixer.su/watch/movie/${tmdbId}",
                     type = if (isTv) "tv" else "movie"
-                ) **/
+                ),
+                StreamProvider(
+                    name = "VidFast",
+                    urlTemplate = if (isTv) "https://vidfast.pro/tv/${tmdbId}/${season}/${episode}?autoPlay=true" else "https://vidfast.pro/movie/${tmdbId}?autoPlay=true",
+                    type = if (isTv) "tv" else "movie"
+                )
             )
 
             val checkedProviders = providers.map { provider ->
