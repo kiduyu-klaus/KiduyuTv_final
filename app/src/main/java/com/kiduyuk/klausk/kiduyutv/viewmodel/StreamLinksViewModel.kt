@@ -29,7 +29,7 @@ class StreamLinksViewModel : ViewModel() {
                     name = "VidKing",
                     urlTemplate = if (isTv) "https://www.vidking.net/embed/tv/${tmdbId}/${season}/${episode}?autoPlay=true&nextEpisode=true" else "https://www.vidking.net/embed/movie/${tmdbId}?autoPlay=true",
                     type = if (isTv) "tv" else "movie"
-                ),
+                ) ,
                 StreamProvider(
                     name = "Videasy",
                     urlTemplate = if (isTv) "https://player.videasy.net/tv/${tmdbId}/${season}/${episode}?autoPlay=true" else "https://player.videasy.net/movie/${tmdbId}?autoPlay=true",
