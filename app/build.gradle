@@ -11,6 +11,7 @@ plugins {
 
 android {
     namespace 'com.kiduyuk.klausk.kiduyutv'
+    //noinspection GradleDependency
     compileSdk 35
 
     defaultConfig {
