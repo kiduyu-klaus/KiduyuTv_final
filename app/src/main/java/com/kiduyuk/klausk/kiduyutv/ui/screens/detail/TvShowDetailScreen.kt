@@ -35,7 +35,6 @@ import com.kiduyuk.klausk.kiduyutv.ui.components.ContentRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.TvShowCard
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
-import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
 
@@ -290,8 +289,11 @@ fun TvShowDetailScreen(
                                             season = uiState.watchHistoryItem?.seasonNumber ?: 1,
                                             episode = uiState.watchHistoryItem?.episodeNumber ?: 1,
                                             title = tvShow.name ?: "",
+                                            overview = tvShow.overview,
                                             posterPath = tvShow.posterPath,
-                                            backdropPath = tvShow.backdropPath
+                                            backdropPath = tvShow.backdropPath,
+                                            voteAverage = tvShow.voteAverage,
+                                            releaseDate = tvShow.firstAirDate
                                         )
                                     )
                                 },
