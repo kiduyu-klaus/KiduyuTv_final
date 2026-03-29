@@ -1,0 +1,179 @@
+name: Android Release CI
+
+on:
+  push:
+    tags:
+      - 'v*.*.*' # Triggers on pushes to tags like v1.0.0, v2.0.0-beta, etc.
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Specify a custom release tag (e.g., v1.0.0)'
+        required: false
+        type: string
+      release_notes:
+        description: 'Custom release notes (overrides commit message)'
+        required: false
+        type: string
+
+permissions:
+  contents: write # Required to create a release
+  packages: write # Required to upload release assets
+
+jobs:
+  build_and_release:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Determine Release Tag
+      id: tag
+      run: |
+        if [ -n "${{ github.event.inputs.release_tag }}" ]; then
+          TAG="${{ github.event.inputs.release_tag }}"
+        else
+          VERSION=$(grep 'versionName' app/build.gradle | sed 's/.*"\(.*\)".*/\1/' | tr -d '[:space:]')
+          BUILD=$(git rev-list --count HEAD)
+          TAG="v${VERSION}-build${BUILD}"
+        fi
+        echo "tag=${TAG}" >> $GITHUB_OUTPUT
+        echo "Release tag: ${TAG}"
+
+    - name: Build Debug APK
+      run: ./gradlew assembleDebug
+
+    # TODO: Add signing configuration here. This typically involves:
+    # 1. Storing signing key and keystore password as GitHub Secrets.
+    # 2. Using actions/upload-artifact to upload the generated AAB/APK.
+    # 3. Using r0adkll/sign-android-release@v1 to sign the release.
+    #    Example: https://github.com/r0adkll/sign-android-release
+
+    - name: Get last commit message
+      id: commit_msg
+      if: github.event_name != 'pull_request'
+      run: |
+        MSG=$(git log -1 --pretty=%B | tr -d '\r')
+        echo "message<<EOF" >> $GITHUB_OUTPUT
+        echo "$MSG" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: Rename APK
+      id: rename_apk
+      run: |
+        APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
+        VERSION=$(grep 'versionName' app/build.gradle | sed 's/.*"\(.*\)".*/\1/' | tr -d '[:space:]')
+        BUILD=$(git rev-list --count HEAD)
+        NEW_APK_NAME="KiduyuTv-debug-${VERSION}-build${BUILD}.apk"
+        mv $APK_PATH app/build/outputs/apk/debug/$NEW_APK_NAME
+        echo "apk_path=app/build/outputs/apk/debug/$NEW_APK_NAME" >> $GITHUB_OUTPUT
+        echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+    - name: Upload Release Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-release
+        path: app/build/outputs/apk/debug/app-debug.apk
+
+    - name: Create GitHub Release
+      id: create_release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ steps.tag.outputs.tag }}
+        name: "KiduyuTv ${{ steps.tag.outputs.tag }}"
+        body: |
+          ## KiduyuTv — Debug Build
+          **Tag:** `${{ steps.tag.outputs.tag }}`
+          **Commit:** [`${{ steps.rename_apk.outputs.short_sha }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+          **Branch:** `${{ github.ref_name }}`
+          **Built:** ${{ github.run_id }}
+          ---
+          ${{ github.event.inputs.release_notes || steps.commit_msg.outputs.message }}
+          ---
+          ### Install
+          1. Download `KiduyuTv-debug-*.apk` below
+          2. Enable **Install unknown apps** on your Android TV / Fire TV device
+          3. Sideload via ADB:
+             ```bash
+             adb connect <device-ip>:5555
+             adb install KiduyuTv-debug-*.apk
+             ```
+        files: ${{ steps.rename_apk.outputs.apk_path }}
+        draft: false
+        prerelease: true
+        make_latest: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── Cleanup: delete all failed workflow runs ─────────────────────────────
+  cleanup_failed_runs:
+    name: Delete Failed Workflow Runs
+    runs-on: ubuntu-latest
+    # Always runs after build, regardless of whether build passed or failed.
+    # This ensures even the run that just failed gets cleaned up on next push.
+    needs: build_and_release
+    if: always()
+    steps:
+      - name: Check for failed runs
+        id: check
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo  = context.repo.repo;
+            // Collect all failed runs across all pages
+            let failedRuns = [];
+            let page = 1;
+            while (true) {
+              const { data } = await github.rest.actions.listWorkflowRunsForRepo({
+                owner,
+                repo,
+                status: 'failure',
+                per_page: 100,
+                page,
+              });
+              if (data.workflow_runs.length === 0) break;
+              failedRuns = failedRuns.concat(data.workflow_runs);
+              page++;
+            }
+            console.log(`Found ${failedRuns.length} failed run(s).`);
+            core.setOutput('count', failedRuns.length);
+            // Store IDs as JSON for the next step
+            core.setOutput('run_ids', JSON.stringify(failedRuns.map(r => r.id)));
+      - name: Delete failed runs
+        if: steps.check.outputs.count > 0
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner   = context.repo.owner;
+            const repo    = context.repo.repo;
+            const runIds  = JSON.parse('${{ steps.check.outputs.run_ids }}');
+            const current = context.runId;   // never delete the currently running job
+            let deleted = 0;
+            let skipped = 0;
+            for (const id of runIds) {
+              if (id === current) {
+                console.log(`Skipping current run #${id}`);
+                skipped++;
+                continue;
+              }
+              try {
+                await github.rest.actions.deleteWorkflowRun({ owner, repo, run_id: id });
+                console.log(`✅ Deleted failed run #${id}`);
+                deleted++;
+              } catch (err) {
+                console.warn(`⚠️  Could not delete run #${id}: ${err.message}`);
+              }
+            }
+            console.log(`\nSummary: ${deleted} deleted, ${skipped} skipped (current run).`);
