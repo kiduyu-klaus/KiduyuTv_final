@@ -184,8 +184,11 @@ fun NavGraph(navController: NavHostController) {
                 navArgument("season") { type = NavType.IntType; defaultValue = 0 },
                 navArgument("episode") { type = NavType.IntType; defaultValue = 0 },
                 navArgument("title") { type = NavType.StringType; defaultValue = "" },
+                navArgument("overview") { type = NavType.StringType; defaultValue = "" },
                 navArgument("posterPath") { type = NavType.StringType; defaultValue = "" },
-                navArgument("backdropPath") { type = NavType.StringType; defaultValue = "" }
+                navArgument("backdropPath") { type = NavType.StringType; defaultValue = "" },
+                navArgument("voteAverage") { type = NavType.FloatType; defaultValue = 0f },
+                navArgument("releaseDate") { type = NavType.StringType; defaultValue = "" }
             )
         ) { backStackEntry ->
             val tmdbId = backStackEntry.arguments?.getInt("tmdbId") ?: 0
@@ -193,15 +196,21 @@ fun NavGraph(navController: NavHostController) {
             val season = backStackEntry.arguments?.getInt("season")
             val episode = backStackEntry.arguments?.getInt("episode")
             val title = backStackEntry.arguments?.getString("title") ?: ""
+            val overview = backStackEntry.arguments?.getString("overview") ?: ""
             val posterPath = backStackEntry.arguments?.getString("posterPath")
             val backdropPath = backStackEntry.arguments?.getString("backdropPath")
+            val voteAverage = backStackEntry.arguments?.getFloat("voteAverage")?.toDouble() ?: 0.0
+            val releaseDate = backStackEntry.arguments?.getString("releaseDate")
 
             StreamLinksScreen(
                 tmdbId = tmdbId,
                 isTv = isTv,
                 title = title,
+                overview = overview,
                 posterPath = posterPath,
                 backdropPath = backdropPath,
+                voteAverage = voteAverage,
+                releaseDate = releaseDate,
                 season = if (season == 0) null else season,
                 episode = if (episode == 0) null else episode,
                 onBackClick = { navController.popBackStack() }

@@ -18,6 +18,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kiduyuk.klausk.kiduyutv.data.model.Movie
+import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
 import com.kiduyuk.klausk.kiduyutv.ui.components.*
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
@@ -52,7 +53,23 @@ fun MoviesScreen(
     }
 
     val selectedMovie by remember(uiState.selectedItem) {
-        derivedStateOf { uiState.selectedItem as? Movie }
+        derivedStateOf {
+            when (val item = uiState.selectedItem) {
+                is Movie -> item
+                is WatchHistoryItem -> if (!item.isTv) Movie(
+                    id = item.id,
+                    title = item.title,
+                    overview = item.overview ?: "",
+                    posterPath = item.posterPath,
+                    backdropPath = item.backdropPath,
+                    voteAverage = item.voteAverage,
+                    releaseDate = item.releaseDate ?: "",
+                    genreIds = emptyList(),
+                    popularity = 0.0
+                ) else null
+                else -> null
+            }
+        }
     }
 
     LaunchedEffect(uiState.isLoading) {
@@ -91,12 +108,6 @@ fun MoviesScreen(
                         .weight(1f)
                         .verticalScroll(scrollState)
                 ) {
-                    Text(
-                        text = "Movies",
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = TextPrimary,
-                        modifier = Modifier.padding(horizontal = 48.dp, vertical = 16.dp)
-                    )
 
                     // Content Row for Trending Movies.
                     ContentRow(
@@ -111,6 +122,35 @@ fun MoviesScreen(
                             isSelected = isSelected,
                             onClick = onClick
                         )
+                    }
+
+                    // Content Row for Continue Watching Movies.
+                    if (uiState.continueWatching.isNotEmpty()) {
+                        val movieHistory = uiState.continueWatching.filter { !it.isTv }
+                        if (movieHistory.isNotEmpty()) {
+                            ContentRow(
+                                title = "Continue Watching",
+                                items = movieHistory,
+                                onItemFocus = { historyItem -> viewModel.onItemSelected(historyItem) },
+                                onItemClick = { historyItem -> onMovieClick(historyItem.id) }
+                            ) { historyItem, isSelected, onClick ->
+                                MovieCard(
+                                    movie = Movie(
+                                        id = historyItem.id,
+                                        title = historyItem.title,
+                                        overview = historyItem.overview ?: "",
+                                        posterPath = historyItem.posterPath,
+                                        backdropPath = historyItem.backdropPath,
+                                        voteAverage = historyItem.voteAverage,
+                                        releaseDate = historyItem.releaseDate ?: "",
+                                        genreIds = emptyList(),
+                                        popularity = 0.0
+                                    ),
+                                    isSelected = isSelected,
+                                    onClick = onClick
+                                )
+                            }
+                        }
                     }
 
                     // Content Row for Top Rated Movies
