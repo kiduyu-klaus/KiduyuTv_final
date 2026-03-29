@@ -25,10 +25,9 @@
         tools:targetApi="28">
         <activity
             android:name=".ui.player.webview.PlayerActivity"
-            android:configChanges="orientation|screenSize|keyboardHidden"
-            android:exported="false"
+            android:theme="@style/Theme.KiduyuTv.Player"
             android:screenOrientation="landscape"
-            android:theme="@style/Theme.KiduyuTv" />
+            android:configChanges="orientation|screenSize|keyboardHidden" />
         <activity
             android:name=".SplashActivity"
             android:exported="true"
