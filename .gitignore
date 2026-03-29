@@ -32,3 +32,5 @@ google-services.json
 # Android Profiling
 *.hprof
 .kotlin/
+app/release/baselineProfiles/0/app-release.dm
+*.dm
