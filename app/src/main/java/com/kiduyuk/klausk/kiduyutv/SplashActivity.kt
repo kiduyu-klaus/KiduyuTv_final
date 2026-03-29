@@ -82,7 +82,7 @@ fun SplashScreen(onTimeout: () -> Unit) {
                 Text(
                     text = stringResource(id = R.string.app_name).uppercase(),
                     color = Color(0xFFE65100), // Orange
-                    fontSize = 28.sp,
+                    fontSize = 25.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
             }

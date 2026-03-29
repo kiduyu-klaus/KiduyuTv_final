@@ -69,7 +69,7 @@ fun TvShowsScreen(
             .background(BackgroundDark) // Set background color.
     ) {
         // Display a loading indicator if data is being fetched.
-        if (uiState.isLoading) {
+        if (uiState.isLoading && uiState.trendingTvShows.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -125,6 +125,22 @@ fun TvShowsScreen(
                             isSelected = isSelected,
                             onClick = onClick
                         )
+                    }
+
+                    // Content Row for Best Sitcoms Ever
+                    if (uiState.bestSitcoms.isNotEmpty()) {
+                        ContentRow(
+                            title = "Best Sitcoms Ever",
+                            items = uiState.bestSitcoms,
+                            onItemFocus = { tvShow -> viewModel.onItemSelected(tvShow) },
+                            onItemClick = { tvShow -> onTvShowClick(tvShow.id) }
+                        ) { tvShow, isFocused, onClick ->
+                            TvShowCard(
+                                tvShow = tvShow,
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
+                        }
                     }
 
                     // Content Row for Continue Watching TV Shows, only shown if not empty.

@@ -69,7 +69,7 @@ fun MoviesScreen(
             .background(BackgroundDark) // Set background color.
     ) {
         // Display a loading indicator if data is being fetched.
-        if (uiState.isLoading) {
+        if (uiState.isLoading && uiState.trendingMovies.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -113,48 +113,133 @@ fun MoviesScreen(
                         )
                     }
 
-                    // Content Row for Popular Movies (using latestMovies from UI state).
-//                    ContentRow(
-//                        title = "Popular Movies",
-//                        items = uiState.latestMovies,
-//                        onItemFocus = { movie -> viewModel.onItemSelected(movie) },
-//                        onItemClick = { movie -> onMovieClick(movie.id) } // Handle movie click.
-//                    ) { movie, isSelected, onClick ->
-//                        MovieCard(
-//                            movie = movie,
-//                            isSelected = isSelected,
-//                            onClick = onClick
-//                        )
-//                    }
+                    // Content Row for Top Rated Movies
+                    if (uiState.latestMovies.isNotEmpty()) {
+                        ContentRow(
+                            title = "Top Rated Movies",
+                            items = uiState.latestMovies,
+                            onItemFocus = { movie -> viewModel.onItemSelected(movie) },
+                            onItemClick = { movie -> onMovieClick(movie.id) }
+                        ) { movie, isFocused, onClick ->
+                            MovieCard(
+                                movie = movie,
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
+                        }
+                    }
 
-                    // Content Row for Continue Watching Movies, only shown if not empty.
-//                    if (uiState.continueWatching.isNotEmpty()) {
-//                        val movieHistory = uiState.continueWatching.filter { !it.isTv }
-//                        if (movieHistory.isNotEmpty()) {
-//                            ContentRow(
-//                                title = "Continue Watching",
-//                                items = movieHistory,
-//                                onItemFocus = { historyItem -> viewModel.onItemSelected(historyItem) },
-//                                onItemClick = { historyItem -> onMovieClick(historyItem.id) }
-//                            ) { historyItem, isSelected, onClick ->
-//                                MovieCard(
-//                                    movie = Movie(
-//                                        id = historyItem.id,
-//                                        title = historyItem.title,
-//                                        overview = "",
-//                                        posterPath = historyItem.posterPath,
-//                                        backdropPath = historyItem.backdropPath,
-//                                        voteAverage = 0.0,
-//                                        releaseDate = "",
-//                                        genreIds = emptyList(),
-//                                        popularity = 0.0
-//                                    ),
-//                                    isSelected = isSelected,
-//                                    onClick = onClick
-//                                )
-//                            }
-//                        }
-//                    }
+                    // Content Row for 2026 Oscar winners
+                    if (uiState.oscarWinners2026.isNotEmpty()) {
+                        ContentRow(
+                            title = "2026 Oscar winners",
+                            items = uiState.oscarWinners2026,
+                            onItemFocus = { movie -> viewModel.onItemSelected(movie) },
+                            onItemClick = { movie -> onMovieClick(movie.id) }
+                        ) { movie, isFocused, onClick ->
+                            MovieCard(
+                                movie = movie,
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
+                        }
+                    }
+
+                    // Content Row for Hallmark Movies
+                    if (uiState.hallmarkMovies.isNotEmpty()) {
+                        ContentRow(
+                            title = "Hallmark Movies",
+                            items = uiState.hallmarkMovies,
+                            onItemFocus = { movie -> viewModel.onItemSelected(movie) },
+                            onItemClick = { movie -> onMovieClick(movie.id) }
+                        ) { movie, isFocused, onClick ->
+                            MovieCard(
+                                movie = movie,
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
+                        }
+                    }
+
+                    // Content Row for Movies Based on True Stories
+                    if (uiState.trueStoryMovies.isNotEmpty()) {
+                        ContentRow(
+                            title = "Movies Based on True Stories",
+                            items = uiState.trueStoryMovies,
+                            onItemFocus = { movie -> viewModel.onItemSelected(movie) },
+                            onItemClick = { movie -> onMovieClick(movie.id) }
+                        ) { movie, isFocused, onClick ->
+                            MovieCard(
+                                movie = movie,
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
+                        }
+                    }
+
+                    // Content Row for Best movie classics
+                    if (uiState.bestClassics.isNotEmpty()) {
+                        ContentRow(
+                            title = "Best movie classics",
+                            items = uiState.bestClassics,
+                            onItemFocus = { movie -> viewModel.onItemSelected(movie) },
+                            onItemClick = { movie -> onMovieClick(movie.id) }
+                        ) { movie, isFocused, onClick ->
+                            MovieCard(
+                                movie = movie,
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
+                        }
+                    }
+
+                    // Content Row for CIA & Mossad Spies
+                    if (uiState.spyMovies.isNotEmpty()) {
+                        ContentRow(
+                            title = "CIA & Mossad Spies",
+                            items = uiState.spyMovies,
+                            onItemFocus = { movie -> viewModel.onItemSelected(movie) },
+                            onItemClick = { movie -> onMovieClick(movie.id) }
+                        ) { movie, isFocused, onClick ->
+                            MovieCard(
+                                movie = movie,
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
+                        }
+                    }
+
+                    // Content Row for Jason Statham Movies
+                    if (uiState.stathamMovies.isNotEmpty()) {
+                        ContentRow(
+                            title = "Jason Statham Movies",
+                            items = uiState.stathamMovies,
+                            onItemFocus = { movie -> viewModel.onItemSelected(movie) },
+                            onItemClick = { movie -> onMovieClick(movie.id) }
+                        ) { movie, isFocused, onClick ->
+                            MovieCard(
+                                movie = movie,
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
+                        }
+                    }
+
+                    // Content Row for Time Travel Movies
+                    if (uiState.timeTravelMovies.isNotEmpty()) {
+                        ContentRow(
+                            title = "Time Travel Movies",
+                            items = uiState.timeTravelMovies,
+                            onItemFocus = { movie -> viewModel.onItemSelected(movie) },
+                            onItemClick = { movie -> onMovieClick(movie.id) }
+                        ) { movie, isFocused, onClick ->
+                            MovieCard(
+                                movie = movie,
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(32.dp))
                 }

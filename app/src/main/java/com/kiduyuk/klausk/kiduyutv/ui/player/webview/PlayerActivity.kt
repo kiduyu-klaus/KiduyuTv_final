@@ -215,31 +215,6 @@ class PlayerActivity : ComponentActivity() {
         })
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        when (keyCode) {
-            // Media Key Handling
-            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
-                webView.evaluateJavascript("window.playerToggle();", null)
-                return true
-            }
-            KeyEvent.KEYCODE_MEDIA_PLAY -> {
-                webView.evaluateJavascript("window.playerPlay();", null)
-                return true
-            }
-            KeyEvent.KEYCODE_MEDIA_PAUSE -> {
-                webView.evaluateJavascript("window.playerPause();", null)
-                return true
-            }
-            // D-pad navigation for WebView
-            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
-            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
-            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                // Pass these keys to the WebView for spatial navigation
-                return super.onKeyDown(keyCode, event)
-            }
-        }
-        return super.onKeyDown(keyCode, event)
-    }
 
     private fun showExitConfirmationDialog() {
         AlertDialog.Builder(this)

@@ -98,8 +98,8 @@ class HomeViewModel : ViewModel() {
                     trendingTvShows = trendingTv,
                     trendingMovies = trendingMovies,
                     continueWatching = watchHistory,
-                    latestMovies = topRatedMovies.take(10),
-                    topTvShows = topRatedTv.take(10),
+                    latestMovies = topRatedMovies.take(30),
+                    topTvShows = topRatedTv.take(30),
                     selectedItem = trendingTv.firstOrNull() ?: trendingMovies.firstOrNull()
                 )
 

@@ -89,13 +89,7 @@ fun MyListScreen(
                 .fillMaxSize()
                 .padding(horizontal = horizontalPadding) // Padding for the content area.
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
-            // Screen title.
-            Text(
-                text = "My List",
-                style = MaterialTheme.typography.headlineLarge,
-                color = TextPrimary
-            )
+
 
             Spacer(modifier = Modifier.height(32.dp)) // Vertical spacing.
 
