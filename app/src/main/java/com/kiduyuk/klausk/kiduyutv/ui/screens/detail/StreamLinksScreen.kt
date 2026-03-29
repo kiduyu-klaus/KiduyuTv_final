@@ -52,8 +52,11 @@ fun StreamLinksScreen(
     tmdbId: Int,
     isTv: Boolean,
     title: String,
+    overview: String?,
     posterPath: String?,
     backdropPath: String?,
+    voteAverage: Double,
+    releaseDate: String?,
     season: Int? = null,
     episode: Int? = null,
     onBackClick: () -> Unit,
@@ -150,8 +153,11 @@ fun StreamLinksScreen(
                                     putExtra("SEASON_NUMBER", season ?: 0)
                                     putExtra("EPISODE_NUMBER", episode ?: 0)
                                     putExtra("TITLE", title)
+                                    putExtra("OVERVIEW", overview)
                                     putExtra("POSTER_PATH", posterPath)
                                     putExtra("BACKDROP_PATH", backdropPath)
+                                    putExtra("VOTE_AVERAGE", voteAverage)
+                                    putExtra("RELEASE_DATE", releaseDate)
                                     putExtra("STREAM_URL", it.urlTemplate)
                                 }
                                 context.startActivity(intent)

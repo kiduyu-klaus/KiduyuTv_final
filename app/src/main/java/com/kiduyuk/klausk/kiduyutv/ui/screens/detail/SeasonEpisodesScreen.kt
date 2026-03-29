@@ -3,23 +3,19 @@ package com.kiduyuk.klausk.kiduyutv.ui.screens.detail
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import android.content.Intent
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -28,7 +24,6 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -37,7 +32,6 @@ import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.data.model.Episode
 import com.kiduyuk.klausk.kiduyutv.data.model.Season
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
-import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
 
@@ -218,11 +212,14 @@ fun SeasonEpisodesScreen(
                                             Screen.StreamLinks.createRoute(
                                                 tmdbId = tvShowId,
                                                 isTv = true,
-                                                season = sNum,
-                                                episode = eNum,
                                                 title = tvShowName,
+                                                overview = uiState.tvShowDetail?.overview,
                                                 posterPath = episode.stillPath,
-                                                backdropPath = uiState.tvShowDetail?.backdropPath
+                                                backdropPath = uiState.tvShowDetail?.backdropPath,
+                                                voteAverage = uiState.tvShowDetail?.voteAverage,
+                                                releaseDate = uiState.tvShowDetail?.firstAirDate,
+                                                season = sNum,
+                                                episode = eNum
                                             )
                                         )
                                     }
