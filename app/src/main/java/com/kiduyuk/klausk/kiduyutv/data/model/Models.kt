@@ -406,6 +406,33 @@ data class MultiSearchItem(
  * @param oscarsWon The number of Oscars won.
  * @param genres The genre names.
  */
+/**
+ * Data class representing a company from GitHub JSON list.
+ */
+data class GitHubCompany(
+    @SerializedName("id") val id: Int,
+    @SerializedName("name") val name: String,
+    @SerializedName("logo_path") val logoPath: String?,
+    @SerializedName("origin_country") val originCountry: String?
+)
+
+/**
+ * Data class representing a network from GitHub JSON list.
+ */
+data class GitHubNetwork(
+    @SerializedName("id") val id: Int,
+    @SerializedName("name") val name: String,
+    @SerializedName("logo_path") val logoPath: String?
+)
+
+/**
+ * Data class representing the combined companies and networks response from GitHub.
+ */
+data class CompaniesNetworksResponse(
+    @SerializedName("companies") val companies: List<GitHubCompany>,
+    @SerializedName("networks") val networks: List<GitHubNetwork>
+)
+
 data class OscarMovie(
     val film: String,
     val yearFilm: Int,
