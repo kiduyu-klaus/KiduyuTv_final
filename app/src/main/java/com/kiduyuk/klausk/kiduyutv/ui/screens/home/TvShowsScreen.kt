@@ -18,6 +18,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
+import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
 import com.kiduyuk.klausk.kiduyutv.ui.components.*
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
@@ -52,7 +53,23 @@ fun TvShowsScreen(
     }
 
     val selectedTvShow by remember(uiState.selectedItem) {
-        derivedStateOf { uiState.selectedItem as? TvShow }
+        derivedStateOf {
+            when (val item = uiState.selectedItem) {
+                is TvShow -> item
+                is WatchHistoryItem -> if (item.isTv) TvShow(
+                    id = item.id,
+                    name = item.title,
+                    overview = item.overview ?: "",
+                    posterPath = item.posterPath,
+                    backdropPath = item.backdropPath,
+                    voteAverage = item.voteAverage,
+                    firstAirDate = item.releaseDate ?: "",
+                    genreIds = emptyList(),
+                    popularity = 0.0
+                ) else null
+                else -> null
+            }
+        }
     }
 
     LaunchedEffect(uiState.isLoading) {
@@ -91,14 +108,7 @@ fun TvShowsScreen(
                         .weight(1f)
                         .verticalScroll(scrollState)
                 ) {
-                    Text(
-                        text = "TV Shows",
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = TextPrimary,
-                        modifier = Modifier.padding(horizontal = 48.dp, vertical = 16.dp)
-                    )
-
-                    // Content Row for Trending TV Shows.
+                                        // Content Row for Trending TV Shows.
                     ContentRow(
                         title = "Trending TV Shows",
                         items = uiState.trendingTvShows,
@@ -112,6 +122,8 @@ fun TvShowsScreen(
                             onClick = onClick
                         )
                     }
+
+
 
                     // Content Row for Top Rated TV Shows.
                     ContentRow(
@@ -157,11 +169,11 @@ fun TvShowsScreen(
                                     tvShow = TvShow(
                                         id = historyItem.id,
                                         name = historyItem.title,
-                                        overview = "",
+                                        overview = historyItem.overview ?: "",
                                         posterPath = historyItem.posterPath,
                                         backdropPath = historyItem.backdropPath,
-                                        voteAverage = 0.0,
-                                        firstAirDate = "",
+                                        voteAverage = historyItem.voteAverage,
+                                        firstAirDate = historyItem.releaseDate ?: "",
                                         genreIds = emptyList(),
                                         popularity = 0.0
                                     ),
