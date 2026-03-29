@@ -1,17 +1,23 @@
 package com.kiduyuk.klausk.kiduyutv.data.api
 
 import android.content.Context
+import android.util.Log
 import okhttp3.Cache
 import okhttp3.CacheControl
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import okhttp3.Response
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.io.File
+import java.io.IOException
+import java.net.SocketTimeoutException
 import java.util.concurrent.TimeUnit
 
 object ApiClient {
+
+    private const val TAG = "ApiClient"
 
     // Bearer token used for Authorization header for all API requests.
     private const val BEARER_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0MTAzZmMzMDY1YzEyMmViNWRiNmJkY2ZmNzQ5ZmRlNyIsIm5iZiI6MTY2ODA2NDAzNC4yNDk5OTk4LCJzdWIiOiI2MzZjYTMyMjA0OTlmMjAwN2ZlYjA4MWEiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.tjvtYPTPfLOyMdOouQ14GGgOzmfnZRW4RgvOzfoq19w"
@@ -23,12 +29,48 @@ object ApiClient {
 
     // Interceptor that appends authentication and content-type headers to each request.
     private val authInterceptor = Interceptor { chain ->
-        val originalRequest = chain.request() // save the original outgoing request
+        val originalRequest = chain.request( ) // save the original outgoing request
         val newRequest = originalRequest.newBuilder()
             .header("Authorization", "Bearer $BEARER_TOKEN") // attach auth token
             .header("Content-Type", "application/json") // send JSON payload
             .build()
         chain.proceed(newRequest) // continue with the modified request
+    }
+
+    // Global Retry Interceptor: Retries 3 times with a 30-second delay on timeout or IO error
+    private val retryInterceptor = Interceptor { chain ->
+        var attempt = 0
+        val maxRetry = 3
+        val retryDelayMs = 30000L // 30 seconds
+        var response: Response? = null
+        var exception: Exception? = null
+
+        while (attempt <= maxRetry) {
+            try {
+                if (attempt > 0) {
+                    Log.i(TAG, "Retrying request (attempt $attempt of $maxRetry) after ${retryDelayMs / 1000}s...")
+                    Thread.sleep(retryDelayMs)
+                }
+                response = chain.proceed(chain.request())
+                if (response.isSuccessful) return@Interceptor response
+
+                // If not successful, we might want to retry on specific codes (e.g., 503, 504)
+                // For now, we follow the user's request to focus on timeouts/IOExceptions.
+            } catch (e: Exception) {
+                exception = e
+                if (e is SocketTimeoutException || e is IOException) {
+                    Log.w(TAG, "Request failed (attempt $attempt): ${e.message}")
+                } else {
+                    // For non-retryable exceptions, throw immediately
+                    throw e
+                }
+            }
+            attempt++
+        }
+
+        // If we reached here, all attempts failed
+        if (response != null) return@Interceptor response
+        throw exception ?: IOException("Request failed after $maxRetry retries")
     }
 
     // Cache control interceptor for offline support and reduced network calls
@@ -72,22 +114,23 @@ object ApiClient {
     }
 
     /**
-     * Creates OkHttpClient with caching enabled.
+     * Creates OkHttpClient with caching and retry logic enabled.
      * Should be called with application context to initialize cache directory.
      */
     fun createOkHttpClient(context: Context): OkHttpClient {
-        val cacheDir = File(context.cacheDir, "http_cache")
+        val cacheDir = File(context.cacheDir, "http_cache" )
         val cache = Cache(cacheDir, CACHE_SIZE)
 
         return OkHttpClient.Builder()
             .cache(cache)
             .addInterceptor(authInterceptor)
+            .addInterceptor(retryInterceptor) // Added global retry logic
             .addNetworkInterceptor(cacheInterceptor) // For online requests
             .addInterceptor(forceCacheInterceptor) // For offline requests
             //.addInterceptor(loggingInterceptor)
-            .connectTimeout(60, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .writeTimeout(60, TimeUnit.SECONDS)
+            .connectTimeout(30, TimeUnit.SECONDS) // Updated from 60 to 30
+            .readTimeout(30, TimeUnit.SECONDS)    // Updated from 60 to 30
+            .writeTimeout(30, TimeUnit.SECONDS)   // Updated from 60 to 30
             .build()
     }
 
@@ -107,20 +150,16 @@ object ApiClient {
         // Default client without cache (will be replaced when context is available)
         OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
+            .addInterceptor(retryInterceptor) // Added global retry logic
             //.addInterceptor(loggingInterceptor)
-            .connectTimeout(60, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .writeTimeout(60, TimeUnit.SECONDS)
+            .connectTimeout(30, TimeUnit.SECONDS) // Updated from 60 to 30
+            .readTimeout(30, TimeUnit.SECONDS)    // Updated from 60 to 30
+            .writeTimeout(30, TimeUnit.SECONDS)   // Updated from 60 to 30
             .build()
     }
 
     // Singleton access point for the API service interface.
     val tmdbApiService: TmdbApiService by lazy {
-        Retrofit.Builder()
-            .baseUrl(TmdbApiService.BASE_URL)
-            .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(TmdbApiService::class.java)
+        createRetrofit(okHttpClient).create(TmdbApiService::class.java)
     }
 }
