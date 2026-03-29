@@ -154,8 +154,11 @@ object DatabaseManager {
         id: Int,
         mediaType: String,
         title: String,
-        posterPath: String?,
-        backdropPath: String?,
+        overview: String? = null,
+        posterPath: String? = null,
+        backdropPath: String? = null,
+        voteAverage: Double = 0.0,
+        releaseDate: String? = null,
         seasonNumber: Int? = null,
         episodeNumber: Int? = null
     ) {
@@ -164,8 +167,11 @@ object DatabaseManager {
                 id = id,
                 mediaType = mediaType,
                 title = title,
+                overview = overview,
                 posterPath = posterPath,
                 backdropPath = backdropPath,
+                voteAverage = voteAverage,
+                releaseDate = releaseDate,
                 seasonNumber = seasonNumber,
                 episodeNumber = episodeNumber,
                 lastWatchedTimestamp = System.currentTimeMillis()
@@ -204,8 +210,11 @@ object DatabaseManager {
         return WatchHistoryItem(
             id = entity.id,
             title = entity.title,
+            overview = entity.overview,
             posterPath = entity.posterPath,
             backdropPath = entity.backdropPath,
+            voteAverage = entity.voteAverage,
+            releaseDate = entity.releaseDate,
             isTv = entity.mediaType == "tv",
             seasonNumber = entity.seasonNumber,
             episodeNumber = entity.episodeNumber,
