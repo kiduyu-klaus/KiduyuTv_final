@@ -129,19 +129,19 @@ class HomeViewModel : ViewModel() {
                     val timeTravelMovies = repository.getGitHubMovieList("https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/time_travel_movies.json").getOrNull() ?: emptyList()
                     _uiState.value = _uiState.value.copy(timeTravelMovies = timeTravelMovies)
 
-                    // Load networks and companies last
-                    val networkIds = listOf(213, 2739, 1024, 49, 4330, 2552, 453, 3353, 174, 88, 67, 4, 6, 2, 16, 19, 71, 26, 214)
-                    val networks = networkIds.map { id -> repository.getNetworkDetails(id).getOrNull() }
-                        .filterNotNull()
-                        .filter { it.logoPath != null }
-                        .map { NetworkItem(it.id, it.name, it.logoPath, "network") }
+                    // Load networks and companies from GitHub JSON
+                    val companiesNetworks = repository.getGitHubCompaniesNetworks("https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/companies_networks.json").getOrNull()
+
+                    val networks = companiesNetworks?.networks
+                        ?.filter { it.logoPath != null }
+                        ?.map { NetworkItem(it.id, it.name, it.logoPath, "network") }
+                        ?: emptyList()
                     _uiState.value = _uiState.value.copy(popularNetworks = networks)
 
-                    val companyIds = listOf(2, 420, 174, 33, 3, 1, 34, 5, 4, 521, 6704, 923, 25, 12, 9383)
-                    val companies = companyIds.map { id -> repository.getCompanyDetails(id).getOrNull() }
-                        .filterNotNull()
-                        .filter { it.logoPath != null }
-                        .map { NetworkItem(it.id, it.name, it.logoPath, "company") }
+                    val companies = companiesNetworks?.companies
+                        ?.filter { it.logoPath != null }
+                        ?.map { NetworkItem(it.id, it.name, it.logoPath, "company") }
+                        ?: emptyList()
                     _uiState.value = _uiState.value.copy(popularCompanies = companies)
                 }
             } catch (e: Exception) {
