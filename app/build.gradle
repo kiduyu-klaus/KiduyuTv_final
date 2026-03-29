@@ -11,13 +11,13 @@ plugins {
 
 android {
     namespace 'com.kiduyuk.klausk.kiduyutv'
-    //noinspection GradleDependency
-    compileSdk 35
+
+    compileSdk 36
 
     defaultConfig {
         applicationId "com.kiduyuk.klausk.kiduyutv"
         minSdk 24
-        targetSdk 35
+        targetSdk 36
         versionCode 1
         versionName "1.0"
 
