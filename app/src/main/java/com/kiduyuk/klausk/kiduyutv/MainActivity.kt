@@ -78,7 +78,6 @@ class MainActivity : ComponentActivity(), ImageLoaderFactory {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
         super.onCreate(savedInstanceState)
 
         // Initialize Room database manager
