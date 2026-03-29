@@ -226,14 +226,16 @@ class TmdbRepository {
     // ========== Company/Network Endpoints ==========
 
     /** Fetches movies filtered by a specific production company. */
-    suspend fun getMoviesByCompany(companyId: Int, page: Int = 1): Result<MovieResponse> = runCatching {
-        api.getMoviesByCompany(companyId, page = page)
-    }
+    suspend fun getMoviesByCompany(companyId: Int, page: Int = 1): Result<MovieResponse> =
+        runCatching {
+            api.getMoviesByCompany(companyId, page = page)
+        }
 
     /** Fetches TV shows filtered by a specific network. */
-    suspend fun getTvShowsByNetwork(networkId: Int, page: Int = 1): Result<TvShowResponse> = runCatching {
-        api.getTvShowsByNetwork(networkId, page = page)
-    }
+    suspend fun getTvShowsByNetwork(networkId: Int, page: Int = 1): Result<TvShowResponse> =
+        runCatching {
+            api.getTvShowsByNetwork(networkId, page = page)
+        }
 
     /** Fetches details for a specific network. */
     suspend fun getNetworkDetails(networkId: Int): Result<Network> = runCatching {
@@ -412,87 +414,99 @@ class TmdbRepository {
     /**
      * Fetches movies from a GitHub JSON list with caching.
      */
-    suspend fun getGitHubMovieList(urlString: String): Result<List<Movie>> = withContext(Dispatchers.IO) {
-        runCatching {
-            val url = java.net.URL(urlString)
-            val connection = url.openConnection() as java.net.HttpURLConnection
-            connection.requestMethod = "GET"
-            connection.connectTimeout = 15000
-            connection.readTimeout = 15000
+    suspend fun getGitHubMovieList(urlString: String): Result<List<Movie>> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val url = java.net.URL(urlString)
+                val connection = url.openConnection() as java.net.HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.connectTimeout = 15000
+                connection.readTimeout = 15000
 
-            val responseCode = connection.responseCode
-            if (responseCode != java.net.HttpURLConnection.HTTP_OK) {
-                throw Exception("Failed to fetch GitHub list: HTTP $responseCode")
+                val responseCode = connection.responseCode
+                if (responseCode != java.net.HttpURLConnection.HTTP_OK) {
+                    throw Exception("Failed to fetch GitHub list: HTTP $responseCode")
+                }
+
+                val reader = BufferedReader(InputStreamReader(connection.inputStream))
+                val response = reader.readText()
+                reader.close()
+
+                val type = object : TypeToken<List<Movie>>() {}.type
+                val movies: List<Movie> = gson.fromJson(response, type)
+
+                // Cache the movies
+                cacheMovies(
+                    movies,
+                    CACHE_TYPE_GITHUB_LIST,
+                    CachedMovieEntity.LONG_CACHE_DURATION_MS
+                )
+
+                movies
             }
-
-            val reader = BufferedReader(InputStreamReader(connection.inputStream))
-            val response = reader.readText()
-            reader.close()
-
-            val type = object : TypeToken<List<Movie>>() {}.type
-            val movies: List<Movie> = gson.fromJson(response, type)
-
-            // Cache the movies
-            cacheMovies(movies, CACHE_TYPE_GITHUB_LIST, CachedMovieEntity.LONG_CACHE_DURATION_MS)
-
-            movies
         }
-    }
 
     /**
      * Fetches TV shows from a GitHub JSON list with caching.
      */
-    suspend fun getGitHubTvShowList(urlString: String): Result<List<TvShow>> = withContext(Dispatchers.IO) {
-        runCatching {
-            val url = java.net.URL(urlString)
-            val connection = url.openConnection() as java.net.HttpURLConnection
-            connection.requestMethod = "GET"
-            connection.connectTimeout = 15000
-            connection.readTimeout = 15000
+    suspend fun getGitHubTvShowList(urlString: String): Result<List<TvShow>> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val url = java.net.URL(urlString)
+                val connection = url.openConnection() as java.net.HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.connectTimeout = 15000
+                connection.readTimeout = 15000
 
-            val responseCode = connection.responseCode
-            if (responseCode != java.net.HttpURLConnection.HTTP_OK) {
-                throw Exception("Failed to fetch GitHub list: HTTP $responseCode")
+                val responseCode = connection.responseCode
+                if (responseCode != java.net.HttpURLConnection.HTTP_OK) {
+                    throw Exception("Failed to fetch GitHub list: HTTP $responseCode")
+                }
+
+                val reader = BufferedReader(InputStreamReader(connection.inputStream))
+                val response = reader.readText()
+                reader.close()
+
+                val type = object : TypeToken<List<TvShow>>() {}.type
+                val tvShows: List<TvShow> = gson.fromJson(response, type)
+
+                // Cache the TV shows
+                cacheTvShows(
+                    tvShows,
+                    CACHE_TYPE_GITHUB_LIST,
+                    CachedTvShowEntity.LONG_CACHE_DURATION_MS
+                )
+
+                tvShows
             }
-
-            val reader = BufferedReader(InputStreamReader(connection.inputStream))
-            val response = reader.readText()
-            reader.close()
-
-            val type = object : TypeToken<List<TvShow>>() {}.type
-            val tvShows: List<TvShow> = gson.fromJson(response, type)
-
-            // Cache the TV shows
-            cacheTvShows(tvShows, CACHE_TYPE_GITHUB_LIST, CachedTvShowEntity.LONG_CACHE_DURATION_MS)
-
-            tvShows
         }
-    }
 
     /**
      * Fetches companies and networks from a GitHub JSON list.
      */
-    suspend fun getGitHubCompaniesNetworks(urlString: String): Result<CompaniesNetworksResponse> = withContext(Dispatchers.IO) {
-        runCatching {
-            val url = java.net.URL(urlString)
-            val connection = url.openConnection() as java.net.HttpURLConnection
-            connection.requestMethod = "GET"
-            connection.connectTimeout = 15000
-            connection.readTimeout = 15000
+    suspend fun getGitHubCompaniesNetworks(urlString: String): Result<CompaniesNetworksResponse> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val url = java.net.URL(urlString)
+                val connection = url.openConnection() as java.net.HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.connectTimeout = 15000
+                connection.readTimeout = 15000
 
-            val responseCode = connection.responseCode
-            if (responseCode != java.net.HttpURLConnection.HTTP_OK) {
-                throw Exception("Failed to fetch GitHub list: HTTP $responseCode")
+                val responseCode = connection.responseCode
+                if (responseCode != java.net.HttpURLConnection.HTTP_OK) {
+                    throw Exception("Failed to fetch GitHub list: HTTP $responseCode")
+                }
+
+                val reader = BufferedReader(InputStreamReader(connection.inputStream))
+                val response = reader.readText()
+                reader.close()
+
+                val result: CompaniesNetworksResponse =
+                    gson.fromJson(response, CompaniesNetworksResponse::class.java)
+                result
             }
-
-            val reader = BufferedReader(InputStreamReader(connection.inputStream))
-            val response = reader.readText()
-            reader.close()
-
-            val result: CompaniesNetworksResponse = gson.fromJson(response, CompaniesNetworksResponse::class.java)
-            result
         }
-    }
 
     // ========== Private Helper Methods ==========
 
@@ -527,14 +541,22 @@ class TmdbRepository {
     /**
      * Caches movies with the specified type and expiration.
      */
-    private fun cacheMovies(movies: List<Movie>, cacheType: String, expirationMs: Long = CachedMovieEntity.CACHE_DURATION_MS) {
+    private fun cacheMovies(
+        movies: List<Movie>,
+        cacheType: String,
+        expirationMs: Long = CachedMovieEntity.CACHE_DURATION_MS
+    ) {
         DatabaseManager.cacheMovies(movies, cacheType, expirationMs)
     }
 
     /**
      * Caches TV shows with the specified type and expiration.
      */
-    private fun cacheTvShows(tvShows: List<TvShow>, cacheType: String, expirationMs: Long = CachedTvShowEntity.CACHE_DURATION_MS) {
+    private fun cacheTvShows(
+        tvShows: List<TvShow>,
+        cacheType: String,
+        expirationMs: Long = CachedTvShowEntity.CACHE_DURATION_MS
+    ) {
         DatabaseManager.cacheTvShows(tvShows, cacheType, expirationMs)
     }
 
