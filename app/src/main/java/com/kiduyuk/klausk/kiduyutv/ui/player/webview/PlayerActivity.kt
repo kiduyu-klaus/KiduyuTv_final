@@ -145,7 +145,7 @@ class PlayerActivity : ComponentActivity() {
                             setMaxVolume();
 
                             setInterval(function() {
-                                removeAdsAdvanced();
+                                
                                 setMaxVolume();
                             }, 3000);
 

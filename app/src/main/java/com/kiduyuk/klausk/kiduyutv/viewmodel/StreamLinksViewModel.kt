@@ -32,7 +32,7 @@ class StreamLinksViewModel : ViewModel() {
                 ) ,
                 StreamProvider(
                     name = "Videasy",
-                    urlTemplate = if (isTv) "https://player.videasy.net/tv/${tmdbId}/${season}/${episode}?autoPlay=true" else "https://player.videasy.net/movie/${tmdbId}?autoPlay=true",
+                    urlTemplate = if (isTv) "https://player.videasy.net/tv/${tmdbId}/${season}/${episode}" else "https://player.videasy.net/movie/${tmdbId}",
                     type = if (isTv) "tv" else "movie"
                 ),
                 StreamProvider(
