@@ -12,10 +12,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,8 +28,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
+import com.kiduyuk.klausk.kiduyutv.viewmodel.SettingsViewModel
 
 /**
  * Settings screen composable that displays app settings, information, and version details.
@@ -37,10 +41,12 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.*
  */
 @Composable
 fun SettingsScreen(
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    viewModel: SettingsViewModel = viewModel()
 ) {
-    var selectedSection by remember { mutableStateOf(SettingsSection.APP_INFORMATION) }
+    var selectedSection by remember { mutableStateOf(SettingsSection.APP_SETTINGS) }
     val context = LocalContext.current
+    val uiState by viewModel.uiState.collectAsState()
 
     Row(
         modifier = Modifier
@@ -68,7 +74,11 @@ fun SettingsScreen(
         ) {
             when (selectedSection) {
                 SettingsSection.APP_SETTINGS -> {
-                    AppSettingsContent()
+                    AppSettingsContent(
+                        isClearingCache = uiState.isClearingCache,
+                        cacheClearSuccess = uiState.cacheClearSuccess,
+                        onClearCacheClick = { viewModel.clearCache(context) }
+                    )
                 }
                 SettingsSection.APP_INFORMATION -> {
                     AppInformationContent(
@@ -221,7 +231,14 @@ private fun SettingsNavItem(
  * Content for App Settings section.
  */
 @Composable
-private fun AppSettingsContent() {
+private fun AppSettingsContent(
+    isClearingCache: Boolean,
+    cacheClearSuccess: Boolean,
+    onClearCacheClick: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Top
@@ -234,11 +251,100 @@ private fun AppSettingsContent() {
             modifier = Modifier.padding(bottom = 24.dp)
         )
 
+        // Cache Management Section
         Text(
-            text = "App settings configuration options would go here.",
-            color = TextSecondary,
-            fontSize = 16.sp
+            text = "Storage & Cache",
+            color = TextPrimary,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(bottom = 12.dp)
         )
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(CardDark)
+                .padding(24.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(
+                    text = "Clear temporary files and database cache to free up space. Your My List and Watch History will not be affected.",
+                    color = TextSecondary,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Clear Cache Button
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                when {
+                                    isClearingCache -> PrimaryRed.copy(alpha = 0.5f)
+                                    isFocused -> PrimaryRed.copy(alpha = 0.8f)
+                                    else -> PrimaryRed
+                                }
+                            )
+                            .border(
+                                width = if (isFocused) 2.dp else 0.dp,
+                                color = if (isFocused) Color.White.copy(alpha = 0.5f) else Color.Transparent,
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .clickable(
+                                interactionSource = interactionSource,
+                                indication = null,
+                                enabled = !isClearingCache,
+                                onClick = onClearCacheClick
+                            )
+                            .focusable(interactionSource = interactionSource)
+                            .padding(horizontal = 24.dp, vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (isClearingCache) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            Text(
+                                text = if (isClearingCache) "Clearing..." else "Clear Cache",
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+
+                    // Success Feedback
+                    if (cacheClearSuccess) {
+                        Text(
+                            text = "Cache cleared successfully!",
+                            color = Color.Green,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
