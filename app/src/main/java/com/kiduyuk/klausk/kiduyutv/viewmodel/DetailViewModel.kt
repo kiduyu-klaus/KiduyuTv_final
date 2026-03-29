@@ -246,14 +246,14 @@ class DetailViewModel : ViewModel() {
             val item = if (currentState.movieDetail != null) {
                 MyListItem(
                     id = currentState.movieDetail.id,
-                    title = currentState.movieDetail.title,
+                    title = currentState.movieDetail.title ?: "",
                     posterPath = currentState.movieDetail.posterPath,
                     type = "movie"
                 )
             } else if (currentState.tvShowDetail != null) {
                 MyListItem(
                     id = currentState.tvShowDetail.id,
-                    title = currentState.tvShowDetail.name,
+                    title = currentState.tvShowDetail.name ?: "",
                     posterPath = currentState.tvShowDetail.posterPath,
                     type = "tv"
                 )

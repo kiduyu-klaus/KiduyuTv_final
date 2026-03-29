@@ -166,7 +166,7 @@ fun TvShowDetailScreen(
                     ) {
                         // Title
                         Text(
-                            text = tvShow.name,
+                            text = tvShow.name ?: "",
                             style = MaterialTheme.typography.titleLarge,
                             color = TextPrimary,
                             maxLines = 1,
@@ -267,7 +267,7 @@ fun TvShowDetailScreen(
 
                         // Overview — 2 lines max
                         Text(
-                            text = tvShow.overview,
+                            text = tvShow.overview ?: "",
                             color = TextSecondary,
                             maxLines = 2,
                             fontSize = 12.sp
@@ -289,7 +289,7 @@ fun TvShowDetailScreen(
                                             isTv = true,
                                             season = uiState.watchHistoryItem?.seasonNumber ?: 1,
                                             episode = uiState.watchHistoryItem?.episodeNumber ?: 1,
-                                            title = tvShow.name,
+                                            title = tvShow.name ?: "",
                                             posterPath = tvShow.posterPath,
                                             backdropPath = tvShow.backdropPath
                                         )
@@ -333,7 +333,7 @@ fun TvShowDetailScreen(
 
                             // Episodes
                             OutlinedButton(
-                                onClick = { onEpisodesClick(tvShow.id, tvShow.name, tvShow.numberOfSeasons ?: 1) },
+                                onClick = { onEpisodesClick(tvShow.id, tvShow.name ?: tvShow.name ?: "", tvShow.numberOfSeasons ?: 1) },
                                 interactionSource = episodesInteraction,
                                 shape = RoundedCornerShape(4.dp),
                                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),

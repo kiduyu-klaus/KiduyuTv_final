@@ -25,6 +25,7 @@ import coil.request.CachePolicy
 import coil.util.DebugLogger
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.NavGraph
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
+import com.kiduyuk.klausk.kiduyutv.data.local.database.DatabaseManager
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
@@ -79,7 +80,16 @@ class MainActivity : ComponentActivity(), ImageLoaderFactory {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
+
+        // Initialize Room database manager
+        DatabaseManager.init(this)
+
+        // Initialize MyListManager (now uses Room internally)
         MyListManager.init(this)
+
+        // Schedule periodic cache cleanup (optional, can be removed if not needed)
+        scheduleCacheCleanup()
+
         checkAndRequestStoragePermissions()
         setContent {
             KiduyuTvTheme {
@@ -188,5 +198,25 @@ class MainActivity : ComponentActivity(), ImageLoaderFactory {
             }
             .setCancelable(false)
             .show()
+    }
+
+    /**
+     * Schedules periodic cleanup of expired cache entries.
+     * This helps maintain database size and performance.
+     * Cache cleanup runs on app startup.
+     */
+    private fun scheduleCacheCleanup() {
+        // Clean up expired cache on app start
+        DatabaseManager.cleanExpiredCache()
+
+        // You can also schedule periodic cleanup using WorkManager if needed:
+        // val cleanupRequest = PeriodicWorkRequestBuilder<CacheCleanupWorker>(
+        //     6, TimeUnit.HOURS
+        // ).build()
+        // WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+        //     "cache_cleanup",
+        //     ExistingPeriodicWorkPolicy.KEEP,
+        //     cleanupRequest
+        // )
     }
 }

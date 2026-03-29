@@ -157,7 +157,7 @@ fun MovieDetailScreen(
                     ) {
                         // Title
                         Text(
-                            text = movie.title,
+                            text = movie.title ?: "",
                             style = MaterialTheme.typography.titleLarge,
                             color = TextPrimary,
                             maxLines = 1,
@@ -250,7 +250,7 @@ fun MovieDetailScreen(
 
                         // Overview — 2 lines max
                         Text(
-                            text = movie.overview,
+                            text = movie.overview ?: "",
                             color = TextSecondary,
                             maxLines = 2,
                             fontSize = 12.sp
@@ -270,7 +270,7 @@ fun MovieDetailScreen(
                                         Screen.StreamLinks.createRoute(
                                             tmdbId = movie.id,
                                             isTv = false,
-                                            title = movie.title,
+                                            title = movie.title ?: "",
                                             posterPath = movie.posterPath,
                                             backdropPath = movie.backdropPath
                                         )
