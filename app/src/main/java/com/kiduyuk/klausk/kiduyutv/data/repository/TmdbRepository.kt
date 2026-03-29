@@ -111,7 +111,7 @@ class TmdbRepository {
     /** Fetches top-rated movies with caching. */
     suspend fun getTopRatedMovies(): Result<List<Movie>> = runCatching {
         val cached = tryGetCachedMovies(CACHE_TYPE_TOP_RATED)
-        if (cached.isNotEmpty()) {
+        if (cached.isNotEmpty() && cached.size > 20) {
             Log.d(TAG, "Returning cached top rated movies")
             return@runCatching cached
         }
