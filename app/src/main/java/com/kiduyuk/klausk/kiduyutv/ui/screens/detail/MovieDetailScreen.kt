@@ -34,7 +34,6 @@ import com.kiduyuk.klausk.kiduyutv.ui.components.ContentRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.MovieCard
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
-import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
 
@@ -271,8 +270,11 @@ fun MovieDetailScreen(
                                             tmdbId = movie.id,
                                             isTv = false,
                                             title = movie.title ?: "",
+                                            overview = movie.overview,
                                             posterPath = movie.posterPath,
-                                            backdropPath = movie.backdropPath
+                                            backdropPath = movie.backdropPath,
+                                            voteAverage = movie.voteAverage,
+                                            releaseDate = movie.releaseDate
                                         )
                                     )
                                 },

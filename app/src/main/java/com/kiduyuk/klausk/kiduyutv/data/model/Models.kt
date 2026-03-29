@@ -272,8 +272,11 @@ data class SeasonDetail(
 data class WatchHistoryItem(
     val id: Int,
     val title: String,
+    val overview: String? = null,
     val posterPath: String?,
     val backdropPath: String?,
+    val voteAverage: Double = 0.0,
+    val releaseDate: String? = null,
     val isTv: Boolean,
     val seasonNumber: Int? = null,
     val episodeNumber: Int? = null,
