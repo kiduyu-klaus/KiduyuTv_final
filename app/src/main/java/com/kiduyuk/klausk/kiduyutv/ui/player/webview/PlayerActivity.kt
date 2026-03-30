@@ -325,7 +325,13 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         cursorHideHandler.removeCallbacks(cursorHideRunnable)
-        webView.destroy()
+        webView?.apply {
+            stopLoading()
+            clearHistory()
+            removeAllViews()
+            destroy()
+        }
+        //webView = null
         super.onDestroy()
     }
 }
