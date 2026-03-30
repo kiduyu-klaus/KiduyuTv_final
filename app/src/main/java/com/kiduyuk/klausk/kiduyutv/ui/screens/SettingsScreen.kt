@@ -17,7 +17,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -48,6 +47,11 @@ fun SettingsScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
 
+    // Load cache size when the screen is first shown
+    LaunchedEffect(Unit) {
+        viewModel.loadCacheSize(context)
+    }
+
     Row(
         modifier = Modifier
             .fillMaxSize()
@@ -77,6 +81,7 @@ fun SettingsScreen(
                     AppSettingsContent(
                         isClearingCache = uiState.isClearingCache,
                         cacheClearSuccess = uiState.cacheClearSuccess,
+                        cacheSize = uiState.cacheSize,
                         onClearCacheClick = { viewModel.clearCache(context) }
                     )
                 }
@@ -234,6 +239,7 @@ private fun SettingsNavItem(
 private fun AppSettingsContent(
     isClearingCache: Boolean,
     cacheClearSuccess: Boolean,
+    cacheSize: String,
     onClearCacheClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -325,7 +331,7 @@ private fun AppSettingsContent(
                                 )
                             }
                             Text(
-                                text = if (isClearingCache) "Clearing..." else "Clear Cache",
+                                text = if (isClearingCache) "Clearing..." else "Clear Cache ($cacheSize)",
                                 color = Color.White,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.SemiBold
