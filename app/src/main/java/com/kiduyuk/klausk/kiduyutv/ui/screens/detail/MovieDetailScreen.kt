@@ -274,7 +274,8 @@ fun MovieDetailScreen(
                                             posterPath = movie.posterPath,
                                             backdropPath = movie.backdropPath,
                                             voteAverage = movie.voteAverage,
-                                            releaseDate = movie.releaseDate
+                                            releaseDate = movie.releaseDate,
+                                            timestamp = uiState.watchHistoryItem?.playbackPosition ?: 0L
                                         )
                                     )
                                 },
