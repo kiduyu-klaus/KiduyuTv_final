@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -108,10 +109,35 @@ class SettingsViewModel : ViewModel() {
             false
         }
     }
+    fun clearMyList() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isClearingMyList = true, myListClearSuccess = false) }
+            DatabaseManager.clearMyList()
+            delay(600)
+            _uiState.update { it.copy(isClearingMyList = false, myListClearSuccess = true) }
+            delay(3000)
+            _uiState.update { it.copy(myListClearSuccess = false) }
+        }
+    }
+
+    fun clearWatchHistory() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isClearingWatchHistory = true, watchHistoryClearSuccess = false) }
+            DatabaseManager.clearWatchHistory()
+            delay(600)
+            _uiState.update { it.copy(isClearingWatchHistory = false, watchHistoryClearSuccess = true) }
+            delay(3000)
+            _uiState.update { it.copy(watchHistoryClearSuccess = false) }
+        }
+    }
 }
 
 data class SettingsUiState(
     val isClearingCache: Boolean = false,
     val cacheClearSuccess: Boolean = false,
-    val cacheSize: String = "Calculating..."
+    val cacheSize: String = "Calculating...",
+    val isClearingMyList: Boolean = false,
+    val myListClearSuccess: Boolean = false,
+    val isClearingWatchHistory: Boolean = false,
+    val watchHistoryClearSuccess: Boolean = false
 )
