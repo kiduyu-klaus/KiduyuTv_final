@@ -33,29 +33,55 @@ class PlayerActivity : AppCompatActivity() {
         private const val TAG = "VideasyPlayer"
     }
 
-    // JavaScript interface class to receive messages from WebView
+    // JavaScript interface class to receive messages from WebView (supports Videasy, VidKing, and VidLink)
     @Suppress("UNUSED")
     inner class VideasyJavaScriptInterface {
         @JavascriptInterface
         fun postMessage(message: String) {
-            Log.d(TAG, "PostMessage received: $message")
+            Log.i(TAG, "PostMessage received: $message")
             try {
-                // Parse the JSON message from Videasy player
+                // Parse the JSON message from player
                 val json = org.json.JSONObject(message)
 
-                // Extract fields with various possible names
-                val id = json.optString("id", json.optString("contentId", json.optString("movieId", json.optString("tvId", "unknown"))))
-                val type = json.optString("type", json.optString("contentType", json.optString("playerType", "unknown")))
-                val progress = json.optDouble("progress", json.optDouble("percent", 0.0))
-                val timestamp = json.optDouble("timestamp", json.optDouble("currentTime", json.optDouble("time", 0.0)))
-                val duration = json.optDouble("duration", json.optDouble("totalDuration", json.optDouble("totalTime", 0.0)))
-                val season = json.optInt("season", json.optInt("seasonNumber", 0))
-                val episode = json.optInt("episode", json.optInt("episodeNumber", 0))
+                // Check if this is VidKing/VidLink format (nested structure with PLAYER_EVENT type)
+                if (json.has("type") && json.getString("type") == "PLAYER_EVENT" && json.has("data")) {
+                    val data = json.getJSONObject("data")
+                    // Check for mtmdbId (VidLink) or id (VidKing)
+                    val id = if (data.has("mtmdbId")) {
+                        data.get("mtmdbId").toString()
+                    } else {
+                        data.optString("id", "unknown")
+                    }
+                    val mediaType = data.optString("mediaType", "unknown")
+                    val progress = data.optDouble("progress", 0.0)
+                    val currentTime = data.optDouble("currentTime", 0.0)
+                    val duration = data.optDouble("duration", 0.0)
+                    val season = data.optInt("season", 0)
+                    val episode = data.optInt("episode", 0)
+                    val event = data.optString("event", "unknown")
 
-                Log.d(TAG, String.format(
-                    "Progress update: id=%s, type=%s, progress=%.1f%%, timestamp=%.1fs, duration=%.1fs, season=%d, episode=%d",
-                    id, type, progress, timestamp, duration, season, episode
-                ))
+                    // Determine which player sent this (based on field names)
+                    val playerType = if (data.has("mtmdbId")) "VidLink" else "VidKing"
+
+                    Log.i(TAG, String.format(
+                        "[%s] Progress update: id=%s, type=%s, event=%s, progress=%.1f%%, timestamp=%.1fs, duration=%.1fs, season=%d, episode=%d",
+                        playerType, id, mediaType, event, progress, currentTime, duration, season, episode
+                    ))
+                } else {
+                    // Videasy format (direct fields)
+                    val id = json.optString("id", json.optString("contentId", json.optString("movieId", json.optString("tvId", "unknown"))))
+                    val type = json.optString("type", json.optString("contentType", json.optString("playerType", "unknown")))
+                    val progress = json.optDouble("progress", json.optDouble("percent", 0.0))
+                    val timestamp = json.optDouble("timestamp", json.optDouble("currentTime", json.optDouble("time", 0.0)))
+                    val duration = json.optDouble("duration", json.optDouble("totalDuration", json.optDouble("totalTime", 0.0)))
+                    val season = json.optInt("season", json.optInt("seasonNumber", 0))
+                    val episode = json.optInt("episode", json.optInt("episodeNumber", 0))
+
+                    Log.i(TAG, String.format(
+                        "[Videasy] Progress update: id=%s, type=%s, progress=%.1f%%, timestamp=%.1fs, duration=%.1fs, season=%d, episode=%d",
+                        id, type, progress, timestamp, duration, season, episode
+                    ))
+                }
 
                 // You can save progress to local storage or backend here
                 runOnUiThread {
@@ -113,8 +139,11 @@ class PlayerActivity : AppCompatActivity() {
             "https://vidlink.pro/movie/$tmdbId?autoplay=true"
         }
 
-        // Check if this is a Videasy player URL
+        // Check if this is a player URL that supports progress tracking (Videasy, VidKing, or VidLink)
         val isVideasyPlayer = url.startsWith("https://player.videasy.net")
+        val isVidKingPlayer = url.startsWith("https://www.vidking.net") || url.startsWith("https://vidking.")
+        val isVidLinkPlayer = url.startsWith("https://vidlink.pro")
+        val isTrackingEnabled = isVideasyPlayer || isVidKingPlayer || isVidLinkPlayer
 
         // Setup Layout
         val rootLayout = FrameLayout(this).apply {
@@ -138,8 +167,8 @@ class PlayerActivity : AppCompatActivity() {
                 setSupportMultipleWindows(false)
             }
 
-            // Add JavaScript interface for receiving postMessage from Videasy player (only for Videasy URLs)
-            if (isVideasyPlayer) {
+            // Add JavaScript interface for receiving postMessage from players that support progress tracking
+            if (isTrackingEnabled) {
                 addJavascriptInterface(VideasyJavaScriptInterface(), "VideasyInterface")
             }
 
@@ -203,11 +232,11 @@ class PlayerActivity : AppCompatActivity() {
                                 }
                             }
                             
-                            ${if (isVideasyPlayer) """
-                            // Listen for postMessage from Videasy player iframe
+                            ${if (isTrackingEnabled) """
+                            // Listen for postMessage from player (Videasy/VidKing/VidLink)
                             function setupMessageListener() {
                                 // Also add console logging for debugging
-                                console.log('Videasy message listener initialized');
+                                console.log('Player message listener initialized');
                                 
                                 window.addEventListener('message', function(event) {
                                     console.log('Message event received:', typeof event.data === 'string' ? event.data : JSON.stringify(event.data));
@@ -254,10 +283,18 @@ class PlayerActivity : AppCompatActivity() {
                                                 console.log('Video timeupdate:', video.currentTime, '/', video.duration);
                                                 if (window.VideasyInterface) {
                                                     var data = {
-                                                        type: 'VIDEO_TIME_UPDATE',
-                                                        timestamp: video.currentTime,
-                                                        duration: video.duration,
-                                                        progress: (video.duration > 0) ? (video.currentTime / video.duration * 100) : 0
+                                                        type: 'PLAYER_EVENT',
+                                                        data: {
+                                                            event: 'timeupdate',
+                                                            currentTime: video.currentTime,
+                                                            duration: video.duration,
+                                                            progress: (video.duration > 0) ? (video.currentTime / video.duration * 100) : 0,
+                                                            id: '',
+                                                            mediaType: 'unknown',
+                                                            season: 0,
+                                                            episode: 0,
+                                                            timestamp: Date.now()
+                                                        }
                                                     };
                                                     window.VideasyInterface.postMessage(JSON.stringify(data));
                                                 }
@@ -274,9 +311,9 @@ class PlayerActivity : AppCompatActivity() {
                                 setInterval(monitorVideoEvents, 3000);
                             }
                             """ else """
-                            // No message listener needed for non-Videasy players
+                            // No message listener needed for non-tracking players
                             function setupMessageListener() {
-                                console.log('Non-Videasy player, skipping message listener');
+                                console.log('Non-tracking player, skipping message listener');
                             }
                             """}
                             
