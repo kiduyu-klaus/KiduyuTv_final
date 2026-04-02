@@ -1,7 +1,6 @@
 package com.kiduyuk.klausk.kiduyutv.ui.screens.settings
 
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -37,6 +37,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.viewmodel.SettingsViewModel
+import androidx.compose.foundation.Image
+import com.kiduyuk.klausk.kiduyutv.R
+import androidx.core.net.toUri
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Root Screen
@@ -113,7 +116,7 @@ fun SettingsScreen(
                                 "Enjoy seamless navigation, high-quality streaming, and a vast library of entertainment.",
                         websiteUrl = "https://kiduyutv.app",
                         onWebsiteClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://kiduyutv.app"))
+                            val intent = Intent(Intent.ACTION_VIEW, "https://kiduyutv.app".toUri())
                             context.startActivity(intent)
                         }
                     )
@@ -375,20 +378,14 @@ private fun AppInformationContent(
         )
 
         // App icon placeholder
-        Box(
+        // After — replace with this
+        Image(
+            painter = painterResource(id = R.mipmap.ic_launcher11),
+            contentDescription = "$appName icon",
             modifier = Modifier
                 .size(120.dp)
                 .clip(RoundedCornerShape(24.dp))
-                .background(DarkRed),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = appName.first().toString(),
-                color = TextPrimary,
-                fontSize = 48.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
+        )
 
         Spacer(modifier = Modifier.height(24.dp))
 
