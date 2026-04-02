@@ -33,3 +33,4 @@ google-services.json
 .kotlin/
 app/release/baselineProfiles/0/app-release.dm
 *.dm
+/instructions.txt
