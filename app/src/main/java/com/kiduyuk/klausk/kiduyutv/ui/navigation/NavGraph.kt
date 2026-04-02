@@ -7,13 +7,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.kiduyuk.klausk.kiduyutv.ui.screens.MediaListScreen
-import com.kiduyuk.klausk.kiduyutv.ui.screens.SearchScreen
-import com.kiduyuk.klausk.kiduyutv.ui.screens.SettingsScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.search.SearchScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.settings.SettingsScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.MovieDetailScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.SeasonEpisodesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.StreamLinksScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.TvShowDetailScreen
-import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen.StreamLinks
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.HomeScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.MoviesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.MyListScreen
