@@ -5,13 +5,18 @@
 ![KiduyuTV Banner](https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/main/app/src/main/res/mipmap-xhdpi/ic_banner.png)
 
 **A modern Android TV and Fire TV streaming application featuring a curated collection of movies and TV shows**
-
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Android%20TV%20%7C%20Fire%20TV-FF6B35?style=flat-square)](https://developer.android.com/tv)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.24-purple?style=flat-square)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-2024.12.01-61DAFB?style=flat-square)](https://developer.android.com/compose)
 [![Min SDK](https://img.shields.io/badge/Min%20SDK-24-green?style=flat-square)](https://developer.android.com/guide/topics/manifest/uses-sdk-element)
 [![Target SDK](https://img.shields.io/badge/Target%20SDK-35-red?style=flat-square)](https://developer.android.com/guide/topics/manifest/uses-sdk-element)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/kiduyu-klaus/KiduyuTv_final/kiduyu_final.yml?branch=main&style=flat-square&label=Build)](https://github.com/kiduyu-klaus/KiduyuTv_final/actions)
+[![Latest Release](https://img.shields.io/github/v/release/kiduyu-klaus/KiduyuTv_final?include_prereleases&style=flat-square&label=Release)](https://github.com/kiduyu-klaus/KiduyuTv_final/releases/latest)
+[![ExoPlayer](https://img.shields.io/badge/ExoPlayer-1.5.1-orange?style=flat-square)](https://developer.android.com/media/media3/exoplayer)
+[![WebView](https://img.shields.io/badge/WebView-Chromium-4285F4?style=flat-square)](https://developer.android.com/reference/android/webkit/WebView)
+[![TMDB](https://img.shields.io/badge/TMDB-API-01B4E4?style=flat-square&logo=themoviedatabase&logoColor=white)](https://www.themoviedatabase.org)
+
 
 </div>
 
