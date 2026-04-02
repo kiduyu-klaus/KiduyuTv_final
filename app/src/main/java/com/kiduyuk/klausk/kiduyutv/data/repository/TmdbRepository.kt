@@ -55,7 +55,7 @@ class TmdbRepository {
         // Try cache first
         val cached = tryGetCachedTvShows(CACHE_TYPE_TRENDING)
         if (cached.isNotEmpty()) {
-            Log.d(TAG, "Returning cached trending TV shows")
+            Log.i(TAG, "Returning cached trending TV shows")
             return@runCatching cached
         }
 
@@ -72,7 +72,7 @@ class TmdbRepository {
     suspend fun getTrendingMoviesToday(): Result<List<Movie>> = runCatching {
         val cached = tryGetCachedMovies(CACHE_TYPE_TRENDING)
         if (cached.isNotEmpty()) {
-            Log.d(TAG, "Returning cached trending movies")
+            Log.i(TAG, "Returning cached trending movies")
             return@runCatching cached
         }
 
@@ -98,7 +98,7 @@ class TmdbRepository {
     suspend fun getNowPlayingMovies(): Result<List<Movie>> = runCatching {
         val cached = tryGetCachedMovies(CACHE_TYPE_NOW_PLAYING)
         if (cached.isNotEmpty()) {
-            Log.d(TAG, "Returning cached now playing movies")
+            Log.i(TAG, "Returning cached now playing movies")
             return@runCatching cached
         }
 
@@ -111,8 +111,8 @@ class TmdbRepository {
     /** Fetches top-rated movies with caching. */
     suspend fun getTopRatedMovies(): Result<List<Movie>> = runCatching {
         val cached = tryGetCachedMovies(CACHE_TYPE_TOP_RATED)
-        if (cached.isNotEmpty()) {
-            Log.d(TAG, "Returning cached top rated movies")
+        if (cached.isNotEmpty() && cached.size > 25) {
+            Log.i(TAG, "Returning cached top rated movies")
             return@runCatching cached
         }
 
@@ -125,8 +125,8 @@ class TmdbRepository {
     /** Fetches top-rated TV shows. */
     suspend fun getTopRatedTvShows(): Result<List<TvShow>> = runCatching {
         val cached = tryGetCachedTvShows(CACHE_TYPE_TOP_RATED)
-        if (cached.isNotEmpty() && cached.size > 25) { // Limit to 25 items
-            Log.d(TAG, "Returning cached top rated TV shows")
+        if (cached.isNotEmpty() && cached.size > 25) { 
+            Log.i(TAG, "Returning cached top rated TV shows")
             return@runCatching cached
         }
 
@@ -140,7 +140,7 @@ class TmdbRepository {
     suspend fun getPopularMovies(): Result<List<Movie>> = runCatching {
         val cached = tryGetCachedMovies(CACHE_TYPE_POPULAR)
         if (cached.isNotEmpty()) {
-            Log.d(TAG, "Returning cached popular movies")
+            Log.i(TAG, "Returning cached popular movies")
             return@runCatching cached
         }
 
@@ -154,7 +154,7 @@ class TmdbRepository {
     suspend fun getPopularTvShows(): Result<List<TvShow>> = runCatching {
         val cached = tryGetCachedTvShows(CACHE_TYPE_POPULAR)
         if (cached.isNotEmpty()) {
-            Log.d(TAG, "Returning cached popular TV shows")
+            Log.i(TAG, "Returning cached popular TV shows")
             return@runCatching cached
         }
 
@@ -189,7 +189,7 @@ class TmdbRepository {
             // Try to get from cache first
             val cachedGenres = DatabaseManager.getCachedMovieGenres().first()
             if (cachedGenres.isNotEmpty()) {
-                Log.d(TAG, "Returning cached movie genres")
+                Log.i(TAG, "Returning cached movie genres")
                 return@runCatching cachedGenres.map { DatabaseManager.entityToGenre(it) }
             }
         } catch (e: Exception) {
@@ -210,7 +210,7 @@ class TmdbRepository {
         try {
             val cachedGenres = DatabaseManager.getCachedTvGenres().first()
             if (cachedGenres.isNotEmpty()) {
-                Log.d(TAG, "Returning cached TV genres")
+                Log.i(TAG, "Returning cached TV genres")
                 return@runCatching cachedGenres.map { DatabaseManager.entityToGenre(it) }
             }
         } catch (e: Exception) {

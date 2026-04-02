@@ -6,7 +6,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.kiduyuk.klausk.kiduyutv.ui.screens.MediaListScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.company_network_list.MediaListScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.search.SearchScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.settings.SettingsScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.MovieDetailScreen
