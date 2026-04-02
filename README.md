@@ -21,6 +21,18 @@
 
 KiduyuTV is a feature-rich streaming application designed specifically for the big screen experience. Built with Jetpack Compose and Material 3, it delivers a Netflix-like lean-back interface optimized for TV remote navigation with full D-Pad support. The app integrates with The Movie Database (TMDB) API to provide real-time movie and TV show data across multiple curated categories.
 
+
+| Feature | Details |
+|---|---|
+| 🎬 **Content** | Movies, TV shows, by Production Company & TV Network |
+| 🔍 **Discovery** | Search, genre browsing, cast & crew detail pages |
+| ▶️ **Playback** | HLS · DASH · Progressive via ExoPlayer with multi-server failover |
+| 📝 **Subtitles** | External subtitle fetch via Subdl, SRT · VTT · SSA/ASS · TTML |
+| 🎮 **Navigation** | Full D-pad focus management, scale animations, back-stack handling |
+| 💾 **History** | Watch progress saved and resumed per title |
+| ⚙️ **Settings** | Playback buffer duration, preferences persistence |
+
+
 ## Key Features
 
 ### Immersive TV Experience
