@@ -59,6 +59,7 @@ fun StreamLinksScreen(
     releaseDate: String?,
     season: Int? = null,
     episode: Int? = null,
+    timestamp: Long = 0L,
     onBackClick: () -> Unit,
     viewModel: StreamLinksViewModel = viewModel()
 ) {
@@ -158,7 +159,19 @@ fun StreamLinksScreen(
                                     putExtra("BACKDROP_PATH", backdropPath)
                                     putExtra("VOTE_AVERAGE", voteAverage)
                                     putExtra("RELEASE_DATE", releaseDate)
-                                    putExtra("STREAM_URL", it.urlTemplate)
+
+                                    val finalUrl = if (timestamp > 0) {
+                                        when (it.name) {
+                                            "VidLink" -> "${it.urlTemplate}&startAt=$timestamp"
+                                            "VidKing" -> "${it.urlTemplate}&progress=$timestamp"
+                                            "Videasy" -> "${it.urlTemplate}&progress=$timestamp"
+                                            "VidFast" -> "${it.urlTemplate}&startAt=$timestamp"
+                                            else -> it.urlTemplate
+                                        }
+                                    } else {
+                                        it.urlTemplate
+                                    }
+                                    putExtra("STREAM_URL", finalUrl)
                                 }
                                 context.startActivity(intent)
                             }
@@ -226,7 +239,31 @@ fun StreamProviderItem(
                         shape = RoundedCornerShape(4.dp)
                     ) {
                         Text(
-                            text = "BEST",
+                            text = "BEST FOR MOVIES",
+                            color = Color.Black,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                if (provider.name == "Videasy") {
+                    Surface(
+                        color = Color(0xFF4CAF50), // Green color for "Fast"
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = "FAST",
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+                    Surface(
+                        color = Color(0xFFFFC107), // Amber/Gold color for "Best"
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = "BEST FOR TV",
                             color = Color.Black,
                             style = MaterialTheme.typography.labelSmall,
                             modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
