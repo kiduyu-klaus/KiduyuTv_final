@@ -26,15 +26,16 @@ class StreamLinksViewModel : ViewModel() {
                     type = if (isTv) "tv" else "movie"
                 ),
                 StreamProvider(
+                    name = "Videasy",
+                    urlTemplate = if (isTv) "https://player.videasy.net/tv/${tmdbId}/${season}/${episode}?nextEpisode=true&autoplayNextEpisode=true&episodeSelector=true&overlay=true&color=8B5CF6" else "https://player.videasy.net/movie/${tmdbId}",
+                    type = if (isTv) "tv" else "movie"
+                )
+                ,
+                StreamProvider(
                     name = "VidKing",
                     urlTemplate = if (isTv) "https://www.vidking.net/embed/tv/${tmdbId}/${season}/${episode}?autoPlay=true&nextEpisode=true&episodeSelector=true" else "https://www.vidking.net/embed/movie/${tmdbId}?autoPlay=true",
                     type = if (isTv) "tv" else "movie"
                 ) ,
-                StreamProvider(
-                    name = "Videasy",
-                    urlTemplate = if (isTv) "https://player.videasy.net/tv/${tmdbId}/${season}/${episode}?nextEpisode=true&autoplayNextEpisode=true&episodeSelector=true&overlay=true&color=8B5CF6" else "https://player.videasy.net/movie/${tmdbId}",
-                    type = if (isTv) "tv" else "movie"
-                ),
                 StreamProvider(
                     name = "Mapple",
                     urlTemplate = if (isTv) "https://mapple.uk/watch/tv/${tmdbId}-${season}-${episode}" else "https://mapple.uk/watch/movie/${tmdbId}",
