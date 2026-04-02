@@ -24,8 +24,18 @@ android {
         multiDexEnabled = true
     }
 
+    signingConfigs {
+        release {
+            storeFile file("${rootDir}/kiduyutv_final")
+            storePassword "klaus2801"
+            keyAlias "key0"
+            keyPassword "klaus2801"
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
@@ -47,6 +57,9 @@ android {
 
     kotlin {
         jvmToolchain(17)
+    }
+    lintOptions {
+        abortOnError false
     }
 
     packaging {

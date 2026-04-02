@@ -38,12 +38,6 @@ jobs:
       - name: Build Debug APK
         run: ./gradlew assembleDebug
 
-      # TODO: Add signing configuration here. This typically involves:
-      # 1. Storing signing key and keystore password as GitHub Secrets.
-      # 2. Using actions/upload-artifact to upload the generated AAB/APK.
-      # 3. Using r0adkll/sign-android-release@v1 to sign the release.
-      #    Example: https://github.com/r0adkll/sign-android-release
-
       - name: Get last commit message
         id: commit_msg
         if: github.event_name != 'pull_request'
@@ -68,7 +62,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: app-release
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: ${{ steps.rename_apk.outputs.apk_path }}
 
       - name: Create GitHub Release
         id: create_release
@@ -117,8 +111,16 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      # Restore the keystore from the base64-encoded GitHub Secret.
+      # The file is written to the repo root so ${rootDir}/kiduyutv_final
+      # in signingConfigs resolves correctly.
+      - name: Restore keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > kiduyutv_final
+
+      # signingConfigs in app/build.gradle handles all signing details.
+      # No -P flags needed here.
       - name: Build Release APK
-        run: ./gradlew assembleRelease -Pandroid.injected.signing.store.file=kiduyutv_final -Pandroid.injected.signing.store.password=klaus2801 -Pandroid.injected.signing.key.alias=key0 -Pandroid.injected.signing.key.password=klaus2801
+        run: ./gradlew assembleRelease
 
       - name: Rename Release APK
         id: rename_release
