@@ -1,4 +1,4 @@
-package com.kiduyuk.klausk.kiduyutv
+package com.kiduyuk.klausk.kiduyutv.activity.mainactivity
 
 import android.Manifest
 import android.app.AlertDialog
@@ -9,13 +9,17 @@ import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.*
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.core.content.ContextCompat
 import androidx.navigation.compose.rememberNavController
 import coil.ImageLoader
 import coil.ImageLoaderFactory
@@ -23,9 +27,10 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import coil.request.CachePolicy
 import coil.util.DebugLogger
-import com.kiduyuk.klausk.kiduyutv.ui.navigation.NavGraph
-import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
+import com.kiduyuk.klausk.kiduyutv.data.api.ApiClient
 import com.kiduyuk.klausk.kiduyutv.data.local.database.DatabaseManager
+import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
+import com.kiduyuk.klausk.kiduyutv.ui.navigation.NavGraph
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
@@ -55,7 +60,7 @@ class MainActivity : ComponentActivity(), ImageLoaderFactory {
             // Network cache with OkHttp integration
             .okHttpClient {
                 // Reuse the same client for consistent caching
-                com.kiduyuk.klausk.kiduyutv.data.api.ApiClient
+                ApiClient
                     .createOkHttpClient(this@MainActivity)
             }
             // Enable crossfade for smooth image transitions
@@ -124,7 +129,7 @@ class MainActivity : ComponentActivity(), ImageLoaderFactory {
                 }
 
                 Box(
-                    modifier = Modifier
+                    modifier = Modifier.Companion
                         .fillMaxSize()
                         .background(BackgroundDark)
                 ) {

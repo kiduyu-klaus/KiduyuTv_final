@@ -1,4 +1,4 @@
-package com.kiduyuk.klausk.kiduyutv
+package com.kiduyuk.klausk.kiduyutv.activity.splashactivity
 
 import android.annotation.SuppressLint
 import android.content.Intent
@@ -21,6 +21,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.airbnb.lottie.compose.*
+import com.kiduyuk.klausk.kiduyutv.R
+import com.kiduyuk.klausk.kiduyutv.activity.mainactivity.MainActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
 import kotlinx.coroutines.delay
 

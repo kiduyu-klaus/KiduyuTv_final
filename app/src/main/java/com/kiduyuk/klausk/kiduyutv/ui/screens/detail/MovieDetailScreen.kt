@@ -251,7 +251,7 @@ fun MovieDetailScreen(
                         Text(
                             text = movie.overview ?: "",
                             color = TextSecondary,
-                            maxLines = 2,
+                            //maxLines = 2,
                             fontSize = 12.sp
                         )
 

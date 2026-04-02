@@ -29,7 +29,7 @@
             android:screenOrientation="landscape"
             android:configChanges="orientation|screenSize|keyboardHidden" />
         <activity
-            android:name=".SplashActivity"
+            android:name=".activity.splashactivity.SplashActivity"
             android:exported="true"
             android:theme="@style/Theme.KiduyuTv">
             <intent-filter>
@@ -40,7 +40,7 @@
         </activity>
 
         <activity
-            android:name=".MainActivity"
+            android:name=".activity.mainactivity.MainActivity"
             android:exported="false"
             android:theme="@style/Theme.KiduyuTv" />
     </application>
