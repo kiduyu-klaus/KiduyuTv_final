@@ -113,6 +113,9 @@ class PlayerActivity : AppCompatActivity() {
             "https://vidlink.pro/movie/$tmdbId?autoplay=true"
         }
 
+        // Check if this is a Videasy player URL
+        val isVideasyPlayer = url.startsWith("https://player.videasy.net")
+
         // Setup Layout
         val rootLayout = FrameLayout(this).apply {
             layoutParams = ViewGroup.LayoutParams(
@@ -135,8 +138,10 @@ class PlayerActivity : AppCompatActivity() {
                 setSupportMultipleWindows(false)
             }
 
-            // Add JavaScript interface for receiving postMessage from Videasy player
-            addJavascriptInterface(VideasyJavaScriptInterface(), "VideasyInterface")
+            // Add JavaScript interface for receiving postMessage from Videasy player (only for Videasy URLs)
+            if (isVideasyPlayer) {
+                addJavascriptInterface(VideasyJavaScriptInterface(), "VideasyInterface")
+            }
 
 
 
@@ -198,6 +203,7 @@ class PlayerActivity : AppCompatActivity() {
                                 }
                             }
                             
+                            ${if (isVideasyPlayer) """
                             // Listen for postMessage from Videasy player iframe
                             function setupMessageListener() {
                                 // Also add console logging for debugging
@@ -267,6 +273,12 @@ class PlayerActivity : AppCompatActivity() {
                                 monitorVideoEvents();
                                 setInterval(monitorVideoEvents, 3000);
                             }
+                            """ else """
+                            // No message listener needed for non-Videasy players
+                            function setupMessageListener() {
+                                console.log('Non-Videasy player, skipping message listener');
+                            }
+                            """}
                             
                             blockRedirects();
                             removeAdsAdvanced();
