@@ -120,14 +120,25 @@ class PlayerActivity : AppCompatActivity() {
                         // evaluateJavascript wraps string results in extra quotes
                         val clean = result.trim('"').replace("\\\"", "\"")
                         val json = org.json.JSONObject(clean)
+                        val progress = json.getDouble("progress")
+                        val currentTime = json.getDouble("currentTime")
+                        val duration = json.getDouble("duration")
+                        val paused = json.getBoolean("paused")
+                        val ended = json.getBoolean("ended")
+
                         Log.i(TAG, String.format(
                             "[Progress] %.1f%% — %.1fs / %.1fs | paused=%b ended=%b",
-                            json.getDouble("progress"),
-                            json.getDouble("currentTime"),
-                            json.getDouble("duration"),
-                            json.getBoolean("paused"),
-                            json.getBoolean("ended")
+                            progress, currentTime, duration, paused, ended
                         ))
+
+                        // Save progress to watch history every 15 seconds
+                        val tmdbId = intent.getIntExtra("TMDB_ID", -1)
+                        val isTv = intent.getBooleanExtra("IS_TV", false)
+                        if (tmdbId != -1) {
+                            val repository = TmdbRepository()
+                            // Convert seconds to milliseconds for playbackPosition
+                            repository.updatePlaybackPosition(tmdbId, if (isTv) "tv" else "movie", currentTime.toLong())
+                        }
                     } catch (e: Exception) {
                         Log.w(TAG, "Progress parse error: ${e.message}")
                     }
