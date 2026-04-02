@@ -36,8 +36,13 @@ class MainActivity : ComponentActivity(), ImageLoaderFactory {
         return ImageLoader.Builder(this)
             // Memory cache: 25% of app memory
             .memoryCache {
+                val maxMemory = Runtime.getRuntime().maxMemory()
+                val cacheSize = minOf(
+                    (maxMemory * 0.15).toLong(),   // 15% of app memory
+                    50 * 1024 * 1024L              // hard cap at 50MB
+                )
                 MemoryCache.Builder(this)
-                    .maxSizePercent(0.25)
+                    .maxSizeBytes(cacheSize.toInt())
                     .build()
             }
             // Disk cache: 100MB
