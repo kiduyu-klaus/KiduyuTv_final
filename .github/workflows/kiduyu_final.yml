@@ -2,8 +2,8 @@ name: Android Release CI
 
 on:
   push:
-    tags:
-      - main # Triggers on pushes to tags like v1.0.0, v2.0.0-beta, etc.
+    branches:
+      - main
 
 permissions:
   contents: write # Required to create a release
