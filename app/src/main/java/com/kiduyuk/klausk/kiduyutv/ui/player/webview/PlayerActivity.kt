@@ -38,15 +38,12 @@ class PlayerActivity : AppCompatActivity() {
     inner class VideasyJavaScriptInterface {
         @JavascriptInterface
         fun postMessage(message: String) {
-            Log.i(TAG, "PostMessage received: $message")
+            //Log.i(TAG, "PostMessage received: $message")
             try {
-                // Parse the JSON message from player
                 val json = org.json.JSONObject(message)
 
-                // Check if this is VidKing/VidLink format (nested structure with PLAYER_EVENT type)
                 if (json.has("type") && json.getString("type") == "PLAYER_EVENT" && json.has("data")) {
                     val data = json.getJSONObject("data")
-                    // Check for mtmdbId (VidLink) or id (VidKing)
                     val id = if (data.has("mtmdbId")) {
                         data.get("mtmdbId").toString()
                     } else {
@@ -60,15 +57,13 @@ class PlayerActivity : AppCompatActivity() {
                     val episode = data.optInt("episode", 0)
                     val event = data.optString("event", "unknown")
 
-                    // Determine which player sent this (based on field names)
                     val playerType = if (data.has("mtmdbId")) "VidLink" else "VidKing"
 
-                    Log.i(TAG, String.format(
-                        "[%s] Progress update: id=%s, type=%s, event=%s, progress=%.1f%%, timestamp=%.1fs, duration=%.1fs, season=%d, episode=%d",
-                        playerType, id, mediaType, event, progress, currentTime, duration, season, episode
-                    ))
+//                    Log.i(TAG, String.format(
+//                        "[%s] Progress update: id=%s, type=%s, event=%s, progress=%.1f%%, timestamp=%.1fs, duration=%.1fs, season=%d, episode=%d",
+//                        playerType, id, mediaType, event, progress, currentTime, duration, season, episode
+//                    ))
                 } else {
-                    // Videasy format (direct fields)
                     val id = json.optString("id", json.optString("contentId", json.optString("movieId", json.optString("tvId", "unknown"))))
                     val type = json.optString("type", json.optString("contentType", json.optString("playerType", "unknown")))
                     val progress = json.optDouble("progress", json.optDouble("percent", 0.0))
@@ -77,16 +72,14 @@ class PlayerActivity : AppCompatActivity() {
                     val season = json.optInt("season", json.optInt("seasonNumber", 0))
                     val episode = json.optInt("episode", json.optInt("episodeNumber", 0))
 
-                    Log.i(TAG, String.format(
-                        "[Videasy] Progress update: id=%s, type=%s, progress=%.1f%%, timestamp=%.1fs, duration=%.1fs, season=%d, episode=%d",
-                        id, type, progress, timestamp, duration, season, episode
-                    ))
+//                    Log.i(TAG, String.format(
+//                        "[Videasy] Progress update: id=%s, type=%s, progress=%.1f%%, timestamp=%.1fs, duration=%.1fs, season=%d, episode=%d",
+//                        id, type, progress, timestamp, duration, season, episode
+//                    ))
                 }
 
-                // You can save progress to local storage or backend here
                 runOnUiThread {
                     // Update UI or save progress as needed
-                    // For example, save to SharedPreferences or Room database
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error parsing message: ${e.message}")
@@ -94,9 +87,53 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    // ── Cursor hide timer ──────────────────────────────────────────────────────
     private val cursorHideHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val cursorHideRunnable = Runnable {
         cursorView.animate().alpha(0f).setDuration(500).start()
+    }
+
+    // ── 15-second Kotlin-side progress logger ─────────────────────────────────
+    private val progressHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val progressRunnable = object : Runnable {
+        override fun run() {
+            webView.evaluateJavascript("""
+                (function() {
+                    var v = document.querySelector('video');
+                    if (v && v.duration > 0 && !isNaN(v.duration)) {
+                        return JSON.stringify({
+                            currentTime: v.currentTime,
+                            duration:    v.duration,
+                            progress:    (v.currentTime / v.duration) * 100,
+                            paused:      v.paused,
+                            ended:       v.ended
+                        });
+                    }
+                    return null;
+                })();
+            """.trimIndent()) { result ->
+                if (result != null && result != "null") {
+                    try {
+                        // evaluateJavascript wraps string results in extra quotes
+                        val clean = result.trim('"').replace("\\\"", "\"")
+                        val json = org.json.JSONObject(clean)
+                        Log.i(TAG, String.format(
+                            "[Progress] %.1f%% — %.1fs / %.1fs | paused=%b ended=%b",
+                            json.getDouble("progress"),
+                            json.getDouble("currentTime"),
+                            json.getDouble("duration"),
+                            json.getBoolean("paused"),
+                            json.getBoolean("ended")
+                        ))
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Progress parse error: ${e.message}")
+                    }
+                } else {
+                    Log.d(TAG, "[Progress] No video element found yet")
+                }
+            }
+            progressHandler.postDelayed(this, 15_000L)
+        }
     }
 
     @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
@@ -139,13 +176,12 @@ class PlayerActivity : AppCompatActivity() {
             "https://vidlink.pro/movie/$tmdbId?autoplay=true"
         }
 
-        // Check if this is a player URL that supports progress tracking (Videasy, VidKing, or VidLink)
         val isVideasyPlayer = url.startsWith("https://player.videasy.net")
         val isVidKingPlayer = url.startsWith("https://www.vidking.net") || url.startsWith("https://vidking.")
         val isVidLinkPlayer = url.startsWith("https://vidlink.pro")
         val isTrackingEnabled = isVideasyPlayer || isVidKingPlayer || isVidLinkPlayer
 
-        // Setup Layout
+        // ── Layout ────────────────────────────────────────────────────────────
         val rootLayout = FrameLayout(this).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -167,12 +203,9 @@ class PlayerActivity : AppCompatActivity() {
                 setSupportMultipleWindows(false)
             }
 
-            // Add JavaScript interface for receiving postMessage from players that support progress tracking
             if (isTrackingEnabled) {
                 addJavascriptInterface(VideasyJavaScriptInterface(), "VideasyInterface")
             }
-
-
 
             webViewClient = object : WebViewClient() {
                 override fun shouldInterceptRequest(
@@ -233,15 +266,12 @@ class PlayerActivity : AppCompatActivity() {
                             }
                             
                             ${if (isTrackingEnabled) """
-                            // Listen for postMessage from player (Videasy/VidKing/VidLink)
                             function setupMessageListener() {
-                                // Also add console logging for debugging
                                 console.log('Player message listener initialized');
                                 
                                 window.addEventListener('message', function(event) {
                                     console.log('Message event received:', typeof event.data === 'string' ? event.data : JSON.stringify(event.data));
                                     try {
-                                        // Forward ALL messages to Android JavaScript interface
                                         if (window.VideasyInterface) {
                                             if (typeof event.data === 'string') {
                                                 window.VideasyInterface.postMessage(event.data);
@@ -254,7 +284,6 @@ class PlayerActivity : AppCompatActivity() {
                                     }
                                 });
                                 
-                                // Override window.postMessage to capture messages sent from within the page
                                 (function() {
                                     var originalPostMessage = window.postMessage;
                                     window.postMessage = function(message, targetOrigin, transfer) {
@@ -274,44 +303,23 @@ class PlayerActivity : AppCompatActivity() {
                                     };
                                 })();
                                 
-                                // Monitor for video element events
+                                // Monitor for video element events (metadata/timeupdate debug only)
                                 function monitorVideoEvents() {
                                     var videos = document.getElementsByTagName('video');
                                     for (var i = 0; i < videos.length; i++) {
                                         (function(video) {
-                                            video.addEventListener('timeupdate', function() {
-                                                console.log('Video timeupdate:', video.currentTime, '/', video.duration);
-                                                if (window.VideasyInterface) {
-                                                    var data = {
-                                                        type: 'PLAYER_EVENT',
-                                                        data: {
-                                                            event: 'timeupdate',
-                                                            currentTime: video.currentTime,
-                                                            duration: video.duration,
-                                                            progress: (video.duration > 0) ? (video.currentTime / video.duration * 100) : 0,
-                                                            id: '',
-                                                            mediaType: 'unknown',
-                                                            season: 0,
-                                                            episode: 0,
-                                                            timestamp: Date.now()
-                                                        }
-                                                    };
-                                                    window.VideasyInterface.postMessage(JSON.stringify(data));
-                                                }
-                                            });
+                                            if (video._monitored) return;
+                                            video._monitored = true;
                                             video.addEventListener('loadedmetadata', function() {
-                                                console.log('Video loaded:', video.duration);
+                                                console.log('Video loaded: duration=' + video.duration);
                                             });
                                         })(videos[i]);
                                     }
                                 }
-                                
-                                // Check periodically for new video elements
                                 monitorVideoEvents();
                                 setInterval(monitorVideoEvents, 3000);
                             }
                             """ else """
-                            // No message listener needed for non-tracking players
                             function setupMessageListener() {
                                 console.log('Non-tracking player, skipping message listener');
                             }
@@ -343,7 +351,7 @@ class PlayerActivity : AppCompatActivity() {
             loadUrl(url)
         }
 
-        // Initialize Cursor
+        // ── Cursor ────────────────────────────────────────────────────────────
         cursorView = MouseCursorView(this).apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -365,14 +373,13 @@ class PlayerActivity : AppCompatActivity() {
         rootLayout.isFocusableInTouchMode = true
         rootLayout.requestFocus()
 
-        // Set initial cursor position to center
         rootLayout.post {
             screenWidth = rootLayout.width
             screenHeight = rootLayout.height
             cursorX = screenWidth / 2f
             cursorY = screenHeight / 2f
             updateCursorPosition()
-            showCursorAndResetTimer() // ADD
+            showCursorAndResetTimer()
         }
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -387,35 +394,78 @@ class PlayerActivity : AppCompatActivity() {
         })
     }
 
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
+
+    override fun onResume() {
+        super.onResume()
+        webView.onResume()
+        webView.resumeTimers()
+        progressHandler.postDelayed(progressRunnable, 15_000L)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        webView.onPause()
+        webView.pauseTimers()
+        progressHandler.removeCallbacks(progressRunnable)
+    }
+
+    override fun onDestroy() {
+        cursorHideHandler.removeCallbacks(cursorHideRunnable)
+        progressHandler.removeCallbacks(progressRunnable)
+        webView.apply {
+            stopLoading()
+            clearHistory()
+            removeAllViews()
+            destroy()
+        }
+        super.onDestroy()
+    }
+
+    // ── D-pad input ───────────────────────────────────────────────────────────
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_UP,
+                KeyEvent.KEYCODE_DPAD_DOWN,
+                KeyEvent.KEYCODE_DPAD_LEFT,
+                KeyEvent.KEYCODE_DPAD_RIGHT,
+                KeyEvent.KEYCODE_DPAD_CENTER,
+                KeyEvent.KEYCODE_ENTER -> return onKeyDown(event.keyCode, event)
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         return when (keyCode) {
             KeyEvent.KEYCODE_DPAD_UP -> {
-                showCursorAndResetTimer() // ADD
+                showCursorAndResetTimer()
                 cursorY = (cursorY - moveSpeed).coerceAtLeast(0f)
                 updateCursorPosition()
                 true
             }
             KeyEvent.KEYCODE_DPAD_DOWN -> {
-                showCursorAndResetTimer() // ADD
+                showCursorAndResetTimer()
                 cursorY = (cursorY + moveSpeed).coerceAtMost(screenHeight.toFloat())
                 updateCursorPosition()
                 true
             }
             KeyEvent.KEYCODE_DPAD_LEFT -> {
-                showCursorAndResetTimer() // ADD
+                showCursorAndResetTimer()
                 cursorX = (cursorX - moveSpeed).coerceAtLeast(0f)
                 updateCursorPosition()
                 true
             }
             KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                showCursorAndResetTimer() // ADD
+                showCursorAndResetTimer()
                 cursorX = (cursorX + moveSpeed).coerceAtMost(screenWidth.toFloat())
                 updateCursorPosition()
                 true
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                showCursorAndResetTimer() // ADD
+                showCursorAndResetTimer()
                 simulateClick(cursorX, cursorY)
                 true
             }
@@ -423,10 +473,12 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
     private fun updateCursorPosition() {
-        cursorView.x = cursorX          // tip is at x
-        cursorView.y = cursorY          // tip is at y
-        cursorView.invalidate()         // force redraw
+        cursorView.x = cursorX
+        cursorView.y = cursorY
+        cursorView.invalidate()
     }
 
     private fun simulateClick(x: Float, y: Float) {
@@ -442,29 +494,14 @@ class PlayerActivity : AppCompatActivity() {
             MotionEvent.ACTION_UP, x, y, 0
         )
 
-        // Set source as touchscreen so WebView treats it as a real tap
         downEvent.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
         upEvent.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
 
-        // Dispatch through the window instead of directly to WebView
         window.decorView.dispatchTouchEvent(downEvent)
         window.decorView.dispatchTouchEvent(upEvent)
 
         downEvent.recycle()
         upEvent.recycle()
-    }
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.action == KeyEvent.ACTION_DOWN) {
-            when (event.keyCode) {
-                KeyEvent.KEYCODE_DPAD_UP,
-                KeyEvent.KEYCODE_DPAD_DOWN,
-                KeyEvent.KEYCODE_DPAD_LEFT,
-                KeyEvent.KEYCODE_DPAD_RIGHT,
-                KeyEvent.KEYCODE_DPAD_CENTER,
-                KeyEvent.KEYCODE_ENTER -> return onKeyDown(event.keyCode, event)
-            }
-        }
-        return super.dispatchKeyEvent(event)
     }
 
     private fun showCursorAndResetTimer() {
@@ -472,29 +509,5 @@ class PlayerActivity : AppCompatActivity() {
         cursorView.alpha = 1f
         cursorHideHandler.removeCallbacks(cursorHideRunnable)
         cursorHideHandler.postDelayed(cursorHideRunnable, 5000)
-    }
-
-    override fun onPause() {
-        super.onPause()
-        webView.onPause()
-        webView.pauseTimers()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        webView.onResume()
-        webView.resumeTimers()
-    }
-
-    override fun onDestroy() {
-        cursorHideHandler.removeCallbacks(cursorHideRunnable)
-        webView?.apply {
-            stopLoading()
-            clearHistory()
-            removeAllViews()
-            destroy()
-        }
-        //webView = null
-        super.onDestroy()
     }
 }
