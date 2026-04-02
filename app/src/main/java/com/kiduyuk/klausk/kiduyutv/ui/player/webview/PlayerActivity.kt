@@ -241,10 +241,8 @@ class PlayerActivity : AppCompatActivity() {
                     view: WebView?,
                     request: WebResourceRequest?
                 ): Boolean {
-                    val url = request?.url.toString()
-                    if (!request!!.hasGesture()) return true
-                    if (AdvancedAdBlocker.shouldBlock(url)) return true
-                    return false
+                    // Block all navigation attempts to keep the user on the initial stream URL
+                    return true
                 }
 
                 override fun onPageFinished(view: WebView?, url: String?) {
