@@ -25,6 +25,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.navigation.NavGraph
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
+import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 
 class MainActivity : ComponentActivity() {
 
@@ -83,14 +84,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun showExitConfirmationDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("Exit App")
-            .setMessage("Are you sure you want to exit KiduyuTv?")
-            .setPositiveButton("Exit") { _, _ ->
-                finish()
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
+        QuitDialog(
+            context = this,
+            onNo = { /* dismiss — dialog closes itself */ },
+            onYes = { finish() }
+        ).show()
     }
 
     private fun checkAndRequestStoragePermissions() {

@@ -494,6 +494,7 @@ class PlayerActivity : AppCompatActivity() {
                 AlertDialog.Builder(this@PlayerActivity)
                     .setTitle("Exit Player")
                     .setMessage("Stop watching?")
+                    .setCancelable(false)
                     .setPositiveButton("Yes") { _, _ -> finish() }
                     .setNegativeButton("No", null)
                     .show()
