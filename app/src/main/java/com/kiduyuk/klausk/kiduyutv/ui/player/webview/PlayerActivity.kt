@@ -143,7 +143,7 @@ class PlayerActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        AdvancedAdBlocker.init(this)
+        // Note: AdvancedAdBlocker is now initialized in KiduyuTvApp
 
         val tmdbId = intent.getIntExtra("TMDB_ID", -1)
         val isTv = intent.getBooleanExtra("IS_TV", false)
