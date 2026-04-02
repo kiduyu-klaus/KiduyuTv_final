@@ -187,7 +187,8 @@ fun NavGraph(navController: NavHostController) {
                 navArgument("posterPath") { type = NavType.StringType; defaultValue = "" },
                 navArgument("backdropPath") { type = NavType.StringType; defaultValue = "" },
                 navArgument("voteAverage") { type = NavType.FloatType; defaultValue = 0f },
-                navArgument("releaseDate") { type = NavType.StringType; defaultValue = "" }
+                navArgument("releaseDate") { type = NavType.StringType; defaultValue = "" },
+                navArgument("timestamp") { type = NavType.LongType; defaultValue = 0L }
             )
         ) { backStackEntry ->
             val tmdbId = backStackEntry.arguments?.getInt("tmdbId") ?: 0
@@ -200,6 +201,7 @@ fun NavGraph(navController: NavHostController) {
             val backdropPath = backStackEntry.arguments?.getString("backdropPath")
             val voteAverage = backStackEntry.arguments?.getFloat("voteAverage")?.toDouble() ?: 0.0
             val releaseDate = backStackEntry.arguments?.getString("releaseDate")
+            val timestamp = backStackEntry.arguments?.getLong("timestamp") ?: 0L
 
             StreamLinksScreen(
                 tmdbId = tmdbId,
@@ -212,6 +214,7 @@ fun NavGraph(navController: NavHostController) {
                 releaseDate = releaseDate,
                 season = if (season == 0) null else season,
                 episode = if (episode == 0) null else episode,
+                timestamp = timestamp,
                 onBackClick = { navController.popBackStack() }
             )
         }
