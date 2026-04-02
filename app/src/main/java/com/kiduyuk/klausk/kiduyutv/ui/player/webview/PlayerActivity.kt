@@ -432,13 +432,29 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        cursorHideHandler.removeCallbacks(cursorHideRunnable)
+        // Stop progress tracking
         progressHandler.removeCallbacks(progressRunnable)
-        webView.apply {
-            stopLoading()
-            clearHistory()
-            removeAllViews()
-            destroy()
+        cursorHideHandler.removeCallbacks(cursorHideRunnable)
+
+        // Thoroughly clean up the WebView to prevent memory leaks and IllegalStateException
+        if (::webView.isInitialized) {
+            try {
+                // Remove from parent layout
+                (webView.parent as? ViewGroup)?.removeView(webView)
+
+                // Clear state and stop loading
+                webView.apply {
+                    stopLoading()
+                    clearHistory()
+                    clearCache(true)
+                    loadUrl("about:blank")
+                    onPause()
+                    removeAllViews()
+                    destroy()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error during WebView cleanup: ${e.message}")
+            }
         }
         super.onDestroy()
     }
@@ -531,4 +547,6 @@ class PlayerActivity : AppCompatActivity() {
         cursorHideHandler.removeCallbacks(cursorHideRunnable)
         cursorHideHandler.postDelayed(cursorHideRunnable, 5000)
     }
+
+
 }
