@@ -34,6 +34,11 @@ class PlayerActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "VideasyPlayer"
+
+        // ── Stream sniffer ────────────────────────────────────────────────────
+        private const val SNIFFER_TAG = "StreamSniffer"
+        private val STREAM_EXTENSIONS = listOf(".m3u8", ".mpd", ".ts", ".mp4", ".webm", ".mkv")
+        private val STREAM_KEYWORDS   = listOf("playlist", "manifest", "master", "/hls/", "/dash/", "chunklist")
     }
 
     // JavaScript interface class to receive messages from WebView (supports Videasy, VidKing, and VidLink)
@@ -88,6 +93,23 @@ class PlayerActivity : AppCompatActivity() {
                 Log.e(TAG, "Error parsing message: ${e.message}")
             }
         }
+    }
+
+    // ── Stream sniffer JS bridge ──────────────────────────────────────────────
+    /** Receives stream URLs detected by the injected XHR / fetch hooks. */
+    @Suppress("UNUSED")
+    inner class StreamSnifferInterface {
+        @JavascriptInterface
+        fun onStreamFound(url: String, source: String) {
+            Log.i(SNIFFER_TAG, "[JS-$source] Stream URL detected: $url")
+        }
+    }
+
+    /** Returns true when [url] looks like a media stream. */
+    private fun isStreamUrl(url: String): Boolean {
+        val lower = url.lowercase()
+        return STREAM_EXTENSIONS.any { lower.contains(it) } ||
+                STREAM_KEYWORDS.any  { lower.contains(it) }
     }
 
     // ── Cursor hide timer ──────────────────────────────────────────────────────
@@ -220,6 +242,8 @@ class PlayerActivity : AppCompatActivity() {
             if (isTrackingEnabled) {
                 addJavascriptInterface(VideasyJavaScriptInterface(), "VideasyInterface")
             }
+            // Always register the stream sniffer so XHR/fetch hooks can report back
+            addJavascriptInterface(StreamSnifferInterface(), "StreamSniffer")
 
             webViewClient = object : WebViewClient() {
                 override fun shouldInterceptRequest(
@@ -234,6 +258,11 @@ class PlayerActivity : AppCompatActivity() {
                             ByteArrayInputStream(ByteArray(0))
                         )
                     }
+                    // ── Stream sniffer (network level) ────────────────────────
+                    if (isStreamUrl(url)) {
+                        Log.i(SNIFFER_TAG, "[Network] Stream URL detected: $url")
+                    }
+                    // ─────────────────────────────────────────────────────────
                     return super.shouldInterceptRequest(view, request)
                 }
 
@@ -348,8 +377,65 @@ class PlayerActivity : AppCompatActivity() {
                     """.trimIndent()
                     view?.evaluateJavascript(AdvancedAdBlocker.getCss(), null)
                     view?.evaluateJavascript(advancedJs, null)
-                }
-            }
+
+                    // ── Stream sniffer (JS / XHR / fetch level) ───────────────
+                    val streamSnifferJs = """
+                        (function() {
+                            if (window.__streamSnifferInstalled) return;
+                            window.__streamSnifferInstalled = true;
+
+                            var STREAM_EXTS    = ['.m3u8', '.mpd', '.ts', '.mp4', '.webm', '.mkv'];
+                            var STREAM_KEYS    = ['playlist', 'manifest', 'master', '/hls/', '/dash/', 'chunklist'];
+
+                            function looksLikeStream(url) {
+                                if (!url || typeof url !== 'string') return false;
+                                var lower = url.toLowerCase();
+                                for (var i = 0; i < STREAM_EXTS.length; i++) {
+                                    if (lower.indexOf(STREAM_EXTS[i]) !== -1) return true;
+                                }
+                                for (var j = 0; j < STREAM_KEYS.length; j++) {
+                                    if (lower.indexOf(STREAM_KEYS[j]) !== -1) return true;
+                                }
+                                return false;
+                            }
+
+                            function report(url, src) {
+                                if (looksLikeStream(url) && window.StreamSniffer) {
+                                    window.StreamSniffer.onStreamFound(url, src);
+                                }
+                            }
+
+                            /* Hook XMLHttpRequest.open */
+                            var origXhrOpen = XMLHttpRequest.prototype.open;
+                            XMLHttpRequest.prototype.open = function(method, url) {
+                                report(url, 'XHR');
+                                return origXhrOpen.apply(this, arguments);
+                            };
+
+                            /* Hook fetch */
+                            var origFetch = window.fetch;
+                            window.fetch = function(input, init) {
+                                var url = (typeof input === 'string') ? input : (input && input.url ? input.url : '');
+                                report(url, 'fetch');
+                                return origFetch.apply(this, arguments);
+                            };
+
+                            /* Hook MediaSource.addSourceBuffer (MSE / blob streams) */
+                            if (window.MediaSource) {
+                                var origAddSourceBuffer = MediaSource.prototype.addSourceBuffer;
+                                MediaSource.prototype.addSourceBuffer = function(mimeType) {
+                                    if (window.StreamSniffer) {
+                                        window.StreamSniffer.onStreamFound('MSE:' + mimeType, 'MSE');
+                                    }
+                                    return origAddSourceBuffer.apply(this, arguments);
+                                };
+                            }
+                        })();
+                    """.trimIndent()
+                    view?.evaluateJavascript(streamSnifferJs, null)
+                    // ─────────────────────────────────────────────────────────
+                } // onPageFinished
+            } // webViewClient
 
             webChromeClient = object : WebChromeClient() {
                 override fun onCreateWindow(
