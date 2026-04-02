@@ -5,6 +5,7 @@ import android.app.AlertDialog
 import android.os.Bundle
 import android.os.Message
 import android.os.SystemClock
+import android.util.Log
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
@@ -28,6 +29,44 @@ class PlayerActivity : AppCompatActivity() {
     private var screenWidth = 0
     private var screenHeight = 0
 
+    companion object {
+        private const val TAG = "VideasyPlayer"
+    }
+
+    // JavaScript interface class to receive messages from WebView
+    @Suppress("UNUSED")
+    inner class VideasyJavaScriptInterface {
+        @JavascriptInterface
+        fun postMessage(message: String) {
+            Log.d(TAG, "PostMessage received: $message")
+            try {
+                // Parse the JSON message from Videasy player
+                val json = org.json.JSONObject(message)
+
+                // Extract fields with various possible names
+                val id = json.optString("id", json.optString("contentId", json.optString("movieId", json.optString("tvId", "unknown"))))
+                val type = json.optString("type", json.optString("contentType", json.optString("playerType", "unknown")))
+                val progress = json.optDouble("progress", json.optDouble("percent", 0.0))
+                val timestamp = json.optDouble("timestamp", json.optDouble("currentTime", json.optDouble("time", 0.0)))
+                val duration = json.optDouble("duration", json.optDouble("totalDuration", json.optDouble("totalTime", 0.0)))
+                val season = json.optInt("season", json.optInt("seasonNumber", 0))
+                val episode = json.optInt("episode", json.optInt("episodeNumber", 0))
+
+                Log.d(TAG, String.format(
+                    "Progress update: id=%s, type=%s, progress=%.1f%%, timestamp=%.1fs, duration=%.1fs, season=%d, episode=%d",
+                    id, type, progress, timestamp, duration, season, episode
+                ))
+
+                // You can save progress to local storage or backend here
+                runOnUiThread {
+                    // Update UI or save progress as needed
+                    // For example, save to SharedPreferences or Room database
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error parsing message: ${e.message}")
+            }
+        }
+    }
 
     private val cursorHideHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val cursorHideRunnable = Runnable {
@@ -96,6 +135,9 @@ class PlayerActivity : AppCompatActivity() {
                 setSupportMultipleWindows(false)
             }
 
+            // Add JavaScript interface for receiving postMessage from Videasy player
+            addJavascriptInterface(VideasyJavaScriptInterface(), "VideasyInterface")
+
 
 
             webViewClient = object : WebViewClient() {
@@ -155,9 +197,81 @@ class PlayerActivity : AppCompatActivity() {
                                     videos[i].muted = false;
                                 }
                             }
+                            
+                            // Listen for postMessage from Videasy player iframe
+                            function setupMessageListener() {
+                                // Also add console logging for debugging
+                                console.log('Videasy message listener initialized');
+                                
+                                window.addEventListener('message', function(event) {
+                                    console.log('Message event received:', typeof event.data === 'string' ? event.data : JSON.stringify(event.data));
+                                    try {
+                                        // Forward ALL messages to Android JavaScript interface
+                                        if (window.VideasyInterface) {
+                                            if (typeof event.data === 'string') {
+                                                window.VideasyInterface.postMessage(event.data);
+                                            } else {
+                                                window.VideasyInterface.postMessage(JSON.stringify(event.data));
+                                            }
+                                        }
+                                    } catch (e) {
+                                        console.log('Error processing message: ' + e);
+                                    }
+                                });
+                                
+                                // Override window.postMessage to capture messages sent from within the page
+                                (function() {
+                                    var originalPostMessage = window.postMessage;
+                                    window.postMessage = function(message, targetOrigin, transfer) {
+                                        console.log('postMessage intercepted:', typeof message === 'string' ? message : JSON.stringify(message));
+                                        try {
+                                            if (window.VideasyInterface) {
+                                                if (typeof message === 'string') {
+                                                    window.VideasyInterface.postMessage(message);
+                                                } else {
+                                                    window.VideasyInterface.postMessage(JSON.stringify(message));
+                                                }
+                                            }
+                                        } catch (e) {
+                                            console.log('Error capturing postMessage: ' + e);
+                                        }
+                                        return originalPostMessage.apply(this, arguments);
+                                    };
+                                })();
+                                
+                                // Monitor for video element events
+                                function monitorVideoEvents() {
+                                    var videos = document.getElementsByTagName('video');
+                                    for (var i = 0; i < videos.length; i++) {
+                                        (function(video) {
+                                            video.addEventListener('timeupdate', function() {
+                                                console.log('Video timeupdate:', video.currentTime, '/', video.duration);
+                                                if (window.VideasyInterface) {
+                                                    var data = {
+                                                        type: 'VIDEO_TIME_UPDATE',
+                                                        timestamp: video.currentTime,
+                                                        duration: video.duration,
+                                                        progress: (video.duration > 0) ? (video.currentTime / video.duration * 100) : 0
+                                                    };
+                                                    window.VideasyInterface.postMessage(JSON.stringify(data));
+                                                }
+                                            });
+                                            video.addEventListener('loadedmetadata', function() {
+                                                console.log('Video loaded:', video.duration);
+                                            });
+                                        })(videos[i]);
+                                    }
+                                }
+                                
+                                // Check periodically for new video elements
+                                monitorVideoEvents();
+                                setInterval(monitorVideoEvents, 3000);
+                            }
+                            
                             blockRedirects();
                             removeAdsAdvanced();
                             setMaxVolume();
+                            setupMessageListener();
                             setInterval(function() {
                                 setMaxVolume();
                             }, 3000);
