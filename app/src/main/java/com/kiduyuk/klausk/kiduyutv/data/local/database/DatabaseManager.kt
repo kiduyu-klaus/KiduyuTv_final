@@ -11,11 +11,6 @@ import com.kiduyuk.klausk.kiduyutv.data.local.dao.CachedTvShowDetailDao
 import com.kiduyuk.klausk.kiduyutv.data.local.dao.GenreDao
 import com.kiduyuk.klausk.kiduyutv.data.local.dao.SavedMediaDao
 import com.kiduyuk.klausk.kiduyutv.data.local.dao.WatchHistoryDao
-import com.kiduyuk.klausk.kiduyutv.data.local.database.DatabaseManager.cachedMovieDao
-import com.kiduyuk.klausk.kiduyutv.data.local.database.DatabaseManager.cachedMovieDetailDao
-import com.kiduyuk.klausk.kiduyutv.data.local.database.DatabaseManager.cachedTvShowDao
-import com.kiduyuk.klausk.kiduyutv.data.local.database.DatabaseManager.cachedTvShowDetailDao
-import com.kiduyuk.klausk.kiduyutv.data.local.database.DatabaseManager.genreDao
 import com.kiduyuk.klausk.kiduyutv.data.local.entity.CachedMovieDetailEntity
 import com.kiduyuk.klausk.kiduyutv.data.local.entity.CachedMovieEntity
 import com.kiduyuk.klausk.kiduyutv.data.local.entity.CachedTvShowDetailEntity
@@ -32,8 +27,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Singleton manager for accessing the Room database and providing
@@ -41,10 +36,6 @@ import kotlinx.coroutines.launch
  *
  * This class provides a centralized access point to all database operations
  * and handles the conversion between database entities and domain models.
- *
- * Usage:
- * DatabaseManager.init(context) // In Application class or MainActivity
- * val savedMedia = DatabaseManager.savedMediaDao.getAllSavedMedia()
  */
 object DatabaseManager {
 
@@ -62,8 +53,10 @@ object DatabaseManager {
      * @param context Application context
      */
     fun init(context: Context) {
-        database = AppDatabase.getInstance(context)
-        migrateLegacyDataIfNeeded(context)
+        if (!::database.isInitialized) {
+            database = AppDatabase.getInstance(context)
+            migrateLegacyDataIfNeeded(context)
+        }
     }
 
     /**
@@ -80,12 +73,6 @@ object DatabaseManager {
 
     /**
      * Add an item to My List.
-     *
-     * @param id TMDB media ID
-     * @param mediaType "movie" or "tv"
-     * @param title Display title
-     * @param posterPath Poster image path
-     * @param category Optional category (e.g., "favorites", "watchlist")
      */
     fun addToMyList(
         id: Int,
@@ -109,9 +96,6 @@ object DatabaseManager {
 
     /**
      * Remove an item from My List.
-     *
-     * @param mediaId TMDB media ID
-     * @param mediaType "movie" or "tv"
      */
     fun removeFromMyList(mediaId: Int, mediaType: String) {
         applicationScope.launch {
@@ -122,8 +106,8 @@ object DatabaseManager {
     /**
      * Check if a media item is in My List.
      */
-    suspend fun isInMyList(mediaId: Int, mediaType: String): Boolean {
-        return savedMediaDao().isMediaSaved(mediaId, mediaType)
+    suspend fun isInMyList(mediaId: Int, mediaType: String): Boolean = withContext(Dispatchers.IO) {
+        savedMediaDao().isMediaSaved(mediaId, mediaType)
     }
 
     /**
@@ -202,7 +186,7 @@ object DatabaseManager {
     }
 
     /**
-     * Get "Continue Watching" items (items with playback position > 0).
+     * Get "Continue Watching" items.
      */
     fun getContinueWatching(limit: Int = 10): Flow<List<WatchHistoryEntity>> {
         return watchHistoryDao().getContinueWatching(limit)
@@ -233,6 +217,15 @@ object DatabaseManager {
     fun clearWatchHistory() {
         applicationScope.launch {
             watchHistoryDao().deleteAllWatchHistory()
+        }
+    }
+
+    /**
+     * Delete all items in My List.
+     */
+    fun clearMyList() {
+        applicationScope.launch {
+            savedMediaDao().deleteAllSavedMedia()
         }
     }
 
@@ -292,11 +285,11 @@ object DatabaseManager {
         return Movie(
             id = entity.id,
             title = entity.title,
-            overview = entity.overview,
+            overview = entity.overview ?: "",
             posterPath = entity.posterPath,
             backdropPath = entity.backdropPath,
             voteAverage = entity.voteAverage,
-            releaseDate = entity.releaseDate,
+            releaseDate = entity.releaseDate ?: "",
             genreIds = entity.genreIdsJson?.let {
                 val type = object : TypeToken<List<Int>>() {}.type
                 gson.fromJson(it, type)
@@ -363,11 +356,11 @@ object DatabaseManager {
         return TvShow(
             id = entity.id,
             name = entity.name,
-            overview = entity.overview,
+            overview = entity.overview ?: "",
             posterPath = entity.posterPath,
             backdropPath = entity.backdropPath,
             voteAverage = entity.voteAverage,
-            firstAirDate = entity.firstAirDate,
+            firstAirDate = entity.firstAirDate ?: "",
             genreIds = entity.genreIdsJson?.let {
                 val type = object : TypeToken<List<Int>>() {}.type
                 gson.fromJson(it, type)
@@ -442,7 +435,6 @@ object DatabaseManager {
 
     /**
      * Migrate legacy SharedPreferences data to Room database.
-     * This ensures backward compatibility when upgrading from the old implementation.
      */
     private fun migrateLegacyDataIfNeeded(context: Context) {
         val prefs: SharedPreferences = context.getSharedPreferences(LEGACY_PREFS_NAME, Context.MODE_PRIVATE)
@@ -469,7 +461,7 @@ object DatabaseManager {
                     // Clear legacy SharedPreferences after successful migration
                     prefs.edit().remove(LEGACY_KEY_MY_LIST).apply()
                 } catch (e: Exception) {
-                    // Migration failed, keep legacy data for retry
+                    // Migration failed
                 }
             }
         }
@@ -478,8 +470,8 @@ object DatabaseManager {
     /**
      * Get database statistics for debugging/monitoring.
      */
-    suspend fun getDatabaseStats(): DatabaseStats {
-        return DatabaseStats(
+    suspend fun getDatabaseStats(): DatabaseStats = withContext(Dispatchers.IO) {
+        DatabaseStats(
             savedMediaCount = savedMediaDao().getSavedMediaCount(),
             watchHistoryCount = watchHistoryDao().getWatchHistoryCount(),
             cachedMoviesCount = cachedMovieDao().getCachedMovieCount(),
@@ -492,8 +484,6 @@ object DatabaseManager {
 
     /**
      * Clear all cached data from the database.
-     * This includes cached movies, TV shows, details, and genres.
-     * It does NOT clear My List or Watch History.
      */
     fun clearAllCache() {
         applicationScope.launch {
@@ -504,7 +494,6 @@ object DatabaseManager {
             genreDao().deleteAllGenres()
         }
     }
-
 }
 
 /**
@@ -524,4 +513,3 @@ data class DatabaseStats(
                 cachedTvShowsCount + cachedMovieDetailsCount +
                 cachedTvShowDetailsCount + genresCount
 }
-
