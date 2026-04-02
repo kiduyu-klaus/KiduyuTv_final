@@ -270,6 +270,31 @@ fun StreamProviderItem(
                         )
                     }
                 }
+
+                if (provider.name == "VidFast") {
+                    Surface(
+                        color = Color(0xFF4CAF50), // Green color for "Fast"
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = "FAST",
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+                    Surface(
+                        color = Color(0xFFFFC107), // Amber/Gold color for "Best"
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text(
+                            text = "BEST FOR BOTH MOVIES AND TV",
+                            color = Color.Black,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+                }
             }
             if (provider.isAvailable) {
                 Icon(
