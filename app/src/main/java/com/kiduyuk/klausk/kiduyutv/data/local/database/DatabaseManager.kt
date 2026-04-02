@@ -207,7 +207,8 @@ object DatabaseManager {
             isTv = entity.mediaType == "tv",
             seasonNumber = entity.seasonNumber,
             episodeNumber = entity.episodeNumber,
-            timestamp = entity.lastWatchedTimestamp
+            lastWatched = entity.lastWatchedTimestamp,
+            playbackPosition = entity.playbackPosition
         )
     }
 
