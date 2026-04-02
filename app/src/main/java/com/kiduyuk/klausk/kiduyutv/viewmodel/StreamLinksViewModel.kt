@@ -31,13 +31,13 @@ class StreamLinksViewModel : ViewModel() {
                     type = if (isTv) "tv" else "movie"
                 ),
                 StreamProvider(
-                    name = "VidKing",
-                    urlTemplate = if (isTv) "https://www.vidking.net/embed/tv/${tmdbId}/${season}/${episode}?autoPlay=true&nextEpisode=true&episodeSelector=true" else "https://www.vidking.net/embed/movie/${tmdbId}?autoPlay=true",
+                    name = "VidFast",
+                    urlTemplate = if (isTv) "https://vidfast.pro/tv/${tmdbId}/${season}/${episode}?autoPlay=true&nextButton=true&autoNext=true" else "https://vidfast.pro/movie/${tmdbId}?autoPlay=true",
                     type = if (isTv) "tv" else "movie"
                 ),
                 StreamProvider(
-                    name = "VidFast",
-                    urlTemplate = if (isTv) "https://vidfast.pro/tv/${tmdbId}/${season}/${episode}?autoPlay=true&nextButton=true&autoNext=true" else "https://vidfast.pro/movie/${tmdbId}?autoPlay=true",
+                    name = "VidKing",
+                    urlTemplate = if (isTv) "https://www.vidking.net/embed/tv/${tmdbId}/${season}/${episode}?autoPlay=true&nextEpisode=true&episodeSelector=true" else "https://www.vidking.net/embed/movie/${tmdbId}?autoPlay=true",
                     type = if (isTv) "tv" else "movie"
                 ),
                 StreamProvider(
