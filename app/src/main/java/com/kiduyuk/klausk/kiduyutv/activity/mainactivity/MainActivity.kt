@@ -21,62 +21,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.navigation.compose.rememberNavController
-import coil.ImageLoader
-import coil.ImageLoaderFactory
-import coil.disk.DiskCache
-import coil.memory.MemoryCache
-import coil.request.CachePolicy
-import coil.util.DebugLogger
-import com.kiduyuk.klausk.kiduyutv.data.api.ApiClient
-import com.kiduyuk.klausk.kiduyutv.data.local.database.DatabaseManager
-import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.NavGraph
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
 
-class MainActivity : ComponentActivity(), ImageLoaderFactory {
-
-    override fun newImageLoader(): ImageLoader {
-        return ImageLoader.Builder(this)
-            // Memory cache: 25% of app memory
-            .memoryCache {
-                val maxMemory = Runtime.getRuntime().maxMemory()
-                val cacheSize = minOf(
-                    (maxMemory * 0.15).toLong(),   // 15% of app memory
-                    50 * 1024 * 1024L              // hard cap at 50MB
-                )
-                MemoryCache.Builder(this)
-                    .maxSizeBytes(cacheSize.toInt())
-                    .build()
-            }
-            // Disk cache: 100MB
-            .diskCache {
-                DiskCache.Builder()
-                    .directory(cacheDir.resolve("image_cache"))
-                    .maxSizeBytes(100 * 1024 * 1024) // 100MB
-                    .build()
-            }
-            // Network cache with OkHttp integration
-            .okHttpClient {
-                // Reuse the same client for consistent caching
-                ApiClient
-                    .createOkHttpClient(this@MainActivity)
-            }
-            // Enable crossfade for smooth image transitions
-            .crossfade(true)
-            // Respect cache headers
-            .respectCacheHeaders(true)
-            // Memory cache policy: cache first, then network
-            .memoryCachePolicy(CachePolicy.ENABLED)
-            // Disk cache policy: cache first, then network
-            .diskCachePolicy(CachePolicy.ENABLED)
-            // Network policy: prefer cache when available
-            .networkCachePolicy(CachePolicy.ENABLED)
-            // Logger for debugging (disable in release)
-            .logger(DebugLogger())
-            .build()
-    }
+class MainActivity : ComponentActivity() {
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -90,14 +40,7 @@ class MainActivity : ComponentActivity(), ImageLoaderFactory {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Initialize Room database manager
-        DatabaseManager.init(this)
-
-        // Initialize MyListManager (now uses Room internally)
-        MyListManager.init(this)
-
-        // Schedule periodic cache cleanup (optional, can be removed if not needed)
-        scheduleCacheCleanup()
+        // Note: DatabaseManager and MyListManager are now initialized in KiduyuTvApp
 
         checkAndRequestStoragePermissions()
         setContent {
@@ -129,7 +72,7 @@ class MainActivity : ComponentActivity(), ImageLoaderFactory {
                 }
 
                 Box(
-                    modifier = Modifier.Companion
+                    modifier = Modifier
                         .fillMaxSize()
                         .background(BackgroundDark)
                 ) {
@@ -207,25 +150,5 @@ class MainActivity : ComponentActivity(), ImageLoaderFactory {
             }
             .setCancelable(false)
             .show()
-    }
-
-    /**
-     * Schedules periodic cleanup of expired cache entries.
-     * This helps maintain database size and performance.
-     * Cache cleanup runs on app startup.
-     */
-    private fun scheduleCacheCleanup() {
-        // Clean up expired cache on app start
-        DatabaseManager.cleanExpiredCache()
-
-        // You can also schedule periodic cleanup using WorkManager if needed:
-        // val cleanupRequest = PeriodicWorkRequestBuilder<CacheCleanupWorker>(
-        //     6, TimeUnit.HOURS
-        // ).build()
-        // WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-        //     "cache_cleanup",
-        //     ExistingPeriodicWorkPolicy.KEEP,
-        //     cleanupRequest
-        // )
     }
 }
