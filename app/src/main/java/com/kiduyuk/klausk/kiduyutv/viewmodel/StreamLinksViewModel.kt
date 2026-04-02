@@ -27,12 +27,12 @@ class StreamLinksViewModel : ViewModel() {
                 ),
                 StreamProvider(
                     name = "VidKing",
-                    urlTemplate = if (isTv) "https://www.vidking.net/embed/tv/${tmdbId}/${season}/${episode}?autoPlay=true&nextEpisode=true" else "https://www.vidking.net/embed/movie/${tmdbId}?autoPlay=true",
+                    urlTemplate = if (isTv) "https://www.vidking.net/embed/tv/${tmdbId}/${season}/${episode}?autoPlay=true&nextEpisode=true&episodeSelector=true" else "https://www.vidking.net/embed/movie/${tmdbId}?autoPlay=true",
                     type = if (isTv) "tv" else "movie"
                 ) ,
                 StreamProvider(
                     name = "Videasy",
-                    urlTemplate = if (isTv) "https://player.videasy.net/tv/${tmdbId}/${season}/${episode}" else "https://player.videasy.net/movie/${tmdbId}",
+                    urlTemplate = if (isTv) "https://player.videasy.net/tv/${tmdbId}/${season}/${episode}?nextEpisode=true&autoplayNextEpisode=true&episodeSelector=true&overlay=true&color=8B5CF6" else "https://player.videasy.net/movie/${tmdbId}",
                     type = if (isTv) "tv" else "movie"
                 ),
                 StreamProvider(
@@ -47,7 +47,7 @@ class StreamLinksViewModel : ViewModel() {
                 ),
                 StreamProvider(
                     name = "VidFast",
-                    urlTemplate = if (isTv) "https://vidfast.pro/tv/${tmdbId}/${season}/${episode}?autoPlay=true" else "https://vidfast.pro/movie/${tmdbId}?autoPlay=true",
+                    urlTemplate = if (isTv) "https://vidfast.pro/tv/${tmdbId}/${season}/${episode}?autoPlay=true&nextButton=true&autoNext=true" else "https://vidfast.pro/movie/${tmdbId}?autoPlay=true",
                     type = if (isTv) "tv" else "movie"
                 )
             )
