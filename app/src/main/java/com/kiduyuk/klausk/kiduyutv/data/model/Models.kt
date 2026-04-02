@@ -280,7 +280,8 @@ data class WatchHistoryItem(
     val isTv: Boolean,
     val seasonNumber: Int? = null,
     val episodeNumber: Int? = null,
-    val timestamp: Long = System.currentTimeMillis()
+    val lastWatched: Long = System.currentTimeMillis(),
+    val playbackPosition: Long = 0L
 )
 
 /**
