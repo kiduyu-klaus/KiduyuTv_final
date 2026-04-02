@@ -286,14 +286,15 @@ fun TvShowDetailScreen(
                                         Screen.StreamLinks.createRoute(
                                             tmdbId = tvShow.id,
                                             isTv = true,
-                                            season = uiState.watchHistoryItem?.seasonNumber ?: 1,
-                                            episode = uiState.watchHistoryItem?.episodeNumber ?: 1,
                                             title = tvShow.name ?: "",
                                             overview = tvShow.overview,
                                             posterPath = tvShow.posterPath,
                                             backdropPath = tvShow.backdropPath,
                                             voteAverage = tvShow.voteAverage,
-                                            releaseDate = tvShow.firstAirDate
+                                            releaseDate = tvShow.firstAirDate,
+                                            season = uiState.watchHistoryItem?.seasonNumber ?: 1,
+                                            episode = uiState.watchHistoryItem?.episodeNumber ?: 1,
+                                            timestamp = uiState.watchHistoryItem?.playbackPosition ?: 0L
                                         )
                                     )
                                 },
