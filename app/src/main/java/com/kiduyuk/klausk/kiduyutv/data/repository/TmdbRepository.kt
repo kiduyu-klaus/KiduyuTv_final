@@ -125,7 +125,7 @@ class TmdbRepository {
     /** Fetches top-rated TV shows. */
     suspend fun getTopRatedTvShows(): Result<List<TvShow>> = runCatching {
         val cached = tryGetCachedTvShows(CACHE_TYPE_TOP_RATED)
-        if (cached.isNotEmpty()) {
+        if (cached.isNotEmpty() && cached.size > 25) { // Limit to 25 items
             Log.d(TAG, "Returning cached top rated TV shows")
             return@runCatching cached
         }
