@@ -295,8 +295,11 @@ class PlayerActivity : AppCompatActivity() {
         var nextSeason = currentSeason
         var nextEp = currentEpisode + 1
 
+        Log.i(TAG, "[NextEpisode] Current: S$currentSeason E$currentEpisode, TotalSeasons: $totalSeasons, TotalEpisodes: $totalEpisodesInSeason")
+
         // Check if we need to go to next season
-        if (nextEp > totalEpisodesInSeason) {
+        // If totalEpisodesInSeason is 0 (not loaded yet), we'll just try to load the next episode
+        if (totalEpisodesInSeason > 0 && nextEp > totalEpisodesInSeason) {
             if (nextSeason < totalSeasons) {
                 // Move to next season
                 nextSeason++
@@ -313,6 +316,8 @@ class PlayerActivity : AppCompatActivity() {
         currentSeason = nextSeason
         currentEpisode = nextEp
 
+        Log.i(TAG, "[NextEpisode] Loading: S$currentSeason E$currentEpisode")
+
         // Update intent extras
         intent.putExtra("SEASON_NUMBER", currentSeason)
         intent.putExtra("EPISODE_NUMBER", currentEpisode)
@@ -320,8 +325,8 @@ class PlayerActivity : AppCompatActivity() {
         // Save current position before switching
         savePlaybackPosition()
 
-        // Build the new URL
-        val baseUrl = currentProviderUrl ?: "https://vidlink.pro/tv/$tmdbId/$currentSeason/$currentEpisode?autoplay=true"
+        // Build the new URL - always build fresh with correct season and episode
+        val baseUrl = "https://vidlink.pro/tv/$tmdbId/$currentSeason/$currentEpisode?autoplay=true"
         val timestamp = 0L // Start from beginning for new episode
 
         val finalUrl = if (timestamp > 0) {
@@ -338,6 +343,9 @@ class PlayerActivity : AppCompatActivity() {
 
         // Hide button and reset cursor
         hideNextEpisodeButtonUI()
+
+        // Reset episode info so it gets reloaded for the new season
+        episodeInfoLoaded = false
 
         // Save to watch history
         val repository = TmdbRepository()
@@ -658,21 +666,24 @@ class PlayerActivity : AppCompatActivity() {
             isFocusableInTouchMode = true
             setBackgroundColor(android.graphics.Color.parseColor("#4CAF50"))
             setTextColor(android.graphics.Color.WHITE)
-            textSize = 18f
-            setPadding(48, 24, 48, 24)
+            textSize = 20f
+            setPadding(60, 30, 60, 30)
+            // Set minimum width for better visibility
+            minimumWidth = 300
             setOnClickListener {
                 Log.i(TAG, "[NextEpisode] Button clicked")
                 loadNextEpisode()
             }
         }
 
-        // Position the next episode button at bottom center
+        // Position the next episode button at bottom right
         val buttonParams = FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.WRAP_CONTENT,
             FrameLayout.LayoutParams.WRAP_CONTENT
         ).apply {
-            gravity = android.view.Gravity.BOTTOM or android.view.Gravity.CENTER_HORIZONTAL
+            gravity = android.view.Gravity.BOTTOM or android.view.Gravity.END
             bottomMargin = 200
+            marginEnd = 50
         }
 
         rootLayout.addView(webView)
