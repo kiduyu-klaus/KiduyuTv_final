@@ -230,6 +230,21 @@ private fun HomeContent(
                             onClick = onClick
                         )
                     }
+                    // Content Row for Movies Trending This Week.
+                    if (uiState.trendingMoviesThisWeek.isNotEmpty()) {
+                        ContentRow(
+                            title = "Movies Trending This Week",
+                            items = uiState.trendingMoviesThisWeek,
+                            onItemFocus = { movie -> onSelectItem(movie) },
+                            onItemClick = { movie -> onMovieClick(movie.id) }
+                        ) { movie, isSelected, onClick ->
+                            MovieCard(
+                                movie = movie,
+                                isSelected = isSelected,
+                                onClick = onClick
+                            )
+                        }
+                    }
 
                     ContentRow(
                         title = "Movies Trending Today",

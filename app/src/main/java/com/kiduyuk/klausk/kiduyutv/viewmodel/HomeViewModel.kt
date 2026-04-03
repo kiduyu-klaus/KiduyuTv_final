@@ -7,6 +7,7 @@ import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
 import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
+import com.kiduyuk.klausk.kiduyutv.util.WatchHistoryEnricher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +21,7 @@ data class HomeUiState(
     val isLoading: Boolean = true,
     val trendingTvShows: List<TvShow> = emptyList(),
     val trendingMovies: List<Movie> = emptyList(),
+    val trendingMoviesThisWeek: List<Movie> = emptyList(),
     val nowPlayingMovies: List<Movie> = emptyList(),
     val continueWatching: List<WatchHistoryItem> = emptyList(),
     val popularNetworks: List<NetworkItem> = emptyList(),
@@ -80,12 +82,14 @@ class HomeViewModel : ViewModel() {
             try {
                 val trendingTvDeferred = async { repository.getTrendingTvToday() }
                 val trendingMoviesDeferred = async { repository.getTrendingMoviesToday() }
+                val trendingMoviesThisWeekDeferred = async { repository.getTrendingMoviesThisWeek() }
                 val nowPlayingDeferred = async { repository.getNowPlayingMovies() }
                 val topRatedMoviesDeferred = async { repository.getTopRatedMovies() }
                 val topRatedTvDeferred = async { repository.getTopRatedTvShows() }
 
                 val trendingTv = trendingTvDeferred.await().getOrNull() ?: emptyList()
                 val trendingMovies = trendingMoviesDeferred.await().getOrNull() ?: emptyList()
+                val trendingMoviesThisWeek = trendingMoviesThisWeekDeferred.await().getOrNull() ?: emptyList()
                 val nowPlaying = nowPlayingDeferred.await().getOrNull() ?: emptyList()
                 val topRatedMovies = topRatedMoviesDeferred.await().getOrNull() ?: emptyList()
                 val topRatedTv = topRatedTvDeferred.await().getOrNull() ?: emptyList()
@@ -98,12 +102,38 @@ class HomeViewModel : ViewModel() {
                     isLoading = false,
                     trendingTvShows = trendingTv,
                     trendingMovies = trendingMovies,
+                    trendingMoviesThisWeek = trendingMoviesThisWeek,
                     nowPlayingMovies = nowPlaying,
                     continueWatching = watchHistory,
                     latestMovies = topRatedMovies.take(30),
                     topTvShows = topRatedTv.take(30),
                     selectedItem = nowPlaying.firstOrNull() ?: trendingTv.firstOrNull() ?: trendingMovies.firstOrNull()
                 )
+
+                // Enrich watch history items with TMDB details in background
+                // This ensures "Continue Watching" row displays complete information
+                // even for items that were saved with incomplete data
+                //
+                // The WatchHistoryEnricher checks and updates the following fields:
+                // - title: Required display name
+                // - overview: Description/synopsis
+                // - posterPath: Poster image for display
+                // - backdropPath: Background image for hero section
+                // - voteAverage: Rating score
+                // - releaseDate: Release/first air date
+                viewModelScope.launch {
+                    try {
+                        // Enrich all watch history items with missing TMDB details
+                        WatchHistoryEnricher.enrichAllMissingItems(context)
+
+                        // Refresh the watch history after enrichment to get updated items
+                        val enrichedWatchHistory = WatchHistoryEnricher.getEnrichedWatchHistory(context)
+                        _uiState.value = _uiState.value.copy(continueWatching = enrichedWatchHistory)
+                    } catch (e: Exception) {
+                        // Log error but don't fail the entire home screen load
+                        android.util.Log.e("HomeViewModel", "Error enriching watch history: ${e.message}")
+                    }
+                }
 
                 // Load secondary content in background to avoid blocking the UI
                 // Use parallel async calls to load all content simultaneously for faster display
