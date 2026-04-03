@@ -104,45 +104,73 @@ class HomeViewModel : ViewModel() {
                 )
 
                 // Load secondary content in background to avoid blocking the UI
+                // Use parallel async calls to load all content simultaneously for faster display
                 viewModelScope.launch {
-                    val oscarWinners2026 = repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/oscar_winners_2026.json").getOrNull() ?: emptyList()
-                    _uiState.value = _uiState.value.copy(oscarWinners2026 = oscarWinners2026)
+                    val oscarWinnersDeferred = async {
+                        repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/oscar_winners_2026.json").getOrNull() ?: emptyList()
+                    }
+                    // Networks and companies loaded in parallel with other content
+                    val companiesNetworksDeferred = async {
+                        repository.getGitHubCompaniesNetworks(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/companies_networks.json").getOrNull()
+                    }
+                    val hallmarkMoviesDeferred = async {
+                        repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/hallmark_movies.json").getOrNull() ?: emptyList()
+                    }
+                    val trueStoryMoviesDeferred = async {
+                        repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/true_story_movies.json").getOrNull() ?: emptyList()
+                    }
+                    val bestSitcomsDeferred = async {
+                        repository.getGitHubTvShowList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/best_sitcoms.json").getOrNull() ?: emptyList()
+                    }
+                    val bestClassicsDeferred = async {
+                        repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/best_classics.json").getOrNull() ?: emptyList()
+                    }
+                    val spyMoviesDeferred = async {
+                        repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/cia_mossad_spies.json").getOrNull() ?: emptyList()
+                    }
+                    val stathamMoviesDeferred = async {
+                        repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/jason_statham_movies.json").getOrNull() ?: emptyList()
+                    }
+                    val timeTravelMoviesDeferred = async {
+                        repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/time_travel_movies.json").getOrNull() ?: emptyList()
+                    }
 
-                    val hallmarkMovies = repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/hallmark_movies.json").getOrNull() ?: emptyList()
-                    _uiState.value = _uiState.value.copy(hallmarkMovies = hallmarkMovies)
 
-                    val trueStoryMovies = repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klein/KiduyuTv_final/refs/heads/main/lists/true_story_movies.json").getOrNull() ?: emptyList()
-                    _uiState.value = _uiState.value.copy(trueStoryMovies = trueStoryMovies)
+                    // Await all results in parallel
+                    val oscarWinners2026 = oscarWinnersDeferred.await()
+                    val hallmarkMovies = hallmarkMoviesDeferred.await()
+                    val trueStoryMovies = trueStoryMoviesDeferred.await()
+                    val bestSitcoms = bestSitcomsDeferred.await()
+                    val bestClassics = bestClassicsDeferred.await()
+                    val spyMovies = spyMoviesDeferred.await()
+                    val stathamMovies = stathamMoviesDeferred.await()
+                    val timeTravelMovies = timeTravelMoviesDeferred.await()
+                    val companiesNetworks = companiesNetworksDeferred.await()
 
-                    val bestSitcoms = repository.getGitHubTvShowList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/best_sitcoms.json").getOrNull() ?: emptyList()
-                    _uiState.value = _uiState.value.copy(bestSitcoms = bestSitcoms)
-
-                    val bestClassics = repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/best_classics.json").getOrNull() ?: emptyList()
-                    _uiState.value = _uiState.value.copy(bestClassics = bestClassics)
-
-                    val spyMovies = repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/cia_mossad_spies.json").getOrNull() ?: emptyList()
-                    _uiState.value = _uiState.value.copy(spyMovies = spyMovies)
-
-                    val stathamMovies = repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/jason_statham_movies.json").getOrNull() ?: emptyList()
-                    _uiState.value = _uiState.value.copy(stathamMovies = stathamMovies)
-
-                    val timeTravelMovies = repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/time_travel_movies.json").getOrNull() ?: emptyList()
-                    _uiState.value = _uiState.value.copy(timeTravelMovies = timeTravelMovies)
-
-                    // Load networks and companies from GitHub JSON
-                    val companiesNetworks = repository.getGitHubCompaniesNetworks(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/companies_networks.json").getOrNull()
-
+                    // Process networks and companies
                     val networks = companiesNetworks?.networks
                         ?.filter { it.logoPath != null }
                         ?.map { NetworkItem(it.id, it.name, it.logoPath, "network") }
                         ?: emptyList()
-                    _uiState.value = _uiState.value.copy(popularNetworks = networks)
 
                     val companies = companiesNetworks?.companies
                         ?.filter { it.logoPath != null }
                         ?.map { NetworkItem(it.id, it.name, it.logoPath, "company") }
                         ?: emptyList()
-                    _uiState.value = _uiState.value.copy(popularCompanies = companies)
+
+                    // Update UI with all secondary content at once
+                    _uiState.value = _uiState.value.copy(
+                        oscarWinners2026 = oscarWinners2026,
+                        hallmarkMovies = hallmarkMovies,
+                        trueStoryMovies = trueStoryMovies,
+                        bestSitcoms = bestSitcoms,
+                        bestClassics = bestClassics,
+                        spyMovies = spyMovies,
+                        stathamMovies = stathamMovies,
+                        timeTravelMovies = timeTravelMovies,
+                        popularNetworks = networks,
+                        popularCompanies = companies
+                    )
                 }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(

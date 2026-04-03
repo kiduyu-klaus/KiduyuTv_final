@@ -462,6 +462,29 @@ class TmdbRepository {
     }
 
     /**
+     * Checks if a media item exists in the watch history.
+     * This is a synchronous check using runBlocking.
+     *
+     * @param context Context for database operations
+     * @param id The TMDB ID of the media
+     * @param isTv Whether the media is a TV show
+     * @return true if the item exists in watch history, false otherwise
+     */
+    fun isInWatchHistory(context: Context, id: Int, isTv: Boolean): Boolean {
+        DatabaseManager.init(context)
+
+        return try {
+            val dao = DatabaseManager.watchHistoryDao()
+            kotlinx.coroutines.runBlocking {
+                dao.isInWatchHistory(id, if (isTv) "tv" else "movie")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to check watch history existence", e)
+            false
+        }
+    }
+
+    /**
      * Clears all watch history.
      */
     fun clearWatchHistory() {

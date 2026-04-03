@@ -47,6 +47,44 @@ class PlayerActivity : AppCompatActivity() {
     private var currentProviderUrl: String? = null
     private var currentProviderName: String = "VidLink"
     private var episodeInfoLoaded = false
+    private var currentBaseUrl: String = "" // Store the base URL for the current provider
+
+    /**
+     * Extract the base URL (protocol + host) from a full URL.
+     * Example: "https://vidlink.pro/tv/123/1/1?autoplay=true" -> "https://vidlink.pro"
+     */
+    private fun extractBaseUrl(fullUrl: String): String {
+        return try {
+            val urlObj = java.net.URL(fullUrl)
+            "${urlObj.protocol}://${urlObj.host}"
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to extract base URL from: $fullUrl, using fallback")
+            // Fallback: extract manually
+            val startIndex = if (fullUrl.startsWith("https://")) 8 else if (fullUrl.startsWith("http://")) 7 else 0
+            val endIndex = fullUrl.indexOf('/', startIndex)
+            if (endIndex > 0) fullUrl.substring(0, endIndex) else fullUrl
+        }
+    }
+
+    /**
+     * Build the TV show URL for the current provider with the given season and episode.
+     * Uses the current provider's base URL and constructs the correct path pattern.
+     */
+    private fun buildProviderUrl(tmdbId: Int, season: Int, episode: Int): String {
+        val baseUrl = currentBaseUrl.ifEmpty { extractBaseUrl(currentProviderUrl ?: "") }
+
+        // Build URL based on provider name
+        return when (currentProviderName) {
+            "VidLink" -> "$baseUrl/tv/$tmdbId/$season/$episode?autoplay=true"
+            "Videasy" -> "$baseUrl/tv/$tmdbId/$season/$episode?nextEpisode=true&autoplayNextEpisode=true&episodeSelector=true&overlay=true&color=8B5CF6"
+            "VidFast" -> "$baseUrl/tv/$tmdbId/$season/$episode?autoPlay=true&nextButton=true&autoNext=true"
+            "VidKing" -> "$baseUrl/embed/tv/$tmdbId/$season/$episode?autoPlay=true&nextEpisode=true&episodeSelector=true"
+            "VidSrc" -> "$baseUrl/embed/tv/$tmdbId/$season/$episode"
+            "Mapple" -> "$baseUrl/watch/tv/$tmdbId-$season-$episode"
+            "Flixer" -> "$baseUrl/watch/tv/$tmdbId/$season/$episode"
+            else -> "$baseUrl/tv/$tmdbId/$season/$episode?autoplay=true"
+        }
+    }
     // ─────────────────────────────────────────────────────────────────────────
 
     companion object {
@@ -325,20 +363,21 @@ class PlayerActivity : AppCompatActivity() {
         // Save current position before switching
         savePlaybackPosition()
 
-        // Build the new URL - always build fresh with correct season and episode
-        val baseUrl = "https://vidlink.pro/tv/$tmdbId/$currentSeason/$currentEpisode?autoplay=true"
+        // Build the new URL dynamically based on current provider
+        val finalUrl = buildProviderUrl(tmdbId, currentSeason, currentEpisode)
         val timestamp = 0L // Start from beginning for new episode
 
-        val finalUrl = if (timestamp > 0) {
+        // Apply provider-specific timestamp parameter if needed
+        val urlWithTimestamp = if (timestamp > 0) {
             when (currentProviderName) {
-                "VidLink" -> "$baseUrl&startAt=$timestamp"
-                "VidKing" -> "$baseUrl&progress=$timestamp"
-                "Videasy" -> "$baseUrl&progress=$timestamp"
-                "VidFast" -> "$baseUrl&startAt=$timestamp"
-                else -> baseUrl
+                "VidLink" -> "$finalUrl&startAt=$timestamp"
+                "VidKing" -> "$finalUrl&progress=$timestamp"
+                "Videasy" -> "$finalUrl&progress=$timestamp"
+                "VidFast" -> "$finalUrl&startAt=$timestamp"
+                else -> finalUrl
             }
         } else {
-            baseUrl
+            finalUrl
         }
 
         // Hide button and reset cursor
@@ -352,8 +391,8 @@ class PlayerActivity : AppCompatActivity() {
         repository.updateEpisodeInfo(tmdbId, "tv", currentSeason, currentEpisode)
 
         // Reload with new episode
-        Log.i(TAG, "[NextEpisode] Loading Season $currentSeason, Episode $currentEpisode")
-        webView.loadUrl(finalUrl)
+        Log.i(TAG, "[NextEpisode] Loading Season $currentSeason, Episode $currentEpisode with URL: $urlWithTimestamp")
+        webView.loadUrl(urlWithTimestamp)
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -379,21 +418,33 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         val repository = TmdbRepository()
-        repository.saveToWatchHistory(
-            this,
-            WatchHistoryItem(
-                id = tmdbId,
-                title = title,
-                overview = intent.getStringExtra("OVERVIEW"),
-                posterPath = intent.getStringExtra("POSTER_PATH"),
-                backdropPath = intent.getStringExtra("BACKDROP_PATH"),
-                voteAverage = intent.getDoubleExtra("VOTE_AVERAGE", 0.0),
-                releaseDate = intent.getStringExtra("RELEASE_DATE"),
-                isTv = isTv,
-                seasonNumber = if (isTv) currentSeason else null,
-                episodeNumber = if (isTv) currentEpisode else null
+
+        // Check if this media is already in watch history
+        val existsInHistory = repository.isInWatchHistory(this, tmdbId, isTv)
+
+        if (existsInHistory) {
+            // Item already exists - just update season and episode info
+            Log.i(TAG, "[WatchHistory] Item exists, updating season $currentSeason episode $currentEpisode")
+            repository.updateEpisodeInfo(tmdbId, "tv", currentSeason, currentEpisode)
+        } else {
+            // New item - save to watch history
+            Log.i(TAG, "[WatchHistory] New item, saving to history")
+            repository.saveToWatchHistory(
+                this,
+                WatchHistoryItem(
+                    id = tmdbId,
+                    title = title,
+                    overview = intent.getStringExtra("OVERVIEW"),
+                    posterPath = intent.getStringExtra("POSTER_PATH"),
+                    backdropPath = intent.getStringExtra("BACKDROP_PATH"),
+                    voteAverage = intent.getDoubleExtra("VOTE_AVERAGE", 0.0),
+                    releaseDate = intent.getStringExtra("RELEASE_DATE"),
+                    isTv = isTv,
+                    seasonNumber = if (isTv) currentSeason else null,
+                    episodeNumber = if (isTv) currentEpisode else null
+                )
             )
-        )
+        }
 
         val url = intent.getStringExtra("STREAM_URL") ?: if (isTv) {
             "https://vidlink.pro/tv/$tmdbId/$currentSeason/$currentEpisode?autoplay=true"
@@ -401,8 +452,9 @@ class PlayerActivity : AppCompatActivity() {
             "https://vidlink.pro/movie/$tmdbId?autoplay=true"
         }
 
-        // Store the provider URL for next episode
+        // Store the provider URL and extract base URL for next episode
         currentProviderUrl = url
+        currentBaseUrl = extractBaseUrl(url)
 
         val isVideasyPlayer = url.startsWith("https://player.videasy.net")
         val isVidKingPlayer = url.startsWith("https://www.vidking.net") || url.startsWith("https://vidking.")
@@ -415,8 +467,13 @@ class PlayerActivity : AppCompatActivity() {
             isVidKingPlayer -> "VidKing"
             isVideasyPlayer -> "Videasy"
             url.contains("vidfast", ignoreCase = true) -> "VidFast"
+            url.contains("vidsrc", ignoreCase = true) -> "VidSrc"
+            url.contains("mapple", ignoreCase = true) -> "Mapple"
+            url.contains("flixer", ignoreCase = true) -> "Flixer"
             else -> "VidLink"
         }
+
+        Log.i(TAG, "[Provider] Selected: $currentProviderName, Base URL: $currentBaseUrl")
 
         // ── Layout ────────────────────────────────────────────────────────────
         val rootLayout = FrameLayout(this).apply {
