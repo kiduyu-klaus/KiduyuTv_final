@@ -17,11 +17,13 @@ import android.webkit.*
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.lifecycle.lifecycleScope
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
 import com.kiduyuk.klausk.kiduyutv.util.AdvancedAdBlocker
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
+import kotlinx.coroutines.launch
 import java.io.ByteArrayInputStream
 
 class PlayerActivity : AppCompatActivity() {
@@ -34,8 +36,22 @@ class PlayerActivity : AppCompatActivity() {
     private var screenWidth = 0
     private var screenHeight = 0
 
+    // ── Next Episode Variables ────────────────────────────────────────────────
+    private var currentSeason = 1
+    private var currentEpisode = 1
+    private var totalEpisodesInSeason = 0
+    private var totalSeasons = 1
+    private var nextEpisodeButton: View? = null
+    private var showNextEpisodeButton = false
+    private var isCursorDisabled = false
+    private var currentProviderUrl: String? = null
+    private var currentProviderName: String = "VidLink"
+    private var episodeInfoLoaded = false
+    // ─────────────────────────────────────────────────────────────────────────
+
     companion object {
         private const val TAG = "VideasyPlayer"
+        private const val NEXT_EPISODE_THRESHOLD_SECONDS = 60L // Show button when 60 seconds remain
 
         // ── Stream sniffer ────────────────────────────────────────────────────
         private const val SNIFFER_TAG = "StreamSniffer"
@@ -68,11 +84,6 @@ class PlayerActivity : AppCompatActivity() {
                     val event = data.optString("event", "unknown")
 
                     val playerType = if (data.has("mtmdbId")) "VidLink" else "VidKing"
-
-//                    Log.i(TAG, String.format(
-//                        "[%s] Progress update: id=%s, type=%s, event=%s, progress=%.1f%%, timestamp=%.1fs, duration=%.1fs, season=%d, episode=%d",
-//                        playerType, id, mediaType, event, progress, currentTime, duration, season, episode
-//                    ))
                 } else {
                     val id = json.optString("id", json.optString("contentId", json.optString("movieId", json.optString("tvId", "unknown"))))
                     val type = json.optString("type", json.optString("contentType", json.optString("playerType", "unknown")))
@@ -81,11 +92,6 @@ class PlayerActivity : AppCompatActivity() {
                     val duration = json.optDouble("duration", json.optDouble("totalDuration", json.optDouble("totalTime", 0.0)))
                     val season = json.optInt("season", json.optInt("seasonNumber", 0))
                     val episode = json.optInt("episode", json.optInt("episodeNumber", 0))
-
-//                    Log.i(TAG, String.format(
-//                        "[Videasy] Progress update: id=%s, type=%s, progress=%.1f%%, timestamp=%.1fs, duration=%.1fs, season=%d, episode=%d",
-//                        id, type, progress, timestamp, duration, season, episode
-//                    ))
                 }
 
                 runOnUiThread {
@@ -117,7 +123,9 @@ class PlayerActivity : AppCompatActivity() {
     // ── Cursor hide timer ──────────────────────────────────────────────────────
     private val cursorHideHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val cursorHideRunnable = Runnable {
-        cursorView.animate().alpha(0f).setDuration(500).start()
+        if (!isCursorDisabled) {
+            cursorView.animate().alpha(0f).setDuration(500).start()
+        }
     }
 
     // ── 15-second Kotlin-side progress logger ─────────────────────────────────
@@ -163,6 +171,11 @@ class PlayerActivity : AppCompatActivity() {
                             // Convert seconds to milliseconds for playbackPosition
                             repository.updatePlaybackPosition(tmdbId, if (isTv) "tv" else "movie", currentTime.toLong())
                         }
+
+                        // ── Next Episode Logic ──────────────────────────────────
+                        val remainingSeconds = duration - currentTime
+                        checkAndShowNextEpisodeButton(remainingSeconds, ended)
+                        // ──────────────────────────────────────────────────────
                     } catch (e: Exception) {
                         Log.w(TAG, "Progress parse error: ${e.message}")
                     }
@@ -174,7 +187,168 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
+    /**
+     * Check if we should show the next episode button.
+     * Called when video progress is updated.
+     */
+    private fun checkAndShowNextEpisodeButton(remainingSeconds: Double, hasEnded: Boolean) {
+        val isTv = intent.getBooleanExtra("IS_TV", false)
+
+        // Only process for TV shows
+        if (!isTv) return
+
+        // If episode has ended, load next episode automatically
+        if (hasEnded) {
+            Log.i(TAG, "[NextEpisode] Episode ended, loading next episode")
+            loadNextEpisode()
+            return
+        }
+
+        // Check if we should show the button (when 60 seconds remain)
+        val shouldShowButton = remainingSeconds <= NEXT_EPISODE_THRESHOLD_SECONDS && remainingSeconds > 0
+
+        if (shouldShowButton && !showNextEpisodeButton) {
+            Log.i(TAG, "[NextEpisode] Showing next episode button, $remainingSeconds seconds remaining")
+            showNextEpisodeButton = true
+            runOnUiThread {
+                showNextEpisodeButtonUI()
+            }
+        }
+    }
+
+    /**
+     * Load season details to get episode count and info.
+     */
+    private fun loadSeasonInfo() {
+        if (episodeInfoLoaded) return
+
+        val tmdbId = intent.getIntExtra("TMDB_ID", -1)
+        val isTv = intent.getBooleanExtra("IS_TV", false)
+
+        if (!isTv || tmdbId == -1) return
+
+        lifecycleScope.launch {
+            try {
+                val repository = TmdbRepository()
+
+                // Get season detail to count episodes
+                val seasonDetail = repository.getSeasonDetail(tmdbId, currentSeason).getOrNull()
+                if (seasonDetail != null) {
+                    totalEpisodesInSeason = seasonDetail.episodes?.size ?: 0
+                    Log.i(TAG, "[NextEpisode] Season $currentSeason has $totalEpisodesInSeason episodes")
+                }
+
+                // Get TV show detail to know total seasons
+                val tvDetail = repository.getTvShowDetail(tmdbId).getOrNull()
+                if (tvDetail != null) {
+                    totalSeasons = tvDetail.numberOfSeasons ?: 1
+                    Log.i(TAG, "[NextEpisode] TV show has $totalSeasons seasons")
+                }
+
+                episodeInfoLoaded = true
+            } catch (e: Exception) {
+                Log.e(TAG, "[NextEpisode] Error loading season info", e)
+            }
+        }
+    }
+
+    /**
+     * Show the next episode button UI and disable cursor.
+     */
+    private fun showNextEpisodeButtonUI() {
+        // Disable cursor
+        isCursorDisabled = true
+        cursorView.visibility = View.GONE
+
+        // Show the next episode button
+        nextEpisodeButton?.let { button ->
+            button.visibility = View.VISIBLE
+            button.requestFocus()
+            Log.i(TAG, "[NextEpisode] Button shown and focused")
+        }
+    }
+
+    /**
+     * Hide the next episode button UI and enable cursor.
+     */
+    private fun hideNextEpisodeButtonUI() {
+        // Enable cursor
+        isCursorDisabled = false
+        cursorView.visibility = View.VISIBLE
+
+        // Hide the button
+        nextEpisodeButton?.visibility = View.GONE
+        showNextEpisodeButton = false
+    }
+
+    /**
+     * Load the next episode.
+     * If current episode is the last in the season, try to load first episode of next season.
+     */
+    private fun loadNextEpisode() {
+        val tmdbId = intent.getIntExtra("TMDB_ID", -1)
+        if (tmdbId == -1) return
+
+        val isTv = intent.getBooleanExtra("IS_TV", false)
+        if (!isTv) return
+
+        var nextSeason = currentSeason
+        var nextEp = currentEpisode + 1
+
+        // Check if we need to go to next season
+        if (nextEp > totalEpisodesInSeason) {
+            if (nextSeason < totalSeasons) {
+                // Move to next season
+                nextSeason++
+                nextEp = 1
+                Log.i(TAG, "[NextEpisode] Moving to Season $nextSeason, Episode 1")
+            } else {
+                // No more seasons, we're done
+                Log.i(TAG, "[NextEpisode] No more episodes available")
+                return
+            }
+        }
+
+        // Update current episode info
+        currentSeason = nextSeason
+        currentEpisode = nextEp
+
+        // Update intent extras
+        intent.putExtra("SEASON_NUMBER", currentSeason)
+        intent.putExtra("EPISODE_NUMBER", currentEpisode)
+
+        // Save current position before switching
+        savePlaybackPosition()
+
+        // Build the new URL
+        val baseUrl = currentProviderUrl ?: "https://vidlink.pro/tv/$tmdbId/$currentSeason/$currentEpisode?autoplay=true"
+        val timestamp = 0L // Start from beginning for new episode
+
+        val finalUrl = if (timestamp > 0) {
+            when (currentProviderName) {
+                "VidLink" -> "$baseUrl&startAt=$timestamp"
+                "VidKing" -> "$baseUrl&progress=$timestamp"
+                "Videasy" -> "$baseUrl&progress=$timestamp"
+                "VidFast" -> "$baseUrl&startAt=$timestamp"
+                else -> baseUrl
+            }
+        } else {
+            baseUrl
+        }
+
+        // Hide button and reset cursor
+        hideNextEpisodeButtonUI()
+
+        // Save to watch history
+        val repository = TmdbRepository()
+        repository.updateEpisodeInfo(tmdbId, "tv", currentSeason, currentEpisode)
+
+        // Reload with new episode
+        Log.i(TAG, "[NextEpisode] Loading Season $currentSeason, Episode $currentEpisode")
+        webView.loadUrl(finalUrl)
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -182,13 +356,18 @@ class PlayerActivity : AppCompatActivity() {
 
         val tmdbId = intent.getIntExtra("TMDB_ID", -1)
         val isTv = intent.getBooleanExtra("IS_TV", false)
-        val seasonNumber = intent.getIntExtra("SEASON_NUMBER", 1)
-        val episodeNumber = intent.getIntExtra("EPISODE_NUMBER", 1)
+        currentSeason = intent.getIntExtra("SEASON_NUMBER", 1)
+        currentEpisode = intent.getIntExtra("EPISODE_NUMBER", 1)
         val title = intent.getStringExtra("TITLE") ?: "Unknown"
 
         if (tmdbId == -1) {
             finish()
             return
+        }
+
+        // Load season info for TV shows
+        if (isTv) {
+            loadSeasonInfo()
         }
 
         val repository = TmdbRepository()
@@ -203,21 +382,33 @@ class PlayerActivity : AppCompatActivity() {
                 voteAverage = intent.getDoubleExtra("VOTE_AVERAGE", 0.0),
                 releaseDate = intent.getStringExtra("RELEASE_DATE"),
                 isTv = isTv,
-                seasonNumber = if (isTv) seasonNumber else null,
-                episodeNumber = if (isTv) episodeNumber else null
+                seasonNumber = if (isTv) currentSeason else null,
+                episodeNumber = if (isTv) currentEpisode else null
             )
         )
 
         val url = intent.getStringExtra("STREAM_URL") ?: if (isTv) {
-            "https://vidlink.pro/tv/$tmdbId/$seasonNumber/$episodeNumber?autoplay=true"
+            "https://vidlink.pro/tv/$tmdbId/$currentSeason/$currentEpisode?autoplay=true"
         } else {
             "https://vidlink.pro/movie/$tmdbId?autoplay=true"
         }
+
+        // Store the provider URL for next episode
+        currentProviderUrl = url
 
         val isVideasyPlayer = url.startsWith("https://player.videasy.net")
         val isVidKingPlayer = url.startsWith("https://www.vidking.net") || url.startsWith("https://vidking.")
         val isVidLinkPlayer = url.startsWith("https://vidlink.pro")
         val isTrackingEnabled = isVideasyPlayer || isVidKingPlayer || isVidLinkPlayer
+
+        // Determine provider name
+        currentProviderName = when {
+            isVidLinkPlayer -> "VidLink"
+            isVidKingPlayer -> "VidKing"
+            isVideasyPlayer -> "Videasy"
+            url.contains("vidfast", ignoreCase = true) -> "VidFast"
+            else -> "VidLink"
+        }
 
         // ── Layout ────────────────────────────────────────────────────────────
         val rootLayout = FrameLayout(this).apply {
@@ -459,8 +650,34 @@ class PlayerActivity : AppCompatActivity() {
             )
         }
 
+        // ── Next Episode Button ────────────────────────────────────────────────
+        nextEpisodeButton = android.widget.Button(this).apply {
+            text = "Next Episode"
+            visibility = View.GONE
+            isFocusable = true
+            isFocusableInTouchMode = true
+            setBackgroundColor(android.graphics.Color.parseColor("#4CAF50"))
+            setTextColor(android.graphics.Color.WHITE)
+            textSize = 18f
+            setPadding(48, 24, 48, 24)
+            setOnClickListener {
+                Log.i(TAG, "[NextEpisode] Button clicked")
+                loadNextEpisode()
+            }
+        }
+
+        // Position the next episode button at bottom center
+        val buttonParams = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            gravity = android.view.Gravity.BOTTOM or android.view.Gravity.CENTER_HORIZONTAL
+            bottomMargin = 200
+        }
+
         rootLayout.addView(webView)
         rootLayout.addView(cursorView)
+        rootLayout.addView(nextEpisodeButton, buttonParams)
 
         // Clean, no legacy fallback needed for minSdk 28+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -496,6 +713,7 @@ class PlayerActivity : AppCompatActivity() {
                 showExitConfirmationDialog()            }
         })
     }
+
     private fun showExitConfirmationDialog() {
         QuitDialog(
             context = this,
@@ -511,6 +729,7 @@ class PlayerActivity : AppCompatActivity() {
             }
         ).show()
     }
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     override fun onResume() {
@@ -558,6 +777,21 @@ class PlayerActivity : AppCompatActivity() {
     // ── D-pad input ───────────────────────────────────────────────────────────
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // If next episode button is shown, handle D-pad for the button
+        if (showNextEpisodeButton && nextEpisodeButton?.visibility == View.VISIBLE) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_UP,
+                KeyEvent.KEYCODE_DPAD_DOWN,
+                KeyEvent.KEYCODE_DPAD_LEFT,
+                KeyEvent.KEYCODE_DPAD_RIGHT,
+                KeyEvent.KEYCODE_DPAD_CENTER,
+                KeyEvent.KEYCODE_ENTER -> {
+                    // Let the button handle the key
+                    return nextEpisodeButton?.dispatchKeyEvent(event) ?: false
+                }
+            }
+        }
+
         if (event.action == KeyEvent.ACTION_DOWN) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_UP,
@@ -572,6 +806,11 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        // Don't handle D-pad when next episode button is shown
+        if (showNextEpisodeButton && isCursorDisabled) {
+            return false
+        }
+
         return when (keyCode) {
             KeyEvent.KEYCODE_DPAD_UP -> {
                 showCursorAndResetTimer()
@@ -609,9 +848,11 @@ class PlayerActivity : AppCompatActivity() {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private fun updateCursorPosition() {
-        cursorView.x = cursorX
-        cursorView.y = cursorY
-        cursorView.invalidate()
+        if (!isCursorDisabled) {
+            cursorView.x = cursorX
+            cursorView.y = cursorY
+            cursorView.invalidate()
+        }
     }
 
     private fun simulateClick(x: Float, y: Float) {
@@ -638,11 +879,14 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun showCursorAndResetTimer() {
+        if (isCursorDisabled) return
+
         cursorView.animate().cancel()
         cursorView.alpha = 1f
         cursorHideHandler.removeCallbacks(cursorHideRunnable)
         cursorHideHandler.postDelayed(cursorHideRunnable, 5000)
     }
+
     private fun savePlaybackPosition() {
         webView.evaluateJavascript("""
             (function() {
@@ -669,5 +913,4 @@ class PlayerActivity : AppCompatActivity() {
             }
         }
     }
-
 }

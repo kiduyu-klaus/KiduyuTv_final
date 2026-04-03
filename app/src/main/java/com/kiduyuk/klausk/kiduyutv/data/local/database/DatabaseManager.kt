@@ -179,6 +179,15 @@ object DatabaseManager {
     }
 
     /**
+     * Update episode info for TV shows.
+     */
+    fun updateEpisodeInfo(mediaId: Int, mediaType: String, seasonNumber: Int, episodeNumber: Int) {
+        applicationScope.launch {
+            watchHistoryDao().updateEpisodeInfo(mediaId, mediaType, seasonNumber, episodeNumber)
+        }
+    }
+
+    /**
      * Get recent watch history.
      */
     fun getRecentWatchHistory(limit: Int = 20): Flow<List<WatchHistoryEntity>> {

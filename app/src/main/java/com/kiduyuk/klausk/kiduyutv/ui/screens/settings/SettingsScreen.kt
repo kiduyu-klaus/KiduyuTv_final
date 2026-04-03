@@ -14,12 +14,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PlaylistRemove
+import androidx.compose.material.icons.filled.Update
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -125,7 +128,15 @@ fun SettingsScreen(
                 SettingsSection.APP_VERSION -> {
                     AppVersionContent(
                         currentVersion = BuildConfig.VERSION_NAME,
-                        whatsNew = "Fixed some minor bugs and improved performance."
+                        whatsNew = "Fixed some minor bugs and improved performance.",
+                        // Update check states
+                        isCheckingForUpdates = uiState.isCheckingForUpdates,
+                        updateCheckResult = uiState.updateCheckResult,
+                        updateAvailable = uiState.updateAvailable,
+                        isDownloadingUpdate = uiState.isDownloadingUpdate,
+                        downloadProgress = uiState.downloadProgress,
+                        onCheckForUpdatesClick = { viewModel.checkForUpdates(context) },
+                        onDownloadUpdateClick = { viewModel.downloadAndInstallUpdate(context) }
                     )
                 }
             }
@@ -449,10 +460,19 @@ private fun AppInformationContent(
 @Composable
 private fun AppVersionContent(
     currentVersion: String,
-    whatsNew: String
+    whatsNew: String,
+    isCheckingForUpdates: Boolean,
+    updateCheckResult: String?,
+    updateAvailable: Boolean,
+    isDownloadingUpdate: Boolean,
+    downloadProgress: Int,
+    onCheckForUpdatesClick: () -> Unit,
+    onDownloadUpdateClick: () -> Unit
 ) {
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.Top
     ) {
         Text(
@@ -496,6 +516,176 @@ private fun AppVersionContent(
                     fontSize = 14.sp,
                     lineHeight = 22.sp
                 )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // ── Check for Updates Section ────────────────────────────────
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(CardDark)
+                .padding(24.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(
+                    text = "Updates",
+                    color = TextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Text(
+                    text = "Check for the latest updates to ensure you have the best experience with KiduyuTV.",
+                    color = TextSecondary,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+
+                // Check for Updates Button
+                val interactionSource = remember { MutableInteractionSource() }
+                val isFocused by interactionSource.collectIsFocusedAsState()
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            when {
+                                isCheckingForUpdates || isDownloadingUpdate -> PrimaryRed.copy(alpha = 0.5f)
+                                isFocused -> PrimaryRed.copy(alpha = 0.8f)
+                                else -> PrimaryRed
+                            }
+                        )
+                        .border(
+                            width = if (isFocused) 2.dp else 0.dp,
+                            color = if (isFocused) Color.White.copy(alpha = 0.5f) else Color.Transparent,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                            enabled = !isCheckingForUpdates && !isDownloadingUpdate,
+                            onClick = onCheckForUpdatesClick
+                        )
+                        .focusable(interactionSource = interactionSource)
+                        .padding(horizontal = 24.dp, vertical = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (isCheckingForUpdates) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                color = Color.White,
+                                strokeWidth = 2.dp
+                            )
+                            Text(
+                                text = "Checking...",
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Update,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = "Check for Updates",
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+
+                // Update Result Message
+                if (updateCheckResult != null) {
+                    val resultColor = if (updateAvailable) Color(0xFF4CAF50) else TextSecondary
+                    Text(
+                        text = updateCheckResult,
+                        color = resultColor,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                // Download Progress
+                if (isDownloadingUpdate) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "Downloading update... $downloadProgress%",
+                            color = TextSecondary,
+                            fontSize = 14.sp
+                        )
+                        LinearProgressIndicator(
+                            progress = { downloadProgress / 100f },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(4.dp)),
+                            color = PrimaryRed,
+                            trackColor = TextTertiary.copy(alpha = 0.3f),
+                        )
+                    }
+                }
+
+                // Download Update Button (shown when update is available)
+                if (updateAvailable && !isDownloadingUpdate) {
+                    val downloadInteractionSource = remember { MutableInteractionSource() }
+                    val downloadFocused by downloadInteractionSource.collectIsFocusedAsState()
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                when {
+                                    downloadFocused -> Color(0xFF4CAF50).copy(alpha = 0.8f)
+                                    else -> Color(0xFF4CAF50)
+                                }
+                            )
+                            .border(
+                                width = if (downloadFocused) 2.dp else 0.dp,
+                                color = if (downloadFocused) Color.White.copy(alpha = 0.5f) else Color.Transparent,
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .clickable(
+                                interactionSource = downloadInteractionSource,
+                                indication = null,
+                                onClick = onDownloadUpdateClick
+                            )
+                            .focusable(interactionSource = downloadInteractionSource)
+                            .padding(horizontal = 24.dp, vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Download,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = "Download Update",
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -779,7 +969,7 @@ private fun PreviewAppInformation() {
     showBackground = true,
     backgroundColor = 0xFF0D0D0D,
     widthDp = 600,
-    heightDp = 400
+    heightDp = 600
 )
 @Composable
 private fun PreviewAppVersion() {
@@ -792,7 +982,107 @@ private fun PreviewAppVersion() {
         ) {
             AppVersionContent(
                 currentVersion = "1.4.2",
-                whatsNew = "Fixed some minor bugs and improved performance."
+                whatsNew = "Fixed some minor bugs and improved performance.",
+                isCheckingForUpdates = false,
+                updateCheckResult = null,
+                updateAvailable = false,
+                isDownloadingUpdate = false,
+                downloadProgress = 0,
+                onCheckForUpdatesClick = {},
+                onDownloadUpdateClick = {}
+            )
+        }
+    }
+}
+
+@Preview(
+    name = "App Version — Update Available",
+    showBackground = true,
+    backgroundColor = 0xFF0D0D0D,
+    widthDp = 600,
+    heightDp = 600
+)
+@Composable
+private fun PreviewAppVersionUpdateAvailable() {
+    KiduyuTvTheme {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(SurfaceDark)
+                .padding(32.dp)
+        ) {
+            AppVersionContent(
+                currentVersion = "1.4.2",
+                whatsNew = "Fixed some minor bugs and improved performance.",
+                isCheckingForUpdates = false,
+                updateCheckResult = "Update available: v1.5.0 (current: v1.4.2)",
+                updateAvailable = true,
+                isDownloadingUpdate = false,
+                downloadProgress = 0,
+                onCheckForUpdatesClick = {},
+                onDownloadUpdateClick = {}
+            )
+        }
+    }
+}
+
+@Preview(
+    name = "App Version — Checking",
+    showBackground = true,
+    backgroundColor = 0xFF0D0D0D,
+    widthDp = 600,
+    heightDp = 600
+)
+@Composable
+private fun PreviewAppVersionChecking() {
+    KiduyuTvTheme {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(SurfaceDark)
+                .padding(32.dp)
+        ) {
+            AppVersionContent(
+                currentVersion = "1.4.2",
+                whatsNew = "Fixed some minor bugs and improved performance.",
+                isCheckingForUpdates = true,
+                updateCheckResult = null,
+                updateAvailable = false,
+                isDownloadingUpdate = false,
+                downloadProgress = 0,
+                onCheckForUpdatesClick = {},
+                onDownloadUpdateClick = {}
+            )
+        }
+    }
+}
+
+@Preview(
+    name = "App Version — Downloading",
+    showBackground = true,
+    backgroundColor = 0xFF0D0D0D,
+    widthDp = 600,
+    heightDp = 600
+)
+@Composable
+private fun PreviewAppVersionDownloading() {
+    KiduyuTvTheme {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(SurfaceDark)
+                .padding(32.dp)
+        ) {
+            AppVersionContent(
+                currentVersion = "1.4.2",
+                whatsNew = "Fixed some minor bugs and improved performance.",
+                isCheckingForUpdates = false,
+                updateCheckResult = "Update available: v1.5.0 (current: v1.4.2)",
+                updateAvailable = true,
+                isDownloadingUpdate = true,
+                downloadProgress = 45,
+                onCheckForUpdatesClick = {},
+                onDownloadUpdateClick = {}
             )
         }
     }

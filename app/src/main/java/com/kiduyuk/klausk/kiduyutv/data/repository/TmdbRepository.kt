@@ -432,6 +432,18 @@ class TmdbRepository {
     }
 
     /**
+     * Updates episode info for a TV show.
+     *
+     * @param mediaId The TMDB ID of the TV show
+     * @param mediaType "tv"
+     * @param seasonNumber The current season number
+     * @param episodeNumber The current episode number
+     */
+    fun updateEpisodeInfo(mediaId: Int, mediaType: String, seasonNumber: Int, episodeNumber: Int) {
+        DatabaseManager.updateEpisodeInfo(mediaId, mediaType, seasonNumber, episodeNumber)
+    }
+
+    /**
      * Checks if a media item is in the watch history.
      */
     fun getWatchHistoryItem(context: Context, id: Int, isTv: Boolean): WatchHistoryItem? {
