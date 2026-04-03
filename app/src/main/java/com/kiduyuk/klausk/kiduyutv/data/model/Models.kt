@@ -282,7 +282,101 @@ data class WatchHistoryItem(
     val episodeNumber: Int? = null,
     val lastWatched: Long = System.currentTimeMillis(),
     val playbackPosition: Long = 0L
-)
+) {
+    /**
+     * Checks if this watch history item needs enrichment from TMDB.
+     * An item needs enrichment when any of the critical fields are missing or empty.
+     *
+     * Fields checked:
+     * - title: Must not be blank
+     * - posterPath: Must not be null or blank (needed for card display)
+     * - backdropPath: Must not be null or blank (needed for hero section)
+     * - voteAverage: Must not be 0.0 (indicates missing data)
+     * - releaseDate: Must not be null or blank
+     *
+     * @return true if the item needs TMDB detail enrichment, false otherwise
+     */
+    fun needsEnrichment(): Boolean {
+        return title.isBlank() ||
+                posterPath.isNullOrBlank() ||
+                backdropPath.isNullOrBlank() ||
+                voteAverage == 0.0 ||
+                releaseDate.isNullOrBlank()
+    }
+
+    /**
+     * Checks if the overview is missing.
+     * Useful for deciding whether to show "No overview available" placeholder.
+     *
+     * @return true if overview is null or blank, false otherwise
+     */
+    fun hasOverview(): Boolean = !overview.isNullOrBlank()
+
+    /**
+     * Checks if the item has a valid poster image path.
+     *
+     * @return true if posterPath is not null or blank, false otherwise
+     */
+    fun hasPoster(): Boolean = !posterPath.isNullOrBlank()
+
+    /**
+     * Checks if the item has a valid backdrop image path.
+     *
+     * @return true if backdropPath is not null or blank, false otherwise
+     */
+    fun hasBackdrop(): Boolean = !backdropPath.isNullOrBlank()
+
+    /**
+     * Checks if the item has a valid vote average.
+     *
+     * @return true if voteAverage is greater than 0, false otherwise
+     */
+    fun hasVoteAverage(): Boolean = voteAverage > 0.0
+
+    /**
+     * Checks if the item has a valid release date.
+     *
+     * @return true if releaseDate is not null or blank, false otherwise
+     */
+    fun hasReleaseDate(): Boolean = !releaseDate.isNullOrBlank()
+
+    /**
+     * Gets the media type string for API calls.
+     *
+     * @return "movie" if this is a movie, "tv" if this is a TV show
+     */
+    fun getMediaType(): String = if (isTv) "tv" else "movie"
+
+    /**
+     * Creates a copy of this item with enriched data from TMDB.
+     * Only updates fields that are missing in this item.
+     *
+     * @param enrichedTitle The title from TMDB (used if current title is blank)
+     * @param enrichedOverview The overview from TMDB (used if current overview is blank)
+     * @param enrichedPosterPath The poster path from TMDB (used if current is blank)
+     * @param enrichedBackdropPath The backdrop path from TMDB (used if current is blank)
+     * @param enrichedVoteAverage The vote average from TMDB (used if current is 0)
+     * @param enrichedReleaseDate The release date from TMDB (used if current is blank)
+     * @return A new WatchHistoryItem with enriched data
+     */
+    fun withEnrichedData(
+        enrichedTitle: String?,
+        enrichedOverview: String?,
+        enrichedPosterPath: String?,
+        enrichedBackdropPath: String?,
+        enrichedVoteAverage: Double,
+        enrichedReleaseDate: String?
+    ): WatchHistoryItem {
+        return copy(
+            title = if (title.isBlank() && !enrichedTitle.isNullOrBlank()) enrichedTitle else title,
+            overview = if (overview.isNullOrBlank() && !enrichedOverview.isNullOrBlank()) enrichedOverview else overview,
+            posterPath = if (posterPath.isNullOrBlank() && !enrichedPosterPath.isNullOrBlank()) enrichedPosterPath else posterPath,
+            backdropPath = if (backdropPath.isNullOrBlank() && !enrichedBackdropPath.isNullOrBlank()) enrichedBackdropPath else backdropPath,
+            voteAverage = if (voteAverage == 0.0 && enrichedVoteAverage > 0) enrichedVoteAverage else voteAverage,
+            releaseDate = if (releaseDate.isNullOrBlank() && !enrichedReleaseDate.isNullOrBlank()) enrichedReleaseDate else releaseDate
+        )
+    }
+}
 
 /**
  * Data class representing a video associated with a movie or TV show (e.g., a trailer).

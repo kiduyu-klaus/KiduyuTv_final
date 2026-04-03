@@ -76,9 +76,36 @@ class SettingsViewModel : ViewModel() {
                 cacheSize = "0 B"
             )
 
-            // Reset success message after a few seconds
-            delay(3000)
-            _uiState.value = _uiState.value.copy(cacheClearSuccess = false)
+            // Show restart dialog to recommend app restart
+            val restartDialog = QuitDialog(
+                context = context,
+                title = "Cache Cleared",
+                message = "Cache has been cleared successfully. It is recommended to restart the app for the changes to take full effect.",
+                positiveButtonText = "Restart",
+                negativeButtonText = "Later",
+                lottieAnimRes = com.kiduyuk.klausk.kiduyutv.R.raw.exit,
+                onYes = {
+                    // Restart the app
+                    val packageManager = context.packageManager
+                    val intent = packageManager.getLaunchIntentForPackage(context.packageName)
+                    if (intent != null) {
+                        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
+                        context.startActivity(intent)
+                        // Kill the current activity
+                        if (context is android.app.Activity) {
+                            context.finishAffinity()
+                        }
+                    }
+                },
+                onNo = {
+                    // Reset success message after user dismisses dialog
+                    viewModelScope.launch {
+                        delay(500)
+                        _uiState.value = _uiState.value.copy(cacheClearSuccess = false)
+                    }
+                }
+            )
+            restartDialog.show()
         }
     }
 

@@ -249,6 +249,55 @@ object DatabaseManager {
         }
     }
 
+    /**
+     * Update watch history item with fetched TMDB details.
+     * This is a suspend function that updates the database with fresh data from TMDB.
+     *
+     * @param mediaId The TMDB ID of the media
+     * @param mediaType "movie" or "tv"
+     * @param title The title/name from TMDB
+     * @param overview The overview from TMDB
+     * @param posterPath The poster path from TMDB
+     * @param backdropPath The backdrop path from TMDB
+     * @param voteAverage The vote average from TMDB
+     * @param releaseDate The release/air date from TMDB
+     */
+    suspend fun updateWatchHistoryDetails(
+        mediaId: Int,
+        mediaType: String,
+        title: String?,
+        overview: String?,
+        posterPath: String?,
+        backdropPath: String?,
+        voteAverage: Double,
+        releaseDate: String?
+    ) {
+        withContext(Dispatchers.IO) {
+            watchHistoryDao().updateWatchHistoryDetails(
+                mediaId = mediaId,
+                mediaType = mediaType,
+                title = title,
+                overview = overview,
+                posterPath = posterPath,
+                backdropPath = backdropPath,
+                voteAverage = voteAverage,
+                releaseDate = releaseDate
+            )
+        }
+    }
+
+    /**
+     * Get watch history items that need TMDB detail fetching.
+     * These are items with missing or empty poster/backdrop/title.
+     *
+     * @return List of entities needing details
+     */
+    suspend fun getWatchHistoryItemsNeedingDetails(): List<WatchHistoryEntity> {
+        return withContext(Dispatchers.IO) {
+            watchHistoryDao().getWatchHistoryItemsNeedingDetails()
+        }
+    }
+
     // ========== Movie Caching Operations ==========
 
     /**

@@ -189,10 +189,32 @@ private fun HomeContent(
                     // or just start the rows.
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    // Now Playing Row - First row, gets initial focus
+                    if (uiState.nowPlayingMovies.isNotEmpty()) {
+                        ContentRow(
+                            title = "Now Playing",
+                            items = uiState.nowPlayingMovies,
+                            initialFocusRequester = firstItemFocusRequester,
+                            restoreFocusItemId = lastClickedItemId,
+                            getItemId = { it.id },
+                            onItemFocus = { movie -> onSelectItem(movie) },
+                            onItemClick = { movie ->
+                                onSelectItem(movie)
+                                onSetLastClickedItemId(movie.id)
+                                onMovieClick(movie.id)
+                            }
+                        ) { movie, isFocused, onClick ->
+                            MovieCard(
+                                movie = movie,
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
+                        }
+                    }
+
                     ContentRow(
                         title = "TV Shows Trending Today",
                         items = uiState.trendingTvShows,
-                        initialFocusRequester = firstItemFocusRequester,
                         restoreFocusItemId = lastClickedItemId,
                         getItemId = { it.id },
                         onItemFocus = { tvShow -> onSelectItem(tvShow) },

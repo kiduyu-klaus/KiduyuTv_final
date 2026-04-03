@@ -20,6 +20,7 @@ data class HomeUiState(
     val isLoading: Boolean = true,
     val trendingTvShows: List<TvShow> = emptyList(),
     val trendingMovies: List<Movie> = emptyList(),
+    val nowPlayingMovies: List<Movie> = emptyList(),
     val continueWatching: List<WatchHistoryItem> = emptyList(),
     val popularNetworks: List<NetworkItem> = emptyList(),
     val popularCompanies: List<NetworkItem> = emptyList(),
@@ -97,10 +98,11 @@ class HomeViewModel : ViewModel() {
                     isLoading = false,
                     trendingTvShows = trendingTv,
                     trendingMovies = trendingMovies,
+                    nowPlayingMovies = nowPlaying,
                     continueWatching = watchHistory,
                     latestMovies = topRatedMovies.take(30),
                     topTvShows = topRatedTv.take(30),
-                    selectedItem = trendingTv.firstOrNull() ?: trendingMovies.firstOrNull()
+                    selectedItem = nowPlaying.firstOrNull() ?: trendingTv.firstOrNull() ?: trendingMovies.firstOrNull()
                 )
 
                 // Load secondary content in background to avoid blocking the UI

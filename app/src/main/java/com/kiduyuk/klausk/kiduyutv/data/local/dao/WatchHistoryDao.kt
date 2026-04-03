@@ -160,4 +160,42 @@ interface WatchHistoryDao {
         ORDER BY lastWatchedTimestamp DESC
     """)
     fun getWatchHistoryInRange(startTimestamp: Long, endTimestamp: Long): Flow<List<WatchHistoryEntity>>
+
+    /**
+     * Update watch history item with fetched TMDB details.
+     * Used to fill in missing fields like overview, poster, backdrop, etc.
+     */
+    @Query("""
+        UPDATE watch_history 
+        SET title = :title,
+            overview = :overview,
+            posterPath = :posterPath,
+            backdropPath = :backdropPath,
+            voteAverage = :voteAverage,
+            releaseDate = :releaseDate
+        WHERE id = :mediaId AND mediaType = :mediaType
+    """)
+    suspend fun updateWatchHistoryDetails(
+        mediaId: Int,
+        mediaType: String,
+        title: String?,
+        overview: String?,
+        posterPath: String?,
+        backdropPath: String?,
+        voteAverage: Double,
+        releaseDate: String?
+    )
+
+    /**
+     * Get all watch history items that need TMDB detail fetching.
+     * Items where poster or backdrop is null/empty.
+     */
+    @Query("""
+        SELECT * FROM watch_history 
+        WHERE posterPath IS NULL OR posterPath = '' 
+           OR backdropPath IS NULL OR backdropPath = ''
+           OR title IS NULL OR title = ''
+        ORDER BY lastWatchedTimestamp DESC
+    """)
+    suspend fun getWatchHistoryItemsNeedingDetails(): List<WatchHistoryEntity>
 }
