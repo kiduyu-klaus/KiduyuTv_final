@@ -97,17 +97,26 @@ class HomeViewModel : ViewModel() {
                 // Get watch history
                 val watchHistory = repository.getWatchHistory(context)
 
+                // Sort all content rows by vote average (highest first)
+                val sortedTrendingTv = trendingTv.sortedByDescending { it.voteAverage }
+                val sortedTrendingMovies = trendingMovies.sortedByDescending { it.voteAverage }
+                val sortedTrendingMoviesThisWeek = trendingMoviesThisWeek.sortedByDescending { it.voteAverage }
+                val sortedNowPlaying = nowPlaying.sortedByDescending { it.voteAverage }
+                val sortedWatchHistory = watchHistory.sortedByDescending { it.voteAverage }
+                val sortedTopRatedMovies = topRatedMovies.take(30).sortedByDescending { it.voteAverage }
+                val sortedTopRatedTv = topRatedTv.take(30).sortedByDescending { it.voteAverage }
+
                 // Update initial state with primary content first to free up the UI thread
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    trendingTvShows = trendingTv,
-                    trendingMovies = trendingMovies,
-                    trendingMoviesThisWeek = trendingMoviesThisWeek,
-                    nowPlayingMovies = nowPlaying,
-                    continueWatching = watchHistory,
-                    latestMovies = topRatedMovies.take(30),
-                    topTvShows = topRatedTv.take(30),
-                    selectedItem = nowPlaying.firstOrNull() ?: trendingTv.firstOrNull() ?: trendingMovies.firstOrNull()
+                    trendingTvShows = sortedTrendingTv,
+                    trendingMovies = sortedTrendingMovies,
+                    trendingMoviesThisWeek = sortedTrendingMoviesThisWeek,
+                    nowPlayingMovies = sortedNowPlaying,
+                    continueWatching = sortedWatchHistory,
+                    latestMovies = sortedTopRatedMovies,
+                    topTvShows = sortedTopRatedTv,
+                    selectedItem = sortedNowPlaying.firstOrNull() ?: sortedTrendingTv.firstOrNull() ?: sortedTrendingMovies.firstOrNull()
                 )
 
                 // Enrich watch history items with TMDB details in background
@@ -190,16 +199,26 @@ class HomeViewModel : ViewModel() {
                         ?.map { NetworkItem(it.id, it.name, it.logoPath, "company") }
                         ?: emptyList()
 
+                    // Sort secondary content by vote average (highest first)
+                    val sortedOscarWinners = oscarWinners2026.sortedByDescending { it.voteAverage }
+                    val sortedHallmark = hallmarkMovies.sortedByDescending { it.voteAverage }
+                    val sortedTrueStory = trueStoryMovies.sortedByDescending { it.voteAverage }
+                    val sortedSitcoms = bestSitcoms.sortedByDescending { it.voteAverage }
+                    val sortedClassics = bestClassics.sortedByDescending { it.voteAverage }
+                    val sortedSpyMovies = spyMovies.sortedByDescending { it.voteAverage }
+                    val sortedStathamMovies = stathamMovies.sortedByDescending { it.voteAverage }
+                    val sortedTimeTravel = timeTravelMovies.sortedByDescending { it.voteAverage }
+
                     // Update UI with all secondary content at once
                     _uiState.value = _uiState.value.copy(
-                        oscarWinners2026 = oscarWinners2026,
-                        hallmarkMovies = hallmarkMovies,
-                        trueStoryMovies = trueStoryMovies,
-                        bestSitcoms = bestSitcoms,
-                        bestClassics = bestClassics,
-                        spyMovies = spyMovies,
-                        stathamMovies = stathamMovies,
-                        timeTravelMovies = timeTravelMovies,
+                        oscarWinners2026 = sortedOscarWinners,
+                        hallmarkMovies = sortedHallmark,
+                        trueStoryMovies = sortedTrueStory,
+                        bestSitcoms = sortedSitcoms,
+                        bestClassics = sortedClassics,
+                        spyMovies = sortedSpyMovies,
+                        stathamMovies = sortedStathamMovies,
+                        timeTravelMovies = sortedTimeTravel,
                         popularNetworks = networks,
                         popularCompanies = companies
                     )

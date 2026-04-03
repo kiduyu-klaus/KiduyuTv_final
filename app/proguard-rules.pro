@@ -1,43 +1,94 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+##############################################
+# 🔒 GENERAL SAFE RULES
+##############################################
 
-# Keep Retrofit
--keepattributes Signature, InnerClasses, EnclosingMethod
--keepattributes RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations
--keepclassmembers,allowshrinking,allowobfuscation interface * {
-    @retrofit2.http.* <methods>;
+# Keep Kotlin metadata
+-keep class kotlin.Metadata { *; }
+
+# Keep constructors (reflection safety)
+-keepclassmembers class * {
+    public <init>(...);
 }
--dontwarn org.codehaus.mojo.animal_sniffer.IgnoreJRERequirement
+
+# Don't warn common issues
 -dontwarn javax.annotation.**
 -dontwarn kotlin.Unit
--dontwarn retrofit2.KotlinExtensions
--dontwarn retrofit2.KotlinExtensions$*
+-keep class androidx.core.app.CoreComponentFactory { *; }
 
-# Keep Gson
--keepattributes Signature
--keepattributes *Annotation*
--dontwarn sun.misc.**
--keep class com.google.gson.stream.** { *; }
--keep class * extends com.google.gson.TypeAdapter
--keep class * implements com.google.gson.TypeAdapterFactory
--keep class * implements com.google.gson.JsonSerializer
--keep class * implements com.google.gson.JsonDeserializer
--keepclassmembers,allowobfuscation class * {
-  @com.google.gson.annotations.SerializedName <fields>;
+
+##############################################
+# 🌐 WEBVIEW (CRITICAL FOR STREAMING)
+##############################################
+
+# Keep JavaScript interface methods
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
 }
 
-# Keep data models
--keep class com.kiduyuk.klausk.kiduyutv.data.model.** { *; }
+# Prevent WebView warnings
+-dontwarn android.webkit.**
 
-# Keep OkHttp
+
+##############################################
+# 🎨 JETPACK COMPOSE
+##############################################
+
+-keep class androidx.compose.** { *; }
+-dontwarn androidx.compose.**
+
+
+##############################################
+# 📡 RETROFIT / OKHTTP
+##############################################
+
+-keepattributes Signature
+-keepattributes *Annotation*
+
+-keep class retrofit2.** { *; }
+-keep class okhttp3.** { *; }
+
+-dontwarn retrofit2.**
 -dontwarn okhttp3.**
--dontwarn okio.**
--dontwarn javax.annotation.**
--keepnames class okhttp3.internal.publicsuffix.PublicSuffixDatabase
 
-# Keep Coil
--dontwarn coil.**
+
+##############################################
+# 🧠 GSON / JSON PARSING
+##############################################
+
+-keep class com.google.gson.** { *; }
+
+-keep class * {
+    @com.google.gson.annotations.SerializedName <fields>;
+}
+
+
+##############################################
+# 🗄 ROOM DATABASE (if used)
+##############################################
+
+-keep class androidx.room.** { *; }
+-keep @androidx.room.* class * { *; }
+
+
+##############################################
+# 🎥 EXOPLAYER (ONLY IF YOU USE IT)
+##############################################
+
+-keep class com.google.android.exoplayer2.** { *; }
+-dontwarn com.google.android.exoplayer2.**
+
+
+##############################################
+# ⚙️ MODEL CLASSES (IMPORTANT)
+##############################################
+
+# Keep your app models (adjust package if needed)
+-keep class com.kiduyuk.klausk.kiduyutv.model.** { *; }
+
+
+##############################################
+# 🚫 OPTIONAL OPTIMIZATION CONTROL
+##############################################
+
+# Prevent overly aggressive optimization (safer for streaming apps)
+-optimizations !code/simplification/arithmetic

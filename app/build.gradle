@@ -37,8 +37,21 @@ android {
     buildTypes {
         release {
             signingConfig signingConfigs.release
+
+            // ✅ ENABLE R8
+            minifyEnabled true
+
+            // ✅ REMOVE UNUSED RESOURCES
+            shrinkResources true
+
+            // ✅ USE OPTIMIZED DEFAULT RULES
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
+                    'proguard-rules.pro'
+        }
+
+        debug {
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            shrinkResources false
         }
     }
 
@@ -55,7 +68,9 @@ android {
         compose true
         buildConfig true
     }
-
+    composeOptions {
+        kotlinCompilerExtensionVersion '1.5.14'
+    }
     kotlin {
         jvmToolchain(17)
     }
@@ -112,6 +127,10 @@ dependencies {
     // Coil for image loading
     implementation 'io.coil-kt:coil-compose:2.7.0'
 
+    // AppCompat is often the source of this issue
+    implementation "androidx.appcompat:appcompat:1.7.0"
+    implementation "androidx.fragment:fragment-ktx:1.8.5"
+
     // Glide
     implementation 'com.github.bumptech.glide:glide:4.16.0'
     implementation 'androidx.appcompat:appcompat:1.7.0'
@@ -134,7 +153,7 @@ dependencies {
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1'
 
     implementation "androidx.window:window:1.1.0"
-
+    implementation("androidx.webkit:webkit:1.15.0")
     // Testing
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'
@@ -149,5 +168,8 @@ configurations.all {
     resolutionStrategy {
         force 'androidx.core:core-ktx:1.13.1'
         force 'androidx.core:core:1.13.1'
+        force "androidx.appcompat:appcompat:1.7.0"
+        force "androidx.activity:activity-ktx:1.9.3"
+        force "androidx.fragment:fragment-ktx:1.8.5"
     }
 }
