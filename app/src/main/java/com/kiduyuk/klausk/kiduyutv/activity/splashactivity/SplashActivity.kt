@@ -327,6 +327,9 @@ class SplashActivity : ComponentActivity() {
             val json = connection.inputStream.bufferedReader().use { it.readText() }
             val releases = org.json.JSONArray(json)
 
+            var bestApkUrl: String? = null
+            var maxBuildNumber = -1
+
             // Mirror the workflow: first prerelease with a "release" APK asset
             for (i in 0 until releases.length()) {
                 val release = releases.getJSONObject(i)
@@ -336,14 +339,29 @@ class SplashActivity : ComponentActivity() {
                 for (j in 0 until assets.length()) {
                     val asset = assets.getJSONObject(j)
                     val name = asset.optString("name", "")
+                    
+                    // Match "release" and exclude "debug"
                     if (name.contains("release", ignoreCase = true) &&
                         !name.contains("debug", ignoreCase = true)
                     ) {
-                        return@withContext asset.optString("browser_download_url", null)
+                        // Extract build number from name like "KiduyuTv-release-1.1.3-build273.apk"
+                        val buildMatch = Regex("build(\\d+)").find(name)
+                        if (buildMatch != null) {
+                            val buildNumber = buildMatch.groupValues[1].toInt()
+                            if (buildNumber > maxBuildNumber) {
+                                maxBuildNumber = buildNumber
+                                bestApkUrl = asset.optString("browser_download_url", null)
+                            }
+                        } else if (bestApkUrl == null) {
+                            // Fallback if no build number found but it's a valid release APK
+                            bestApkUrl = asset.optString("browser_download_url", null)
+                        }
                     }
                 }
+                // If we found any APK in the first prerelease we encountered, we use it (as it's the latest release)
+                if (bestApkUrl != null) break
             }
-            null
+            bestApkUrl
         } catch (e: Exception) {
             Log.e("SplashActivity", "Error fetching APK URL", e)
             null
