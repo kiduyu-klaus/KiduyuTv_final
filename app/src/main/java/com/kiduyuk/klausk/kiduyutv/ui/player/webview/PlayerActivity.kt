@@ -659,12 +659,15 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         // ── Next Episode Button ────────────────────────────────────────────────
+        val greenColor = android.graphics.Color.parseColor("#4CAF50")
+        val redColor = android.graphics.Color.parseColor("#F44336")
+
         nextEpisodeButton = android.widget.Button(this).apply {
             text = "Next Episode"
             visibility = View.GONE
             isFocusable = true
             isFocusableInTouchMode = true
-            setBackgroundColor(android.graphics.Color.parseColor("#4CAF50"))
+            setBackgroundColor(greenColor)
             setTextColor(android.graphics.Color.WHITE)
             textSize = 20f
             setPadding(60, 30, 60, 30)
@@ -673,6 +676,11 @@ class PlayerActivity : AppCompatActivity() {
             setOnClickListener {
                 Log.i(TAG, "[NextEpisode] Button clicked")
                 loadNextEpisode()
+            }
+            // Change background to red when focused
+            onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
+                setBackgroundColor(if (hasFocus) redColor else greenColor)
+                Log.i(TAG, "[NextEpisode] Button focus: $hasFocus")
             }
         }
 
