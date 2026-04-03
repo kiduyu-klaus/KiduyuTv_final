@@ -143,6 +143,7 @@ fun <T> ContentRow(
     }
 }
 
+
 /**
  * Composable function to display a horizontal row of network items.
  * It handles focus changes and click events for each network item.
@@ -150,6 +151,7 @@ fun <T> ContentRow(
  * @param title The title of the network row.
  * @param items The list of [NetworkItem] data to display.
  * @param modifier The modifier to be applied to the network row.
+ * @param restoreFocusItemId Optional ID of the item to restore focus to after navigation.
  * @param onItemClick Lambda to be invoked when a network item is clicked.
  */
 @Composable
@@ -157,6 +159,7 @@ fun NetworkRow(
     title: String,
     items: List<com.kiduyuk.klausk.kiduyutv.viewmodel.NetworkItem>,
     modifier: Modifier = Modifier,
+    restoreFocusItemId: Int? = null,
     onItemClick: (com.kiduyuk.klausk.kiduyutv.viewmodel.NetworkItem) -> Unit
 ) {
     // State to keep track of the currently selected item's index. Initialized to -1 (no selection).
@@ -191,6 +194,7 @@ fun NetworkRow(
                 NetworkCard(
                     item = item,
                     isSelected = index == selectedIndex,
+                    restoreFocus = restoreFocusItemId != null && item.id == restoreFocusItemId,
                     onFocus = { selectedIndex = index }, // Update selectedIndex when item gains focus.
                     onClick = {
                         selectedIndex = index
@@ -202,6 +206,7 @@ fun NetworkRow(
     }
 }
 
+
 /**
  * Composable function to display a single network card.
  * It handles its own focus and click events, and provides visual feedback for focus.
@@ -209,6 +214,7 @@ fun NetworkRow(
  *
  * @param item The [NetworkItem] data to display.
  * @param isSelected A boolean indicating if the card is currently selected (focused).
+ * @param restoreFocus A boolean indicating if focus should be restored to this card.
  * @param onFocus Lambda to be invoked when the card gains focus.
  * @param onClick Lambda to be invoked when the card is clicked.
  */
@@ -216,6 +222,7 @@ fun NetworkRow(
 private fun NetworkCard(
     item: com.kiduyuk.klausk.kiduyutv.viewmodel.NetworkItem,
     isSelected: Boolean,
+    restoreFocus: Boolean = false,
     onFocus: () -> Unit,
     onClick: () -> Unit
 ) {
@@ -223,6 +230,15 @@ private fun NetworkCard(
     val interactionSource = remember { MutableInteractionSource() }
     // Collect the focus state as a State.
     val isFocused by interactionSource.collectIsFocusedAsState()
+    // Create a FocusRequester for restoring focus after navigation.
+    val focusRequester = remember { FocusRequester() }
+
+    // Effect to restore focus when returning from navigation.
+    LaunchedEffect(restoreFocus) {
+        if (restoreFocus) {
+            focusRequester.requestFocus()
+        }
+    }
 
     // Effect to trigger onFocus callback when the item gains focus.
     LaunchedEffect(isFocused) {
@@ -241,6 +257,7 @@ private fun NetworkCard(
         modifier = Modifier
             .width(160.dp)
             .height(100.dp)
+            .focusRequester(focusRequester)
             .then(
                 // Apply a border if the card is focused.
                 if (isFocused) {

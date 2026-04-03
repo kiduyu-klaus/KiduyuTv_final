@@ -317,6 +317,7 @@ private fun HomeContent(
                         NetworkRow(
                             title = "Popular Networks",
                             items = uiState.popularNetworks,
+                            restoreFocusItemId = lastClickedItemId,  // Added
                             onItemClick = { network ->
                                 onSetLastClickedItemId(network.id)
                                 onNavigate("media_list/network/${network.id}/${network.name}")
@@ -328,6 +329,7 @@ private fun HomeContent(
                         NetworkRow(
                             title = "Popular Companies",
                             items = uiState.popularCompanies,
+                            restoreFocusItemId = lastClickedItemId,  // Added
                             onItemClick = { company ->
                                 onSetLastClickedItemId(company.id)
                                 onNavigate("media_list/company/${company.id}/${company.name}")
