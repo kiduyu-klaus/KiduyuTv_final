@@ -124,9 +124,9 @@ object ApiClient {
         return OkHttpClient.Builder()
             .cache(cache)
             .addInterceptor(authInterceptor)
-            .addInterceptor(retryInterceptor) // Added global retry logic
-            .addNetworkInterceptor(cacheInterceptor) // For online requests
-            .addInterceptor(forceCacheInterceptor) // For offline requests
+            //.addInterceptor(retryInterceptor) // Added global retry logic
+            //.addNetworkInterceptor(cacheInterceptor) // For online requests
+            //.addInterceptor(forceCacheInterceptor) // For offline requests
             //.addInterceptor(loggingInterceptor)
             .connectTimeout(30, TimeUnit.SECONDS) // Updated from 60 to 30
             .readTimeout(30, TimeUnit.SECONDS)    // Updated from 60 to 30
