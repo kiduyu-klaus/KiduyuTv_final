@@ -101,7 +101,7 @@ class SplashActivity : ComponentActivity() {
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
             connection.connectTimeout = 10_000
-            connection.readTimeout    = 10_000
+            connection.readTimeout = 10_000
 
             if (connection.responseCode == HttpURLConnection.HTTP_OK) {
                 connection.inputStream.bufferedReader().use { it.readText().trim() }
@@ -115,11 +115,11 @@ class SplashActivity : ComponentActivity() {
     private fun isNewerVersion(remote: String, local: String): Boolean {
         return try {
             val remoteParts = remote.split(".").map { it.toInt() }
-            val localParts  = local.split(".").map  { it.toInt() }
-            val maxLength   = maxOf(remoteParts.size, localParts.size)
+            val localParts = local.split(".").map { it.toInt() }
+            val maxLength = maxOf(remoteParts.size, localParts.size)
             for (i in 0 until maxLength) {
                 val r = remoteParts.getOrElse(i) { 0 }
-                val l = localParts.getOrElse(i)  { 0 }
+                val l = localParts.getOrElse(i) { 0 }
                 if (r > l) return true
                 if (r < l) return false
             }
@@ -133,14 +133,14 @@ class SplashActivity : ComponentActivity() {
 
     private fun showUpdateDialog() {
         QuitDialog(
-            context            = this,
-            title              = "Update Available",
-            message            = "A newer version of Kiduyu TV is available. Would you like to download it now?",
+            context = this,
+            title = "Update Available",
+            message = "A newer version of Kiduyu TV is available. Would you like to download it now?",
             positiveButtonText = "Download",
             negativeButtonText = "Exit",
-            lottieAnimRes      = R.raw.exit,
-            onNo               = { finish() },
-            onYes              = {
+            lottieAnimRes = R.raw.exit,
+            onNo = { finish() },
+            onYes = {
                 lifecycleScope.launch {
                     val apkUrl = fetchLatestApkUrl()
                     if (apkUrl != null) {
@@ -174,7 +174,7 @@ class SplashActivity : ComponentActivity() {
             this, null, android.R.attr.progressBarStyleHorizontal
         ).apply {
             isIndeterminate = false
-            max      = 100
+            max = 100
             progress = 0
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -198,11 +198,11 @@ class SplashActivity : ComponentActivity() {
                 try {
                     val connection = URL(apkUrl).openConnection() as HttpURLConnection
                     connection.connectTimeout = 15_000
-                    connection.readTimeout    = 30_000
+                    connection.readTimeout = 30_000
                     connection.connect()
 
                     val totalBytes = connection.contentLengthLong
-                    val outFile    = File(getExternalFilesDir(null), "kiduyutv-update.apk")
+                    val outFile = File(getExternalFilesDir(null), "kiduyutv-update.apk")
 
                     connection.inputStream.use { input ->
                         FileOutputStream(outFile).use { output ->
@@ -216,7 +216,7 @@ class SplashActivity : ComponentActivity() {
                                     val pct = (downloaded * 100 / totalBytes).toInt()
                                     withContext(Dispatchers.Main) {
                                         progressBar.progress = pct
-                                        statusText.text      = "Downloading… $pct%"
+                                        statusText.text = "Downloading… $pct%"
                                     }
                                 }
                             }
@@ -236,25 +236,25 @@ class SplashActivity : ComponentActivity() {
             // ── Post-download QuitDialog ──────────────────────────────────────
             if (apkFile != null) {
                 QuitDialog(
-                    context            = this@SplashActivity,
-                    title              = "Download Complete",
-                    message            = "KiduyuTV has been downloaded.\nTap Install to apply the update.",
+                    context = this@SplashActivity,
+                    title = "Download Complete",
+                    message = "KiduyuTV has been downloaded.\nTap Install to apply the update.",
                     positiveButtonText = "Install",
                     negativeButtonText = "Later",
-                    lottieAnimRes      = R.raw.splash_loading,  // swap for a success Lottie if available
-                    onYes              = { installApk(apkFile) },
-                    onNo               = { /* user will install later */ }
+                    lottieAnimRes = R.raw.splash_loading,  // swap for a success Lottie if available
+                    onYes = { installApk(apkFile) },
+                    onNo = { /* user will install later */ }
                 ).showTracked()
             } else {
                 QuitDialog(
-                    context            = this@SplashActivity,
-                    title              = "Download Failed",
-                    message            = "Could not download the update.\nPlease check your connection and try again.",
+                    context = this@SplashActivity,
+                    title = "Download Failed",
+                    message = "Could not download the update.\nPlease check your connection and try again.",
                     positiveButtonText = "Retry",
                     negativeButtonText = "Cancel",
-                    lottieAnimRes      = R.raw.exit,
-                    onYes              = { downloadAndInstallApk(apkUrl) },
-                    onNo               = { /* dismiss */ }
+                    lottieAnimRes = R.raw.exit,
+                    onYes = { downloadAndInstallApk(apkUrl) },
+                    onNo = { /* dismiss */ }
                 ).showTracked()
             }
         }
@@ -267,7 +267,7 @@ class SplashActivity : ComponentActivity() {
             apkFile
         )
         val intent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
-            data  = uri
+            data = uri
             flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
             putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
             putExtra(Intent.EXTRA_RETURN_RESULT, true)
@@ -283,78 +283,88 @@ class SplashActivity : ComponentActivity() {
             val connection = url.openConnection() as HttpURLConnection
             connection.setRequestProperty("Accept", "application/vnd.github+json")
             connection.connectTimeout = 10_000
-            connection.readTimeout    = 10_000
+            connection.readTimeout = 10_000
 
             if (connection.responseCode != HttpURLConnection.HTTP_OK) return@withContext null
 
             val json = connection.inputStream.bufferedReader().use { it.readText() }
+            val releases = org.json.JSONArray(json)
 
             // Mirror the workflow: first prerelease with a "release" APK asset
-            val releaseBlock = Regex(
-                """"prerelease"\s*:\s*true[\s\S]*?"assets"\s*:\s*\[[\s\S]*?\]"""
-            ).find(json)
+            for (i in 0 until releases.length()) {
+                val release = releases.getJSONObject(i)
+                if (!release.optBoolean("prerelease", false)) continue
 
-            Regex(""""browser_download_url"\s*:\s*"([^"]*release[^"]*)"""")
-                .find(releaseBlock?.value ?: json)
-                ?.groupValues?.get(1)
+                val assets = release.getJSONArray("assets")
+                for (j in 0 until assets.length()) {
+                    val asset = assets.getJSONObject(j)
+                    val name = asset.optString("name", "")
+                    if (name.contains("release", ignoreCase = true) &&
+                        !name.contains("debug", ignoreCase = true)
+                    ) {
+                        return@withContext asset.optString("browser_download_url", null)
+                    }
+                }
+            }
+            null
         } catch (e: Exception) {
             Log.e("SplashActivity", "Error fetching APK URL", e)
             null
         }
     }
-}
 
 // ── Composable ────────────────────────────────────────────────────────────────
 
-@Composable
-fun SplashScreen(updateAvailable: Boolean = false, onTimeout: () -> Unit) {
-    val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.splash_loading))
-    val progress    by animateLottieCompositionAsState(
-        composition = composition,
-        iterations  = LottieConstants.IterateForever
-    )
+    @Composable
+    fun SplashScreen(updateAvailable: Boolean = false, onTimeout: () -> Unit) {
+        val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.splash_loading))
+        val progress by animateLottieCompositionAsState(
+            composition = composition,
+            iterations = LottieConstants.IterateForever
+        )
 
-    LaunchedEffect(Unit) {
-        delay(10_000)
-        if (!updateAvailable) onTimeout()   // stay on splash if update dialog is showing
-    }
+        LaunchedEffect(Unit) {
+            delay(10_000)
+            if (!updateAvailable) onTimeout()   // stay on splash if update dialog is showing
+        }
 
-    Box(
-        modifier         = Modifier
-            .fillMaxSize()
-            .background(Color.Black),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment   = Alignment.CenterHorizontally,
-            verticalArrangement   = Arrangement.Center
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black),
+            contentAlignment = Alignment.Center
         ) {
-            Row(
-                verticalAlignment     = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
             ) {
-                Image(
-                    painter            = painterResource(id = R.mipmap.ic_launcher11),
-                    contentDescription = "App Icon",
-                    modifier           = Modifier
-                        .size(48.dp)
-                        .padding(end = 12.dp)
-                )
-                Text(
-                    text       = stringResource(id = R.string.app_name).uppercase(),
-                    color      = Color(0xFFE65100),
-                    fontSize   = 25.sp,
-                    fontWeight = FontWeight.ExtraBold
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Image(
+                        painter = painterResource(id = R.mipmap.ic_launcher11),
+                        contentDescription = "App Icon",
+                        modifier = Modifier
+                            .size(48.dp)
+                            .padding(end = 12.dp)
+                    )
+                    Text(
+                        text = stringResource(id = R.string.app_name).uppercase(),
+                        color = Color(0xFFE65100),
+                        fontSize = 25.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(5.dp))
+
+                LottieAnimation(
+                    composition = composition,
+                    progress = { progress },
+                    modifier = Modifier.height(10.dp)
                 )
             }
-
-            Spacer(modifier = Modifier.height(5.dp))
-
-            LottieAnimation(
-                composition = composition,
-                progress    = { progress },
-                modifier    = Modifier.height(10.dp)
-            )
         }
     }
 }
