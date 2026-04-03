@@ -109,6 +109,22 @@ fun MoviesScreen(
                         .verticalScroll(scrollState)
                 ) {
 
+                    // Content Row for Now Playing Movies.
+                    if (uiState.nowPlayingMovies.isNotEmpty()) {
+                        ContentRow(
+                            title = "Now Playing",
+                            items = uiState.nowPlayingMovies,
+                            onItemFocus = { movie -> viewModel.onItemSelected(movie) },
+                            onItemClick = { movie -> onMovieClick(movie.id) }
+                        ) { movie, isSelected, onClick ->
+                            MovieCard(
+                                movie = movie,
+                                isSelected = isSelected,
+                                onClick = onClick
+                            )
+                        }
+                    }
+
                     // Content Row for Trending Movies.
                     ContentRow(
                         title = "Trending Movies",
@@ -122,6 +138,22 @@ fun MoviesScreen(
                             isSelected = isSelected,
                             onClick = onClick
                         )
+                    }
+
+                    // Content Row for Movies Trending This Week.
+                    if (uiState.trendingMoviesThisWeek.isNotEmpty()) {
+                        ContentRow(
+                            title = "Movies Trending This Week",
+                            items = uiState.trendingMoviesThisWeek,
+                            onItemFocus = { movie -> viewModel.onItemSelected(movie) },
+                            onItemClick = { movie -> onMovieClick(movie.id) }
+                        ) { movie, isSelected, onClick ->
+                            MovieCard(
+                                movie = movie,
+                                isSelected = isSelected,
+                                onClick = onClick
+                            )
+                        }
                     }
 
                     // Content Row for Continue Watching Movies.
