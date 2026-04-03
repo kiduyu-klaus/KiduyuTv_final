@@ -29,8 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
-import androidx.multidex.BuildConfig
 import com.airbnb.lottie.compose.*
+import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.activity.mainactivity.MainActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
@@ -87,6 +87,7 @@ class SplashActivity : ComponentActivity() {
             val remoteVersion = fetchRemoteVersion()
             if (remoteVersion != null) {
                 val localVersionName = BuildConfig.VERSION_NAME
+                Log.d("SplashActivity", "Remote version: $remoteVersion, Local version: $localVersionName")
                 if (isNewerVersion(remoteVersion, localVersionName)) {
                     updateAvailable = true   // gate the splash timeout BEFORE showing the dialog
                     showUpdateDialog()
@@ -116,8 +117,11 @@ class SplashActivity : ComponentActivity() {
 
     private fun isNewerVersion(remote: String, local: String): Boolean {
         return try {
-            val remoteParts = remote.split(".").map { it.toInt() }
-            val localParts = local.split(".").map { it.toInt() }
+            val remoteParts = remote.split(".").mapNotNull { it.toIntOrNull() }
+            val localParts = local.split(".").mapNotNull { it.toIntOrNull() }
+            
+            if (remoteParts.isEmpty() || localParts.isEmpty()) return remote > local
+
             val maxLength = maxOf(remoteParts.size, localParts.size)
             for (i in 0 until maxLength) {
                 val r = remoteParts.getOrElse(i) { 0 }
