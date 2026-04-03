@@ -42,9 +42,9 @@
     { "id": 67, "name": "Showtime", "logo_path": "/Allse9kbjiP6ExaQrnSpIhkurEi.png" },
     { "id": 71, "name": "The CW", "logo_path": "/hEpcdJ4O6eitG9ADSnDXNUrlovS.png" },
     { "id": 26, "name": "Channel 4", "logo_path": "/7Ai64ZDaVbGDtm7f0QSZAKohjk4.png" },
-    { "id": 214, "name": "Sky One", "logo_path": "/pNoTYkElreTiHtxhF1UpUnOyDPF.png" }
-  ]
-}    { "id": 19, "name": "FOX", "logo_path": "/1DSpHrWyOORkL9N2QHX7Adt31mQ.png" },
+    { "id": 214, "name": "Sky One", "logo_path": "/pNoTYkElreTiHtxhF1UpUnOyDPF.png" },
+
+   { "id": 19, "name": "FOX", "logo_path": "/1DSpHrWyOORkL9N2QHX7Adt31mQ.png" },
 
     { "id": 4, "name": "BBC One", "logo_path": "/uJjcCg3O4DMEjM0xtno9OWFciRP.png" },
     { "id": 88, "name": "FX", "logo_path": "/aexGjtcs42DgRtZh7zOxayiry4J.png" },
