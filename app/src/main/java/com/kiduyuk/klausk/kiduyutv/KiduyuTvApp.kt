@@ -11,6 +11,8 @@ import com.kiduyuk.klausk.kiduyutv.data.api.ApiClient
 import com.kiduyuk.klausk.kiduyutv.data.local.database.DatabaseManager
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.util.AdvancedAdBlocker
+import com.google.firebase.analytics.FirebaseAnalytics
+import com.google.firebase.database.FirebaseDatabase
 
 /**
  * Custom Application class for KiduyuTv.
@@ -21,18 +23,24 @@ class KiduyuTvApp : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
-        
+
         // Initialize Room database manager
         DatabaseManager.init(this)
-        
+
         // Initialize MyListManager (now uses Room internally)
         MyListManager.init(this)
-        
+
         // Initialize Ad Blocker (previously in PlayerActivity)
         AdvancedAdBlocker.init(this)
-        
+
         // Clean up expired cache on app start
         DatabaseManager.cleanExpiredCache()
+
+        // Initialize Firebase Analytics
+        FirebaseAnalytics.getInstance(this)
+
+        // Initialize Firebase Realtime Database with persistence
+        FirebaseDatabase.getInstance().setPersistenceEnabled(true)
     }
 
     /**
