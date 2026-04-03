@@ -17,9 +17,11 @@ import android.webkit.*
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.OnBackPressedCallback
+import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
 import com.kiduyuk.klausk.kiduyutv.util.AdvancedAdBlocker
+import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import java.io.ByteArrayInputStream
 
 class PlayerActivity : AppCompatActivity() {
@@ -491,17 +493,24 @@ class PlayerActivity : AppCompatActivity() {
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                AlertDialog.Builder(this@PlayerActivity)
-                    .setTitle("Exit Player")
-                    .setMessage("Stop watching?")
-                    .setCancelable(false)
-                    .setPositiveButton("Yes") { _, _ -> finish() }
-                    .setNegativeButton("No", null)
-                    .show()
-            }
+                showExitConfirmationDialog()            }
         })
     }
-
+    private fun showExitConfirmationDialog() {
+        QuitDialog(
+            context = this,
+            title = "Stop Playback?",
+            message = "Are you sure you want to stop playback and exit?",
+            positiveButtonText = "Stop",
+            negativeButtonText = "Continue",
+            lottieAnimRes = R.raw.exit,
+            onNo = { /* dismiss — dialog closes itself */ },
+            onYes = {
+                savePlaybackPosition()
+                finish()
+            }
+        ).show()
+    }
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     override fun onResume() {
@@ -634,6 +643,31 @@ class PlayerActivity : AppCompatActivity() {
         cursorHideHandler.removeCallbacks(cursorHideRunnable)
         cursorHideHandler.postDelayed(cursorHideRunnable, 5000)
     }
-
+    private fun savePlaybackPosition() {
+        webView.evaluateJavascript("""
+            (function() {
+                var v = document.querySelector('video');
+                if (v && v.duration > 0 && !isNaN(v.duration)) {
+                    return v.currentTime;
+                }
+                return null;
+            })();
+        """.trimIndent()) { result ->
+            if (result != null && result != "null") {
+                try {
+                    val currentTime = result.toDouble()
+                    val tmdbId = intent.getIntExtra("TMDB_ID", -1)
+                    val isTv = intent.getBooleanExtra("IS_TV", false)
+                    if (tmdbId != -1) {
+                        val repository = TmdbRepository()
+                        repository.updatePlaybackPosition(tmdbId, if (isTv) "tv" else "movie", currentTime.toLong())
+                        Log.i(TAG, "Final playback position saved: ${currentTime}s")
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error saving final playback position: ${e.message}")
+                }
+            }
+        }
+    }
 
 }

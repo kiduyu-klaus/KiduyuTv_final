@@ -86,6 +86,11 @@ class MainActivity : ComponentActivity() {
     private fun showExitConfirmationDialog() {
         QuitDialog(
             context = this,
+            title = "Quit Kiduyu TV?",
+            message = "Are you sure you want to exit the app?",
+            positiveButtonText = "Yes",
+            negativeButtonText = "No",
+            lottieAnimRes = com.kiduyuk.klausk.kiduyutv.R.raw.exit,
             onNo = { /* dismiss — dialog closes itself */ },
             onYes = { finish() }
         ).show()
@@ -123,30 +128,28 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun showPermissionExplanationDialog(permissions: Array<String>) {
-        AlertDialog.Builder(this)
-            .setTitle("Storage Permission Required")
-            .setMessage("KiduyuTv needs storage access to cache images and provide a smoother experience. Please grant the following permissions.")
-            .setPositiveButton("Grant") { _, _ ->
-                requestPermissionLauncher.launch(permissions)
-            }
-            .setNegativeButton("Exit App") { _, _ ->
-                finish()
-            }
-            .setCancelable(false)
-            .show()
+        QuitDialog(
+            context = this,
+            title = "Storage Permission Required",
+            message = "KiduyuTv needs storage access to cache images and provide a smoother experience. Please grant the following permissions.",
+            positiveButtonText = "Grant",
+            negativeButtonText = "Exit App",
+            lottieAnimRes = com.kiduyuk.klausk.kiduyutv.R.raw.exit,
+            onNo = { finish() },
+            onYes = { requestPermissionLauncher.launch(permissions) }
+        ).show()
     }
 
     private fun showPermissionDeniedDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("Permissions Denied")
-            .setMessage("Storage permissions are essential for KiduyuTv to function correctly. Would you like to try again or exit the app?")
-            .setPositiveButton("Try Again") { _, _ ->
-                checkAndRequestStoragePermissions()
-            }
-            .setNegativeButton("Exit App") { _, _ ->
-                finish()
-            }
-            .setCancelable(false)
-            .show()
+        QuitDialog(
+            context = this,
+            title = "Permissions Denied",
+            message = "Storage permissions are essential for KiduyuTv to function correctly. Would you like to try again or exit the app?",
+            positiveButtonText = "Try Again",
+            negativeButtonText = "Exit App",
+            lottieAnimRes = com.kiduyuk.klausk.kiduyutv.R.raw.exit,
+            onNo = { finish() },
+            onYes = { checkAndRequestStoragePermissions() }
+        ).show()
     }
 }

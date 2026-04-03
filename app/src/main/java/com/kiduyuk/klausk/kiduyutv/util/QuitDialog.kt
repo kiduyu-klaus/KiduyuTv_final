@@ -61,6 +61,11 @@ import com.kiduyuk.klausk.kiduyutv.R
 
 class QuitDialog(
     context: Context,
+    private val title: String,
+    private val message: String,
+    private val positiveButtonText: String,
+    private val negativeButtonText: String,
+    private val lottieAnimRes: Int,
     private val onNo: () -> Unit = {},
     private val onYes: () -> Unit = {}
 ) : Dialog(context, android.R.style.Theme_Translucent_NoTitleBar) {
@@ -99,6 +104,11 @@ class QuitDialog(
         val composeView = ComposeView(context).apply {
             setContent {
                 QuitDialogContent(
+                    title = title,
+                    message = message,
+                    positiveButtonText = positiveButtonText,
+                    negativeButtonText = negativeButtonText,
+                    lottieAnimRes = lottieAnimRes,
                     onNo = {
                         onNo()
                         dismiss()
@@ -128,10 +138,15 @@ class QuitDialog(
 
 @Composable
 fun QuitDialogContent(
+    title: String,
+    message: String,
+    positiveButtonText: String,
+    negativeButtonText: String,
+    lottieAnimRes: Int,
     onNo: () -> Unit,
     onYes: () -> Unit
 ) {
-    val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.exit))
+    val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(lottieAnimRes))
     val focusRequester = remember { FocusRequester() }
 
     // Use a Box to center the dialog card on screen.
@@ -157,8 +172,8 @@ fun QuitDialogContent(
                     .padding(bottom = 16.dp)
             )
 
-            Text(
-                text = "Quit Kiduyu TV?",
+                Text(
+                    text = title,
                 color = ComposeColor.White,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
@@ -167,8 +182,8 @@ fun QuitDialogContent(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            Text(
-                text = "Are you sure you want to exit the app?",
+                Text(
+                    text = message,
                 color = ComposeColor.Gray,
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center
@@ -197,7 +212,7 @@ fun QuitDialogContent(
                     ),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("No", fontWeight = FontWeight.SemiBold)
+                    Text(negativeButtonText, fontWeight = FontWeight.SemiBold)
                 }
 
                 // YES Button
@@ -213,7 +228,7 @@ fun QuitDialogContent(
                     ),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("Yes", fontWeight = FontWeight.SemiBold)
+                    Text(positiveButtonText, fontWeight = FontWeight.SemiBold)
                 }
             }
 
@@ -231,11 +246,27 @@ fun QuitDialogContent(
 @Preview(name = "QuitDialog – NO focused", showBackground = true, widthDp = 420, heightDp = 320)
 @Composable
 private fun QuitDialogPreviewNoFocused() {
-    QuitDialogContent(onNo = {}, onYes = {})
+    QuitDialogContent(
+        title = "Quit Kiduyu TV?",
+        message = "Are you sure you want to exit the app?",
+        positiveButtonText = "Yes",
+        negativeButtonText = "No",
+        lottieAnimRes = R.raw.exit,
+        onNo = {},
+        onYes = {}
+    )
 }
 
 @Preview(name = "QuitDialog – Dark background", showBackground = true, backgroundColor = 0xFF1A2035, widthDp = 420, heightDp = 320)
 @Composable
 private fun QuitDialogPreviewDarkBg() {
-    QuitDialogContent(onNo = {}, onYes = {})
+    QuitDialogContent(
+        title = "Quit Kiduyu TV?",
+        message = "Are you sure you want to exit the app?",
+        positiveButtonText = "Yes",
+        negativeButtonText = "No",
+        lottieAnimRes = R.raw.exit,
+        onNo = {},
+        onYes = {}
+    )
 }

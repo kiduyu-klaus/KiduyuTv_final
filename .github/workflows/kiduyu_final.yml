@@ -211,14 +211,16 @@ jobs:
           html = re.sub(
               r'(href=")https://github\.com/[^/]+/[^/]+/releases/download/[^"]+(")',
               rf'\g<1>{apk_url}\2',
-              html
+              html,
+              flags=re.IGNORECASE
           )
 
           # Replace download="KiduyuTv-release-..." attribute value
           html = re.sub(
               r'(download=")KiduyuTv-release-[^"]+(")',
               rf'\g<1>{apk_name}\2',
-              html
+              html,
+              flags=re.IGNORECASE
           )
 
           pathlib.Path("index.html").write_text(html, encoding="utf-8")

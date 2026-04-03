@@ -44,7 +44,12 @@ fun HeroSection(
 
     val isMovie = movie != null
 
-    val backdropPath = if (isMovie) movie?.backdropPath else tvShow?.backdropPath
+    // Fallback: Use posterPath if backdropPath is missing
+    val backdropPath = if (isMovie) {
+        movie?.backdropPath ?: movie?.posterPath
+    } else {
+        tvShow?.backdropPath ?: tvShow?.posterPath
+    }
     val title = (if (isMovie) movie?.title else tvShow?.name) ?: ""
     val overview = (if (isMovie) movie?.overview else tvShow?.overview) ?: ""
     val rating = (if (isMovie) movie?.voteAverage else tvShow?.voteAverage) ?: 0.0
@@ -81,10 +86,10 @@ fun HeroSection(
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        listOf(
+                        colors = listOf(
                             Color.Transparent,
-                            Color.Black.copy(alpha = 0.5f),
-                            Color.Black.copy(alpha = 0.9f)
+                            BackgroundDark.copy(alpha = 0.5f),
+                            BackgroundDark
                         )
                     )
                 )

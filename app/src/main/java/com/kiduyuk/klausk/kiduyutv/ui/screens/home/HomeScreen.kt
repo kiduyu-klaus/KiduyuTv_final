@@ -175,161 +175,132 @@ private fun HomeContent(
                 tvShow = selectedTvShow
             )
 
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .weight(1f)
-                    .verticalScroll(scrollState)
             ) {
-                ContentRow(
-                    title = "TV Shows Trending Today",
-                    items = uiState.trendingTvShows,
-                    initialFocusRequester = firstItemFocusRequester,
-                    restoreFocusItemId = lastClickedItemId,
-                    getItemId = { it.id },
-                    onItemFocus = { tvShow -> onSelectItem(tvShow) },
-                    onItemClick = { tvShow ->
-                        onSelectItem(tvShow)
-                        onSetLastClickedItemId(tvShow.id)
-                        onTvShowClick(tvShow.id)
-                    }
-                ) { tvShow, isFocused, onClick ->
-                    TvShowCard(
-                        tvShow = tvShow,
-                        isSelected = isFocused,
-                        onClick = onClick
-                    )
-                }
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(scrollState)
+                ) {
+                    // Spacer to push content down slightly if needed,
+                    // or just start the rows.
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                ContentRow(
-                    title = "Movies Trending Today",
-                    items = uiState.trendingMovies,
-                    restoreFocusItemId = lastClickedItemId,
-                    getItemId = { it.id },
-                    onItemFocus = { movie -> onSelectItem(movie) },
-                    onItemClick = { movie ->
-                        onSelectItem(movie)
-                        onSetLastClickedItemId(movie.id)
-                        onMovieClick(movie.id)
-                    }
-                ) { movie, isFocused, onClick ->
-                    MovieCard(
-                        movie = movie,
-                        isSelected = isFocused,
-                        onClick = onClick
-                    )
-                }
-
-                if (uiState.continueWatching.isNotEmpty()) {
                     ContentRow(
-                        title = "Continue Watching",
-                        items = uiState.continueWatching,
+                        title = "TV Shows Trending Today",
+                        items = uiState.trendingTvShows,
+                        initialFocusRequester = firstItemFocusRequester,
                         restoreFocusItemId = lastClickedItemId,
                         getItemId = { it.id },
-                        onItemFocus = { item -> onSelectItem(item) },
-                        onItemClick = { item ->
-                            onSetLastClickedItemId(item.id)
-                            if (item.isTv) onTvShowClick(item.id) else onMovieClick(item.id)
+                        onItemFocus = { tvShow -> onSelectItem(tvShow) },
+                        onItemClick = { tvShow ->
+                            onSelectItem(tvShow)
+                            onSetLastClickedItemId(tvShow.id)
+                            onTvShowClick(tvShow.id)
                         }
-                    ) { item, isFocused, onClick ->
-                        if (item.isTv) {
-                            TvShowCard(
-                                tvShow = TvShow(
-                                    id = item.id,
-                                    name = item.title,
-                                    overview = item.overview ?: "",
-                                    posterPath = item.posterPath,
-                                    backdropPath = item.backdropPath,
-                                    voteAverage = item.voteAverage,
-                                    firstAirDate = item.releaseDate ?: "",
-                                    genreIds = emptyList(),
-                                    popularity = 0.0
-                                ),
-                                isSelected = isFocused,
-                                onClick = onClick
-                            )
-                        } else {
-                            MovieCard(
-                                movie = Movie(
-                                    id = item.id,
-                                    title = item.title,
-                                    overview = item.overview ?: "",
-                                    posterPath = item.posterPath,
-                                    backdropPath = item.backdropPath,
-                                    voteAverage = item.voteAverage,
-                                    releaseDate = item.releaseDate ?: "",
-                                    genreIds = emptyList(),
-                                    popularity = 0.0
-                                ),
-                                isSelected = isFocused,
-                                onClick = onClick
-                            )
-                        }
+                    ) { tvShow, isFocused, onClick ->
+                        TvShowCard(
+                            tvShow = tvShow,
+                            isSelected = isFocused,
+                            onClick = onClick
+                        )
                     }
-                }
 
-                if (uiState.popularNetworks.isNotEmpty()) {
-                    NetworkRow(
-                        title = "Popular Networks",
-                        items = uiState.popularNetworks,
-                        onItemClick = { network ->
-                            onSetLastClickedItemId(network.id)
-                            onNavigate("media_list/network/${network.id}/${network.name}")
-                        }
-                    )
-                }
-
-                if (uiState.popularCompanies.isNotEmpty()) {
-                    NetworkRow(
-                        title = "Popular Companies",
-                        items = uiState.popularCompanies,
-                        onItemClick = { company ->
-                            onSetLastClickedItemId(company.id)
-                            onNavigate("media_list/company/${company.id}/${company.name}")
-                        }
-                    )
-                }
-
-                ContentRow(
-                    title = "Top Rated Movies",
-                    items = uiState.latestMovies,
-                    restoreFocusItemId = lastClickedItemId,
-                    getItemId = { it.id },
-                    onItemFocus = { movie -> onSelectItem(movie) },
-                    onItemClick = { movie ->
-                        onSetLastClickedItemId(movie.id)
-                        onMovieClick(movie.id)
-                    }
-                ) { movie, isFocused, onClick ->
-                    MovieCard(
-                        movie = movie,
-                        isSelected = isFocused,
-                        onClick = onClick
-                    )
-                }
-
-                ContentRow(
-                    title = "Top Rated TV Shows",
-                    items = uiState.topTvShows,
-                    restoreFocusItemId = lastClickedItemId,
-                    getItemId = { it.id },
-                    onItemFocus = { tvShow -> onSelectItem(tvShow) },
-                    onItemClick = { tvShow ->
-                        onSetLastClickedItemId(tvShow.id)
-                        onTvShowClick(tvShow.id)
-                    }
-                ) { tvShow, isFocused, onClick ->
-                    TvShowCard(
-                        tvShow = tvShow,
-                        isSelected = isFocused,
-                        onClick = onClick
-                    )
-                }
-
-                if (uiState.oscarWinners2026.isNotEmpty()) {
                     ContentRow(
-                        title = "2026 Oscar winners",
-                        items = uiState.oscarWinners2026,
+                        title = "Movies Trending Today",
+                        items = uiState.trendingMovies,
+                        restoreFocusItemId = lastClickedItemId,
+                        getItemId = { it.id },
+                        onItemFocus = { movie -> onSelectItem(movie) },
+                        onItemClick = { movie ->
+                            onSelectItem(movie)
+                            onSetLastClickedItemId(movie.id)
+                            onMovieClick(movie.id)
+                        }
+                    ) { movie, isFocused, onClick ->
+                        MovieCard(
+                            movie = movie,
+                            isSelected = isFocused,
+                            onClick = onClick
+                        )
+                    }
+
+                    if (uiState.continueWatching.isNotEmpty()) {
+                        ContentRow(
+                            title = "Continue Watching",
+                            items = uiState.continueWatching,
+                            restoreFocusItemId = lastClickedItemId,
+                            getItemId = { it.id },
+                            onItemFocus = { item -> onSelectItem(item) },
+                            onItemClick = { item ->
+                                onSetLastClickedItemId(item.id)
+                                if (item.isTv) onTvShowClick(item.id) else onMovieClick(item.id)
+                            }
+                        ) { item, isFocused, onClick ->
+                            if (item.isTv) {
+                                TvShowCard(
+                                    tvShow = TvShow(
+                                        id = item.id,
+                                        name = item.title,
+                                        overview = item.overview ?: "",
+                                        posterPath = item.posterPath,
+                                        backdropPath = item.backdropPath,
+                                        voteAverage = item.voteAverage,
+                                        firstAirDate = item.releaseDate ?: "",
+                                        genreIds = emptyList(),
+                                        popularity = 0.0
+                                    ),
+                                    isSelected = isFocused,
+                                    onClick = onClick
+                                )
+                            } else {
+                                MovieCard(
+                                    movie = Movie(
+                                        id = item.id,
+                                        title = item.title,
+                                        overview = item.overview ?: "",
+                                        posterPath = item.posterPath,
+                                        backdropPath = item.backdropPath,
+                                        voteAverage = item.voteAverage,
+                                        releaseDate = item.releaseDate ?: "",
+                                        genreIds = emptyList(),
+                                        popularity = 0.0
+                                    ),
+                                    isSelected = isFocused,
+                                    onClick = onClick
+                                )
+                            }
+                        }
+                    }
+
+                    if (uiState.popularNetworks.isNotEmpty()) {
+                        NetworkRow(
+                            title = "Popular Networks",
+                            items = uiState.popularNetworks,
+                            onItemClick = { network ->
+                                onSetLastClickedItemId(network.id)
+                                onNavigate("media_list/network/${network.id}/${network.name}")
+                            }
+                        )
+                    }
+
+                    if (uiState.popularCompanies.isNotEmpty()) {
+                        NetworkRow(
+                            title = "Popular Companies",
+                            items = uiState.popularCompanies,
+                            onItemClick = { company ->
+                                onSetLastClickedItemId(company.id)
+                                onNavigate("media_list/company/${company.id}/${company.name}")
+                            }
+                        )
+                    }
+
+                    ContentRow(
+                        title = "Top Rated Movies",
+                        items = uiState.latestMovies,
                         restoreFocusItemId = lastClickedItemId,
                         getItemId = { it.id },
                         onItemFocus = { movie -> onSelectItem(movie) },
@@ -344,52 +315,10 @@ private fun HomeContent(
                             onClick = onClick
                         )
                     }
-                }
 
-                if (uiState.hallmarkMovies.isNotEmpty()) {
                     ContentRow(
-                        title = "Hallmark Movies",
-                        items = uiState.hallmarkMovies,
-                        restoreFocusItemId = lastClickedItemId,
-                        getItemId = { it.id },
-                        onItemFocus = { movie -> onSelectItem(movie) },
-                        onItemClick = { movie ->
-                            onSetLastClickedItemId(movie.id)
-                            onMovieClick(movie.id)
-                        }
-                    ) { movie, isFocused, onClick ->
-                        MovieCard(
-                            movie = movie,
-                            isSelected = isFocused,
-                            onClick = onClick
-                        )
-                    }
-                }
-
-                if (uiState.trueStoryMovies.isNotEmpty()) {
-                    ContentRow(
-                        title = "Movies Based on True Stories",
-                        items = uiState.trueStoryMovies,
-                        restoreFocusItemId = lastClickedItemId,
-                        getItemId = { it.id },
-                        onItemFocus = { movie -> onSelectItem(movie) },
-                        onItemClick = { movie ->
-                            onSetLastClickedItemId(movie.id)
-                            onMovieClick(movie.id)
-                        }
-                    ) { movie, isFocused, onClick ->
-                        MovieCard(
-                            movie = movie,
-                            isSelected = isFocused,
-                            onClick = onClick
-                        )
-                    }
-                }
-
-                if (uiState.bestSitcoms.isNotEmpty()) {
-                    ContentRow(
-                        title = "Best Sitcoms Ever",
-                        items = uiState.bestSitcoms,
+                        title = "Top Rated TV Shows",
+                        items = uiState.topTvShows,
                         restoreFocusItemId = lastClickedItemId,
                         getItemId = { it.id },
                         onItemFocus = { tvShow -> onSelectItem(tvShow) },
@@ -404,122 +333,192 @@ private fun HomeContent(
                             onClick = onClick
                         )
                     }
-                }
 
-                if (uiState.bestClassics.isNotEmpty()) {
-                    ContentRow(
-                        title = "Best movie classics",
-                        items = uiState.bestClassics,
-                        restoreFocusItemId = lastClickedItemId,
-                        getItemId = { it.id },
-                        onItemFocus = { movie -> onSelectItem(movie) },
-                        onItemClick = { movie ->
-                            onSetLastClickedItemId(movie.id)
-                            onMovieClick(movie.id)
+                    if (uiState.oscarWinners2026.isNotEmpty()) {
+                        ContentRow(
+                            title = "2026 Oscar winners",
+                            items = uiState.oscarWinners2026,
+                            restoreFocusItemId = lastClickedItemId,
+                            getItemId = { it.id },
+                            onItemFocus = { movie -> onSelectItem(movie) },
+                            onItemClick = { movie ->
+                                onSetLastClickedItemId(movie.id)
+                                onMovieClick(movie.id)
+                            }
+                        ) { movie, isFocused, onClick ->
+                            MovieCard(
+                                movie = movie,
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
                         }
-                    ) { movie, isFocused, onClick ->
-                        MovieCard(
-                            movie = movie,
-                            isSelected = isFocused,
-                            onClick = onClick
-                        )
                     }
-                }
 
-                if (uiState.spyMovies.isNotEmpty()) {
-                    ContentRow(
-                        title = "CIA & Mossad Spies",
-                        items = uiState.spyMovies,
-                        restoreFocusItemId = lastClickedItemId,
-                        getItemId = { it.id },
-                        onItemFocus = { movie -> onSelectItem(movie) },
-                        onItemClick = { movie ->
-                            onSetLastClickedItemId(movie.id)
-                            onMovieClick(movie.id)
+                    if (uiState.hallmarkMovies.isNotEmpty()) {
+                        ContentRow(
+                            title = "Hallmark Movies",
+                            items = uiState.hallmarkMovies,
+                            restoreFocusItemId = lastClickedItemId,
+                            getItemId = { it.id },
+                            onItemFocus = { movie -> onSelectItem(movie) },
+                            onItemClick = { movie ->
+                                onSetLastClickedItemId(movie.id)
+                                onMovieClick(movie.id)
+                            }
+                        ) { movie, isFocused, onClick ->
+                            MovieCard(
+                                movie = movie,
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
                         }
-                    ) { movie, isFocused, onClick ->
-                        MovieCard(
-                            movie = movie,
-                            isSelected = isFocused,
-                            onClick = onClick
-                        )
                     }
-                }
 
-                if (uiState.stathamMovies.isNotEmpty()) {
-                    ContentRow(
-                        title = "Jason Statham Movies",
-                        items = uiState.stathamMovies,
-                        restoreFocusItemId = lastClickedItemId,
-                        getItemId = { it.id },
-                        onItemFocus = { movie -> onSelectItem(movie) },
-                        onItemClick = { movie ->
-                            onSetLastClickedItemId(movie.id)
-                            onMovieClick(movie.id)
+                    if (uiState.trueStoryMovies.isNotEmpty()) {
+                        ContentRow(
+                            title = "Movies Based on True Stories",
+                            items = uiState.trueStoryMovies,
+                            restoreFocusItemId = lastClickedItemId,
+                            getItemId = { it.id },
+                            onItemFocus = { movie -> onSelectItem(movie) },
+                            onItemClick = { movie ->
+                                onSetLastClickedItemId(movie.id)
+                                onMovieClick(movie.id)
+                            }
+                        ) { movie, isFocused, onClick ->
+                            MovieCard(
+                                movie = movie,
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
                         }
-                    ) { movie, isFocused, onClick ->
-                        MovieCard(
-                            movie = movie,
-                            isSelected = isFocused,
-                            onClick = onClick
-                        )
                     }
-                }
 
-                if (uiState.timeTravelMovies.isNotEmpty()) {
-                    ContentRow(
-                        title = "Time Travel Movies",
-                        items = uiState.timeTravelMovies,
-                        restoreFocusItemId = lastClickedItemId,
-                        getItemId = { it.id },
-                        onItemFocus = { movie -> onSelectItem(movie) },
-                        onItemClick = { movie ->
-                            onSetLastClickedItemId(movie.id)
-                            onMovieClick(movie.id)
+                    if (uiState.bestSitcoms.isNotEmpty()) {
+                        ContentRow(
+                            title = "Best Sitcoms Ever",
+                            items = uiState.bestSitcoms,
+                            restoreFocusItemId = lastClickedItemId,
+                            getItemId = { it.id },
+                            onItemFocus = { tvShow -> onSelectItem(tvShow) },
+                            onItemClick = { tvShow ->
+                                onSetLastClickedItemId(tvShow.id)
+                                onTvShowClick(tvShow.id)
+                            }
+                        ) { tvShow, isFocused, onClick ->
+                            TvShowCard(
+                                tvShow = tvShow,
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
                         }
-                    ) { movie, isFocused, onClick ->
-                        MovieCard(
-                            movie = movie,
-                            isSelected = isFocused,
-                            onClick = onClick
-                        )
                     }
+
+                    if (uiState.bestClassics.isNotEmpty()) {
+                        ContentRow(
+                            title = "Best movie classics",
+                            items = uiState.bestClassics,
+                            restoreFocusItemId = lastClickedItemId,
+                            getItemId = { it.id },
+                            onItemFocus = { movie -> onSelectItem(movie) },
+                            onItemClick = { movie ->
+                                onSetLastClickedItemId(movie.id)
+                                onMovieClick(movie.id)
+                            }
+                        ) { movie, isFocused, onClick ->
+                            MovieCard(
+                                movie = movie,
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
+                        }
+                    }
+
+                    if (uiState.spyMovies.isNotEmpty()) {
+                        ContentRow(
+                            title = "CIA & Mossad Spies",
+                            items = uiState.spyMovies,
+                            restoreFocusItemId = lastClickedItemId,
+                            getItemId = { it.id },
+                            onItemFocus = { movie -> onSelectItem(movie) },
+                            onItemClick = { movie ->
+                                onSetLastClickedItemId(movie.id)
+                                onMovieClick(movie.id)
+                            }
+                        ) { movie, isFocused, onClick ->
+                            MovieCard(
+                                movie = movie,
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
+                        }
+                    }
+
+                    if (uiState.stathamMovies.isNotEmpty()) {
+                        ContentRow(
+                            title = "Jason Statham Movies",
+                            items = uiState.stathamMovies,
+                            restoreFocusItemId = lastClickedItemId,
+                            getItemId = { it.id },
+                            onItemFocus = { movie -> onSelectItem(movie) },
+                            onItemClick = { movie ->
+                                onSetLastClickedItemId(movie.id)
+                                onMovieClick(movie.id)
+                            }
+                        ) { movie, isFocused, onClick ->
+                            MovieCard(
+                                movie = movie,
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
+                        }
+                    }
+
+                    if (uiState.timeTravelMovies.isNotEmpty()) {
+                        ContentRow(
+                            title = "Time Travel Movies",
+                            items = uiState.timeTravelMovies,
+                            restoreFocusItemId = lastClickedItemId,
+                            getItemId = { it.id },
+                            onItemFocus = { movie -> onSelectItem(movie) },
+                            onItemClick = { movie ->
+                                onSetLastClickedItemId(movie.id)
+                                onMovieClick(movie.id)
+                            }
+                        ) { movie, isFocused, onClick ->
+                            MovieCard(
+                                movie = movie,
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(32.dp))
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
+                // Top gradient overlay to blend with HeroSection
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(40.dp)
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    BackgroundDark,
+                                    Color.Transparent
+                                )
+                            )
+                        )
+                )
             }
         }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(120.dp)
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(BackgroundDark, Color.Transparent)
-                    )
-                )
-        )
 
         TopBar(
             selectedRoute = selectedRoute,
             onNavItemClick = onNavItemClick,
             onSearchClick = onSearchClick,
             onSettingsClick = onSettingsClick
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun HomeScreenPreview() {
-    KiduyuTvTheme {
-        HomeScreen(
-            onMovieClick = {},
-            onTvShowClick = {},
-            onNavigate = {},
-            onSearchClick = {},
-            onSettingsClick = {}
         )
     }
 }
