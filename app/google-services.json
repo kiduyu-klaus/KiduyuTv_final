@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "109926033937",
+    "project_id": "kiduyutvfinal",
+    "storage_bucket": "kiduyutvfinal.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:109926033937:android:113ea4200ce3fc69f2dfb0",
+        "android_client_info": {
+          "package_name": "com.kiduyuk.klausk.kiduyutv"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDNXqfgr68VzLaBsQ4hpULUdspS6uB4Sxw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
