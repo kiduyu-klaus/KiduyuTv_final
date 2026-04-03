@@ -1,57 +1,652 @@
 {
   "companies": [
-    { "id": 2, "name": "Walt Disney Pictures", "logo_path": "/wdrCwmRnLFJhEoH8GSfymY85KHT.png", "origin_country": "US" },
-    { "id": 420, "name": "Marvel Studios", "logo_path": "/hUzeosd33nzE5MCNsZxCGEKTXaQ.png", "origin_country": "US" },
-    { "id": 1, "name": "Lucasfilm Ltd.", "logo_path": "/tlVSws0RvvtPBwViUyOFAO0vcQS.png", "origin_country": "US" },
-    { "id": 3, "name": "Pixar", "logo_path": "/1TjvGVDMYsj6JBxOAkUHpPEwLf7.png", "origin_country": "US" },
-    { "id": 25, "name": "20th Century Fox", "logo_path": "/qZCc1lty5FzX30aOCVRBLzaVmcp.png", "origin_country": "US" },
-
-    { "id": 33, "name": "Universal Pictures", "logo_path": "/8lvHyhjr8oUKOOy2dKXoALWKdp0.png", "origin_country": "US" },
-    { "id": 174, "name": "Warner Bros. Pictures", "logo_path": "/zhD3hhtKB5qyv7ZeL4uLpNxgMVU.png", "origin_country": "US" },
-    { "id": 34, "name": "Sony Pictures", "logo_path": "/mtp1fvZbe4H991Ka1HOORl572VH.png", "origin_country": "US" },
-    { "id": 5, "name": "Columbia Pictures", "logo_path": "/71BqEFAF4V3qjjMPCpLuyJFB9A.png", "origin_country": "US" },
-    { "id": 4, "name": "Paramount Pictures", "logo_path": "/jay6WcMgagAklUt7i9Euwj1pzTF.png", "origin_country": "US" },
-
-    { "id": 923, "name": "Legendary Pictures", "logo_path": "/5UQsZrfbfG2dYJbx8DxfoTr2Bvu.png", "origin_country": "US" },
-    { "id": 12, "name": "New Line Cinema", "logo_path": "/2ycs64eqV5rqKYHyQK0GVoKGvfX.png", "origin_country": "US" },
-
-    { "id": 6704, "name": "Illumination", "logo_path": "/fOG2oY4m1YuYTQh4bMqqZkmgOAI.png", "origin_country": "US" },
-    { "id": 521, "name": "DreamWorks Animation", "logo_path": "/3BPX5VGBov8SDqTV7wC1L1xShAS.png", "origin_country": "US" },
-    { "id": 9383, "name": "Blue Sky Studios", "logo_path": "/ppeMh4iZJQUMm1nAjRALeNhWDfU.png", "origin_country": "US" }
+    {
+      "id": 2,
+      "name": "Walt Disney Pictures",
+      "logo_path": "/wdrCwmRnLFJhEoH8GSfymY85KHT.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 420,
+      "name": "Marvel Studios",
+      "logo_path": "/hUzeosd33nzE5MCNsZxCGEKTXaQ.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 1,
+      "name": "Lucasfilm Ltd.",
+      "logo_path": "/tlVSws0RvvtPBwViUyOFAO0vcQS.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 3,
+      "name": "Pixar",
+      "logo_path": "/1TjvGVDMYsj6JBxOAkUHpPEwLf7.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 25,
+      "name": "20th Century Fox",
+      "logo_path": "/qZCc1lty5FzX30aOCVRBLzaVmcp.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 33,
+      "name": "Universal Pictures",
+      "logo_path": "/8lvHyhjr8oUKOOy2dKXoALWKdp0.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 174,
+      "name": "Warner Bros. Pictures",
+      "logo_path": "/zhD3hhtKB5qyv7ZeL4uLpNxgMVU.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 34,
+      "name": "Sony Pictures",
+      "logo_path": "/mtp1fvZbe4H991Ka1HOORl572VH.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 5,
+      "name": "Columbia Pictures",
+      "logo_path": "/71BqEFAF4V3qjjMPCpLuyJFB9A.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 4,
+      "name": "Paramount Pictures",
+      "logo_path": "/jay6WcMgagAklUt7i9Euwj1pzTF.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 923,
+      "name": "Legendary Pictures",
+      "logo_path": "/5UQsZrfbfG2dYJbx8DxfoTr2Bvu.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 12,
+      "name": "New Line Cinema",
+      "logo_path": "/2ycs64eqV5rqKYHyQK0GVoKGvfX.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 6704,
+      "name": "Illumination",
+      "logo_path": "/fOG2oY4m1YuYTQh4bMqqZkmgOAI.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 521,
+      "name": "DreamWorks Animation",
+      "logo_path": "/3BPX5VGBov8SDqTV7wC1L1xShAS.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 9383,
+      "name": "Blue Sky Studios",
+      "logo_path": "/ppeMh4iZJQUMm1nAjRALeNhWDfU.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 7,
+      "name": "DreamWorks Pictures",
+      "logo_path": "/vru2SssLX3FPhnKZGtYw00pVIS9.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 14,
+      "name": "Miramax",
+      "logo_path": "/m6AHu84oZQxvq7n1rsvMNJIAsMu.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 17,
+      "name": "Warner Bros. Entertainment",
+      "logo_path": "/famoQxsF9T7bDspYcFAfEcv2o3z.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 21,
+      "name": "Metro-Goldwyn-Mayer",
+      "logo_path": "/usUnaYV6hQnlVAXP6r4HwrlLFPG.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 23,
+      "name": "Imagine Entertainment",
+      "logo_path": "/bJOFo2ufq7iFC1F4qZm8aLxF5aS.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 43,
+      "name": "Fox Searchlight Pictures",
+      "logo_path": "/4RgIPr55kBakgupWkzdDxqXJEqr.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 56,
+      "name": "Amblin Entertainment",
+      "logo_path": "/cEaxANEisCqeEoRvODv2dO1I0iI.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 60,
+      "name": "United Artists",
+      "logo_path": "/4YldLvCWQL9VIAHQ2Fu3Ffkh9Si.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 79,
+      "name": "Village Roadshow Pictures",
+      "logo_path": "/at4uYdwAAgNRKhZuuFX8ShKSybw.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 97,
+      "name": "Castle Rock Entertainment",
+      "logo_path": "/smyTD67uNsdaySnnjVDmh0kyotp.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 130,
+      "name": "Jerry Bruckheimer Films",
+      "logo_path": "/c9dVHPOL3cqCr2593Ahk0nEKTEM.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 213,
+      "name": "Cooper's Town",
+      "logo_path": "",
+      "origin_country": "US"
+    },
+    {
+      "id": 308,
+      "name": "The Weinstein Company",
+      "logo_path": "/e8F3mQM7DkJ5SfYYDp8FYzPBOGX.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 429,
+      "name": "DC",
+      "logo_path": "/4Y00XuSMuP1gimd0jP6JT57QbCI.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 491,
+      "name": "Summit Entertainment",
+      "logo_path": "/5LvDUt3KmvRnXQ4NrdWJYHeuA8J.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 508,
+      "name": "Regency Enterprises",
+      "logo_path": "/4sGWXoboEkWPphI6es6rTmqkCBh.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 559,
+      "name": "TriStar Pictures",
+      "logo_path": "/eC0bWHVjnjUducyA6YFoEFqnPMC.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 1440,
+      "name": "Satel Film",
+      "logo_path": "/tTPVO2jX1Zy5UhLRyqywA0BZvwR.png",
+      "origin_country": "AT"
+    },
+    {
+      "id": 1557,
+      "name": "The Mark Gordon Company",
+      "logo_path": "/ccz9bqCu3jSFKbPFnfWmjAKZLBL.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 1632,
+      "name": "Lionsgate",
+      "logo_path": "/cisLn1YAUuptXVBa0xjq7ST9cH0.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 2263,
+      "name": "Full Content Productions",
+      "logo_path": "",
+      "origin_country": ""
+    },
+    {
+      "id": 3172,
+      "name": "Blumhouse Productions",
+      "logo_path": "/rzKluDcRkIwHZK2pHsiT667A2Kw.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 3287,
+      "name": "Screen Gems",
+      "logo_path": "/bz6GbCQQXGNE56LTW9dwgksW0Iw.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 6125,
+      "name": "Walt Disney Animation Studios",
+      "logo_path": "/8bH86UPmMP8hlITzXV3XgV9eaAc.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 7295,
+      "name": "Relativity Media",
+      "logo_path": "/5MYE96QiE5a5oFhXxFb4y8ILSpw.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 7429,
+      "name": "HBO Films",
+      "logo_path": "/6in9uMqxXEHx5XgYgkeRBpZ4rPw.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 7505,
+      "name": "Marvel Entertainment",
+      "logo_path": "/837VMM4wOkODc1idNxGT0KQJlej.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 8601,
+      "name": "Tim Burton Productions",
+      "logo_path": "/kqubCH3sfBAk4znUj7hjqv8ffgi.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 9195,
+      "name": "Touchstone Pictures",
+      "logo_path": "/geK5QOBsXIPGHutKwXtYjMUyYSG.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 10146,
+      "name": "Focus Features",
+      "logo_path": "/xnFIOeq5cKw09kCWqV7foWDe4AA.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 10201,
+      "name": "Interscope Communications",
+      "logo_path": "/cgmwywVZ9NvAidd6Pn7p0CBYQkW.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 10342,
+      "name": "Studio Ghibli",
+      "logo_path": "/uFuxPEZRUcBTEiYIxjHJq62Vr77.png",
+      "origin_country": "JP"
+    },
+    {
+      "id": 11073,
+      "name": "Sony Pictures Television",
+      "logo_path": "/wHs44fktdoj6c378ZbSWfzKsM2Z.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 11461,
+      "name": "Bad Robot",
+      "logo_path": "/p9FoEt5shEKRWRKVIlvFaEmRnun.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 13252,
+      "name": "Marvel Animation",
+      "logo_path": "/aGeUvfSNA8gRl6ZjvmLQOsb7PMw.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 19177,
+      "name": "Red Granite Pictures",
+      "logo_path": "",
+      "origin_country": "US"
+    },
+    {
+      "id": 20580,
+      "name": "Amazon Studios",
+      "logo_path": "/oRR9EXVoKP9szDkVKlze5HVJS7g.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 41077,
+      "name": "A24",
+      "logo_path": "/1ZXsGaFPgrgS6ZZGS37AqD5uU12.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 44297,
+      "name": "SunCast Entertainment",
+      "logo_path": "",
+      "origin_country": ""
+    },
+    {
+      "id": 56242,
+      "name": "Apelles Entertainment",
+      "logo_path": "/1YORRYmg7hgYIgoJek8jU3cykuQ.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 76043,
+      "name": "Revolution Sun Studios",
+      "logo_path": "/9RO2vbQ67otPrBLXCaC8UMp3Qat.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 76907,
+      "name": "Atomic Monster",
+      "logo_path": "/ygMQtjsKX7BZkCQhQZY82lgnCUO.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 82819,
+      "name": "Skydance Media",
+      "logo_path": "/gXfFl9pRPaoaq14jybEn1pHeldr.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 88934,
+      "name": "Monkeypaw Productions",
+      "logo_path": "/5Be96V9WXa7jJInSDPqDOqMBA0o.png",
+      "origin_country": "US"
+    },
+    {
+      "id": 104403,
+      "name": "Vintage:Nine Studios",
+      "logo_path": "",
+      "origin_country": ""
+    },
+    {
+      "id": 127928,
+      "name": "20th Century Studios",
+      "logo_path": "/h0rjX5vjW5r8yEnUBStFarjcLT4.png",
+      "origin_country": "US"
+    }
   ],
-
   "networks": [
-    { "id": 213, "name": "Netflix", "logo_path": "/wwemzKWzjKYJFfCeiB57q3r4Bcm.png" },
-    { "id": 2739, "name": "Disney+", "logo_path": "/1edZOYAfoyZyZ3rklNSiUpXX30Q.png" },
-    { "id": 1024, "name": "Prime Video", "logo_path": "/w7HfLNm9CWwRmAMU58udl2L7We7.png" },
-    { "id": 49, "name": "HBO", "logo_path": "/tuomPhY2UtuPTqqFnKMVHvSb724.png" },
-    { "id": 3186, "name": "HBO Max", "logo_path": "/nmU0UMDJB3dRRQSTUqawzF2Od1a.png" },
-    { "id": 453, "name": "Hulu", "logo_path": "/pqUTCleNUiTLAVlelGxUgWn1ELh.png" },
-    { "id": 4330, "name": "Paramount+", "logo_path": "/fi83B1oztoS47xxcemFdPMhIzK.png" },
-    { "id": 3353, "name": "Peacock", "logo_path": "/gIAcGTjKKr0KOHL5s4O36roJ8p7.png" },
-    { "id": 2552, "name": "Apple TV", "logo_path": "/bngHRFi794mnMq34gfVcm9nDxN1.png" },
-
-    { "id": 6, "name": "NBC", "logo_path": "/cm111bsDVlYaC1foL0itvEI4yLG.png" },
-    { "id": 16, "name": "CBS", "logo_path": "/wju8KhOUsR5y4bH9p3Jc50hhaLO.png" },
-    { "id": 2, "name": "ABC", "logo_path": "/2uy2ZWcplrSObIyt4x0Y9rkG6qO.png" },
-    { "id": 19, "name": "FOX", "logo_path": "/1DSpHrWyOORkL9N2QHX7Adt31mQ.png" },
-
-    { "id": 4, "name": "BBC One", "logo_path": "/uJjcCg3O4DMEjM0xtno9OWFciRP.png" },
-    { "id": 88, "name": "FX", "logo_path": "/aexGjtcs42DgRtZh7zOxayiry4J.png" },
-    { "id": 174, "name": "AMC", "logo_path": "/pmvRmATOCaDykE6JrVoeYxlFHw3.png" },
-    { "id": 67, "name": "Showtime", "logo_path": "/Allse9kbjiP6ExaQrnSpIhkurEi.png" },
-    { "id": 71, "name": "The CW", "logo_path": "/hEpcdJ4O6eitG9ADSnDXNUrlovS.png" },
-    { "id": 26, "name": "Channel 4", "logo_path": "/7Ai64ZDaVbGDtm7f0QSZAKohjk4.png" },
-    { "id": 214, "name": "Sky One", "logo_path": "/pNoTYkElreTiHtxhF1UpUnOyDPF.png" },
-
-   { "id": 19, "name": "FOX", "logo_path": "/1DSpHrWyOORkL9N2QHX7Adt31mQ.png" },
-
-    { "id": 4, "name": "BBC One", "logo_path": "/uJjcCg3O4DMEjM0xtno9OWFciRP.png" },
-    { "id": 88, "name": "FX", "logo_path": "/aexGjtcs42DgRtZh7zOxayiry4J.png" },
-    { "id": 174, "name": "AMC", "logo_path": "/pmvRmATOCaDykE6JrVoeYxlFHw3.png" },
-    { "id": 67, "name": "Showtime", "logo_path": "/Allse9kbjiP6ExaQrnSpIhkurEi.png" },
-    { "id": 71, "name": "The CW", "logo_path": "/hEpcdJ4O6eitG9ADSnDXNUrlovS.png" },
-    { "id": 26, "name": "Channel 4", "logo_path": "/7Ai64ZDaVbGDtm7f0QSZAKohjk4.png" },
-    { "id": 214, "name": "Sky One", "logo_path": "/pNoTYkElreTiHtxhF1UpUnOyDPF.png" }
+    {
+      "id": 213,
+      "name": "Netflix",
+      "logo_path": "/wwemzKWzjKYJFfCeiB57q3r4Bcm.png"
+    },
+    {
+      "id": 2739,
+      "name": "Disney+",
+      "logo_path": "/1edZOYAfoyZyZ3rklNSiUpXX30Q.png"
+    },
+    {
+      "id": 1024,
+      "name": "Prime Video",
+      "logo_path": "/w7HfLNm9CWwRmAMU58udl2L7We7.png"
+    },
+    {
+      "id": 49,
+      "name": "HBO",
+      "logo_path": "/tuomPhY2UtuPTqqFnKMVHvSb724.png"
+    },
+    {
+      "id": 3186,
+      "name": "HBO Max",
+      "logo_path": "/nmU0UMDJB3dRRQSTUqawzF2Od1a.png"
+    },
+    {
+      "id": 453,
+      "name": "Hulu",
+      "logo_path": "/pqUTCleNUiTLAVlelGxUgWn1ELh.png"
+    },
+    {
+      "id": 4330,
+      "name": "Paramount+",
+      "logo_path": "/fi83B1oztoS47xxcemFdPMhIzK.png"
+    },
+    {
+      "id": 3353,
+      "name": "Peacock",
+      "logo_path": "/gIAcGTjKKr0KOHL5s4O36roJ8p7.png"
+    },
+    {
+      "id": 2552,
+      "name": "Apple TV",
+      "logo_path": "/bngHRFi794mnMq34gfVcm9nDxN1.png"
+    },
+    {
+      "id": 6,
+      "name": "NBC",
+      "logo_path": "/cm111bsDVlYaC1foL0itvEI4yLG.png"
+    },
+    {
+      "id": 16,
+      "name": "CBS",
+      "logo_path": "/wju8KhOUsR5y4bH9p3Jc50hhaLO.png"
+    },
+    {
+      "id": 2,
+      "name": "ABC",
+      "logo_path": "/2uy2ZWcplrSObIyt4x0Y9rkG6qO.png"
+    },
+    {
+      "id": 19,
+      "name": "FOX",
+      "logo_path": "/1DSpHrWyOORkL9N2QHX7Adt31mQ.png"
+    },
+    {
+      "id": 4,
+      "name": "BBC One",
+      "logo_path": "/uJjcCg3O4DMEjM0xtno9OWFciRP.png"
+    },
+    {
+      "id": 88,
+      "name": "FX",
+      "logo_path": "/aexGjtcs42DgRtZh7zOxayiry4J.png"
+    },
+    {
+      "id": 174,
+      "name": "AMC",
+      "logo_path": "/pmvRmATOCaDykE6JrVoeYxlFHw3.png"
+    },
+    {
+      "id": 67,
+      "name": "Showtime",
+      "logo_path": "/Allse9kbjiP6ExaQrnSpIhkurEi.png"
+    },
+    {
+      "id": 71,
+      "name": "The CW",
+      "logo_path": "/hEpcdJ4O6eitG9ADSnDXNUrlovS.png"
+    },
+    {
+      "id": 26,
+      "name": "Channel 4",
+      "logo_path": "/7Ai64ZDaVbGDtm7f0QSZAKohjk4.png"
+    },
+    {
+      "id": 214,
+      "name": "Sky One",
+      "logo_path": "/pNoTYkElreTiHtxhF1UpUnOyDPF.png"
+    },
+    {
+      "id": 3,
+      "name": "BBC Three",
+      "logo_path": "/s22fRhj8xFPbiexrJwiAOcDEIrS.png"
+    },
+    {
+      "id": 9,
+      "name": "ITV1",
+      "logo_path": "/oz9pjTHnBUmlju8OkaTymhKbh6C.png"
+    },
+    {
+      "id": 13,
+      "name": "Nickelodeon",
+      "logo_path": "/aYkLXz4dxHgOrFNH7Jv7Cpy56Ms.png"
+    },
+    {
+      "id": 14,
+      "name": "PBS",
+      "logo_path": "/4Fn4eQmEmJZ9YWjiIhZ6cF1QHAi.png"
+    },
+    {
+      "id": 29,
+      "name": "ESPN",
+      "logo_path": "/nGVnOlJb5axYcLLdUT3dmiw7vU.png"
+    },
+    {
+      "id": 30,
+      "name": "USA Network",
+      "logo_path": "/g1e0H0Ka97IG5SyInMXdJkHGKiH.png"
+    },
+    {
+      "id": 33,
+      "name": "MTV",
+      "logo_path": "/w4qtv7xBkSVsbOQdSzjUjlyOuSr.png"
+    },
+    {
+      "id": 34,
+      "name": "Lifetime",
+      "logo_path": "/kEeaVLcJ6L6jq3v5YlPcjQs9igm.png"
+    },
+    {
+      "id": 41,
+      "name": "TNT",
+      "logo_path": "/6ISsKwa2XUhSC6oBtHZjYf6xFqv.png"
+    },
+    {
+      "id": 44,
+      "name": "Disney XD",
+      "logo_path": "/nKM9EnV7jTpt3MKRbhBusJ03lAY.png"
+    },
+    {
+      "id": 47,
+      "name": "Comedy Central",
+      "logo_path": "/6ooPjtXufjsoskdJqj6pxuvHEno.png"
+    },
+    {
+      "id": 54,
+      "name": "Disney Channel",
+      "logo_path": "/9AxUB1RdRnm0r5ki8Thb69Jo9Ma.png"
+    },
+    {
+      "id": 55,
+      "name": "Spike",
+      "logo_path": "/82MKSH7iM5LAGXFb0PDOclTWn5u.png"
+    },
+    {
+      "id": 56,
+      "name": "Cartoon Network",
+      "logo_path": "/c5OC6oVCg6QP4eqzW6XIq17CQjI.png"
+    },
+    {
+      "id": 59,
+      "name": "CNN",
+      "logo_path": "/2EIKV6SomKx8L52HoSViKyJO87m.png"
+    },
+    {
+      "id": 64,
+      "name": "Discovery",
+      "logo_path": "/tmttRFo2OiXQD0EHMxxlw8EzUuZ.png"
+    },
+    {
+      "id": 65,
+      "name": "History",
+      "logo_path": "/9fGgdJz17aBX7dOyfHJtsozB7bf.png"
+    },
+    {
+      "id": 68,
+      "name": "TBS",
+      "logo_path": "/65r0kR6MfOBYF0gEQsJGM6v5fEG.png"
+    },
+    {
+      "id": 74,
+      "name": "Bravo",
+      "logo_path": "/wX5HsfS47u6UUCSpYXqaQ1x2qdu.png"
+    },
+    {
+      "id": 76,
+      "name": "E!",
+      "logo_path": "/ptpx2Ag52sYJG6LiX9zBlnKsQOS.png"
+    },
+    {
+      "id": 77,
+      "name": "Syfy",
+      "logo_path": "/iYfrkobwDhTOFJ4AXYPSLIEeaAT.png"
+    },
+    {
+      "id": 80,
+      "name": "Adult Swim",
+      "logo_path": "/tHZPHOLc6iF27G34cAZGPsMtMSy.png"
+    },
+    {
+      "id": 84,
+      "name": "TLC",
+      "logo_path": "/6GRfZSrYh9D6C88n9kWlyrySB2l.png"
+    },
+    {
+      "id": 91,
+      "name": "Animal Planet",
+      "logo_path": "/m3KrDu1g96YByhH0wp4OvyghgsG.png"
+    },
+    {
+      "id": 95,
+      "name": "MediaCorp Channel 5",
+      "logo_path": "/ytoLym9NLbZnxX4orlD5bEIWYm0.png"
+    },
+    {
+      "id": 99,
+      "name": "5",
+      "logo_path": "/tAOMutfVve2or2LTYQfIa42sc33.png"
+    },
+    {
+      "id": 129,
+      "name": "A&E",
+      "logo_path": "/ptSTdU4GPNJ1M8UVEOtA0KgtuNk.png"
+    },
+    {
+      "id": 158,
+      "name": "VH1",
+      "logo_path": "/w9oUxxUiXTC1O1MzJSvsMjQbgft.png"
+    },
+    {
+      "id": 192,
+      "name": "M-Net",
+      "logo_path": "/dJ9KWprPx7AXMOxBrGJoadLhhZQ.png"
+    },
+    {
+      "id": 202,
+      "name": "WGN America",
+      "logo_path": "/kCNFRiqVRMgNWKSWu0LzAIpy9um.png"
+    },
+    {
+      "id": 210,
+      "name": "HGTV",
+      "logo_path": "/tzTtKdQ7vC2FkBvJDUErOhBPdKJ.png"
+    },
+    {
+      "id": 318,
+      "name": "STARZ",
+      "logo_path": "/qx3Y9LCaK4mq1ykFuDIfjshlo3U.png"
+    },
+    {
+      "id": 799,
+      "name": "National Geographic Channel",
+      "logo_path": "/5UtQpFierweXjriDoRf3LUVDjce.png"
+    },
+    {
+      "id": 1267,
+      "name": "Freeform",
+      "logo_path": "/jk2Z7WH6JnHSZrxouYh4sireM3a.png"
+    },
+    {
+      "id": 2243,
+      "name": "DC Universe",
+      "logo_path": "/eOL4PkiC0zkDpxKFQhBnmCtwx5p.png"
+    },
+    {
+      "id": 4353,
+      "name": "discovery+",
+      "logo_path": "/1D1bS3Dyw4ScYnFWTlBOvJXC3nb.png"
+    }
   ]
-}
+    }
