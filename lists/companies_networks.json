@@ -25,7 +25,7 @@
     { "id": 2739, "name": "Disney+", "logo_path": "/1edZOYAfoyZyZ3rklNSiUpXX30Q.png" },
     { "id": 1024, "name": "Prime Video", "logo_path": "/w7HfLNm9CWwRmAMU58udl2L7We7.png" },
     { "id": 49, "name": "HBO", "logo_path": "/tuomPhY2UtuPTqqFnKMVHvSb724.png" },
-    { "id": 3186, "name": "HBO Max", "logo_path": "/mS9O8E19Y62Oq80R8R4N7pWlY.png" },
+    { "id": 3186, "name": "HBO Max", "logo_path": "/nmU0UMDJB3dRRQSTUqawzF2Od1a.png" },
     { "id": 453, "name": "Hulu", "logo_path": "/pqUTCleNUiTLAVlelGxUgWn1ELh.png" },
     { "id": 4330, "name": "Paramount+", "logo_path": "/fi83B1oztoS47xxcemFdPMhIzK.png" },
     { "id": 3353, "name": "Peacock", "logo_path": "/gIAcGTjKKr0KOHL5s4O36roJ8p7.png" },
@@ -35,6 +35,16 @@
     { "id": 16, "name": "CBS", "logo_path": "/wju8KhOUsR5y4bH9p3Jc50hhaLO.png" },
     { "id": 2, "name": "ABC", "logo_path": "/2uy2ZWcplrSObIyt4x0Y9rkG6qO.png" },
     { "id": 19, "name": "FOX", "logo_path": "/1DSpHrWyOORkL9N2QHX7Adt31mQ.png" },
+
+    { "id": 4, "name": "BBC One", "logo_path": "/uJjcCg3O4DMEjM0xtno9OWFciRP.png" },
+    { "id": 88, "name": "FX", "logo_path": "/aexGjtcs42DgRtZh7zOxayiry4J.png" },
+    { "id": 174, "name": "AMC", "logo_path": "/pmvRmATOCaDykE6JrVoeYxlFHw3.png" },
+    { "id": 67, "name": "Showtime", "logo_path": "/Allse9kbjiP6ExaQrnSpIhkurEi.png" },
+    { "id": 71, "name": "The CW", "logo_path": "/hEpcdJ4O6eitG9ADSnDXNUrlovS.png" },
+    { "id": 26, "name": "Channel 4", "logo_path": "/7Ai64ZDaVbGDtm7f0QSZAKohjk4.png" },
+    { "id": 214, "name": "Sky One", "logo_path": "/pNoTYkElreTiHtxhF1UpUnOyDPF.png" }
+  ]
+}    { "id": 19, "name": "FOX", "logo_path": "/1DSpHrWyOORkL9N2QHX7Adt31mQ.png" },
 
     { "id": 4, "name": "BBC One", "logo_path": "/uJjcCg3O4DMEjM0xtno9OWFciRP.png" },
     { "id": 88, "name": "FX", "logo_path": "/aexGjtcs42DgRtZh7zOxayiry4J.png" },
