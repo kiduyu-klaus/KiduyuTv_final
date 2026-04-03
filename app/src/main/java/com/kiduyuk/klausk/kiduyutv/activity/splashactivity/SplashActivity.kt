@@ -5,7 +5,9 @@ import android.app.AlertDialog
 import android.app.Dialog
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Log
 import android.widget.LinearLayout
 import android.widget.ProgressBar
@@ -139,7 +141,7 @@ class SplashActivity : ComponentActivity() {
             positiveButtonText = "Download",
             negativeButtonText = "Exit",
             lottieAnimRes = R.raw.exit,
-            onNo = { finish() },
+            onNo = { finish() }, // User chose Exit, close the app
             onYes = {
                 lifecycleScope.launch {
                     val apkUrl = fetchLatestApkUrl()
@@ -240,10 +242,10 @@ class SplashActivity : ComponentActivity() {
                     title = "Download Complete",
                     message = "KiduyuTV has been downloaded.\nTap Install to apply the update.",
                     positiveButtonText = "Install",
-                    negativeButtonText = "Later",
+                    negativeButtonText = "Exit",
                     lottieAnimRes = R.raw.splash_loading,  // swap for a success Lottie if available
-                    onYes = { installApk(apkFile) },
-                    onNo = { /* user will install later */ }
+                    onYes = { checkPermissionAndInstall(apkFile) },
+                    onNo = { finish() } // Exit if user declines installation after download
                 ).showTracked()
             } else {
                 QuitDialog(
@@ -251,13 +253,44 @@ class SplashActivity : ComponentActivity() {
                     title = "Download Failed",
                     message = "Could not download the update.\nPlease check your connection and try again.",
                     positiveButtonText = "Retry",
-                    negativeButtonText = "Cancel",
+                    negativeButtonText = "Exit",
                     lottieAnimRes = R.raw.exit,
                     onYes = { downloadAndInstallApk(apkUrl) },
-                    onNo = { /* dismiss */ }
+                    onNo = { finish() } // Exit if user cancels after failure
                 ).showTracked()
             }
         }
+    }
+
+    private fun checkPermissionAndInstall(apkFile: File) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (!packageManager.canRequestPackageInstalls()) {
+                showPermissionDialog(apkFile)
+                return
+            }
+        }
+        installApk(apkFile)
+    }
+
+    private fun showPermissionDialog(apkFile: File) {
+        QuitDialog(
+            context = this,
+            title = "Permission Required",
+            message = "To install the update, Kiduyu TV needs permission to install unknown apps. Please enable it in the settings.",
+            positiveButtonText = "Settings",
+            negativeButtonText = "Exit",
+            lottieAnimRes = R.raw.exit,
+            onNo = { finish() },
+            onYes = {
+                val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                    data = Uri.parse("package:$packageName")
+                }
+                startActivity(intent)
+                // We finish here because once they leave to settings, the app state might be lost
+                // or they can restart the app to trigger the check again.
+                finish()
+            }
+        ).showTracked()
     }
 
     private fun installApk(apkFile: File) {
@@ -323,9 +356,11 @@ class SplashActivity : ComponentActivity() {
             iterations = LottieConstants.IterateForever
         )
 
-        LaunchedEffect(Unit) {
-            delay(10_000)
-            if (!updateAvailable) onTimeout()   // stay on splash if update dialog is showing
+        LaunchedEffect(updateAvailable) {
+            if (!updateAvailable) {
+                delay(10_000)
+                onTimeout()
+            }
         }
 
         Box(
