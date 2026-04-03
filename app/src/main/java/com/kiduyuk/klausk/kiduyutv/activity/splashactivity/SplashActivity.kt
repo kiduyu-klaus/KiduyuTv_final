@@ -87,7 +87,7 @@ class SplashActivity : ComponentActivity() {
             val remoteVersion = fetchRemoteVersion()
             if (remoteVersion != null) {
                 val localVersionName = BuildConfig.VERSION_NAME
-                Log.d("SplashActivity", "Remote version: $remoteVersion, Local version: $localVersionName")
+                Log.i("SplashActivity", "Remote version: $remoteVersion, Local version: $localVersionName")
                 if (isNewerVersion(remoteVersion, localVersionName)) {
                     updateAvailable = true   // gate the splash timeout BEFORE showing the dialog
                     showUpdateDialog()

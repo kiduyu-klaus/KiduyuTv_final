@@ -167,7 +167,7 @@ class PlayerActivity : AppCompatActivity() {
                         Log.w(TAG, "Progress parse error: ${e.message}")
                     }
                 } else {
-                    Log.d(TAG, "[Progress] No video element found yet")
+                    Log.i(TAG, "[Progress] No video element found yet")
                 }
             }
             progressHandler.postDelayed(this, 15_000L)

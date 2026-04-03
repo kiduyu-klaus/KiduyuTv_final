@@ -1,6 +1,7 @@
 package com.kiduyuk.klausk.kiduyutv
 
 import android.app.Application
+import androidx.multidex.MultiDexApplication
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
@@ -19,7 +20,7 @@ import com.google.firebase.database.FirebaseDatabase
  * This class handles app-wide initializations and provides a centralized
  * configuration for the Coil image loader.
  */
-class KiduyuTvApp : Application(), ImageLoaderFactory {
+class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()

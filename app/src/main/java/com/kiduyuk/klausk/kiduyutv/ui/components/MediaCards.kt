@@ -1,5 +1,6 @@
 package com.kiduyuk.klausk.kiduyutv.ui.components
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -41,6 +42,18 @@ fun MovieCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Logging for image loading debugging
+    Log.i("MovieCard", "MovieCard composed: ${movie.title} (id=${movie.id})")
+    Log.i("MovieCard", "posterPath=${movie.posterPath}, backdropPath=${movie.backdropPath}")
+
+    // Build the full image URL for logging
+    val imageUrl = if (movie.posterPath != null) {
+        "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.POSTER_SIZE}${movie.posterPath}"
+    } else {
+        null
+    }
+    Log.i("MovieCard", "Loading poster image: $imageUrl")
+
     // Root container for the card
     Box(
         modifier = modifier
@@ -60,14 +73,25 @@ fun MovieCard(
 
         // 🔹 Poster Image (fills entire card)
         if (movie.posterPath != null) {
+            Log.i("MovieCard", "Rendering AsyncImage for movie: ${movie.title}")
             AsyncImage(
-                model = "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.POSTER_SIZE}${movie.posterPath}",
+                model = imageUrl,
                 contentDescription = movie.title,
                 contentScale = ContentScale.Crop, // Crop to fill without distortion
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                onError = { errorState ->
+                    Log.e("MovieCard", "AsyncImage error for ${movie.title}: ${errorState.result.toString()}")
+                },
+                onLoading = {
+                    Log.i("MovieCard", "AsyncImage loading for ${movie.title}")
+                },
+                onSuccess = { metadata ->
+                    Log.i("MovieCard", "AsyncImage loaded successfully for ${movie.title} from: ${metadata.result}")
+                }
             )
         } else {
             // 🔹 Fallback background if no image
+            Log.w("MovieCard", "No posterPath for movie: ${movie.title}, showing fallback")
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -113,6 +137,18 @@ fun TvShowCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Logging for image loading debugging
+    Log.i("TvShowCard", "TvShowCard composed: ${tvShow.name} (id=${tvShow.id})")
+    Log.i("TvShowCard", "posterPath=${tvShow.posterPath}, backdropPath=${tvShow.backdropPath}")
+
+    // Build the full image URL for logging
+    val imageUrl = if (tvShow.posterPath != null) {
+        "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.POSTER_SIZE}${tvShow.posterPath}"
+    } else {
+        null
+    }
+    Log.i("TvShowCard", "Loading poster image: $imageUrl")
+
     // Root container for the card
     Box(
         modifier = modifier
@@ -132,14 +168,25 @@ fun TvShowCard(
 
         // 🔹 Poster Image
         if (tvShow.posterPath != null) {
+            Log.i("TvShowCard", "Rendering AsyncImage for TV show: ${tvShow.name}")
             AsyncImage(
-                model = "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.POSTER_SIZE}${tvShow.posterPath}",
+                model = imageUrl,
                 contentDescription = tvShow.name,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                onError = { errorState ->
+                    Log.e("TvShowCard", "AsyncImage error for ${tvShow.name}: ${errorState.result}")
+                },
+                onLoading = {
+                    Log.i("TvShowCard", "AsyncImage loading for ${tvShow.name}")
+                },
+                onSuccess = { metadata ->
+                    Log.i("TvShowCard", "AsyncImage loaded successfully for ${tvShow.name} from: ${metadata.result.dataSource}")
+                }
             )
         } else {
             // 🔹 Fallback if no poster
+            Log.w("TvShowCard", "No posterPath for TV show: ${tvShow.name}, showing fallback")
             Box(
                 modifier = Modifier
                     .fillMaxSize()

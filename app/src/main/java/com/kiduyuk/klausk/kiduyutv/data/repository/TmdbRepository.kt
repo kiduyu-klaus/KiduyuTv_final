@@ -18,8 +18,11 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import okhttp3.Cache
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.io.File
+import java.util.concurrent.TimeUnit
 
 /**
  * Repository class that handles data operations, specifically fetching data from the TMDB API.
@@ -46,30 +49,58 @@ class TmdbRepository {
         const val CACHE_TYPE_TOP_RATED = "top_rated"
         const val CACHE_TYPE_NOW_PLAYING = "now_playing"
         const val CACHE_TYPE_GITHUB_LIST = "github_list"
+
+        // OkHttpClient for GitHub JSON fetching
+// Uses longer timeouts suitable for larger JSON payloads
+        private const val GITHUB_CACHE_SIZE = 10L * 1024 * 1024 // 10 MB cache
+
+        @Volatile
+        private var githubHttpClient: OkHttpClient? = null
+
+        fun getGitHubOkHttpClient(context: Context): OkHttpClient {
+            return githubHttpClient ?: synchronized(this) {
+                githubHttpClient ?: createGitHubOkHttpClient(context).also { githubHttpClient = it }
+            }
+        }
+
+        private fun createGitHubOkHttpClient(context: Context): OkHttpClient {
+            val cacheDir = File(context.cacheDir, "github_json_cache")
+            val cache = Cache(cacheDir, GITHUB_CACHE_SIZE)
+
+            return OkHttpClient.Builder()
+                .cache(cache)
+// Longer timeouts for fetching larger JSON payloads
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .writeTimeout(30, TimeUnit.SECONDS)
+                .retryOnConnectionFailure(true)
+                .build()
+        }
     }
 
-    // ========== Trending Content ==========
+// ========== Trending Content ==========
 
     /** Fetches trending TV shows for today with caching. */
     suspend fun getTrendingTvToday(): Result<List<TvShow>> = runCatching {
-        // Try cache first
+// Try cache first
         val cached = tryGetCachedTvShows(CACHE_TYPE_TRENDING)
-        // Check if cached items have missing images
+// Check if cached items have missing images
         val hasMissingImages = cached.any { it.posterPath.isNullOrEmpty() && it.backdropPath.isNullOrEmpty() }
 
-//        if (cached.isNotEmpty() && !hasMissingImages) {
-//            Log.i(TAG, "Returning cached trending TV shows")
-//            return@runCatching cached
-//        }
+// Return cached data if available and has images
+        if (cached.isNotEmpty() && !hasMissingImages) {
+            Log.i(TAG, "Returning cached trending TV shows")
+            return@runCatching cached
+        }
 
         if (hasMissingImages) {
             Log.i(TAG, "Cached trending TV shows have missing images, refreshing from API")
         }
 
-        // Fetch from API
+// Fetch from API
         val result = api.getTrendingTvToday().results
 
-        // Cache the results
+// Cache the results
         cacheTvShows(result, CACHE_TYPE_TRENDING)
 
         result
@@ -80,10 +111,11 @@ class TmdbRepository {
         val cached = tryGetCachedMovies(CACHE_TYPE_TRENDING)
         val hasMissingImages = cached.any { it.posterPath.isNullOrEmpty() && it.backdropPath.isNullOrEmpty() }
 
-//        if (cached.isNotEmpty() && !hasMissingImages) {
-//            Log.i(TAG, "Returning cached trending movies")
-//            return@runCatching cached
-//        }
+// Return cached data if available and has images
+        if (cached.isNotEmpty() && !hasMissingImages) {
+            Log.i(TAG, "Returning cached trending movies")
+            return@runCatching cached
+        }
 
         if (hasMissingImages) {
             Log.i(TAG, "Cached trending movies have missing images, refreshing from API")
@@ -105,7 +137,7 @@ class TmdbRepository {
         api.getTrendingMoviesThisWeek().results
     }
 
-    // ========== General Content ==========
+// ========== General Content ==========
 
     /** Fetches movies currently playing in theaters with caching. */
     suspend fun getNowPlayingMovies(): Result<List<Movie>> = runCatching {
@@ -124,10 +156,11 @@ class TmdbRepository {
     /** Fetches top-rated movies with caching. */
     suspend fun getTopRatedMovies(): Result<List<Movie>> = runCatching {
         val cached = tryGetCachedMovies(CACHE_TYPE_TOP_RATED)
-//        if (cached.isNotEmpty() && cached.size > 25) {
-//            Log.i(TAG, "Returning cached top rated movies")
-//            return@runCatching cached
-//        }
+// Return cached data if available with sufficient items
+        if (cached.isNotEmpty() && cached.size > 25) {
+            Log.i(TAG, "Returning cached top rated movies")
+            return@runCatching cached
+        }
 
         val result = api.getTopRatedMovies().results
         cacheMovies(result, CACHE_TYPE_TOP_RATED)
@@ -138,10 +171,11 @@ class TmdbRepository {
     /** Fetches top-rated TV shows. */
     suspend fun getTopRatedTvShows(): Result<List<TvShow>> = runCatching {
         val cached = tryGetCachedTvShows(CACHE_TYPE_TOP_RATED)
-//        if (cached.isNotEmpty() && cached.size > 25) {
-//            Log.i(TAG, "Returning cached top rated TV shows")
-//            return@runCatching cached
-//        }
+// Return cached data if available with sufficient items
+        if (cached.isNotEmpty() && cached.size > 25) {
+            Log.i(TAG, "Returning cached top rated TV shows")
+            return@runCatching cached
+        }
 
         val result = api.getTopRatedTvShows().results
         cacheTvShows(result, CACHE_TYPE_TOP_RATED)
@@ -177,7 +211,7 @@ class TmdbRepository {
         result
     }
 
-    // ========== Detail Endpoints ==========
+// ========== Detail Endpoints ==========
 
     /** Fetches detailed information for a specific movie. */
     suspend fun getMovieDetail(movieId: Int): Result<MovieDetail> = runCatching {
@@ -194,12 +228,12 @@ class TmdbRepository {
         api.getSeasonDetail(tvId, seasonNumber)
     }
 
-    // ========== Genre Endpoints ==========
+// ========== Genre Endpoints ==========
 
     /** Fetches the list of available movie genres with caching. */
     suspend fun getMovieGenres(): Result<List<Genre>> = runCatching {
         try {
-            // Try to get from cache first
+// Try to get from cache first
             val cachedGenres = DatabaseManager.getCachedMovieGenres().first()
             if (cachedGenres.isNotEmpty()) {
                 Log.i(TAG, "Returning cached movie genres")
@@ -209,10 +243,10 @@ class TmdbRepository {
             Log.w(TAG, "Failed to get cached genres", e)
         }
 
-        // Fetch from API
+// Fetch from API
         val result = api.getMovieGenres().genres
 
-        // Cache the genres
+// Cache the genres
         DatabaseManager.cacheGenres(result, "movie")
 
         result
@@ -236,7 +270,7 @@ class TmdbRepository {
         result
     }
 
-    // ========== Company/Network Endpoints ==========
+// ========== Company/Network Endpoints ==========
 
     /** Fetches movies filtered by a specific production company. */
     suspend fun getMoviesByCompany(companyId: Int, page: Int = 1): Result<MovieResponse> =
@@ -260,7 +294,7 @@ class TmdbRepository {
         api.getCompanyDetails(companyId)
     }
 
-    // ========== Video Endpoints ==========
+// ========== Video Endpoints ==========
 
     /** Fetches videos (trailers, etc.) for a specific movie. */
     suspend fun getMovieVideos(movieId: Int): Result<List<Video>> = runCatching {
@@ -272,7 +306,7 @@ class TmdbRepository {
         api.getTvShowVideos(tvId).results
     }
 
-    // ========== Search Endpoints ==========
+// ========== Search Endpoints ==========
 
     /** Searches for movies matching a query string. */
     suspend fun searchMovies(query: String): Result<List<Movie>> = runCatching {
@@ -290,7 +324,7 @@ class TmdbRepository {
         response.results.mapNotNull { it.toSearchResult() }
     }
 
-    // ========== Recommendations ==========
+// ========== Recommendations ==========
 
     /** Fetches recommended movies for a specific movie. */
     suspend fun getRecommendedMovies(movieId: Int): Result<List<Movie>> = runCatching {
@@ -307,7 +341,7 @@ class TmdbRepository {
         api.getCollectionDetails(collectionId)
     }
 
-    // ========== Watch History (Now using Room) ==========
+// ========== Watch History (Now using Room) ==========
 
     /**
      * Saves a media item to the watch history using Room database.
@@ -348,7 +382,7 @@ class TmdbRepository {
             items = entities.map { DatabaseManager.entityToWatchHistoryItem(it) }
         }
 
-        // For synchronous access, fall back to the database directly
+// For synchronous access, fall back to the database directly
         return try {
             val dao = DatabaseManager.watchHistoryDao()
             kotlinx.coroutines.runBlocking {
@@ -422,38 +456,50 @@ class TmdbRepository {
         DatabaseManager.clearWatchHistory()
     }
 
-    // ========== GitHub Lists with Caching ==========
+// ========== GitHub Lists with Caching ==========
 
     /**
      * Fetches movies from a GitHub JSON list with caching.
+     * Now uses OkHttpClient for better connection management and caching.
      */
-    suspend fun getGitHubMovieList(urlString: String): Result<List<Movie>> =
+    suspend fun getGitHubMovieList(context: Context, urlString: String): Result<List<Movie>> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val url = java.net.URL(urlString)
-                val connection = url.openConnection() as java.net.HttpURLConnection
-                connection.requestMethod = "GET"
-                connection.connectTimeout = 15000
-                connection.readTimeout = 15000
+                Log.i(TAG, "Fetching GitHub movie list from: $urlString")
 
-                val responseCode = connection.responseCode
-                if (responseCode != java.net.HttpURLConnection.HTTP_OK) {
-                    throw Exception("Failed to fetch GitHub list: HTTP $responseCode")
+                val client = getGitHubOkHttpClient(context)
+                val request = Request.Builder()
+                    .url(urlString)
+                    .build()
+
+                val response = client.newCall(request).execute()
+
+                if (!response.isSuccessful) {
+                    val errorBody = response.body?.string() ?: "Unknown error"
+                    Log.e(TAG, "GitHub API error: ${response.code} - $errorBody")
+                    response.close()
+                    throw Exception("Failed to fetch GitHub list: HTTP ${response.code}")
                 }
 
-                val reader = BufferedReader(InputStreamReader(connection.inputStream))
-                val response = reader.readText()
-                reader.close()
+                val responseBody = response.body?.string()
+                if (responseBody.isNullOrEmpty()) {
+                    response.close()
+                    throw Exception("Empty response from GitHub")
+                }
+
+                response.close()
 
                 val type = object : TypeToken<List<Movie>>() {}.type
-                val movies: List<Movie> = gson.fromJson(response, type)
+                val movies: List<Movie> = gson.fromJson(responseBody, type)
 
-//                // Cache the movies
-//                cacheMovies(
-//                    movies,
-//                    CACHE_TYPE_GITHUB_LIST,
-//                    CachedMovieEntity.LONG_CACHE_DURATION_MS
-//                )
+                Log.i(TAG, "Fetched ${movies.size} movies from GitHub")
+
+// Cache the movies for offline access
+                cacheMovies(
+                    movies,
+                    CACHE_TYPE_GITHUB_LIST,
+                    CachedMovieEntity.LONG_CACHE_DURATION_MS
+                )
 
                 movies
             }
@@ -461,34 +507,46 @@ class TmdbRepository {
 
     /**
      * Fetches TV shows from a GitHub JSON list with caching.
+     * Now uses OkHttpClient for better connection management and caching.
      */
-    suspend fun getGitHubTvShowList(urlString: String): Result<List<TvShow>> =
+    suspend fun getGitHubTvShowList(context: Context, urlString: String): Result<List<TvShow>> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val url = java.net.URL(urlString)
-                val connection = url.openConnection() as java.net.HttpURLConnection
-                connection.requestMethod = "GET"
-                connection.connectTimeout = 15000
-                connection.readTimeout = 15000
+                Log.i(TAG, "Fetching GitHub TV show list from: $urlString")
 
-                val responseCode = connection.responseCode
-                if (responseCode != java.net.HttpURLConnection.HTTP_OK) {
-                    throw Exception("Failed to fetch GitHub list: HTTP $responseCode")
+                val client = getGitHubOkHttpClient(context)
+                val request = Request.Builder()
+                    .url(urlString)
+                    .build()
+
+                val response = client.newCall(request).execute()
+
+                if (!response.isSuccessful) {
+                    val errorBody = response.body?.string() ?: "Unknown error"
+                    Log.e(TAG, "GitHub API error: ${response.code} - $errorBody")
+                    response.close()
+                    throw Exception("Failed to fetch GitHub list: HTTP ${response.code}")
                 }
 
-                val reader = BufferedReader(InputStreamReader(connection.inputStream))
-                val response = reader.readText()
-                reader.close()
+                val responseBody = response.body?.string()
+                if (responseBody.isNullOrEmpty()) {
+                    response.close()
+                    throw Exception("Empty response from GitHub")
+                }
+
+                response.close()
 
                 val type = object : TypeToken<List<TvShow>>() {}.type
-                val tvShows: List<TvShow> = gson.fromJson(response, type)
+                val tvShows: List<TvShow> = gson.fromJson(responseBody, type)
 
-                // Cache the TV shows
-//                cacheTvShows(
-//                    tvShows,
-//                    CACHE_TYPE_GITHUB_LIST,
-//                    CachedTvShowEntity.LONG_CACHE_DURATION_MS
-//                )
+                Log.i(TAG, "Fetched ${tvShows.size} TV shows from GitHub")
+
+// Cache the TV shows for offline access
+                cacheTvShows(
+                    tvShows,
+                    CACHE_TYPE_GITHUB_LIST,
+                    CachedTvShowEntity.LONG_CACHE_DURATION_MS
+                )
 
                 tvShows
             }
@@ -496,32 +554,44 @@ class TmdbRepository {
 
     /**
      * Fetches companies and networks from a GitHub JSON list.
+     * Now uses OkHttpClient for better connection management and caching.
      */
-    suspend fun getGitHubCompaniesNetworks(urlString: String): Result<CompaniesNetworksResponse> =
+    suspend fun getGitHubCompaniesNetworks(context: Context, urlString: String): Result<CompaniesNetworksResponse> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val url = java.net.URL(urlString)
-                val connection = url.openConnection() as java.net.HttpURLConnection
-                connection.requestMethod = "GET"
-                connection.connectTimeout = 15000
-                connection.readTimeout = 15000
+                Log.i(TAG, "Fetching GitHub companies/networks list from: $urlString")
 
-                val responseCode = connection.responseCode
-                if (responseCode != java.net.HttpURLConnection.HTTP_OK) {
-                    throw Exception("Failed to fetch GitHub list: HTTP $responseCode")
+                val client = getGitHubOkHttpClient(context)
+                val request = Request.Builder()
+                    .url(urlString)
+                    .build()
+
+                val response = client.newCall(request).execute()
+
+                if (!response.isSuccessful) {
+                    val errorBody = response.body?.string() ?: "Unknown error"
+                    Log.e(TAG, "GitHub API error: ${response.code} - $errorBody")
+                    response.close()
+                    throw Exception("Failed to fetch GitHub list: HTTP ${response.code}")
                 }
 
-                val reader = BufferedReader(InputStreamReader(connection.inputStream))
-                val response = reader.readText()
-                reader.close()
+                val responseBody = response.body?.string()
+                if (responseBody.isNullOrEmpty()) {
+                    response.close()
+                    throw Exception("Empty response from GitHub")
+                }
 
-                val result: CompaniesNetworksResponse =
-                    gson.fromJson(response, CompaniesNetworksResponse::class.java)
+                response.close()
+
+                val result: CompaniesNetworksResponse = gson.fromJson(responseBody, CompaniesNetworksResponse::class.java)
+
+                Log.i(TAG, "Fetched companies/networks from GitHub")
+
                 result
             }
         }
 
-    // ========== Private Helper Methods ==========
+// ========== Private Helper Methods ==========
 
     /**
      * Attempts to get cached movies of a specific type.

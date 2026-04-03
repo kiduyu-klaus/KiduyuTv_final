@@ -1,5 +1,7 @@
 package com.kiduyuk.klausk.kiduyutv.viewmodel
 
+import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.StreamProvider
@@ -8,15 +10,55 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.net.HttpURLConnection
-import java.net.URL
+import okhttp3.Cache
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.io.File
+import java.util.concurrent.TimeUnit
 
 class StreamLinksViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(StreamLinksUiState())
     val uiState: StateFlow<StreamLinksUiState> = _uiState
 
-    fun loadStreamProviders(tmdbId: Int, isTv: Boolean, season: Int?, episode: Int?) {
+    companion object {
+        private const val TAG = "StreamLinksViewModel"
+        private const val CACHE_SIZE = 5L * 1024 * 1024 // 5 MB cache for stream checks
+
+        // Separate OkHttpClient for stream URL availability checks
+// Uses shorter timeouts suitable for quick availability checks
+        @Volatile
+        private var httpClient: OkHttpClient? = null
+
+        fun getOkHttpClient(context: Context): OkHttpClient {
+            return httpClient ?: synchronized(this) {
+                httpClient ?: createOkHttpClient(context).also { httpClient = it }
+            }
+        }
+
+        private fun createOkHttpClient(context: Context): OkHttpClient {
+            val cacheDir = File(context.cacheDir, "stream_check_cache")
+            val cache = Cache(cacheDir, CACHE_SIZE)
+
+            return OkHttpClient.Builder()
+                .cache(cache)
+// Shorter timeouts for availability checks (5 seconds)
+                .connectTimeout(5, TimeUnit.SECONDS)
+                .readTimeout(5, TimeUnit.SECONDS)
+                .writeTimeout(5, TimeUnit.SECONDS)
+// Only retry once on failure
+                .retryOnConnectionFailure(true)
+                .build()
+        }
+    }
+
+    fun loadStreamProviders(
+        tmdbId: Int,
+        isTv: Boolean,
+        season: Int?,
+        episode: Int?,
+        context: Context
+    ) {
         _uiState.value = _uiState.value.copy(isLoading = true)
         viewModelScope.launch {
             val providers = listOf(
@@ -57,8 +99,10 @@ class StreamLinksViewModel : ViewModel() {
                 )
             )
 
+            val client = getOkHttpClient(context)
+
             val checkedProviders = providers.map { provider ->
-                val isAvailable = checkUrlAvailability(provider.urlTemplate)
+                val isAvailable = checkUrlAvailability(client, provider.urlTemplate)
                 provider.copy(isAvailable = isAvailable)
             }
 
@@ -69,18 +113,25 @@ class StreamLinksViewModel : ViewModel() {
         }
     }
 
-    private suspend fun checkUrlAvailability(urlString: String): Boolean {
+    private suspend fun checkUrlAvailability(client: OkHttpClient, urlString: String): Boolean {
         return withContext(Dispatchers.IO) {
             try {
-                val url = URL(urlString)
-                val connection = url.openConnection() as HttpURLConnection
-                connection.requestMethod = "HEAD"
-                connection.connectTimeout = 5000 // 5 seconds timeout
-                connection.readTimeout = 5000 // 5 seconds timeout
-                val responseCode = connection.responseCode
-                // Consider 2xx and 3xx responses as available
-                responseCode in 200..399
+                Log.i(TAG, "Checking URL availability: $urlString")
+
+                val request = Request.Builder()
+                    .url(urlString)
+                    .head() // Use HEAD request to avoid downloading body
+                    .build()
+
+                val response = client.newCall(request).execute()
+
+                val isAvailable = response.code in 200..399
+                Log.i(TAG, "URL $urlString availability: $isAvailable (code: ${response.code})")
+
+                response.close()
+                isAvailable
             } catch (e: Exception) {
+                Log.w(TAG, "Failed to check URL availability for $urlString: ${e.message}")
                 false
             }
         }

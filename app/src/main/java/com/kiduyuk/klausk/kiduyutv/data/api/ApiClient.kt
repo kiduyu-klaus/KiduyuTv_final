@@ -37,29 +37,41 @@ object ApiClient {
         chain.proceed(newRequest) // continue with the modified request
     }
 
-    // Global Retry Interceptor: Retries 3 times with a 30-second delay on timeout or IO error
+    // Global Retry Interceptor: Retries 3 times with delay on timeout or IO error
     private val retryInterceptor = Interceptor { chain ->
         var attempt = 0
         val maxRetry = 3
-        val retryDelayMs = 30000L // 30 seconds
+        val retryDelayMs = 3000L // 3 seconds (reduced from 30s)
         var response: Response? = null
         var exception: Exception? = null
 
         while (attempt <= maxRetry) {
             try {
                 if (attempt > 0) {
+                    // CRITICAL: Close previous response before retrying
+                    response?.close()
                     Log.i(TAG, "Retrying request (attempt $attempt of $maxRetry) after ${retryDelayMs / 1000}s...")
                     Thread.sleep(retryDelayMs)
                 }
                 response = chain.proceed(chain.request())
                 if (response.isSuccessful) return@Interceptor response
 
-                // If not successful, we might want to retry on specific codes (e.g., 503, 504)
-                // For now, we follow the user's request to focus on timeouts/IOExceptions.
+                // If not successful, close and check if retryable
+                val code = response.code
+                response.close()
+
+                // Only retry on specific server error codes
+                if (code == 503 || code == 504 || code == 429) {
+                    Log.w(TAG, "Request failed with code $code, will retry")
+                } else {
+                    // For non-retryable codes, return the response (will be handled by caller)
+                    throw IOException("Request failed with non-retryable code: $code")
+                }
             } catch (e: Exception) {
                 exception = e
                 if (e is SocketTimeoutException || e is IOException) {
                     Log.w(TAG, "Request failed (attempt $attempt): ${e.message}")
+                    // Don't close response here as it might be null or already closed
                 } else {
                     // For non-retryable exceptions, throw immediately
                     throw e
@@ -69,7 +81,7 @@ object ApiClient {
         }
 
         // If we reached here, all attempts failed
-        if (response != null) return@Interceptor response
+        response?.close()
         throw exception ?: IOException("Request failed after $maxRetry retries")
     }
 
@@ -125,8 +137,8 @@ object ApiClient {
             .cache(cache)
             .addInterceptor(authInterceptor)
             //.addInterceptor(retryInterceptor) // Added global retry logic
-            //.addNetworkInterceptor(cacheInterceptor) // For online requests
-            //.addInterceptor(forceCacheInterceptor) // For offline requests
+            .addNetworkInterceptor(cacheInterceptor) // For online requests with proper cache headers
+            .addInterceptor(forceCacheInterceptor) // For offline requests - fallback to cached data
             //.addInterceptor(loggingInterceptor)
             .connectTimeout(30, TimeUnit.SECONDS) // Updated from 60 to 30
             .readTimeout(30, TimeUnit.SECONDS)    // Updated from 60 to 30

@@ -1,5 +1,6 @@
 package com.kiduyuk.klausk.kiduyutv.ui.components
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
@@ -39,6 +40,9 @@ fun HeroSection(
     tvShow: TvShow?,
     modifier: Modifier = Modifier
 ) {
+    // Logging for image loading debugging
+    Log.i("HeroSection", "HeroSection composed: movie=${movie?.title}, tvShow=${tvShow?.name}")
+
     val configuration = LocalConfiguration.current
     val heroHeight = (configuration.screenHeightDp * 0.50f).dp
 
@@ -55,6 +59,14 @@ fun HeroSection(
     val rating = (if (isMovie) movie?.voteAverage else tvShow?.voteAverage) ?: 0.0
     val year = (if (isMovie) movie?.releaseDate else tvShow?.firstAirDate)?.take(4) ?: ""
 
+    // Build the full backdrop image URL for logging
+    val backdropUrl = if (!backdropPath.isNullOrEmpty()) {
+        "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.BACKDROP_SIZE}$backdropPath"
+    } else {
+        null
+    }
+    Log.i("HeroSection", "backdropPath=${backdropPath}, backdropUrl=${backdropUrl}")
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -63,16 +75,27 @@ fun HeroSection(
 
         // 🔹 Background Image (safe for preview)
         if (!backdropPath.isNullOrEmpty()) {
+            Log.i("HeroSection", "Rendering backdrop AsyncImage: ${title}")
             AsyncImage(
-                model = "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.BACKDROP_SIZE}$backdropPath",
+                model = backdropUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxSize()
-                    .blur(10.dp)
+                    .blur(10.dp),
+                onError = { errorState ->
+                    Log.e("HeroSection", "Backdrop AsyncImage error for ${title}: ${errorState.result}")
+                },
+                onLoading = {
+                    Log.i("HeroSection", "Backdrop AsyncImage loading for ${title}")
+                },
+                onSuccess = { metadata ->
+                    Log.i("HeroSection", "Backdrop AsyncImage loaded successfully for ${title} from: ${metadata.result.dataSource}")
+                }
             )
         } else {
             // Fallback background (for preview / errors)
+            Log.w("HeroSection", "No backdropPath for ${title}, showing fallback background")
             Box(
                 modifier = Modifier
                     .fillMaxSize()

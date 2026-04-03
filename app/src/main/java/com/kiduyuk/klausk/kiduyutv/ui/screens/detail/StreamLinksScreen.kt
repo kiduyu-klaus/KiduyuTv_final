@@ -67,7 +67,7 @@ fun StreamLinksScreen(
     val uiState by viewModel.uiState.collectAsState()
 
     LaunchedEffect(tmdbId, isTv, season, episode) {
-        viewModel.loadStreamProviders(tmdbId, isTv, season, episode)
+        viewModel.loadStreamProviders(tmdbId, isTv, season, episode, context)
     }
 
     Box(
@@ -75,7 +75,7 @@ fun StreamLinksScreen(
             .fillMaxSize()
             .background(BackgroundDark)
     ) {
-        // Backdrop image
+// Backdrop image
         if (backdropPath != null) {
             AsyncImage(
                 model = "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.BACKDROP_SIZE}${backdropPath}",
@@ -85,7 +85,7 @@ fun StreamLinksScreen(
             )
         }
 
-        // Gradient overlay
+// Gradient overlay
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -100,7 +100,7 @@ fun StreamLinksScreen(
                 )
         )
 
-        // Back button
+// Back button
         IconButton(
             onClick = onBackClick,
             modifier = Modifier
@@ -305,9 +305,9 @@ fun StreamProviderItem(
                 )
             } else {
                 Icon(
-                    imageVector = Icons.Default.Cancel,
-                    contentDescription = "Unavailable",
-                    tint = Color.Red,
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = "Available",
+                    tint = Color.Green,
                     modifier = Modifier.size(24.dp)
                 )
             }
