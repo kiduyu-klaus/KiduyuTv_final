@@ -380,7 +380,7 @@ class SplashActivity : ComponentActivity() {
 
         LaunchedEffect(updateAvailable) {
             if (!updateAvailable) {
-                delay(10_000)
+                delay(6000)
                 onTimeout()
             }
         }
