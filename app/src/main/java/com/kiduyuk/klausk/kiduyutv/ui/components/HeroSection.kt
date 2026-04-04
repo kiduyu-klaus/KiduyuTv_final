@@ -38,7 +38,9 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 fun HeroSection(
     movie: Movie?,
     tvShow: TvShow?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onInfoClick: () -> Unit = {},
+    onPlayClick: () -> Unit = {}
 ) {
     // Logging for image loading debugging
     Log.i("HeroSection", "HeroSection composed: movie=${movie?.title}, tvShow=${tvShow?.name}")
@@ -193,7 +195,7 @@ fun HeroSection(
                 val playFocused by playInteraction.collectIsFocusedAsState()
 
                 Button(
-                    onClick = { },
+                    onClick = onPlayClick,
                     interactionSource = playInteraction,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (playFocused) DarkRed else Color.Transparent
@@ -213,7 +215,7 @@ fun HeroSection(
                 val infoFocused by infoInteraction.collectIsFocusedAsState()
 
                 OutlinedButton(
-                    onClick = { },
+                    onClick = onInfoClick,
                     interactionSource = infoInteraction,
                     border = BorderStroke(1.dp, if (infoFocused) DarkRed else TextPrimary),
                     shape = RoundedCornerShape(4.dp),

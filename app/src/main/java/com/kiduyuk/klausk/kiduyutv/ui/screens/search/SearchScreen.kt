@@ -14,6 +14,9 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import androidx.compose.material3.Icon
@@ -44,6 +47,7 @@ import com.kiduyuk.klausk.kiduyutv.viewmodel.SearchViewModel
 /**
  * Search screen composable that allows users to search for movies and TV shows.
  * Displays search results in a list layout with modern dark mode design.
+ * Also shows recent searches when the search is empty.
  *
  * @param onBackClick Callback when the back button is clicked.
  * @param onMovieClick Callback when a movie result is clicked.
@@ -82,7 +86,10 @@ fun SearchScreen(
         SearchContent(
             uiState = uiState,
             onMovieClick = onMovieClick,
-            onTvShowClick = onTvShowClick
+            onTvShowClick = onTvShowClick,
+            onRecentSearchClick = viewModel::setSearchQuery,
+            onRemoveRecentSearch = viewModel::removeRecentSearch,
+            onClearAllRecentSearches = viewModel::clearRecentSearches
         )
     }
 }
@@ -230,13 +237,16 @@ private fun SearchTextField(
 }
 
 /**
- * Content area that displays search results or loading/error states.
+ * Content area that displays search results, recent searches, or loading/error states.
  */
 @Composable
 private fun SearchContent(
     uiState: SearchUiState,
     onMovieClick: (Int) -> Unit,
-    onTvShowClick: (Int) -> Unit
+    onTvShowClick: (Int) -> Unit,
+    onRecentSearchClick: (String) -> Unit,
+    onRemoveRecentSearch: (String) -> Unit,
+    onClearAllRecentSearches: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -277,31 +287,42 @@ private fun SearchContent(
                 }
             }
 
-            !uiState.hasSearched -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+            !uiState.hasSearched && uiState.query.isEmpty() -> {
+                // Show recent searches when no search has been performed and query is empty
+                if (uiState.recentSearches.isNotEmpty()) {
+                    RecentSearchesList(
+                        recentSearches = uiState.recentSearches,
+                        onRecentSearchClick = onRecentSearchClick,
+                        onRemoveRecentSearch = onRemoveRecentSearch,
+                        onClearAllRecentSearches = onClearAllRecentSearches
+                    )
+                } else {
+                    // Show empty state
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = null,
-                            tint = TextTertiary,
-                            modifier = Modifier.size(64.dp)
-                        )
-                        Text(
-                            text = "Start typing to search",
-                            color = TextSecondary,
-                            fontSize = 18.sp
-                        )
-                        Text(
-                            text = "Find movies and TV shows",
-                            color = TextTertiary,
-                            fontSize = 14.sp
-                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = null,
+                                tint = TextTertiary,
+                                modifier = Modifier.size(64.dp)
+                            )
+                            Text(
+                                text = "Start typing to search",
+                                color = TextSecondary,
+                                fontSize = 18.sp
+                            )
+                            Text(
+                                text = "Find movies and TV shows",
+                                color = TextTertiary,
+                                fontSize = 14.sp
+                            )
+                        }
                     }
                 }
             }
@@ -337,6 +358,141 @@ private fun SearchContent(
                     onTvShowClick = onTvShowClick
                 )
             }
+        }
+    }
+}
+
+/**
+ * Displays the list of recent searches.
+ */
+@Composable
+private fun RecentSearchesList(
+    recentSearches: List<String>,
+    onRecentSearchClick: (String) -> Unit,
+    onRemoveRecentSearch: (String) -> Unit,
+    onClearAllRecentSearches: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        // Header with title and clear all button
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.History,
+                    contentDescription = null,
+                    tint = TextSecondary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Text(
+                    text = "Recent Searches",
+                    color = TextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            Text(
+                text = "Clear All",
+                color = DarkRed,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onClearAllRecentSearches() }
+                    .padding(8.dp)
+            )
+        }
+
+        LazyColumn(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(recentSearches) { search ->
+                RecentSearchItem(
+                    query = search,
+                    onClick = { onRecentSearchClick(search) },
+                    onRemove = { onRemoveRecentSearch(search) }
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Single recent search item with query text and remove button.
+ */
+@Composable
+private fun RecentSearchItem(
+    query: String,
+    onClick: () -> Unit,
+    onRemove: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                if (isFocused) CardDark else SurfaceDark
+            )
+            .border(
+                width = if (isFocused) 2.dp else 0.dp,
+                color = if (isFocused) DarkRed else Color.Transparent,
+                shape = RoundedCornerShape(12.dp)
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+            .focusable(interactionSource = interactionSource)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.weight(1f)
+        ) {
+            Icon(
+                imageVector = Icons.Filled.History,
+                contentDescription = null,
+                tint = TextTertiary,
+                modifier = Modifier.size(20.dp)
+            )
+            Text(
+                text = query,
+                color = TextPrimary,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Normal,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+
+        IconButton(
+            onClick = onRemove,
+            modifier = Modifier.size(32.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "Remove",
+                tint = TextTertiary,
+                modifier = Modifier.size(18.dp)
+            )
         }
     }
 }

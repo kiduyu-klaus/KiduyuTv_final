@@ -1,6 +1,9 @@
 package com.kiduyuk.klausk.kiduyutv.ui.navigation
 
+import android.app.Application
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -17,6 +20,8 @@ import com.kiduyuk.klausk.kiduyutv.ui.screens.home.HomeScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.MoviesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.MyListScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.TvShowsScreen
+import com.kiduyuk.klausk.kiduyutv.viewmodel.SearchViewModel
+import com.kiduyuk.klausk.kiduyutv.viewmodel.SearchViewModelFactory
 
 /**
  * Main navigation graph for the application.
@@ -118,7 +123,13 @@ fun NavGraph(navController: NavHostController) {
 
         // Search Screen: Screen for searching movies and TV shows.
         composable(Screen.Search.route) {
+            val context = LocalContext.current
+            val application = context.applicationContext as Application
+            val searchViewModel: SearchViewModel = viewModel(
+                factory = SearchViewModelFactory(application)
+            )
             SearchScreen(
+                viewModel = searchViewModel,
                 onBackClick = { navController.popBackStack() },
                 onMovieClick = { movieId ->
                     navController.navigate(Screen.MovieDetail.createRoute(movieId))

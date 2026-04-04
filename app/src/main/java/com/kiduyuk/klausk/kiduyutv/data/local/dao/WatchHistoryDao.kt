@@ -25,6 +25,13 @@ interface WatchHistoryDao {
     fun getAllWatchHistory(): Flow<List<WatchHistoryEntity>>
 
     /**
+     * Get all watch history items as a List (suspend function).
+     * Useful for batch operations like refreshing all images.
+     */
+    @Query("SELECT * FROM watch_history ORDER BY lastWatchedTimestamp DESC")
+    suspend fun getAllWatchHistoryItems(): List<WatchHistoryEntity>
+
+    /**
      * Get recent watch history limited by count.
      * Useful for displaying "Continue Watching" section.
      */

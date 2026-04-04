@@ -119,20 +119,20 @@ class HomeViewModel : ViewModel() {
                     selectedItem = sortedNowPlaying.firstOrNull() ?: sortedTrendingTv.firstOrNull() ?: sortedTrendingMovies.firstOrNull()
                 )
 
-                // Enrich watch history items with TMDB details in background
-                // This ensures "Continue Watching" row displays complete information
-                // even for items that were saved with incomplete data
+                // Refresh watch history images and enrich items with TMDB details in background
+                // This ensures "Continue Watching" row displays complete and accurate information
+                // even for items that were saved with incomplete data.
                 //
-                // The WatchHistoryEnricher checks and updates the following fields:
-                // - title: Required display name
-                // - overview: Description/synopsis
-                // - posterPath: Poster image for display
-                // - backdropPath: Background image for hero section
-                // - voteAverage: Rating score
-                // - releaseDate: Release/first air date
+                // The WatchHistoryEnricher handles two types of updates:
+                // 1. refreshAllWatchHistoryImages - Always fetches and overwrites poster/backdrop
+                //    images from TMDB to ensure users see the most current images
+                // 2. enrichAllMissingItems - Fills in other missing fields (title, overview, etc.)
                 viewModelScope.launch {
                     try {
-                        // Enrich all watch history items with missing TMDB details
+                        // First, refresh all images from TMDB to ensure fresh images
+                        WatchHistoryEnricher.refreshAllWatchHistoryImages(context)
+
+                        // Then, enrich items with missing TMDB details
                         WatchHistoryEnricher.enrichAllMissingItems(context)
 
                         // Refresh the watch history after enrichment to get updated items

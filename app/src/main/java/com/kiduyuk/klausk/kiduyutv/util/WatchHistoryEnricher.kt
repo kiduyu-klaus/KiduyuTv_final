@@ -110,9 +110,98 @@ object WatchHistoryEnricher {
     }
 
     /**
+     * Refreshes images (poster and backdrop) for ALL watch history items from TMDB.
+     * This method always overwrites the existing images with fresh data from TMDB,
+     * ensuring that users see the most current and accurate images regardless of
+     * whether the existing data is complete or not.
+     *
+     * This is useful when:
+     * - TMDB has updated images for existing content
+     * - Cached images need to be refreshed
+     * - Ensuring consistent image quality across all watch history items
+     *
+     * @param context Context required for database operations
+     * @return Number of items whose images were successfully refreshed
+     */
+    suspend fun refreshAllWatchHistoryImages(context: Context): Int {
+        DatabaseManager.init(context)
+
+        return try {
+            val allWatchHistory = DatabaseManager.getAllWatchHistoryItems()
+
+            if (allWatchHistory.isEmpty()) {
+                Log.i(TAG, "No watch history items to refresh images for")
+                return 0
+            }
+
+            Log.i(TAG, "Refreshing images for ${allWatchHistory.size} watch history items")
+
+            var refreshedCount = 0
+
+            for (entity in allWatchHistory) {
+                val success = refreshEntityImages(entity)
+                if (success) {
+                    refreshedCount++
+                }
+            }
+
+            Log.i(TAG, "Successfully refreshed images for $refreshedCount out of ${allWatchHistory.size} items")
+            refreshedCount
+        } catch (e: Exception) {
+            Log.e(TAG, "Error refreshing watch history images: ${e.message}")
+            0
+        }
+    }
+
+    /**
+     * Refreshes only the images (poster and backdrop) for a single watch history entity.
+     * Always fetches the latest images from TMDB and overwrites existing ones.
+     *
+     * @param entity The entity whose images should be refreshed
+     * @return true if image refresh was successful, false otherwise
+     */
+    private suspend fun refreshEntityImages(entity: WatchHistoryEntity): Boolean {
+        return try {
+            val details = fetchTmdbDetails(entity.id, entity.mediaType)
+
+            if (details != null) {
+                val (title, overview, posterPath, backdropPath, voteAverage, releaseDate) = extractDetails(details)
+
+                // Always update with TMDB images - this is the core purpose of this method
+                val updatedPosterPath = posterPath ?: entity.posterPath
+                val updatedBackdropPath = backdropPath ?: entity.backdropPath
+
+                // Only update if we actually got new images from TMDB
+                if (updatedPosterPath != entity.posterPath || updatedBackdropPath != entity.backdropPath) {
+                    DatabaseManager.updateWatchHistoryDetails(
+                        mediaId = entity.id,
+                        mediaType = entity.mediaType,
+                        title = entity.title,
+                        overview = entity.overview,
+                        posterPath = updatedPosterPath,
+                        backdropPath = updatedBackdropPath,
+                        voteAverage = entity.voteAverage,
+                        releaseDate = entity.releaseDate
+                    )
+                    Log.i(TAG, "Refreshed images for watch history item ${entity.id} (${entity.mediaType})")
+                } else {
+                    Log.d(TAG, "No image changes for watch history item ${entity.id} (${entity.mediaType})")
+                }
+                true
+            } else {
+                Log.w(TAG, "Failed to fetch TMDB details for image refresh: ${entity.id} (${entity.mediaType})")
+                false
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error refreshing images for entity ${entity.id}: ${e.message}")
+            false
+        }
+    }
+
+    /**
      * Enriches a single watch history item with TMDB details.
      * Use this when you want to update a specific item rather than all items.
-     * 
+     *
      * @param context Context required for database operations
      * @param mediaId The TMDB ID of the media
      * @param mediaType "movie" or "tv"
@@ -143,7 +232,7 @@ object WatchHistoryEnricher {
 
     /**
      * Enriches a WatchHistoryEntity with TMDB details.
-     * 
+     *
      * @param entity The entity to enrich
      * @return true if enrichment was successful, false otherwise
      */
@@ -154,11 +243,12 @@ object WatchHistoryEnricher {
             if (details != null) {
                 val (title, overview, posterPath, backdropPath, voteAverage, releaseDate) = extractDetails(details)
 
-                // Update only missing fields
+                // Always overwrite poster and backdrop images from TMDB to ensure fresh/correct images
+                // Keep existing values for other fields (title, overview, etc.) to preserve user's data
                 val updatedTitle = coalesce(entity.title, title)
                 val updatedOverview = coalesce(entity.overview, overview)
-                val updatedPosterPath = coalesce(entity.posterPath, posterPath)
-                val updatedBackdropPath = coalesce(entity.backdropPath, backdropPath)
+                val updatedPosterPath = posterPath ?: entity.posterPath  // Always prefer TMDB poster
+                val updatedBackdropPath = backdropPath ?: entity.backdropPath  // Always prefer TMDB backdrop
                 val updatedVoteAverage = if (entity.voteAverage == 0.0 && voteAverage > 0) voteAverage else entity.voteAverage
                 val updatedReleaseDate = coalesce(entity.releaseDate, releaseDate)
 

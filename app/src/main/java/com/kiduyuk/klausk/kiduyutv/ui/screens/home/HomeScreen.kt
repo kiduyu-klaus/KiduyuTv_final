@@ -22,6 +22,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.components.*
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
+import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeViewModel
 import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeUiState
 
@@ -109,7 +110,48 @@ fun HomeScreen(
                 onNavigate = onNavigate,
                 onSelectItem = { viewModel.onItemSelected(it) },
                 onSetLastClickedItemId = { viewModel.onItemClicked(it ?: 0) },
-                lastClickedItemId = uiState.lastClickedItemId
+                lastClickedItemId = uiState.lastClickedItemId,
+                onHeroInfoClick = {
+                    selectedMovie?.let { onMovieClick(it.id) }
+                        ?: selectedTvShow?.let { onTvShowClick(it.id) }
+                },
+                onHeroPlayClick = {
+                    // Navigate to StreamLinksScreen to choose a stream provider
+                    selectedMovie?.let { movie ->
+                        movie.title?.let {
+                            onNavigate(
+                                Screen.StreamLinks.createRoute(
+                                    tmdbId = movie.id,
+                                    isTv = false,
+                                    title = it,
+                                    overview = movie.overview,
+                                    posterPath = movie.posterPath,
+                                    backdropPath = movie.backdropPath,
+                                    voteAverage = movie.voteAverage,
+                                    releaseDate = movie.releaseDate,
+                                    timestamp = 0L
+                                )
+                            )
+                        }
+                    }
+                    selectedTvShow?.let { tvShow ->
+                        tvShow.name?.let {
+                            onNavigate(
+                                Screen.StreamLinks.createRoute(
+                                    tmdbId = tvShow.id,
+                                    isTv = true,
+                                    title = it,
+                                    overview = tvShow.overview,
+                                    posterPath = tvShow.posterPath,
+                                    backdropPath = tvShow.backdropPath,
+                                    voteAverage = tvShow.voteAverage,
+                                    releaseDate = tvShow.firstAirDate,
+                                    timestamp = 0L
+                                )
+                            )
+                        }
+                    }
+                }
             )
         }
     }
@@ -154,7 +196,9 @@ private fun HomeContent(
     onNavigate: (String) -> Unit,
     onSelectItem: (Any?) -> Unit,
     onSetLastClickedItemId: (Int?) -> Unit = {},
-    lastClickedItemId: Int? = null
+    lastClickedItemId: Int? = null,
+    onHeroInfoClick: () -> Unit = {},
+    onHeroPlayClick: () -> Unit = {}
 ) {
     val firstItemFocusRequester = remember { FocusRequester() }
 
@@ -172,7 +216,9 @@ private fun HomeContent(
         ) {
             HeroSection(
                 movie = selectedMovie,
-                tvShow = selectedTvShow
+                tvShow = selectedTvShow,
+                onInfoClick = onHeroInfoClick,
+                onPlayClick = onHeroPlayClick
             )
 
             Box(
@@ -187,7 +233,7 @@ private fun HomeContent(
                 ) {
                     // Spacer to push content down slightly if needed,
                     // or just start the rows.
-                   // Spacer(modifier = Modifier.height(5.dp))
+                    // Spacer(modifier = Modifier.height(5.dp))
 
                     // Now Playing Row - First row, gets initial focus
                     if (uiState.nowPlayingMovies.isNotEmpty()) {

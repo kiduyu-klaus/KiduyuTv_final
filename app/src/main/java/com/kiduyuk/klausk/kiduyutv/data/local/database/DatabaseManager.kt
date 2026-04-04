@@ -298,6 +298,18 @@ object DatabaseManager {
         }
     }
 
+    /**
+     * Get all watch history items as a List.
+     * Useful for batch operations like refreshing all images from TMDB.
+     *
+     * @return List of all watch history entities
+     */
+    suspend fun getAllWatchHistoryItems(): List<WatchHistoryEntity> {
+        return withContext(Dispatchers.IO) {
+            watchHistoryDao().getAllWatchHistoryItems()
+        }
+    }
+
     // ========== Movie Caching Operations ==========
 
     /**
