@@ -22,6 +22,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.KiduyuTv"
         android:usesCleartextTraffic="true"
+        android:hardwareAccelerated="true"
         tools:targetApi="28">
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -36,6 +37,7 @@
             android:name=".ui.player.webview.PlayerActivity"
             android:theme="@style/Theme.KiduyuTv.Player"
             android:screenOrientation="landscape"
+            android:hardwareAccelerated="true"
             android:configChanges="orientation|screenSize|keyboardHidden" />
         <activity
             android:name=".activity.splashactivity.SplashActivity"

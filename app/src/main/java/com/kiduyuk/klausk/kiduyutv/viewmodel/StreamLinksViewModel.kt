@@ -77,21 +77,21 @@ class StreamLinksViewModel : ViewModel() {
                     urlTemplate = if (isTv) "https://vidfast.pro/tv/${tmdbId}/${season}/${episode}?autoPlay=true&nextButton=true&autoNext=true" else "https://vidfast.pro/movie/${tmdbId}?autoPlay=true",
                     type = if (isTv) "tv" else "movie"
                 ),
-                StreamProvider(
-                    name = "VidSrc",
-                    urlTemplate = if (isTv) "https://vidsrc.icu/embed/tv/${tmdbId}/${season}/${episode}" else "https://vidsrc.icu/embed/movie/${tmdbId}",
-                    type = if (isTv) "tv" else "movie"
-                ),
+//                StreamProvider(
+//                    name = "VidSrc",
+//                    urlTemplate = if (isTv) "https://vidsrc.icu/embed/tv/${tmdbId}/${season}/${episode}" else "https://vidsrc.icu/embed/movie/${tmdbId}",
+//                    type = if (isTv) "tv" else "movie"
+//                ),
                 StreamProvider(
                     name = "VidKing",
                     urlTemplate = if (isTv) "https://www.vidking.net/embed/tv/${tmdbId}/${season}/${episode}?autoPlay=true&nextEpisode=true&episodeSelector=true" else "https://www.vidking.net/embed/movie/${tmdbId}?autoPlay=true",
                     type = if (isTv) "tv" else "movie"
                 ),
-                StreamProvider(
-                    name = "Mapple",
-                    urlTemplate = if (isTv) "https://mapple.uk/watch/tv/${tmdbId}-${season}-${episode}" else "https://mapple.uk/watch/movie/${tmdbId}",
-                    type = if (isTv) "tv" else "movie"
-                ),
+//                StreamProvider(
+//                    name = "Mapple",
+//                    urlTemplate = if (isTv) "https://mapple.uk/watch/tv/${tmdbId}-${season}-${episode}" else "https://mapple.uk/watch/movie/${tmdbId}",
+//                    type = if (isTv) "tv" else "movie"
+//                ),
                 StreamProvider(
                     name = "Flixer",
                     urlTemplate = if (isTv) "https://flixer.su/watch/tv/${tmdbId}/${season}/${episode}" else "https://flixer.su/watch/movie/${tmdbId}",

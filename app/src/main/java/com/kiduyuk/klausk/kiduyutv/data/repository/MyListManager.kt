@@ -54,7 +54,8 @@ object MyListManager {
                         id = entity.id,
                         title = entity.title ?: "",
                         posterPath = entity.posterPath,
-                        type = entity.mediaType
+                        type = entity.mediaType,
+                        voteAverage = entity.voteAverage
                     )
                 }
             }
@@ -79,7 +80,8 @@ object MyListManager {
                         id = entity.id,
                         title = entity.title ?: "",
                         posterPath = entity.posterPath,
-                        type = entity.mediaType
+                        type = entity.mediaType,
+                        voteAverage = entity.voteAverage
                     )
                 }
             }
@@ -111,7 +113,8 @@ object MyListManager {
                 id = item.id,
                 mediaType = item.type,
                 title = item.title,
-                posterPath = item.posterPath
+                posterPath = item.posterPath,
+                voteAverage = item.voteAverage
             )
         }
     }

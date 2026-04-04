@@ -58,7 +58,8 @@ data class MyListItem(
     val id: Int,
     val title: String,
     val posterPath: String?,
-    val type: String
+    val type: String,
+    val voteAverage: Double = 0.0
 )
 
 /**

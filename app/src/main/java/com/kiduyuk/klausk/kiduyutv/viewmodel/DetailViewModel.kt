@@ -248,14 +248,16 @@ class DetailViewModel : ViewModel() {
                     id = currentState.movieDetail.id,
                     title = currentState.movieDetail.title ?: "",
                     posterPath = currentState.movieDetail.posterPath,
-                    type = "movie"
+                    type = "movie",
+                    voteAverage = currentState.movieDetail.voteAverage ?: 0.0
                 )
             } else if (currentState.tvShowDetail != null) {
                 MyListItem(
                     id = currentState.tvShowDetail.id,
                     title = currentState.tvShowDetail.name ?: "",
                     posterPath = currentState.tvShowDetail.posterPath,
-                    type = "tv"
+                    type = "tv",
+                    voteAverage = currentState.tvShowDetail.voteAverage ?: 0.0
                 )
             } else null
 

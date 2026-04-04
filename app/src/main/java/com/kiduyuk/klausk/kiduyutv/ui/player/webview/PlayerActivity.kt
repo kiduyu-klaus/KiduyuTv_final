@@ -208,6 +208,12 @@ class PlayerActivity : AppCompatActivity() {
                             val repository = TmdbRepository()
                             // Convert seconds to milliseconds for playbackPosition
                             repository.updatePlaybackPosition(tmdbId, if (isTv) "tv" else "movie", currentTime.toLong())
+
+                            // If it's a TV show, also ensure the current season and episode are up to date
+                            // This fixes the issue where clicking "Next Episode" would leave the old episode number in the database
+                            if (isTv) {
+                                repository.updateEpisodeInfo(tmdbId, "tv", currentSeason, currentEpisode)
+                            }
                         }
 
                         // ── Next Episode Logic ──────────────────────────────────
@@ -495,7 +501,16 @@ class PlayerActivity : AppCompatActivity() {
                 mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                 javaScriptCanOpenWindowsAutomatically = false
                 setSupportMultipleWindows(false)
+
+                // Hardware Acceleration and Performance Settings
+                cacheMode = WebSettings.LOAD_DEFAULT
+                setRenderPriority(WebSettings.RenderPriority.HIGH)
+                useWideViewPort = true
+                loadWithOverviewMode = true
             }
+
+            // Enable hardware acceleration at the view level
+            setLayerType(View.LAYER_TYPE_HARDWARE, null)
 
             if (isTrackingEnabled) {
                 addJavascriptInterface(VideasyJavaScriptInterface(), "VideasyInterface")
@@ -981,7 +996,13 @@ class PlayerActivity : AppCompatActivity() {
                     if (tmdbId != -1) {
                         val repository = TmdbRepository()
                         repository.updatePlaybackPosition(tmdbId, if (isTv) "tv" else "movie", currentTime.toLong())
-                        Log.i(TAG, "Final playback position saved: ${currentTime}s")
+
+                        // If it's a TV show, also ensure the current season and episode are saved
+                        if (isTv) {
+                            repository.updateEpisodeInfo(tmdbId, "tv", currentSeason, currentEpisode)
+                        }
+
+                        Log.i(TAG, "Final playback position saved: ${currentTime}s (S$currentSeason E$currentEpisode)")
                     }
                 } catch (e: Exception) {
                     Log.w(TAG, "Error saving final playback position: ${e.message}")

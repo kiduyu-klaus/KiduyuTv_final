@@ -79,6 +79,7 @@ object DatabaseManager {
         mediaType: String,
         title: String,
         posterPath: String?,
+        voteAverage: Double = 0.0,
         category: String? = null
     ) {
         applicationScope.launch {
@@ -87,6 +88,7 @@ object DatabaseManager {
                 mediaType = mediaType,
                 title = title,
                 posterPath = posterPath,
+                voteAverage = voteAverage,
                 category = category,
                 savedTimestamp = System.currentTimeMillis()
             )
@@ -125,7 +127,8 @@ object DatabaseManager {
             id = entity.id,
             title = entity.title ?: "",
             posterPath = entity.posterPath,
-            type = entity.mediaType
+            type = entity.mediaType,
+            voteAverage = entity.voteAverage
         )
     }
 

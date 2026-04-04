@@ -160,7 +160,7 @@ fun TvShowDetailScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = 24.dp)
-                            .padding(top = 40.dp, bottom = 12.dp),
+                            .padding(top = 10.dp, bottom = 12.dp),
                         verticalArrangement = Arrangement.Bottom
                     ) {
                         // Title

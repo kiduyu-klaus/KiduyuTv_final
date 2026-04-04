@@ -140,7 +140,7 @@ fun MyListScreen(
                                         overview = "",
                                         posterPath = item.posterPath,
                                         backdropPath = null,
-                                        voteAverage = 0.0,
+                                        voteAverage = item.voteAverage,
                                         releaseDate = null,
                                         genreIds = null,
                                         popularity = 0.0
@@ -157,7 +157,7 @@ fun MyListScreen(
                                         overview = "",
                                         posterPath = item.posterPath,
                                         backdropPath = null,
-                                        voteAverage = 0.0,
+                                        voteAverage = item.voteAverage,
                                         firstAirDate = null,
                                         genreIds = null,
                                         popularity = 0.0

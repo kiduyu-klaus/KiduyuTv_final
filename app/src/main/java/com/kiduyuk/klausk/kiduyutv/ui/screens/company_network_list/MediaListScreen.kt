@@ -52,8 +52,8 @@ fun MediaListScreen(
     // Get screen configuration to calculate responsive grid
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
-    val horizontalPadding = 48.dp
-    val spacing = 16.dp
+    val horizontalPadding = 25.dp
+    val spacing = 10.dp
     val availableWidth = screenWidth - (horizontalPadding * 2)
     val minCardWidth = 120.dp
     val actualColumns = maxOf(4, minOf(8, ((availableWidth + spacing) / (minCardWidth + spacing)).toInt()))
@@ -107,7 +107,7 @@ fun MediaListScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                    .padding(horizontal = 25.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBackClick) {
