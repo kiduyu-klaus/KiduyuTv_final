@@ -63,10 +63,10 @@ fun MyListScreen(
     // Get screen configuration to calculate responsive grid
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
-    val horizontalPadding = 48.dp
-    val spacing = 16.dp
+    val horizontalPadding = 25.dp
+    val spacing = 10.dp
     val availableWidth = screenWidth - (horizontalPadding * 2)
-    val minCardWidth = 120.dp
+    val minCardWidth = 100.dp
     val actualColumns = maxOf(4, minOf(8, ((availableWidth + spacing) / (minCardWidth + spacing)).toInt()))
     val calculatedCardWidth = (availableWidth - (spacing * (actualColumns - 1))) / actualColumns
     val calculatedCardHeight = calculatedCardWidth * 1.8f
@@ -91,7 +91,7 @@ fun MyListScreen(
         ) {
 
 
-            Spacer(modifier = Modifier.height(32.dp)) // Vertical spacing.
+            Spacer(modifier = Modifier.height(15.dp)) // Vertical spacing.
 
             // Display a message if the list is empty, otherwise show the list.
             if (myList.isEmpty()) {
@@ -110,7 +110,7 @@ fun MyListScreen(
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(actualColumns),
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 32.dp),
+                    contentPadding = PaddingValues(bottom = 10.dp),
                     horizontalArrangement = Arrangement.spacedBy(spacing),
                     verticalArrangement = Arrangement.spacedBy(spacing)
                 ) {
@@ -169,24 +169,24 @@ fun MyListScreen(
                             }
 
                             // Remove button overlay
-                            IconButton(
-                                onClick = { MyListManager.removeItem(item.id, item.type, context) },
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(4.dp)
-                                    .size(24.dp)
-                                    .background(
-                                        color = Color.Black.copy(alpha = 0.6f),
-                                        shape = RoundedCornerShape(12.dp)
-                                    )
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Remove from list",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
+//                            IconButton(
+//                                onClick = { MyListManager.removeItem(item.id, item.type, context) },
+//                                modifier = Modifier
+//                                    .align(Alignment.TopEnd)
+//                                    .padding(4.dp)
+//                                    .size(24.dp)
+//                                    .background(
+//                                        color = Color.Black.copy(alpha = 0.6f),
+//                                        shape = RoundedCornerShape(12.dp)
+//                                    )
+//                            ) {
+//                                Icon(
+//                                    imageVector = Icons.Default.Close,
+//                                    contentDescription = "Remove from list",
+//                                    tint = Color.White,
+//                                    modifier = Modifier.size(16.dp)
+//                                )
+//                            }
                         }
                     }
                 }
@@ -218,7 +218,7 @@ private fun MyListItemCard(
                 shape = RoundedCornerShape(8.dp) // Rounded corners for the card background.
             )
             .clickable { onClick() }
-            .padding(16.dp), // Padding inside the card.
+            .padding(10.dp), // Padding inside the card.
         horizontalArrangement = Arrangement.spacedBy(16.dp) // Spacing between elements in the row.
     ) {
         // Poster thumbnail.
@@ -289,7 +289,7 @@ fun MyListScreenPreview() {
             // Sample My List Items for the preview.
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 48.dp, vertical = 16.dp),
+                contentPadding = PaddingValues(horizontal = 25.dp, vertical = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 items(5) { index ->

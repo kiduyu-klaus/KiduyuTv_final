@@ -187,7 +187,7 @@ private fun HomeContent(
                 ) {
                     // Spacer to push content down slightly if needed,
                     // or just start the rows.
-                    Spacer(modifier = Modifier.height(8.dp))
+                   // Spacer(modifier = Modifier.height(5.dp))
 
                     // Now Playing Row - First row, gets initial focus
                     if (uiState.nowPlayingMovies.isNotEmpty()) {
@@ -533,7 +533,7 @@ private fun HomeContent(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(32.dp))
+                    Spacer(modifier = Modifier.height(15.dp))
                 }
 
                 // Top gradient overlay to blend with HeroSection

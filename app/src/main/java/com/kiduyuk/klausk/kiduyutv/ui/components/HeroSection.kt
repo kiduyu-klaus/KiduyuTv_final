@@ -44,7 +44,7 @@ fun HeroSection(
     Log.i("HeroSection", "HeroSection composed: movie=${movie?.title}, tvShow=${tvShow?.name}")
 
     val configuration = LocalConfiguration.current
-    val heroHeight = (configuration.screenHeightDp * 0.50f).dp
+    val heroHeight = (configuration.screenHeightDp * 0.55f).dp
 
     val isMovie = movie != null
 
@@ -122,8 +122,8 @@ fun HeroSection(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 24.dp)
-                .padding(top = 45.dp), // 🔽 reduced padding
+                .padding(horizontal = 20.dp, vertical = 10.dp)
+                .padding(top = 30.dp), // 🔽 reduced padding
 
             verticalArrangement = Arrangement.Bottom
         ) {
@@ -140,7 +140,7 @@ fun HeroSection(
             Spacer(modifier = Modifier.height(8.dp)) // 🔽 tighter
 
             Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
 
@@ -171,18 +171,18 @@ fun HeroSection(
                 )
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(7.dp))
 
             Text(
                 text = overview,
                 color = TextSecondary,
-                maxLines = 2, // 🔽 reduce lines to fit
+                maxLines = 3, // 🔽 reduce lines to fit
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.widthIn(max = 600.dp),
-                fontSize = 13.sp
+                fontSize = 15.sp
             )
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(7.dp))
 
             Row(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -205,7 +205,7 @@ fun HeroSection(
                 ) {
                     Icon(Icons.Default.PlayArrow, null, tint = TextPrimary, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Play", fontSize = 13.sp, color = TextPrimary)
+                    Text("Play", fontSize = 10.sp, color = TextPrimary)
                 }
 
                 // Info button — add focus
@@ -226,7 +226,7 @@ fun HeroSection(
                 ) {
                     Icon(Icons.Default.Info, null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Info", fontSize = 13.sp)
+                    Text("Info", fontSize = 10.sp)
                 }
             }
         }

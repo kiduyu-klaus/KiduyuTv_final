@@ -63,22 +63,23 @@ fun <T> ContentRow(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 16.dp)
+            .padding(vertical = 10.dp)
+
     ) {
         // Display the title of the content row.
         Text(
             text = title,
             style = MaterialTheme.typography.titleLarge,
             color = TextPrimary,
-            modifier = Modifier.padding(horizontal = 48.dp)
+            modifier = Modifier.padding(horizontal = 20.dp)
         )
 
-        Spacer(modifier = Modifier.height(16.dp)) // Vertical spacing.
+        Spacer(modifier = Modifier.height(5.dp)) // Vertical spacing.
 
         // Horizontal scrollable list of items.
         LazyRow(
             state = listState,
-            contentPadding = PaddingValues(horizontal = 48.dp),
+            contentPadding = PaddingValues(horizontal = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -177,16 +178,16 @@ fun NetworkRow(
             text = title,
             style = MaterialTheme.typography.titleLarge,
             color = TextPrimary,
-            modifier = Modifier.padding(horizontal = 48.dp)
+            modifier = Modifier.padding(horizontal = 20.dp)
         )
 
-        Spacer(modifier = Modifier.height(16.dp)) // Vertical spacing.
+        Spacer(modifier = Modifier.height(5.dp)) // Vertical spacing.
 
         // Horizontal scrollable list of network items.
         LazyRow(
             state = listState,
-            contentPadding = PaddingValues(horizontal = 48.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(horizontal = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
             itemsIndexed(items) { index, item ->
