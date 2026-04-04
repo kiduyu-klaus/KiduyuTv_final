@@ -39,7 +39,7 @@ fun TopBar(
         modifier = modifier
             .fillMaxWidth()
             .background(Color.Transparent)
-            .padding(horizontal = 20.dp, vertical = 10.dp)
+            .padding(horizontal = 20.dp, vertical = 5.dp)
         ,
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -74,7 +74,7 @@ fun TopBar(
 
             // Nav items
             Row(
-                horizontalArrangement = Arrangement.spacedBy(32.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 navItems.forEachIndexed { index, title ->
@@ -119,7 +119,7 @@ fun TopBar(
 
         // Right: Search + Settings
         Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             FocusableIconButton(

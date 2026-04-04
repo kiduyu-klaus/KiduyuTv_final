@@ -151,7 +151,7 @@ fun MovieDetailScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = 24.dp)
-                            .padding(top = 40.dp, bottom = 12.dp),
+                            .padding(top = 15.dp, bottom = 12.dp),
                         verticalArrangement = Arrangement.Bottom
                     ) {
                         // Title
@@ -209,7 +209,7 @@ fun MovieDetailScreen(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            movie.genres?.take(2)?.forEach { genre ->
+                            movie.genres?.take(5)?.forEach { genre ->
                                 Surface(
                                     shape = RoundedCornerShape(12.dp),
                                     color = GenrePill
@@ -223,7 +223,7 @@ fun MovieDetailScreen(
                                 }
                             }
 
-                            movie.productionCompanies?.take(2)?.forEach { company ->
+                            movie.productionCompanies?.take(5)?.forEach { company ->
                                 val companyInteraction = remember { MutableInteractionSource() }
                                 val companyFocused by companyInteraction.collectIsFocusedAsState()
 

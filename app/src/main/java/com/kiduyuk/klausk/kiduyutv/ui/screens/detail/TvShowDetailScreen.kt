@@ -160,7 +160,7 @@ fun TvShowDetailScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(horizontal = 24.dp)
-                            .padding(top = 10.dp, bottom = 12.dp),
+                            .padding(top = 20.dp, bottom = 12.dp),
                         verticalArrangement = Arrangement.Bottom
                     ) {
                         // Title
@@ -226,7 +226,7 @@ fun TvShowDetailScreen(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            tvShow.genres?.take(2)?.forEach { genre ->
+                            tvShow.genres?.take(5)?.forEach { genre ->
                                 Surface(
                                     shape = RoundedCornerShape(12.dp),
                                     color = GenrePill
@@ -240,7 +240,7 @@ fun TvShowDetailScreen(
                                 }
                             }
 
-                            tvShow.networks?.take(2)?.forEach { network ->
+                            tvShow.networks?.take(5)?.forEach { network ->
                                 val networkInteraction = remember { MutableInteractionSource() }
                                 val networkFocused by networkInteraction.collectIsFocusedAsState()
 
@@ -268,7 +268,7 @@ fun TvShowDetailScreen(
                         Text(
                             text = tvShow.overview ?: "",
                             color = TextSecondary,
-                            maxLines = 2,
+                            //maxLines = 3,
                             fontSize = 12.sp
                         )
 
