@@ -25,6 +25,10 @@ import com.kiduyuk.klausk.kiduyutv.util.AdvancedAdBlocker
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import kotlinx.coroutines.launch
 import java.io.ByteArrayInputStream
+import java.io.File
+import java.io.FileOutputStream
+import java.io.PrintWriter
+import android.os.Environment
 
 class PlayerActivity : AppCompatActivity() {
 
@@ -148,6 +152,26 @@ class PlayerActivity : AppCompatActivity() {
         @JavascriptInterface
         fun onStreamFound(url: String, source: String) {
             Log.i(SNIFFER_TAG, "[JS-$source] Stream URL detected: $url")
+            appendUrlToFile(url, source)
+        }
+
+        private fun appendUrlToFile(url: String, source: String) {
+            try {
+                val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                if (!downloadsDir.exists()) {
+                    downloadsDir.mkdirs()
+                }
+                val file = File(downloadsDir, "AllSniffedUrls.txt")
+                val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+
+                FileOutputStream(file, true).use { fos ->
+                    PrintWriter(fos).use { pw ->
+                        pw.println("[$timestamp] [JS-$source] $url")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(SNIFFER_TAG, "Error writing to AllSniffedUrls.txt: ${e.message}")
+            }
         }
     }
 
@@ -511,6 +535,13 @@ class PlayerActivity : AppCompatActivity() {
                 setRenderPriority(WebSettings.RenderPriority.HIGH)
                 useWideViewPort = true
                 loadWithOverviewMode = true
+
+                // Fix for FireTV/Chromium IllegalStateException: Warning: Router objects should be explicitly closed.
+                // Disabling AndroidOverlay prevents the WebView from trying to create a separate
+                // hardware surface for video, which is the source of the leaked Mojo Router.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    safeSetSafeBrowsingEnabled(this, false)
+                }
             }
 
             // On some Android TV devices, LAYER_TYPE_HARDWARE causes a black screen
@@ -844,6 +875,19 @@ class PlayerActivity : AppCompatActivity() {
         progressHandler.removeCallbacks(progressRunnable)
     }
 
+    /**
+     * Helper to safely set Safe Browsing.
+     */
+    private fun safeSetSafeBrowsingEnabled(settings: WebSettings, enabled: Boolean) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                settings.safeBrowsingEnabled = enabled
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to set safe browsing: ${e.message}")
+        }
+    }
+
     override fun onDestroy() {
         // Stop progress tracking
         progressHandler.removeCallbacks(progressRunnable)
@@ -857,9 +901,16 @@ class PlayerActivity : AppCompatActivity() {
 
                 // Clear state and stop loading
                 webView.apply {
+                    // Remove interfaces first
+                    removeJavascriptInterface("VideasyInterface")
+                    removeJavascriptInterface("StreamSniffer")
+
                     stopLoading()
+                    webChromeClient = WebChromeClient()
+                    webViewClient = WebViewClient()
+
                     clearHistory()
-                    clearCache(true)
+                    //clearCache(true)
                     loadUrl("about:blank")
                     onPause()
                     removeAllViews()

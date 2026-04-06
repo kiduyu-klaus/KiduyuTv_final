@@ -14,7 +14,6 @@
 
     <application
         android:name=".KiduyuTvApp"
-        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
         android:allowBackup="true"
         android:banner="@mipmap/ic_banner_foreground"
         android:icon="@mipmap/ic_launcher11"
