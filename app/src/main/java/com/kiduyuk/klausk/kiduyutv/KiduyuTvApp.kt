@@ -12,6 +12,7 @@ import com.kiduyuk.klausk.kiduyutv.data.api.ApiClient
 import com.kiduyuk.klausk.kiduyutv.data.local.database.DatabaseManager
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.util.AdvancedAdBlocker
+import com.kiduyuk.klausk.kiduyutv.util.NotificationHelper
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.database.FirebaseDatabase
 
@@ -33,6 +34,9 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
 
         // Initialize Ad Blocker (previously in PlayerActivity)
         AdvancedAdBlocker.init(this)
+
+        // Initialize notification channels
+        NotificationHelper.createNotificationChannel(this)
 
         // Clean up expired cache on app start
         DatabaseManager.cleanExpiredCache()

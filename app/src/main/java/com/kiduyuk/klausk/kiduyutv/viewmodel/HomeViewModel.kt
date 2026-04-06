@@ -7,6 +7,7 @@ import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
 import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
+import com.kiduyuk.klausk.kiduyutv.util.NotificationHelper
 import com.kiduyuk.klausk.kiduyutv.util.WatchHistoryEnricher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -119,6 +120,9 @@ class HomeViewModel : ViewModel() {
                     topTvShows = sortedTopRatedTv,
                     selectedItem = sortedNowPlaying.firstOrNull() ?: sortedTrendingTv.firstOrNull() ?: sortedTrendingMovies.firstOrNull()
                 )
+
+                // Trigger a random recommendation notification if we have content
+                triggerRandomRecommendation(context, sortedTrendingMovies, sortedTrendingTv)
 
                 // Refresh watch history images and enrich items with TMDB details in background
                 // This ensures "Continue Watching" row displays complete and accurate information
@@ -239,5 +243,44 @@ class HomeViewModel : ViewModel() {
 
     fun onItemClicked(itemId: Int) {
         _uiState.value = _uiState.value.copy(lastClickedItemId = itemId)
+    }
+
+    /**
+     * Selects a random movie or TV show from the provided lists and posts a notification.
+     */
+    private fun triggerRandomRecommendation(
+        context: Context,
+        movies: List<com.kiduyuk.klausk.kiduyutv.data.model.Movie>,
+        tvShows: List<com.kiduyuk.klausk.kiduyutv.data.model.TvShow>
+    ) {
+        val allMedia = mutableListOf<Pair<Any, String>>()
+        allMedia.addAll(movies.map { it to "movie" })
+        allMedia.addAll(tvShows.map { it to "tv" })
+
+        if (allMedia.isNotEmpty()) {
+            val randomItem = allMedia.random()
+            val media = randomItem.first
+            val type = randomItem.second
+
+            if (type == "movie") {
+                val movie = media as com.kiduyuk.klausk.kiduyutv.data.model.Movie
+                NotificationHelper.postMediaNotification(
+                    context,
+                    movie.id,
+                    movie.title ?: "Unknown Movie",
+                    "movie",
+                    movie.overview ?: "Check out this movie on Kiduyu TV!"
+                )
+            } else {
+                val tvShow = media as com.kiduyuk.klausk.kiduyutv.data.model.TvShow
+                NotificationHelper.postMediaNotification(
+                    context,
+                    tvShow.id,
+                    tvShow.name ?: "Unknown TV Show",
+                    "tv",
+                    tvShow.overview ?: "Check out this TV show on Kiduyu TV!"
+                )
+            }
+        }
     }
 }

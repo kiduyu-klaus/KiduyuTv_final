@@ -20,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.NavGraph
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
@@ -56,6 +57,11 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // Handle deep-linking from notifications
+                LaunchedEffect(navController) {
+                    handleNotificationIntent(navController)
+                }
+
                 // Handle back press for exit confirmation
                 DisposableEffect(navController) {
                     val callback = object : OnBackPressedCallback(true) {
@@ -80,6 +86,33 @@ class MainActivity : ComponentActivity() {
                     NavGraph(navController = navController)
                 }
             }
+        }
+    }
+
+    /**
+     * Handles navigation when the app is opened via a notification deep-link.
+     */
+    private fun handleNotificationIntent(navController: NavHostController) {
+        val mediaId = intent.getIntExtra("NOTIFICATION_MEDIA_ID", -1)
+        val mediaType = intent.getStringExtra("NOTIFICATION_MEDIA_TYPE")
+
+        if (mediaId != -1 && mediaType != null) {
+            val route = when (mediaType) {
+                "movie" -> Screen.MovieDetail.createRoute(mediaId)
+                "tv" -> Screen.TvShowDetail.createRoute(mediaId)
+                else -> null
+            }
+
+            route?.let {
+                // Navigate to the detail screen, clearing the backstack up to home if needed
+                navController.navigate(it) {
+                    popUpTo(Screen.Home.route) { inclusive = false }
+                }
+            }
+
+            // Clear the intent extras to avoid re-triggering navigation on configuration changes
+            intent.removeExtra("NOTIFICATION_MEDIA_ID")
+            intent.removeExtra("NOTIFICATION_MEDIA_TYPE")
         }
     }
 

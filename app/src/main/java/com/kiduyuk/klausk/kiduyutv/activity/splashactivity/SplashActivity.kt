@@ -37,6 +37,7 @@ import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.activity.mainactivity.MainActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
+import com.kiduyuk.klausk.kiduyutv.util.NotificationHelper
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -85,22 +86,38 @@ class SplashActivity : ComponentActivity() {
     }
 
     private fun checkNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            when {
-                ContextCompat.checkSelfPermission(
-                    this,
-                    android.Manifest.permission.POST_NOTIFICATIONS
-                ) == PackageManager.PERMISSION_GRANTED -> {
-                    permissionHandled = true
-                }
-                else -> {
-                    requestPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        when {
+            // Fire TV: notification permission dialogs are not surfaced to the user
+            // on most Fire OS builds — skip the request and proceed immediately.
+            isFireTv() -> {
+                Log.i("SplashActivity", "Fire TV detected — skipping notification permission request")
+                permissionHandled = true
+            }
+
+            // Android 13+ phones/tablets: request POST_NOTIFICATIONS at runtime
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
+                when {
+                    ContextCompat.checkSelfPermission(
+                        this,
+                        android.Manifest.permission.POST_NOTIFICATIONS
+                    ) == PackageManager.PERMISSION_GRANTED -> {
+                        permissionHandled = true
+                    }
+                    else -> {
+                        requestPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                    }
                 }
             }
-        } else {
-            permissionHandled = true
+
+            // Below Android 13: permission is granted implicitly
+            else -> permissionHandled = true
         }
     }
+
+    // ── Device detection ──────────────────────────────────────────────────────────
+
+    private fun isFireTv(): Boolean =
+        packageManager.hasSystemFeature("amazon.hardware.fire_tv")
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
