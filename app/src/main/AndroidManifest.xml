@@ -26,12 +26,6 @@
         android:theme="@style/Theme.KiduyuTv"
         android:usesCleartextTraffic="true"
         tools:targetApi="28">
-        <activity
-            android:name=".ui.player.exoplayer.ExoplayerActivity"
-            android:exported="false"
-            android:hardwareAccelerated="true"
-            android:screenOrientation="landscape"
-            android:theme="@style/Theme.KiduyuTv.Player" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

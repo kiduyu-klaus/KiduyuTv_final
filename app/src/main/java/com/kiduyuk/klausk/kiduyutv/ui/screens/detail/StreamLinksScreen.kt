@@ -46,7 +46,6 @@ import androidx.media3.common.util.UnstableApi
 import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
-import com.kiduyuk.klausk.kiduyutv.ui.player.exoplayer.ExoplayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
@@ -163,41 +162,35 @@ fun StreamLinksScreen(
                         StreamProviderItem(
                             provider = provider,
                             onProviderClick = {
-                                if (provider.name.contains("direct_link")) {
-                                    // Launch ExoplayerActivity for direct links
-                                    val intent = Intent(context, ExoplayerActivity::class.java).apply {
-                                        putExtra(ExoplayerActivity.EXTRA_STREAM_URL, provider.urlTemplate)
-                                    }
-                                    context.startActivity(intent)
-                                } else {
-                                    // Launch PlayerActivity for webview links
-                                    val intent = Intent(context, PlayerActivity::class.java).apply {
-                                        putExtra("TMDB_ID", tmdbId)
-                                        putExtra("IS_TV", isTv)
-                                        putExtra("SEASON_NUMBER", season ?: 0)
-                                        putExtra("EPISODE_NUMBER", episode ?: 0)
-                                        putExtra("TITLE", title)
-                                        putExtra("OVERVIEW", overview)
-                                        putExtra("POSTER_PATH", posterPath)
-                                        putExtra("BACKDROP_PATH", backdropPath)
-                                        putExtra("VOTE_AVERAGE", voteAverage)
-                                        putExtra("RELEASE_DATE", releaseDate)
 
-                                        val finalUrl = if (timestamp > 0) {
-                                            when (provider.name) {
-                                                "VidLink" -> "${provider.urlTemplate}&startAt=$timestamp"
-                                                "VidKing" -> "${provider.urlTemplate}&progress=$timestamp"
-                                                "Videasy" -> "${provider.urlTemplate}&progress=$timestamp"
-                                                "VidFast" -> "${provider.urlTemplate}&startAt=$timestamp"
-                                                else -> provider.urlTemplate
-                                            }
-                                        } else {
-                                            provider.urlTemplate
+                                // Launch PlayerActivity for webview links
+                                val intent = Intent(context, PlayerActivity::class.java).apply {
+                                    putExtra("TMDB_ID", tmdbId)
+                                    putExtra("IS_TV", isTv)
+                                    putExtra("SEASON_NUMBER", season ?: 0)
+                                    putExtra("EPISODE_NUMBER", episode ?: 0)
+                                    putExtra("TITLE", title)
+                                    putExtra("OVERVIEW", overview)
+                                    putExtra("POSTER_PATH", posterPath)
+                                    putExtra("BACKDROP_PATH", backdropPath)
+                                    putExtra("VOTE_AVERAGE", voteAverage)
+                                    putExtra("RELEASE_DATE", releaseDate)
+
+                                    val finalUrl = if (timestamp > 0) {
+                                        when (provider.name) {
+                                            "VidLink" -> "${provider.urlTemplate}&startAt=$timestamp"
+                                            "VidKing" -> "${provider.urlTemplate}&progress=$timestamp"
+                                            "Videasy" -> "${provider.urlTemplate}&progress=$timestamp"
+                                            "VidFast" -> "${provider.urlTemplate}&startAt=$timestamp"
+                                            else -> provider.urlTemplate
                                         }
-                                        putExtra("STREAM_URL", finalUrl)
+                                    } else {
+                                        provider.urlTemplate
                                     }
-                                    context.startActivity(intent)
+                                    putExtra("STREAM_URL", finalUrl)
                                 }
+                                context.startActivity(intent)
+
                             }
                         )
                     }
