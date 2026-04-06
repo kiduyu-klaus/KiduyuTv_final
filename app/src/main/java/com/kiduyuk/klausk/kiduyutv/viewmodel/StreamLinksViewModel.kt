@@ -5,7 +5,6 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.StreamProvider
-import com.kiduyuk.klausk.kiduyutv.util.UrlSniffer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -105,28 +104,8 @@ class StreamLinksViewModel : ViewModel() {
             val finalProviders = mutableListOf<StreamProvider>()
 
             for (provider in initialProviders) {
-                if (provider.name == "VidLink" || provider.name == "Videasy") {
-                    // 1. Add the original provider link
-                    val isAvailable = checkUrlAvailability(client, provider.urlTemplate)
-                    finalProviders.add(provider.copy(isAvailable = isAvailable))
-
-                    // 2. Attempt to sniff and add the direct link
-                    Log.i(TAG, "Sniffing link for ${provider.name}")
-                    val sniffedUrl = UrlSniffer.sniff(context, provider.urlTemplate)
-                    if (sniffedUrl != null) {
-                        Log.i(TAG, "Successfully sniffed link for ${provider.name}: $sniffedUrl")
-                        finalProviders.add(provider.copy(
-                            name = "${provider.name} direct_link",
-                            urlTemplate = sniffedUrl,
-                            isAvailable = true
-                        ))
-                    } else {
-                        Log.i(TAG, "Failed to sniff link for ${provider.name}")
-                    }
-                } else {
-                    val isAvailable = checkUrlAvailability(client, provider.urlTemplate)
-                    finalProviders.add(provider.copy(isAvailable = isAvailable))
-                }
+                val isAvailable = checkUrlAvailability(client, provider.urlTemplate)
+                finalProviders.add(provider.copy(isAvailable = isAvailable))
             }
 
             _uiState.value = _uiState.value.copy(
