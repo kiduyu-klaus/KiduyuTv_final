@@ -177,6 +177,17 @@ dependencies {
     // implementation 'com.google.android.gms:play-services-ads:25.1.0'
 
     // ─────────────────────────────────────────────
+    // media3
+    // ─────────────────────────────────────────────
+    def media3Version = "1.5.1"
+
+    implementation("androidx.media3:media3-exoplayer:$media3Version")
+    implementation("androidx.media3:media3-exoplayer-hls:$media3Version")
+    implementation("androidx.media3:media3-ui:$media3Version")
+    implementation("androidx.media3:media3-common:$media3Version")
+    implementation("androidx.media3:media3-datasource:$media3Version")
+
+    // ─────────────────────────────────────────────
     // Testing
     // ─────────────────────────────────────────────
     testImplementation 'junit:junit:4.13.2'

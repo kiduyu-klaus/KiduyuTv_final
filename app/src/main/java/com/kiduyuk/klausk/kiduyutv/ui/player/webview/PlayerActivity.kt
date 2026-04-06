@@ -155,6 +155,11 @@ class PlayerActivity : AppCompatActivity() {
             appendUrlToFile(url, source)
         }
 
+        @JavascriptInterface
+        fun onTokenFound(token: String, type: String) {
+            Log.i(SNIFFER_TAG, "[Token-$type] Found: $token")
+        }
+
         private fun appendUrlToFile(url: String, source: String) {
             try {
                 val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
@@ -587,6 +592,15 @@ class PlayerActivity : AppCompatActivity() {
 
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
+
+                    // Log cookies for the current page
+                    if (url != null) {
+                        val cookieManager = CookieManager.getInstance()
+                        val cookies = cookieManager.getCookie(url)
+                        Log.i(TAG, "[Cookies] URL: $url")
+                        Log.i(TAG, "[Cookies] Content: ${cookies ?: "No cookies found"}")
+                    }
+
                     val advancedJs = """
                         (function() {
                             function removeAdsAdvanced() {
@@ -730,6 +744,48 @@ class PlayerActivity : AppCompatActivity() {
                                 report(url, 'fetch');
                                 return origFetch.apply(this, arguments);
                             };
+
+                            /* Token Sniffer */
+                            function scanForTokens() {
+                                if (!window.StreamSniffer) return;
+                                
+                                // Search in HTML and Scripts
+                                const content = document.documentElement.innerHTML;
+                                
+                                // JWT Pattern: x-app-token["']\s*:\s*["']([^"']+)["']
+                                const jwtRegex = /x-app-token["']\s*:\s*["']([^"']+)["']/g;
+                                let match;
+                                while ((match = jwtRegex.exec(content)) !== null) {
+                                    window.StreamSniffer.onTokenFound(match[1], 'JWT');
+                                }
+                                
+                                // Script Token Pattern: token\s*=\s*["']([^"']+)["']
+                                const scriptRegex = /token\s*=\s*["']([^"']+)["']/g;
+                                while ((match = scriptRegex.exec(content)) !== null) {
+                                    window.StreamSniffer.onTokenFound(match[1], 'Script');
+                                }
+
+                                // Specific check for Videasy Cloudflare beacon token
+                                try {
+                                    const scripts = document.getElementsByTagName('script');
+                                    if (scripts.length > 0) {
+                                        const lastScript = scripts[scripts.length - 1];
+                                        const beaconData = lastScript.getAttribute('data-cf-beacon');
+                                        if (beaconData) {
+                                            const beaconJson = JSON.parse(beaconData);
+                                            if (beaconJson && beaconJson.token) {
+                                                window.StreamSniffer.onTokenFound(beaconJson.token, 'CF-Beacon');
+                                            }
+                                        }
+                                    }
+                                } catch (e) {
+                                    // Silent fail for beacon parsing
+                                }
+                            }
+                            
+                            // Initial scan and periodic scans
+                            scanForTokens();
+                            setInterval(scanForTokens, 5000);
 
                             /* Hook MediaSource.addSourceBuffer (MSE / blob streams) */
                             if (window.MediaSource) {
@@ -910,7 +966,7 @@ class PlayerActivity : AppCompatActivity() {
                     webViewClient = WebViewClient()
 
                     clearHistory()
-                    //clearCache(true)
+                    clearCache(true)
                     loadUrl("about:blank")
                     onPause()
                     removeAllViews()
