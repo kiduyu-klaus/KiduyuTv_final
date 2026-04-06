@@ -403,6 +403,10 @@ class PlayerActivity : AppCompatActivity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Fix for black screen with hardware acceleration on some Android TV devices
+        // This ensures the window surface is ready for video content
+        window.setFormat(android.graphics.PixelFormat.TRANSLUCENT)
+
         super.onCreate(savedInstanceState)
 
         // Note: AdvancedAdBlocker is now initialized in KiduyuTvApp
@@ -509,8 +513,11 @@ class PlayerActivity : AppCompatActivity() {
                 loadWithOverviewMode = true
             }
 
-            // Enable hardware acceleration at the view level
-            setLayerType(View.LAYER_TYPE_HARDWARE, null)
+            // On some Android TV devices, LAYER_TYPE_HARDWARE causes a black screen
+            // while audio plays. Using LAYER_TYPE_NONE allows the WebView to
+            // manage its own internal hardware acceleration for the video
+            // while keeping the view surface compatible.
+            setLayerType(View.LAYER_TYPE_NONE, null)
 
             if (isTrackingEnabled) {
                 addJavascriptInterface(VideasyJavaScriptInterface(), "VideasyInterface")
