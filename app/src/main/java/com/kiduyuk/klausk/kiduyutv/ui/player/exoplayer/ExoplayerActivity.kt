@@ -1,5 +1,6 @@
 package com.kiduyuk.klausk.kiduyutv.ui.player.exoplayer
 
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.WindowManager
@@ -13,6 +14,8 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.ui.PlayerView
+import org.json.JSONObject
+import java.net.URLDecoder
 
 @UnstableApi
 class ExoplayerActivity : AppCompatActivity() {
@@ -23,9 +26,12 @@ class ExoplayerActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "ExoplayerActivity"
         const val EXTRA_STREAM_URL = "STREAM_URL"
-        const val EXTRA_COOKIES    = "COOKIES"
-        const val EXTRA_REFERER    = "REFERER"
-        const val EXTRA_ORIGIN     = "ORIGIN"
+
+        private val DEFAULT_HEADERS = mapOf(
+            "Origin" to "https://cineby.gd",
+            "Referer" to "https://cineby.gd/",
+            "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -52,41 +58,83 @@ class ExoplayerActivity : AppCompatActivity() {
 
         val streamUrl = intent.getStringExtra(EXTRA_STREAM_URL)
         if (streamUrl.isNullOrBlank()) {
-            Log.e(TAG, "No stream URL provided — finishing")
+            Log.i(TAG, "No stream URL provided — finishing")
             finish()
             return
         }
 
-        val cookies = intent.getStringExtra(EXTRA_COOKIES)
-        val referer = intent.getStringExtra(EXTRA_REFERER) ?: "https://videostr.net/"
-        val origin  = intent.getStringExtra(EXTRA_ORIGIN)  ?: "https://videostr.net"
-
-        initPlayer(streamUrl, cookies, referer, origin)
+        initPlayer(streamUrl)
     }
 
-    private fun initPlayer(
-        streamUrl: String,
-        cookies: String?,
-        referer: String,
-        origin: String
-    ) {
-        val headers = mutableMapOf(
-            "Referer" to referer,
-            "Origin"  to origin
-        )
-        cookies?.let { headers["Cookie"] = it }
+    private fun initPlayer(streamUrl: String) {
+        Log.i(TAG, "[Init] Original Stream : $streamUrl")
 
-        Log.i(TAG, "[Init] Stream : $streamUrl")
+        // Start with default headers
+        val headers = DEFAULT_HEADERS.toMutableMap()
+        val headers2 = DEFAULT_HEADERS.toMutableMap()
+        var finalUrl = streamUrl
+
+        try {
+            val uri = Uri.parse(streamUrl)
+
+            // 1. Extract headers from JSON string in query param
+            uri.getQueryParameter("headers")?.let { rawHeaders ->
+                try {
+                    val jsonString = if (rawHeaders.startsWith("%")) {
+                        URLDecoder.decode(rawHeaders, "UTF-8")
+                    } else {
+                        rawHeaders
+                    }
+
+                    val jsonHeaders = JSONObject(jsonString)
+                    val keys = jsonHeaders.keys()
+                    while (keys.hasNext()) {
+                        val key = keys.next()
+                        when (key.lowercase()) {
+                            "referer" -> headers["Referer"] = jsonHeaders.getString(key)
+                            "origin" -> headers["Origin"] = jsonHeaders.getString(key)
+                            "user-agent" -> headers["User-Agent"] = jsonHeaders.getString(key)
+                            else -> headers[key] = jsonHeaders.getString(key)
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.i(TAG, "Error parsing headers JSON: ${e.message}")
+                }
+            }
+
+            // 2. Extract host from query param
+            uri.getQueryParameter("host")?.let { rawHost ->
+                try {
+                    val decodedHost = if (rawHost.startsWith("http")) rawHost else URLDecoder.decode(rawHost, "UTF-8")
+                    val hostUri = Uri.parse(decodedHost)
+                    val hostValue = hostUri.host ?: decodedHost.removePrefix("https://").removePrefix("http://").substringBefore("/")
+
+                    if (hostValue.isNotEmpty()) {
+                        headers["Host"] = hostValue
+                    }
+                } catch (e: Exception) {
+                    Log.i(TAG, "Error parsing host: ${e.message}")
+                }
+            }
+
+            // 3. The actual media URL is everything before the query parameters
+            finalUrl = streamUrl.substringBefore("?")
+
+        } catch (e: Exception) {
+            Log.i(TAG, "Error parsing stream URL components: ${e.message}")
+        }
+
+        Log.i(TAG, "[Init] Final Stream : $finalUrl")
         Log.i(TAG, "[Init] Headers: $headers")
 
         val dataSourceFactory = DefaultHttpDataSource.Factory()
-            .setDefaultRequestProperties(headers)
+            .setDefaultRequestProperties(headers2)
             .setConnectTimeoutMs(15_000)
             .setReadTimeoutMs(15_000)
             .setAllowCrossProtocolRedirects(true)
 
         val mediaSource = HlsMediaSource.Factory(dataSourceFactory)
-            .createMediaSource(MediaItem.fromUri(streamUrl))
+            .createMediaSource(MediaItem.fromUri(finalUrl))
 
         player = ExoPlayer.Builder(this).build().also { exo ->
             playerView.player = exo
@@ -102,7 +150,7 @@ class ExoplayerActivity : AppCompatActivity() {
                 }
 
                 override fun onPlayerError(error: PlaybackException) {
-                    Log.e(TAG, "[Error] ${error.errorCode} — ${error.message}")
+                    Log.i(TAG, "[Error] ${error.errorCode} — ${error.message}")
                 }
             })
 

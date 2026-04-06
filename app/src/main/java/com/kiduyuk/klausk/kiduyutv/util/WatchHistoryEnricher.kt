@@ -185,7 +185,7 @@ object WatchHistoryEnricher {
                     )
                     Log.i(TAG, "Refreshed images for watch history item ${entity.id} (${entity.mediaType})")
                 } else {
-                    Log.d(TAG, "No image changes for watch history item ${entity.id} (${entity.mediaType})")
+                    Log.i(TAG, "No image changes for watch history item ${entity.id} (${entity.mediaType})")
                 }
                 true
             } else {

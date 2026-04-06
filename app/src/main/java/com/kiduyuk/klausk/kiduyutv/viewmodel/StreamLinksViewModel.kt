@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.StreamProvider
+import com.kiduyuk.klausk.kiduyutv.util.UrlSniffer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,8 +26,6 @@ class StreamLinksViewModel : ViewModel() {
         private const val TAG = "StreamLinksViewModel"
         private const val CACHE_SIZE = 5L * 1024 * 1024 // 5 MB cache for stream checks
 
-        // Separate OkHttpClient for stream URL availability checks
-// Uses shorter timeouts suitable for quick availability checks
         @Volatile
         private var httpClient: OkHttpClient? = null
 
@@ -42,11 +41,9 @@ class StreamLinksViewModel : ViewModel() {
 
             return OkHttpClient.Builder()
                 .cache(cache)
-// Shorter timeouts for availability checks (5 seconds)
                 .connectTimeout(5, TimeUnit.SECONDS)
                 .readTimeout(5, TimeUnit.SECONDS)
                 .writeTimeout(5, TimeUnit.SECONDS)
-// Only retry once on failure
                 .retryOnConnectionFailure(true)
                 .build()
         }
@@ -61,7 +58,7 @@ class StreamLinksViewModel : ViewModel() {
     ) {
         _uiState.value = _uiState.value.copy(isLoading = true)
         viewModelScope.launch {
-            val providers = listOf(
+            val initialProviders = listOf(
                 StreamProvider(
                     name = "VidLink",
                     urlTemplate = if (isTv) "https://vidlink.pro/tv/${tmdbId}/${season}/${episode}?autoPlay=true" else "https://vidlink.pro/movie/${tmdbId}?autoPlay=true",
@@ -70,6 +67,11 @@ class StreamLinksViewModel : ViewModel() {
                 StreamProvider(
                     name = "Videasy",
                     urlTemplate = if (isTv) "https://player.videasy.net/tv/${tmdbId}/${season}/${episode}?nextEpisode=true&autoplayNextEpisode=true&episodeSelector=true&overlay=true&color=8B5CF6" else "https://player.videasy.net/movie/${tmdbId}",
+                    type = if (isTv) "tv" else "movie"
+                ),
+                StreamProvider(
+                    name = "Hexa",
+                    urlTemplate = if (isTv) "https://hexa.su/watch/tv/${tmdbId}/${season}/${episode}" else "https://hexa.su/watch/movie/${tmdbId}",
                     type = if (isTv) "tv" else "movie"
                 ),
                 StreamProvider(
@@ -100,14 +102,35 @@ class StreamLinksViewModel : ViewModel() {
             )
 
             val client = getOkHttpClient(context)
+            val finalProviders = mutableListOf<StreamProvider>()
 
-            val checkedProviders = providers.map { provider ->
-                val isAvailable = checkUrlAvailability(client, provider.urlTemplate)
-                provider.copy(isAvailable = isAvailable)
+            for (provider in initialProviders) {
+                if (provider.name == "VidLink" || provider.name == "Videasy") {
+                    // 1. Add the original provider link
+                    val isAvailable = checkUrlAvailability(client, provider.urlTemplate)
+                    finalProviders.add(provider.copy(isAvailable = isAvailable))
+
+                    // 2. Attempt to sniff and add the direct link
+                    Log.i(TAG, "Sniffing link for ${provider.name}")
+                    val sniffedUrl = UrlSniffer.sniff(context, provider.urlTemplate)
+                    if (sniffedUrl != null) {
+                        Log.i(TAG, "Successfully sniffed link for ${provider.name}: $sniffedUrl")
+                        finalProviders.add(provider.copy(
+                            name = "${provider.name} direct_link",
+                            urlTemplate = sniffedUrl,
+                            isAvailable = true
+                        ))
+                    } else {
+                        Log.i(TAG, "Failed to sniff link for ${provider.name}")
+                    }
+                } else {
+                    val isAvailable = checkUrlAvailability(client, provider.urlTemplate)
+                    finalProviders.add(provider.copy(isAvailable = isAvailable))
+                }
             }
 
             _uiState.value = _uiState.value.copy(
-                streamProviders = checkedProviders,
+                streamProviders = finalProviders,
                 isLoading = false
             )
         }
@@ -120,18 +143,16 @@ class StreamLinksViewModel : ViewModel() {
 
                 val request = Request.Builder()
                     .url(urlString)
-                    .head() // Use HEAD request to avoid downloading body
+                    .head()
                     .build()
 
                 val response = client.newCall(request).execute()
-
                 val isAvailable = response.code in 200..399
                 Log.i(TAG, "URL $urlString availability: $isAvailable (code: ${response.code})")
-
                 response.close()
                 isAvailable
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to check URL availability for $urlString: ${e.message}")
+                Log.i(TAG, "Failed to check URL availability for $urlString: ${e.message}")
                 false
             }
         }

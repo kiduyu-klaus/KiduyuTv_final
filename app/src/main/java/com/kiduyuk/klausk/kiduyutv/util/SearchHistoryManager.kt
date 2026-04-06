@@ -23,7 +23,7 @@ object SearchHistoryManager {
     fun init(context: Context) {
         if (prefs == null) {
             prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            Log.d(TAG, "SearchHistoryManager initialized")
+            Log.i(TAG, "SearchHistoryManager initialized")
         }
     }
 
@@ -85,7 +85,7 @@ object SearchHistoryManager {
             val searchesString = trimmedSearches.joinToString("|||")
             preferences.edit().putString(KEY_RECENT_SEARCHES, searchesString).apply()
 
-            Log.d(TAG, "Added search: $query. Total searches: ${trimmedSearches.size}")
+            Log.i(TAG, "Added search: $query. Total searches: ${trimmedSearches.size}")
         } catch (e: Exception) {
             Log.e(TAG, "Error adding recent search: ${e.message}")
         }
@@ -110,7 +110,7 @@ object SearchHistoryManager {
             val searchesString = currentSearches.joinToString("|||")
             preferences.edit().putString(KEY_RECENT_SEARCHES, searchesString).apply()
 
-            Log.d(TAG, "Removed search: $query")
+            Log.i(TAG, "Removed search: $query")
         } catch (e: Exception) {
             Log.e(TAG, "Error removing recent search: ${e.message}")
         }
@@ -128,7 +128,7 @@ object SearchHistoryManager {
 
         try {
             preferences.edit().remove(KEY_RECENT_SEARCHES).apply()
-            Log.d(TAG, "Cleared all recent searches")
+            Log.i(TAG, "Cleared all recent searches")
         } catch (e: Exception) {
             Log.e(TAG, "Error clearing recent searches: ${e.message}")
         }
