@@ -481,7 +481,7 @@ class SplashActivity : ComponentActivity() {
                 LottieAnimation(
                     composition = composition,
                     progress = { progress },
-                    modifier = Modifier.height(10.dp)
+                    modifier = Modifier.height(15.dp)
                 )
             }
         }
