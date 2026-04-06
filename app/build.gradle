@@ -89,18 +89,24 @@ android {
 }
 
 dependencies {
+
+    // ─────────────────────────────────────────────
     // Core Android
+    // ─────────────────────────────────────────────
     implementation 'androidx.core:core-ktx:1.13.1'
     implementation 'androidx.core:core-splashscreen:1.2.0'
-    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.7'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'androidx.activity:activity-ktx:1.9.3'
     implementation 'androidx.activity:activity-compose:1.9.3'
-
+    implementation 'androidx.fragment:fragment-ktx:1.8.5'
+    implementation 'androidx.constraintlayout:constraintlayout:2.2.1'
     implementation 'androidx.multidex:multidex:2.0.1'
+    implementation 'androidx.window:window:1.1.0'
+    implementation 'androidx.webkit:webkit:1.15.0'
 
-    // Add the Google Mobile Ads SDK
-    //implementation 'com.google.android.gms:play-services-ads:25.1.0'
-
-    // Compose BOM
+    // ─────────────────────────────────────────────
+    // Jetpack Compose (BOM manages all versions)
+    // ─────────────────────────────────────────────
     implementation platform('androidx.compose:compose-bom:2024.12.01')
     implementation 'androidx.compose.ui:ui'
     implementation 'androidx.compose.ui:ui-graphics'
@@ -108,53 +114,71 @@ dependencies {
     implementation 'androidx.compose.material3:material3'
     implementation 'androidx.compose.material:material-icons-extended'
 
+    // ─────────────────────────────────────────────
     // Navigation
+    // ─────────────────────────────────────────────
     implementation 'androidx.navigation:navigation-compose:2.8.5'
 
-    // Lifecycle
-    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7'
+    // ─────────────────────────────────────────────
+    // Lifecycle & ViewModel
+    // ─────────────────────────────────────────────
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.7'
     implementation 'androidx.lifecycle:lifecycle-runtime-compose:2.8.7'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7'
 
-    // Retrofit for API calls
+    // ─────────────────────────────────────────────
+    // Networking (Retrofit + OkHttp)
+    // ─────────────────────────────────────────────
     implementation 'com.squareup.retrofit2:retrofit:2.11.0'
     implementation 'com.squareup.retrofit2:converter-gson:2.11.0'
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
-    implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
+    implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0' // Logs HTTP requests/responses
 
-    // Gson
+    // ─────────────────────────────────────────────
+    // JSON Parsing
+    // ─────────────────────────────────────────────
     implementation 'com.google.code.gson:gson:2.10.1'
 
-    // Coil for image loading
-    implementation 'io.coil-kt:coil-compose:2.7.0'
-
-    // AppCompat is often the source of this issue
-    implementation "androidx.appcompat:appcompat:1.7.0"
-    implementation "androidx.fragment:fragment-ktx:1.8.5"
-
-    // Glide
-    implementation 'com.github.bumptech.glide:glide:4.16.0'
-    implementation 'androidx.appcompat:appcompat:1.7.0'
-    implementation 'com.google.android.material:material:1.12.0'
-    implementation 'androidx.activity:activity-ktx:1.9.3'
-    implementation 'androidx.constraintlayout:constraintlayout:2.2.1'
-    implementation 'com.google.firebase:firebase-analytics:23.2.0'
-    implementation 'com.google.firebase:firebase-database:22.0.1'
+    // ─────────────────────────────────────────────
+    // Image Loading
+    // ─────────────────────────────────────────────
+    implementation 'io.coil-kt:coil-compose:2.7.0'           // Compose-native image loading
+    implementation 'com.github.bumptech.glide:glide:4.16.0'  // Legacy/Java view image loading
     annotationProcessor 'com.github.bumptech.glide:compiler:4.16.0'
 
-    // Lottie for animations
-    implementation 'com.airbnb.android:lottie-compose:6.6.2'
-
-    // Room Database
+    // ─────────────────────────────────────────────
+    // Database (Room)
+    // ─────────────────────────────────────────────
     implementation 'androidx.room:room-runtime:2.6.1'
-    implementation 'androidx.room:room-ktx:2.6.1'
-    ksp 'androidx.room:room-compiler:2.6.1'
+    implementation 'androidx.room:room-ktx:2.6.1'    // Coroutine support for Room
+    ksp 'androidx.room:room-compiler:2.6.1'           // Code generation (use KSP over kapt)
 
+    // ─────────────────────────────────────────────
     // Coroutines
+    // ─────────────────────────────────────────────
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1'
 
-    implementation "androidx.window:window:1.1.0"
-    implementation("androidx.webkit:webkit:1.15.0")
+    // ─────────────────────────────────────────────
+    // Firebase
+    // ─────────────────────────────────────────────
+    implementation 'com.google.firebase:firebase-analytics:23.2.0'
+    implementation 'com.google.firebase:firebase-database:22.0.1'
+    implementation 'com.google.firebase:firebase-messaging-ktx:23.4.1' // Push notifications
+
+    // ─────────────────────────────────────────────
+    // UI Components & Animations
+    // ─────────────────────────────────────────────
+    implementation 'com.google.android.material:material:1.12.0'      // Material Design components
+    implementation 'com.airbnb.android:lottie-compose:6.6.2'          // JSON-based animations
+
+    // ─────────────────────────────────────────────
+    // Ads (disabled — uncomment to enable)
+    // ─────────────────────────────────────────────
+    // implementation 'com.google.android.gms:play-services-ads:25.1.0'
+
+    // ─────────────────────────────────────────────
     // Testing
+    // ─────────────────────────────────────────────
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.2.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
@@ -162,6 +186,7 @@ dependencies {
     androidTestImplementation 'androidx.compose.ui:ui-test-junit4'
     debugImplementation 'androidx.compose.ui:ui-tooling'
     debugImplementation 'androidx.compose.ui:ui-test-manifest'
+
 }
 
 configurations.all {

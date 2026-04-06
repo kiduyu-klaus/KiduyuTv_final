@@ -6,9 +6,12 @@ import android.app.Dialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -50,6 +53,9 @@ class SplashActivity : ComponentActivity() {
     // Compose-observable flag — when true, SplashScreen will NOT navigate to MainActivity
     private var updateAvailable by mutableStateOf(false)
 
+    // Flag to ensure we only proceed after permission is handled (if applicable)
+    private var permissionHandled by mutableStateOf(false)
+
     // Tracks every dialog shown so onDestroy can safely dismiss them all
     private val activeDialogs = mutableListOf<Dialog>()
 
@@ -65,14 +71,49 @@ class SplashActivity : ComponentActivity() {
         activeDialogs.clear()
     }
 
+    // ── Permissions ──────────────────────────────────────────────────────────
+
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            Log.i("SplashActivity", "Notification permission granted")
+        } else {
+            Log.i("SplashActivity", "Notification permission denied")
+        }
+        permissionHandled = true
+    }
+
+    private fun checkNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            when {
+                ContextCompat.checkSelfPermission(
+                    this,
+                    android.Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED -> {
+                    permissionHandled = true
+                }
+                else -> {
+                    requestPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                }
+            }
+        } else {
+            permissionHandled = true
+        }
+    }
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         checkForUpdates()
+        checkNotificationPermission()
         setContent {
             KiduyuTvTheme {
-                SplashScreen(updateAvailable = updateAvailable) {
+                SplashScreen(
+                    updateAvailable = updateAvailable,
+                    permissionHandled = permissionHandled
+                ) {
                     startActivity(Intent(this@SplashActivity, MainActivity::class.java))
                     finish()
                 }
@@ -119,7 +160,7 @@ class SplashActivity : ComponentActivity() {
         return try {
             val remoteParts = remote.split(".").mapNotNull { it.toIntOrNull() }
             val localParts = local.split(".").mapNotNull { it.toIntOrNull() }
-            
+
             if (remoteParts.isEmpty() || localParts.isEmpty()) return remote > local
 
             val maxLength = maxOf(remoteParts.size, localParts.size)
@@ -339,7 +380,7 @@ class SplashActivity : ComponentActivity() {
                 for (j in 0 until assets.length()) {
                     val asset = assets.getJSONObject(j)
                     val name = asset.optString("name", "")
-                    
+
                     // Match "release" and exclude "debug"
                     if (name.contains("release", ignoreCase = true) &&
                         !name.contains("debug", ignoreCase = true)
@@ -371,15 +412,19 @@ class SplashActivity : ComponentActivity() {
 // ── Composable ────────────────────────────────────────────────────────────────
 
     @Composable
-    fun SplashScreen(updateAvailable: Boolean = false, onTimeout: () -> Unit) {
+    fun SplashScreen(
+        updateAvailable: Boolean = false,
+        permissionHandled: Boolean = true,
+        onTimeout: () -> Unit
+    ) {
         val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.splash_loading))
         val progress by animateLottieCompositionAsState(
             composition = composition,
             iterations = LottieConstants.IterateForever
         )
 
-        LaunchedEffect(updateAvailable) {
-            if (!updateAvailable) {
+        LaunchedEffect(updateAvailable, permissionHandled) {
+            if (!updateAvailable && permissionHandled) {
                 delay(6000)
                 onTimeout()
             }
