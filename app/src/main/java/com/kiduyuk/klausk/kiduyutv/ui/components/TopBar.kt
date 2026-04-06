@@ -21,9 +21,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.tooling.preview.Preview
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
-import com.kiduyuk.klausk.kiduyutv.ui.theme.DarkRed   // ← new
+import com.kiduyuk.klausk.kiduyutv.ui.theme.DarkRed
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
+import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
 
 @Composable
 fun TopBar(
@@ -39,7 +41,7 @@ fun TopBar(
         modifier = modifier
             .fillMaxWidth()
             .background(Color.Transparent)
-            .padding(horizontal = 20.dp, vertical = 5.dp)
+            .padding(horizontal = 20.dp, vertical = 10.dp)
         ,
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -74,7 +76,7 @@ fun TopBar(
 
             // Nav items
             Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(32.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 navItems.forEachIndexed { index, title ->
@@ -119,7 +121,7 @@ fun TopBar(
 
         // Right: Search + Settings
         Row(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             FocusableIconButton(
@@ -136,7 +138,7 @@ fun TopBar(
     }
 }
 
-/** Icon button that tints dark red when focused. */
+/** Icon button that tints dark red and shows text when focused. */
 @Composable
 private fun FocusableIconButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -146,22 +148,34 @@ private fun FocusableIconButton(
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
-    Box(
+    Row(
         modifier = Modifier
-            .size(48.dp)
+            .height(48.dp)
+            .wrapContentWidth()
             .background(
                 color = if (isFocused) DarkRed else Color.Transparent,
                 shape = RoundedCornerShape(8.dp)
             )
+            .padding(horizontal = if (isFocused) 12.dp else 0.dp)
             .noRippleClickable(interactionSource = interactionSource) { onClick() },
-        contentAlignment = Alignment.Center
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
     ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = TextPrimary, // always white — background does the work
+            tint = TextPrimary,
             modifier = Modifier.size(24.dp)
         )
+        if (isFocused) {
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = contentDescription,
+                color = TextPrimary,
+                fontSize = 16.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
+            )
+        }
     }
 }
 
@@ -177,3 +191,18 @@ fun Modifier.noRippleClickable(
     indication = null,
     onClick = onClick
 )
+
+@Preview(showBackground = true, backgroundColor = 0xFF141414)
+@Composable
+fun TopBarPreview() {
+    KiduyuTvTheme {
+        Surface(color = BackgroundDark) {
+            TopBar(
+                selectedRoute = "movies",
+                onNavItemClick = {},
+                onSearchClick = {},
+                onSettingsClick = {}
+            )
+        }
+    }
+}
