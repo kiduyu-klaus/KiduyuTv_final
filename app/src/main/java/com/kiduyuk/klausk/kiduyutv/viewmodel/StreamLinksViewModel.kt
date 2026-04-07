@@ -104,7 +104,8 @@ class StreamLinksViewModel : ViewModel() {
             val finalProviders = mutableListOf<StreamProvider>()
 
             for (provider in initialProviders) {
-                val isAvailable = checkUrlAvailability(client, provider.urlTemplate)
+                //val isAvailable = checkUrlAvailability(client, provider.urlTemplate)
+                val isAvailable = true
                 finalProviders.add(provider.copy(isAvailable = isAvailable))
             }
 
