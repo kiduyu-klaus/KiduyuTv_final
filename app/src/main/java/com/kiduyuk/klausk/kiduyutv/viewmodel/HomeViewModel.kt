@@ -112,7 +112,6 @@ class HomeViewModel : ViewModel() {
                 val sortedWatchHistory = watchHistory.sortedByDescending { it.voteAverage }
                 val sortedTopRatedMovies = topRatedMovies.take(30).sortedByDescending { it.voteAverage }
                 val sortedTopRatedTv = topRatedTv.take(30).sortedByDescending { it.voteAverage }
-                val sortedTimeTravelTv = timeTravelTv.sortedByDescending { it.voteAverage }
 
                 // Update initial state with primary content first to free up the UI thread
                 _uiState.value = _uiState.value.copy(
@@ -124,7 +123,7 @@ class HomeViewModel : ViewModel() {
                     continueWatching = sortedWatchHistory,
                     latestMovies = sortedTopRatedMovies,
                     topTvShows = sortedTopRatedTv,
-                    timeTravelTvShows = sortedTimeTravelTv,
+                    timeTravelTvShows = timeTravelTv,
                     selectedItem = sortedNowPlaying.firstOrNull() ?: sortedTrendingTv.firstOrNull() ?: sortedTrendingMovies.firstOrNull()
                 )
 
