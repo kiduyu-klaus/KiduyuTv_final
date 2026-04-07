@@ -3,6 +3,7 @@ package com.kiduyuk.klausk.kiduyutv.ui.screens.cast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
@@ -16,6 +17,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -28,8 +32,6 @@ import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.data.model.CastMember
 import com.kiduyuk.klausk.kiduyutv.data.model.MediaItem
-import com.kiduyuk.klausk.kiduyutv.data.model.Movie
-import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
@@ -211,6 +213,9 @@ private fun CastDetailContent(
     val screenWidth = configuration.screenWidthDp.dp
     val headerHeight = screenHeight * 0.35f // 35% of screen height to fit overview
 
+    // Dialog state for biography
+    var showBiographyDialog by remember { mutableStateOf(false) }
+
     // Responsive grid calculation
     val horizontalPadding = 16.dp
     val spacing = 12.dp
@@ -222,6 +227,15 @@ private fun CastDetailContent(
 
     val profileUrl = castMember.profilePath?.let { path ->
         "${TmdbApiService.IMAGE_BASE_URL}h632$path"
+    }
+
+    // Biography dialog
+    if (showBiographyDialog && !castMember.overview.isNullOrBlank()) {
+        BiographyDialog(
+            name = castMember.name,
+            biography = castMember.overview!!,
+            onDismiss = { showBiographyDialog = false }
+        )
     }
 
     // Single Box containing header (fixed) and scrollable content
@@ -352,21 +366,11 @@ private fun CastDetailContent(
 
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    // Biography section
+                    // Biography section (focusable and clickable)
                     if (!castMember.overview.isNullOrBlank()) {
-                        Text(
-                            text = "Biography",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = TextPrimary,
-                            fontSize = 12.sp
-                        )
-                        Text(
-                            text = castMember.overview!!,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = TextSecondary,
-                            fontSize = 11.sp,
-                            maxLines = 4,
-                            overflow = TextOverflow.Ellipsis
+                        FocusableBiographySection(
+                            biography = castMember.overview!!,
+                            onClick = { showBiographyDialog = true }
                         )
                     }
                 }
@@ -449,6 +453,118 @@ private fun CastDetailContent(
             Spacer(modifier = Modifier.height(32.dp))
         }
     }
+}
+
+/**
+ * Focusable biography section that shows 3 lines and opens dialog on click.
+ */
+@Composable
+private fun FocusableBiographySection(
+    biography: String,
+    onClick: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val focusRequester = remember { FocusRequester() }
+
+    Column(
+        modifier = Modifier
+            .focusRequester(focusRequester)
+            .onFocusChanged { }
+            .then(
+                if (isFocused) {
+                    Modifier.border(
+                        2.dp,
+                        FocusBorder,
+                        RoundedCornerShape(8.dp)
+                    )
+                } else Modifier
+            )
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null
+            ) {
+                onClick()
+            }
+            .background(
+                if (isFocused) CardDark.copy(alpha = 0.8f) else Color.Transparent,
+                RoundedCornerShape(8.dp)
+            )
+            .padding(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Biography",
+                style = MaterialTheme.typography.labelLarge,
+                color = TextPrimary,
+                fontSize = 12.sp
+            )
+            if (isFocused) {
+                Text(
+                    text = "Click for more",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = PrimaryRed,
+                    fontSize = 10.sp
+                )
+            }
+        }
+        Text(
+            text = biography,
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondary,
+            fontSize = 11.sp,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+/**
+ * Biography dialog showing full biography text.
+ */
+@Composable
+private fun BiographyDialog(
+    name: String,
+    biography: String,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = CardDark,
+        title = {
+            Text(
+                text = "$name's Biography",
+                style = MaterialTheme.typography.headlineSmall,
+                color = TextPrimary
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = biography,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextSecondary
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    text = "Close",
+                    color = PrimaryRed
+                )
+            }
+        }
+    )
 }
 
 /**
