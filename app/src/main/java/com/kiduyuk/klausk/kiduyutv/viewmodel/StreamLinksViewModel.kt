@@ -23,7 +23,7 @@ class StreamLinksViewModel : ViewModel() {
 
     companion object {
         private const val TAG = "StreamLinksViewModel"
-        private const val CACHE_SIZE = 5L * 1024 * 1024 // 5 MB cache for stream checks
+        private const val CACHE_SIZE = 5L * 1024 * 1024 // 5 MB cache for stream checks (limited)
 
         @Volatile
         private var httpClient: OkHttpClient? = null

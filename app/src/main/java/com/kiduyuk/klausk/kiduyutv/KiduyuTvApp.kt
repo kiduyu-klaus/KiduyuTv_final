@@ -70,7 +70,7 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
             .diskCache {
                 DiskCache.Builder()
                     .directory(cacheDir.resolve("image_cache"))
-                    .maxSizeBytes(100 * 1024 * 1024)
+                    .maxSizeBytes(30 * 1024 * 1024) // Reduced from 100MB to 30MB
                     .build()
             }
             // Network cache with OkHttp integration

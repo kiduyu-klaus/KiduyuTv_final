@@ -52,7 +52,7 @@ class TmdbRepository {
 
         // OkHttpClient for GitHub JSON fetching
 // Uses longer timeouts suitable for larger JSON payloads
-        private const val GITHUB_CACHE_SIZE = 10L * 1024 * 1024 // 10 MB cache
+        private const val GITHUB_CACHE_SIZE = 5L * 1024 * 1024 // 5 MB cache (reduced from 10MB)
 
         @Volatile
         private var githubHttpClient: OkHttpClient? = null
