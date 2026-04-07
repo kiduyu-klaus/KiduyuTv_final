@@ -2,6 +2,7 @@ package com.kiduyuk.klausk.kiduyutv.ui.screens.detail
 
 import android.content.Intent
 import android.net.Uri
+import android.net.Uri.encode
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -30,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
+import com.kiduyuk.klausk.kiduyutv.ui.components.CastRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.ContentRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.MovieCard
@@ -54,6 +56,7 @@ fun MovieDetailScreen(
     onMovieClick: (Int) -> Unit,
     onCompanyClick: (id: Int, name: String) -> Unit = { _, _ -> },
     onPlayClick: (String) -> Unit,
+    onCastClick: (Int, String, String?, String?, String?) -> Unit = { _, _, _, _, _ -> },
     viewModel: DetailViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -336,7 +339,6 @@ fun MovieDetailScreen(
                     }
                 }
                 // ── End Hero Section ─────────────────────────────────────────
-
                 // Collection Movies
                 if (uiState.collectionDetail != null) {
                     val collection = uiState.collectionDetail!!
@@ -348,6 +350,24 @@ fun MovieDetailScreen(
                         MovieCard(movie = movie, isSelected = isSelected, onClick = onClick)
                     }
                 }
+                // Cast Row
+                if (uiState.cast.isNotEmpty()) {
+                    CastRow(
+                        title = "Cast",
+                        cast = uiState.cast,
+                        onCastClick = { castMember ->
+                            onCastClick(
+                                castMember.id,
+                                castMember.name,
+                                castMember.character,
+                                castMember.profilePath,
+                                castMember.knownForDepartment
+                            )
+                        }
+                    )
+                }
+
+
 
                 // Similar Movies
                 if (uiState.similarMovies.isNotEmpty()) {

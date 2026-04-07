@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.kiduyuk.klausk.kiduyutv.data.model.*
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,6 +35,7 @@ data class DetailUiState(
     val similarMovies: List<Movie> = emptyList(),
     val similarTvShows: List<TvShow> = emptyList(),
     val collectionDetail: CollectionDetail? = null,
+    val cast: List<CastMember> = emptyList(),
     val isInMyList: Boolean = false,
     val watchHistoryItem: WatchHistoryItem? = null,
     val trailerKey: String? = null,
@@ -69,14 +71,19 @@ class DetailViewModel : ViewModel() {
             val historyItem = repository.getWatchHistoryItem(context, movieId, false)
 
             try {
-                // Fetch movie details and recommended movies.
-                val movieDetailResult = repository.getMovieDetail(movieId)
-                val recommendedMoviesResult = repository.getRecommendedMovies(movieId)
-                val videosResult = repository.getMovieVideos(movieId)
+                // Fetch movie details, recommended movies, videos, and credits in parallel.
+                val movieDetailDeferred = async { repository.getMovieDetail(movieId) }
+                val recommendedMoviesDeferred = async { repository.getRecommendedMovies(movieId) }
+                val videosDeferred = async { repository.getMovieVideos(movieId) }
+                val creditsDeferred = async { repository.getMovieCredits(movieId) }
 
-                val movieDetail = movieDetailResult.getOrNull()
-                val similarMovies = recommendedMoviesResult.getOrNull()?.take(10) ?: repository.getTrendingMoviesToday().getOrNull()?.take(10) ?: emptyList()
-                val videos = videosResult.getOrNull() ?: emptyList()
+                val movieDetail = movieDetailDeferred.await().getOrNull()
+                val recommendedMovies = recommendedMoviesDeferred.await().getOrNull()?.take(10) ?: repository.getTrendingMoviesToday().getOrNull()?.take(10) ?: emptyList()
+                val videos = videosDeferred.await().getOrNull() ?: emptyList()
+                val credits = creditsDeferred.await().getOrNull()
+
+                // Get cast members, sorted by order (top billed)
+                val cast = credits?.cast?.sortedBy { it.order ?: Int.MAX_VALUE }?.take(20) ?: emptyList()
 
                 // Fetch collection details if the movie belongs to one.
                 val collectionDetail = movieDetail?.belongsToCollection?.id?.let { collectionId ->
@@ -96,8 +103,9 @@ class DetailViewModel : ViewModel() {
                 _uiState.value = DetailUiState(
                     isLoading = false,
                     movieDetail = movieDetail,
-                    similarMovies = similarMovies,
+                    similarMovies = recommendedMovies,
                     collectionDetail = collectionDetail,
+                    cast = cast,
                     trailerKey = trailerKey,
                     isInMyList = isInMyList,
                     watchHistoryItem = historyItem
@@ -123,13 +131,19 @@ class DetailViewModel : ViewModel() {
             val historyItem = repository.getWatchHistoryItem(context, tvId, true)
 
             try {
-                // Fetch TV show details and recommended TV shows.
-                val tvShowDetail = repository.getTvShowDetail(tvId).getOrElse { throw it }
-                val recommendedTvShowsResult = repository.getRecommendedTvShows(tvId)
-                val videosResult = repository.getTvShowVideos(tvId)
+                // Fetch TV show details, recommended TV shows, videos, and credits in parallel.
+                val tvShowDetailDeferred = async { repository.getTvShowDetail(tvId) }
+                val recommendedTvShowsDeferred = async { repository.getRecommendedTvShows(tvId) }
+                val videosDeferred = async { repository.getTvShowVideos(tvId) }
+                val creditsDeferred = async { repository.getTvShowCredits(tvId) }
 
-                val similarTvShows = recommendedTvShowsResult.getOrNull()?.take(10) ?: repository.getTrendingTvToday().getOrNull()?.take(10) ?: emptyList()
-                val videos = videosResult.getOrNull() ?: emptyList()
+                val tvShowDetail = tvShowDetailDeferred.await().getOrElse { throw it }
+                val similarTvShows = recommendedTvShowsDeferred.await().getOrNull()?.take(10) ?: repository.getTrendingTvToday().getOrNull()?.take(10) ?: emptyList()
+                val videos = videosDeferred.await().getOrNull() ?: emptyList()
+                val credits = creditsDeferred.await().getOrNull()
+
+                // Get cast members, sorted by order (top billed)
+                val cast = credits?.cast?.sortedBy { it.order ?: Int.MAX_VALUE }?.take(20) ?: emptyList()
 
                 // Find the first YouTube trailer.
                 val trailerKey = videos.firstOrNull {
@@ -151,6 +165,7 @@ class DetailViewModel : ViewModel() {
                     tvShowDetail = tvShowDetail,
                     seasons = seasonList,
                     similarTvShows = similarTvShows,
+                    cast = cast,
                     trailerKey = trailerKey,
                     isInMyList = isInMyList,
                     watchHistoryItem = historyItem

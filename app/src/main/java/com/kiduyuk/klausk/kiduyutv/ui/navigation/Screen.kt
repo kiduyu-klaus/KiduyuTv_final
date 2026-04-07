@@ -22,6 +22,7 @@ sealed class Screen(val route: String) {
         }
     }
     object Settings : Screen("settings")
+    object CastDetail : Screen("cast_detail/{castId}/{castName}/{character}/{profilePath}/{knownForDepartment}")
     object StreamLinks : Screen("stream_links/{tmdbId}/{isTv}?season={season}&episode={episode}&title={title}&overview={overview}&posterPath={posterPath}&backdropPath={backdropPath}&voteAverage={voteAverage}&releaseDate={releaseDate}&timestamp={timestamp}") {
         fun createRoute(
             tmdbId: Int,

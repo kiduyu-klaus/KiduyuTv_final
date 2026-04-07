@@ -504,6 +504,122 @@ data class MultiSearchItem(
  * @param oscarsWon The number of Oscars won.
  * @param genres The genre names.
  */
+
+/**
+ * Data class representing a cast member.
+ * @param id The unique identifier for the person.
+ * @param name The name of the cast member.
+ * @param character The character name they played.
+ * @param profilePath The path to the profile image.
+ * @param knownForDepartment The department they're known for (acting, directing, etc.).
+ * @param popularity The popularity score of the cast member.
+ * @param order The order of the cast member in the credits list.
+ */
+data class CastMember(
+    @SerializedName("id") val id: Int,
+    @SerializedName("name") val name: String,
+    @SerializedName("character") val character: String?,
+    @SerializedName("profile_path") val profilePath: String?,
+    @SerializedName("known_for_department") val knownForDepartment: String?,
+    @SerializedName("popularity") val popularity: Double?,
+    @SerializedName("order") val order: Int?
+)
+
+/**
+ * Data class representing a crew member.
+ * @param id The unique identifier for the person.
+ * @param name The name of the crew member.
+ * @param job The job they performed.
+ * @param department The department they belong to.
+ * @param profilePath The path to the profile image.
+ */
+data class CrewMember(
+    @SerializedName("id") val id: Int,
+    @SerializedName("name") val name: String,
+    @SerializedName("job") val job: String?,
+    @SerializedName("department") val department: String?,
+    @SerializedName("profile_path") val profilePath: String?
+)
+
+/**
+ * Response class for movie credits endpoint.
+ * @param id The TMDB ID of the movie.
+ * @param cast The list of cast members.
+ * @param crew The list of crew members.
+ */
+data class MovieCreditsResponse(
+    @SerializedName("id") val id: Int,
+    @SerializedName("cast") val cast: List<CastMember>,
+    @SerializedName("crew") val crew: List<CrewMember>
+)
+
+/**
+ * Response class for TV show credits endpoint.
+ * @param id The TMDB ID of the TV show.
+ * @param cast The list of cast members.
+ * @param crew The list of crew members.
+ */
+data class TvShowCreditsResponse(
+    @SerializedName("id") val id: Int,
+    @SerializedName("cast") val cast: List<CastMember>,
+    @SerializedName("crew") val crew: List<CrewMember>
+)
+
+/**
+ * Response class for person movie credits endpoint.
+ * @param cast The list of movies the person acted in.
+ */
+data class PersonMovieCreditsResponse(
+    @SerializedName("cast") val cast: List<Movie>
+)
+
+/**
+ * Response class for person TV show credits endpoint.
+ * @param cast The list of TV shows the person acted in.
+ */
+data class PersonTvCreditsResponse(
+    @SerializedName("cast") val cast: List<TvShow>
+)
+
+/**
+ * Data class representing a combined media item (Movie or TV Show) for cast detail screen.
+ */
+sealed class MediaItem {
+    abstract val id: Int
+    abstract val title: String
+    abstract val posterPath: String?
+    abstract val backdropPath: String?
+    abstract val voteAverage: Double
+    abstract val releaseDate: String?
+    abstract val mediaType: String
+
+    data class MovieItem(
+        override val id: Int,
+        override val title: String,
+        override val posterPath: String?,
+        override val backdropPath: String?,
+        override val voteAverage: Double,
+        override val releaseDate: String?,
+        val overview: String?,
+        val popularity: Double?
+    ) : MediaItem() {
+        override val mediaType: String = "movie"
+    }
+
+    data class TvShowItem(
+        override val id: Int,
+        override val title: String,
+        override val posterPath: String?,
+        override val backdropPath: String?,
+        override val voteAverage: Double,
+        override val releaseDate: String?,
+        val overview: String?,
+        val popularity: Double?
+    ) : MediaItem() {
+        override val mediaType: String = "tv"
+    }
+}
+
 /**
  * Data class representing a company from GitHub JSON list.
  */

@@ -1,9 +1,12 @@
 package com.kiduyuk.klausk.kiduyutv.ui.navigation
 
 import android.app.Application
+import android.net.Uri
+import androidx.annotation.OptIn
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -16,6 +19,8 @@ import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.MovieDetailScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.SeasonEpisodesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.StreamLinksScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.TvShowDetailScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.CastDetailScreen
+import com.kiduyuk.klausk.kiduyutv.data.model.CastMember
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.HomeScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.MoviesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.MyListScreen
@@ -29,6 +34,8 @@ import com.kiduyuk.klausk.kiduyutv.viewmodel.SearchViewModelFactory
  *
  * @param navController The [NavHostController] responsible for managing app navigation.
  */
+@androidx.media3.common.util.UnstableApi
+@OptIn(UnstableApi::class)
 @Composable
 fun NavGraph(navController: NavHostController) {
     NavHost(
@@ -157,6 +164,11 @@ fun NavGraph(navController: NavHostController) {
                 },
                 onPlayClick = { route ->
                     navController.navigate(route)
+                },
+                onCastClick = { castId, castName, character, profilePath, knownForDepartment ->
+                    navController.navigate(
+                        "cast_detail/$castId/${Uri.encode(castName)}/${Uri.encode(character ?: "")}/${Uri.encode(profilePath ?: "")}/${Uri.encode(knownForDepartment ?: "")}"
+                    )
                 }
             )
         }
@@ -181,6 +193,11 @@ fun NavGraph(navController: NavHostController) {
                 },
                 onPlayClick = { route ->
                     navController.navigate(route)
+                },
+                onCastClick = { castId, castName, character, profilePath, knownForDepartment ->
+                    navController.navigate(
+                        "cast_detail/$castId/${Uri.encode(castName)}/${Uri.encode(character ?: "")}/${Uri.encode(profilePath ?: "")}/${Uri.encode(knownForDepartment ?: "")}"
+                    )
                 }
             )
         }
@@ -287,6 +304,45 @@ fun NavGraph(navController: NavHostController) {
         composable(Screen.Settings.route) {
             SettingsScreen(
                 onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        // Cast Detail Screen: Screen for displaying all movies and TV shows by a cast member.
+        composable(
+            route = Screen.CastDetail.route,
+            arguments = listOf(
+                navArgument("castId") { type = NavType.IntType },
+                navArgument("castName") { type = NavType.StringType },
+                navArgument("character") { type = NavType.StringType; defaultValue = "" },
+                navArgument("profilePath") { type = NavType.StringType; defaultValue = "" },
+                navArgument("knownForDepartment") { type = NavType.StringType; defaultValue = "" }
+            )
+        ) { backStackEntry ->
+            val castId = backStackEntry.arguments?.getInt("castId") ?: 0
+            val castName = backStackEntry.arguments?.getString("castName") ?: ""
+            val character = backStackEntry.arguments?.getString("character")
+            val profilePath = backStackEntry.arguments?.getString("profilePath")
+            val knownForDepartment = backStackEntry.arguments?.getString("knownForDepartment")
+
+            val castMember = CastMember(
+                id = castId,
+                name = Uri.decode(castName),
+                character = Uri.decode(character ?: ""),
+                profilePath = if (profilePath.isNullOrBlank()) null else Uri.decode(profilePath),
+                knownForDepartment = Uri.decode(knownForDepartment ?: ""),
+                popularity = null,
+                order = null
+            )
+
+            CastDetailScreen(
+                castMember = castMember,
+                onBackClick = { navController.popBackStack() },
+                onMovieClick = { movieId ->
+                    navController.navigate(Screen.MovieDetail.createRoute(movieId))
+                },
+                onTvShowClick = { tvId ->
+                    navController.navigate(Screen.TvShowDetail.createRoute(tvId))
+                }
             )
         }
     }

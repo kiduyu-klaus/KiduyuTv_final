@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
+import com.kiduyuk.klausk.kiduyutv.ui.components.CastRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.ContentRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.TvShowCard
@@ -57,6 +58,7 @@ fun TvShowDetailScreen(
     onEpisodesClick: (tvId: Int, tvShowName: String, totalSeasons: Int) -> Unit = { _, _, _ -> },
     onNetworkClick: (id: Int, name: String) -> Unit = { _, _ -> },
     onPlayClick: (String) -> Unit,
+    onCastClick: (Int, String, String?, String?, String?) -> Unit = { _, _, _, _, _ -> },
     viewModel: DetailViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -371,6 +373,23 @@ fun TvShowDetailScreen(
                     }
                 }
                 // ── End Hero Section ─────────────────────────────────────────
+
+                // Cast Row
+                if (uiState.cast.isNotEmpty()) {
+                    CastRow(
+                        title = "Cast",
+                        cast = uiState.cast,
+                        onCastClick = { castMember ->
+                            onCastClick(
+                                castMember.id,
+                                castMember.name,
+                                castMember.character,
+                                castMember.profilePath,
+                                castMember.knownForDepartment
+                            )
+                        }
+                    )
+                }
 
                 // Similar TV Shows
                 if (uiState.similarTvShows.isNotEmpty()) {

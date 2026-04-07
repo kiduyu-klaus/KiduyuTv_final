@@ -341,6 +341,30 @@ class TmdbRepository {
         api.getCollectionDetails(collectionId)
     }
 
+// ========== Credits (Cast & Crew) ==========
+
+    /** Fetches movie credits (cast and crew) for a specific movie. */
+    suspend fun getMovieCredits(movieId: Int): Result<MovieCreditsResponse> = runCatching {
+        api.getMovieCredits(movieId)
+    }
+
+    /** Fetches TV show credits (cast and crew) for a specific TV show. */
+    suspend fun getTvShowCredits(tvId: Int): Result<TvShowCreditsResponse> = runCatching {
+        api.getTvShowCredits(tvId)
+    }
+
+// ========== Person Credits ==========
+
+    /** Fetches movie credits for a specific person. */
+    suspend fun getPersonMovieCredits(personId: Int): Result<PersonMovieCreditsResponse> = runCatching {
+        api.getPersonMovieCredits(personId)
+    }
+
+    /** Fetches TV show credits for a specific person. */
+    suspend fun getPersonTvCredits(personId: Int): Result<PersonTvCreditsResponse> = runCatching {
+        api.getPersonTvCredits(personId)
+    }
+
 // ========== Watch History (Now using Room) ==========
 
     /**

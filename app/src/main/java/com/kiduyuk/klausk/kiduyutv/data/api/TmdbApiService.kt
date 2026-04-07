@@ -201,4 +201,28 @@ interface TmdbApiService {
     suspend fun getCollectionDetails(
         @Path("collection_id") collectionId: Int
     ): CollectionDetail
+
+    /** Fetches movie credits (cast and crew) for a specific movie. */
+    @GET("movie/{movie_id}/credits")
+    suspend fun getMovieCredits(
+        @Path("movie_id") movieId: Int
+    ): MovieCreditsResponse
+
+    /** Fetches TV show credits (cast and crew) for a specific TV show. */
+    @GET("tv/{tv_id}/credits")
+    suspend fun getTvShowCredits(
+        @Path("tv_id") tvId: Int
+    ): TvShowCreditsResponse
+
+    /** Fetches movie credits for a specific person. */
+    @GET("person/{person_id}/movie_credits")
+    suspend fun getPersonMovieCredits(
+        @Path("person_id") personId: Int
+    ): PersonMovieCreditsResponse
+
+    /** Fetches TV show credits for a specific person. */
+    @GET("person/{person_id}/tv_credits")
+    suspend fun getPersonTvCredits(
+        @Path("person_id") personId: Int
+    ): PersonTvCreditsResponse
 }
