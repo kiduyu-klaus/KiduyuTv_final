@@ -490,6 +490,48 @@
             display: flex;
         }
 
+        /* Changelog Section */
+        .changelog-section {
+            background: var(--card-bg);
+            border-radius: 24px;
+            padding: 4rem 2rem;
+            margin: 2rem auto;
+            max-width: 1200px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .changelog-content {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 2rem;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            white-space: pre-wrap;
+            overflow-x: auto;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .changelog-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .changelog-content::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .changelog-content::-webkit-scrollbar-thumb {
+            background: rgba(229, 9, 20, 0.3);
+            border-radius: 4px;
+        }
+
+        .changelog-content::-webkit-scrollbar-thumb:hover {
+            background: rgba(229, 9, 20, 0.5);
+        }
+
         .img-modal-inner {
             position: relative;
             max-width: 95vw;
@@ -721,6 +763,8 @@
         <li><a href="#features">Features</a></li>
         <li><a href="#categories">Categories</a></li>
         <li><a href="#tech">Tech Stack</a></li>
+        <li><a href="#screenshots">Screenshots</a></li>
+        <li><a href="#changelog">Updates</a></li>
         <li><a href="#download">Download</a></li>
     </ul>
 </nav>
@@ -1119,6 +1163,106 @@
         </div>
     </div>
 
+</section>
+
+<!-- Changelog Section -->
+<section class="section" id="changelog">
+    <div class="section-header">
+        <p class="section-label">Updates</p>
+        <h2 class="section-title">What's New</h2>
+        <p class="section-description">
+            Stay up to date with the latest features, improvements, and fixes in KiduyuTV.
+        </p>
+    </div>
+    <div class="changelog-section">
+        <div class="changelog-content">================================================================================
+            KIDUYU TV - VERSION 1.2.1
+            WHAT'S NEW / CHANGELOG
+            ================================================================================
+
+            Release Date: April 7, 2026
+
+            ================================================================================
+            NEW FEATURES
+            ================================================================================
+
+            1. ENHANCED CAST DETAIL SCREEN
+            - Added cast member biography (overview) display
+            - Biography is shown in the fixed header section for quick reference
+            - Click on biography to view the complete text in a dedicated dialog
+
+            2. IMPROVED HEADER LAYOUT
+            - Header section is now fixed and does not scroll with the content
+            - Header occupies 35% of the screen height for optimal visibility
+            - Cast member profile image, name, and truncated biography are displayed
+            - Responsive design adapts to different screen sizes
+
+            3. NEW FILMOGRAPHY GRID VIEW
+            - Movies and TV shows are now displayed in a unified responsive grid
+            - Grid layout automatically adjusts columns based on screen width
+            - Media type badge (Movie/TV) is displayed on each item card
+            - Clean, consistent presentation for all filmography items
+
+            4. ENHANCED TV REMOTE NAVIGATION
+            - Full D-pad navigation support throughout the Cast Detail Screen
+            - Visual focus indicators on all interactive elements
+            - Smooth focus transitions between different sections
+            - Optimized for comfortable TV remote control usage
+
+            5. INTERACTIVE BIOGRAPHY DIALOG
+            - Truncated biography preview shows first 3 lines in header
+            - Full biography accessible via focused click
+            - Dialog has constrained height (200dp max) for better UX
+            - Scrollable content within dialog for long biographies
+
+            ================================================================================
+            IMPROVEMENTS
+            ================================================================================
+
+            - Streamlined data fetching with parallel API calls
+            - Better state management for screen transitions
+            - Improved visual hierarchy with clear content separation
+            - Enhanced error handling and loading states
+            - Optimized layout performance for large filmography lists
+
+            ================================================================================
+            TECHNICAL UPDATES
+            ================================================================================
+
+            - Added PersonDetail data model for person-specific API responses
+            - Extended TmdbApiService with person details endpoint
+            - Updated TmdbRepository with new data fetching method
+            - Implemented CastDetailViewModel with concurrent data loading
+            - Added focus management system for TV navigation
+
+            ================================================================================
+            KNOWN ISSUES
+            ================================================================================
+
+            - None reported at this time
+
+            ================================================================================
+            COMPATIBILITY
+            ================================================================================
+
+            - Minimum Android SDK: 24 (Android 7.0 Nougat)
+            - Target Android SDK: 35 (Android 15)
+            - Requires TV device or emulator for optimal experience
+            - Internet connection required for streaming content
+
+            ================================================================================
+            SUPPORT
+            ================================================================================
+
+            For bug reports, feature requests, or assistance, please contact the
+            development team through the official GitHub repository.
+
+            GitHub: https://github.com/kiduyu-klaus/KiduyuTv_final
+
+            ================================================================================
+            © 2026 Kiduyu Klaus. All rights reserved.
+            ================================================================================</div>
+    </div>
 </section>
 
 <!-- Download Section -->
