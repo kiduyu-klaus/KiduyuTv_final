@@ -198,6 +198,24 @@ object MyListManager {
     }
 
     /**
+     * Clear items from the list by type.
+     *
+     * @param type The type of items to clear ("movie", "tv", "company", "network", or "cast")
+     * @param context Context for database operations
+     */
+    fun clearByType(type: String, context: Context? = null) {
+        if (!isInitialized && context != null) {
+            init(context)
+        }
+
+        // Optimistically update local state
+        _myList.value = _myList.value.filter { it.type != type }
+
+        // Persist to database
+        DatabaseManager.clearMyListByType(type)
+    }
+
+    /**
      * Search items in the list by title.
      */
     fun searchItems(query: String): List<MyListItem> {

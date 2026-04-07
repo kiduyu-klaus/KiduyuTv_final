@@ -91,6 +91,12 @@ interface SavedMediaDao {
     suspend fun deleteAllSavedMedia()
 
     /**
+     * Delete saved media items by type.
+     */
+    @Query("DELETE FROM saved_media WHERE mediaType = :mediaType")
+    suspend fun deleteSavedMediaByType(mediaType: String)
+
+    /**
      * Get the count of saved items.
      */
     @Query("SELECT COUNT(*) FROM saved_media")

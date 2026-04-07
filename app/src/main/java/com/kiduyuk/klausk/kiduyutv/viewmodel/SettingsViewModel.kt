@@ -15,6 +15,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.data.local.database.DatabaseManager
+import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -160,6 +161,39 @@ class SettingsViewModel : ViewModel() {
             _uiState.update { it.copy(isClearingMyList = false, myListClearSuccess = true) }
             delay(3000)
             _uiState.update { it.copy(myListClearSuccess = false) }
+        }
+    }
+
+    fun clearCompanies() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isClearingCompanies = true, companiesClearSuccess = false) }
+            MyListManager.clearByType("company")
+            delay(600)
+            _uiState.update { it.copy(isClearingCompanies = false, companiesClearSuccess = true) }
+            delay(3000)
+            _uiState.update { it.copy(companiesClearSuccess = false) }
+        }
+    }
+
+    fun clearNetworks() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isClearingNetworks = true, networksClearSuccess = false) }
+            MyListManager.clearByType("network")
+            delay(600)
+            _uiState.update { it.copy(isClearingNetworks = false, networksClearSuccess = true) }
+            delay(3000)
+            _uiState.update { it.copy(networksClearSuccess = false) }
+        }
+    }
+
+    fun clearCasts() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isClearingCasts = true, castsClearSuccess = false) }
+            MyListManager.clearByType("cast")
+            delay(600)
+            _uiState.update { it.copy(isClearingCasts = false, castsClearSuccess = true) }
+            delay(3000)
+            _uiState.update { it.copy(castsClearSuccess = false) }
         }
     }
 
@@ -440,6 +474,12 @@ data class SettingsUiState(
     val cacheSize: String = "Calculating...",
     val isClearingMyList: Boolean = false,
     val myListClearSuccess: Boolean = false,
+    val isClearingCompanies: Boolean = false,
+    val companiesClearSuccess: Boolean = false,
+    val isClearingNetworks: Boolean = false,
+    val networksClearSuccess: Boolean = false,
+    val isClearingCasts: Boolean = false,
+    val castsClearSuccess: Boolean = false,
     val isClearingWatchHistory: Boolean = false,
     val watchHistoryClearSuccess: Boolean = false,
     // Update check states

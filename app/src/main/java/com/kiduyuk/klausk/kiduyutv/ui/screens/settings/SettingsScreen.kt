@@ -104,6 +104,18 @@ fun SettingsScreen(
                         isClearingMyList = uiState.isClearingMyList,
                         myListClearSuccess = uiState.myListClearSuccess,
                         onClearMyListClick = { viewModel.clearMyList() },
+                        // Companies
+                        isClearingCompanies = uiState.isClearingCompanies,
+                        companiesClearSuccess = uiState.companiesClearSuccess,
+                        onClearCompaniesClick = { viewModel.clearCompanies() },
+                        // Networks
+                        isClearingNetworks = uiState.isClearingNetworks,
+                        networksClearSuccess = uiState.networksClearSuccess,
+                        onClearNetworksClick = { viewModel.clearNetworks() },
+                        // Casts
+                        isClearingCasts = uiState.isClearingCasts,
+                        castsClearSuccess = uiState.castsClearSuccess,
+                        onClearCastsClick = { viewModel.clearCasts() },
                         // Watch History
                         isClearingWatchHistory = uiState.isClearingWatchHistory,
                         watchHistoryClearSuccess = uiState.watchHistoryClearSuccess,
@@ -291,6 +303,18 @@ private fun AppSettingsContent(
     isClearingMyList: Boolean,
     myListClearSuccess: Boolean,
     onClearMyListClick: () -> Unit,
+    // Companies
+    isClearingCompanies: Boolean,
+    companiesClearSuccess: Boolean,
+    onClearCompaniesClick: () -> Unit,
+    // Networks
+    isClearingNetworks: Boolean,
+    networksClearSuccess: Boolean,
+    onClearNetworksClick: () -> Unit,
+    // Casts
+    isClearingCasts: Boolean,
+    castsClearSuccess: Boolean,
+    onClearCastsClick: () -> Unit,
     // Watch History
     isClearingWatchHistory: Boolean,
     watchHistoryClearSuccess: Boolean,
@@ -340,6 +364,54 @@ private fun AppSettingsContent(
             showSuccess = myListClearSuccess,
             icon = Icons.Default.PlaylistRemove,
             onClick = onClearMyListClick
+        )
+
+        Spacer(modifier = Modifier.height(28.dp))
+
+        // ── 2a. Companies ─────────────────────────────────────────────
+        SettingsSectionLabel(text = "Companies")
+
+        SettingsActionCard(
+            description = "Remove all production companies you have saved to My List.",
+            buttonLabel = "Clear Saved Companies",
+            isLoading = isClearingCompanies,
+            loadingLabel = "Clearing...",
+            successMessage = "Companies cleared!",
+            showSuccess = companiesClearSuccess,
+            icon = Icons.Default.PlaylistRemove,
+            onClick = onClearCompaniesClick
+        )
+
+        Spacer(modifier = Modifier.height(28.dp))
+
+        // ── 2b. Networks ──────────────────────────────────────────────
+        SettingsSectionLabel(text = "Networks")
+
+        SettingsActionCard(
+            description = "Remove all TV networks you have saved to My List.",
+            buttonLabel = "Clear Saved Networks",
+            isLoading = isClearingNetworks,
+            loadingLabel = "Clearing...",
+            successMessage = "Networks cleared!",
+            showSuccess = networksClearSuccess,
+            icon = Icons.Default.PlaylistRemove,
+            onClick = onClearNetworksClick
+        )
+
+        Spacer(modifier = Modifier.height(28.dp))
+
+        // ── 2c. Casts ─────────────────────────────────────────────────
+        SettingsSectionLabel(text = "Casts")
+
+        SettingsActionCard(
+            description = "Remove all cast members you have saved to My List.",
+            buttonLabel = "Clear Saved Casts",
+            isLoading = isClearingCasts,
+            loadingLabel = "Clearing...",
+            successMessage = "Casts cleared!",
+            showSuccess = castsClearSuccess,
+            icon = Icons.Default.PlaylistRemove,
+            onClick = onClearCastsClick
         )
 
         Spacer(modifier = Modifier.height(28.dp))
@@ -869,6 +941,15 @@ private fun PreviewAppSettingsIdle() {
                 isClearingMyList = false,
                 myListClearSuccess = false,
                 onClearMyListClick = {},
+                isClearingCompanies = false,
+                companiesClearSuccess = false,
+                onClearCompaniesClick = {},
+                isClearingNetworks = false,
+                networksClearSuccess = false,
+                onClearNetworksClick = {},
+                isClearingCasts = false,
+                castsClearSuccess = false,
+                onClearCastsClick = {},
                 isClearingWatchHistory = false,
                 watchHistoryClearSuccess = false,
                 onClearWatchHistoryClick = {}
@@ -901,6 +982,15 @@ private fun PreviewAppSettingsCacheClearing() {
                 isClearingMyList = false,
                 myListClearSuccess = false,
                 onClearMyListClick = {},
+                isClearingCompanies = false,
+                companiesClearSuccess = false,
+                onClearCompaniesClick = {},
+                isClearingNetworks = false,
+                networksClearSuccess = false,
+                onClearNetworksClick = {},
+                isClearingCasts = false,
+                castsClearSuccess = false,
+                onClearCastsClick = {},
                 isClearingWatchHistory = false,
                 watchHistoryClearSuccess = false,
                 onClearWatchHistoryClick = {}
@@ -933,6 +1023,15 @@ private fun PreviewAppSettingsAllSuccess() {
                 isClearingMyList = false,
                 myListClearSuccess = true,
                 onClearMyListClick = {},
+                isClearingCompanies = false,
+                companiesClearSuccess = true,
+                onClearCompaniesClick = {},
+                isClearingNetworks = false,
+                networksClearSuccess = true,
+                onClearNetworksClick = {},
+                isClearingCasts = false,
+                castsClearSuccess = true,
+                onClearCastsClick = {},
                 isClearingWatchHistory = false,
                 watchHistoryClearSuccess = true,
                 onClearWatchHistoryClick = {}

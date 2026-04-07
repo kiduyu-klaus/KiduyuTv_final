@@ -249,6 +249,15 @@ object DatabaseManager {
     }
 
     /**
+     * Delete items in My List by type.
+     */
+    fun clearMyListByType(mediaType: String) {
+        applicationScope.launch {
+            savedMediaDao().deleteSavedMediaByType(mediaType)
+        }
+    }
+
+    /**
      * Delete watch history older than specified days.
      */
     fun deleteOldWatchHistory(daysOld: Int = 30) {
