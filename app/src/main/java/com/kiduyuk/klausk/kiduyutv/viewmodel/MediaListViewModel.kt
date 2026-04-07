@@ -160,16 +160,29 @@ class MediaListViewModel : ViewModel() {
             MyListManager.removeItem(id, type, context)
             _uiState.value = _uiState.value.copy(isSaved = false)
         } else {
-            MyListManager.addItem(
-                MyListItem(
-                    id = id,
-                    title = name,
-                    posterPath = null, // Companies/networks don't have posters in this context
-                    type = type
-                ),
-                context
-            )
-            _uiState.value = _uiState.value.copy(isSaved = true)
+            viewModelScope.launch {
+                var logoPath: String? = null
+                try {
+                    if (type == "company") {
+                        repository.getCompanyDetails(id).onSuccess { logoPath = it.logoPath }
+                    } else if (type == "network") {
+                        repository.getNetworkDetails(id).onSuccess { logoPath = it.logoPath }
+                    }
+                } catch (e: Exception) {
+                    // Fallback to null if fetch fails
+                }
+
+                MyListManager.addItem(
+                    MyListItem(
+                        id = id,
+                        title = name,
+                        posterPath = logoPath,
+                        type = type
+                    ),
+                    context
+                )
+                _uiState.value = _uiState.value.copy(isSaved = true)
+            }
         }
     }
 }

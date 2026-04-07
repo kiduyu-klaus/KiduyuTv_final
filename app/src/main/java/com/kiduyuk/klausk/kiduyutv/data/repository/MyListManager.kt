@@ -123,7 +123,7 @@ object MyListManager {
      * Removes an item from the list and removes from Room database.
      *
      * @param itemId The ID of the item to remove
-     * @param type The type of the item ("movie", "tv", "company", or "network")
+     * @param type The type of the item ("movie", "tv", "company", "network", or "cast")
      * @param context Context for database operations (can be null if already initialized)
      */
     fun removeItem(itemId: Int, type: String, context: Context? = null) {
@@ -145,7 +145,7 @@ object MyListManager {
      * This now queries the local state which is synced with the database.
      *
      * @param itemId The ID of the item
-     * @param type The type of the item ("movie", "tv", "company", or "network")
+     * @param type The type of the item ("movie", "tv", "company", "network", or "cast")
      * @return true if the item is in the list
      */
     fun isInList(itemId: Int, type: String): Boolean {
@@ -157,7 +157,7 @@ object MyListManager {
      * Use this when you need the most up-to-date information.
      *
      * @param itemId The ID of the item
-     * @param type The type of the item ("movie", "tv", "company", or "network")
+     * @param type The type of the item ("movie", "tv", "company", "network", or "cast")
      * @return true if the item is in the list
      */
     suspend fun isInListAsync(itemId: Int, type: String): Boolean {

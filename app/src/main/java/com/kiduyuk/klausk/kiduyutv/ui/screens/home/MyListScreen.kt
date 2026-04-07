@@ -1,19 +1,20 @@
 package com.kiduyuk.klausk.kiduyutv.ui.screens.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,6 +32,7 @@ import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
+import com.kiduyuk.klausk.kiduyutv.data.model.CastMember
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.ui.components.MovieCard
 import com.kiduyuk.klausk.kiduyutv.ui.components.TopBar
@@ -38,6 +40,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.components.TvShowCard
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeViewModel
 import com.kiduyuk.klausk.kiduyutv.viewmodel.MyListItem
+import androidx.compose.ui.text.style.TextOverflow
 
 /**
  * Composable function for the "My List" screen, displaying items saved by the user.
@@ -59,6 +62,7 @@ fun MyListScreen(
     onSettingsClick: () -> Unit = {},
     onCompanyClick: (Int, String) -> Unit = { _, _ -> },
     onNetworkClick: (Int, String) -> Unit = { _, _ -> },
+    onCastClick: (CastMember) -> Unit = { _ -> },
     viewModel: HomeViewModel = viewModel()
 ) {
     // Collect My List from the global manager.
@@ -70,6 +74,11 @@ fun MyListScreen(
     val tvShows = myList.filter { it.type == "tv" }
     val companies = myList.filter { it.type == "company" }
     val networks = myList.filter { it.type == "network" }
+    val castMembers = myList.filter { it.type == "cast" }
+
+    // Tab state
+    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    val tabs = listOf("Movies", "TV Shows", "Companies", "Networks", "Cast")
 
     // Get screen configuration to calculate responsive grid
     val configuration = LocalConfiguration.current
@@ -100,22 +109,59 @@ fun MyListScreen(
                 .fillMaxSize()
                 .padding(horizontal = horizontalPadding) // Padding for the content area.
         ) {
+            // Tab Row
+            ScrollableTabRow(
+                selectedTabIndex = selectedTabIndex,
+                containerColor = Color.Transparent,
+                contentColor = MaterialTheme.colorScheme.primary,
+                edgePadding = 0.dp,
+                divider = {},
+                indicator = { tabPositions ->
+                    TabRowDefaults.SecondaryIndicator(
+                        modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            ) {
+                tabs.forEachIndexed { index, title ->
+                    Tab(
+                        selected = selectedTabIndex == index,
+                        onClick = { selectedTabIndex = index },
+                        text = {
+                            Text(
+                                text = title,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = if (selectedTabIndex == index) MaterialTheme.colorScheme.primary else TextSecondary
+                            )
+                        }
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(15.dp)) // Vertical spacing.
 
-            // Display a message if the list is empty, otherwise show the list.
-            if (myList.isEmpty()) {
+            // Content based on selected tab
+            val currentList = when (selectedTabIndex) {
+                0 -> movies
+                1 -> tvShows
+                2 -> companies
+                3 -> networks
+                4 -> castMembers
+                else -> emptyList()
+            }
+
+            if (currentList.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Your list is empty. Start adding movies and TV shows!",
+                        text = "No ${tabs[selectedTabIndex]} saved yet.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = TextSecondary
                     )
                 }
             } else {
-                // LazyVerticalGrid to efficiently display a scrollable grid of items.
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(actualColumns),
                     modifier = Modifier.fillMaxSize(),
@@ -123,164 +169,142 @@ fun MyListScreen(
                     horizontalArrangement = Arrangement.spacedBy(spacing),
                     verticalArrangement = Arrangement.spacedBy(spacing)
                 ) {
-                    // Movies Section
-                    if (movies.isNotEmpty()) {
-                        item(span = { GridItemSpan(actualColumns) }) {
-                            Text(
-                                text = "Movies",
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 20.sp
-                                ),
-                                color = TextPrimary,
-                                modifier = Modifier.padding(vertical = 8.dp)
-                            )
-                        }
-                        items(movies) { item ->
-                            val interactionSource = remember { MutableInteractionSource() }
-                            val isFocused by interactionSource.collectIsFocusedAsState()
-                            MovieCard(
-                                movie = Movie(
-                                    id = item.id,
-                                    title = item.title,
-                                    overview = "",
-                                    posterPath = item.posterPath,
-                                    backdropPath = null,
-                                    voteAverage = item.voteAverage,
-                                    releaseDate = null,
-                                    genreIds = null,
-                                    popularity = 0.0
-                                ),
-                                isSelected = isFocused,
-                                onClick = { onMovieClick(item.id) },
-                                modifier = Modifier
-                                    .width(calculatedCardWidth)
-                                    .height(calculatedCardHeight)
-                            )
-                        }
-                    }
+                    items(currentList) { item ->
+                        val interactionSource = remember { MutableInteractionSource() }
+                        val isFocused by interactionSource.collectIsFocusedAsState()
 
-                    // TV Shows Section
-                    if (tvShows.isNotEmpty()) {
-                        item(span = { GridItemSpan(actualColumns) }) {
-                            Text(
-                                text = "TV Shows",
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 20.sp
-                                ),
-                                color = TextPrimary,
-                                modifier = Modifier.padding(top = 24.dp, bottom = 8.dp)
-                            )
-                        }
-                        items(tvShows) { item ->
-                            val interactionSource = remember { MutableInteractionSource() }
-                            val isFocused by interactionSource.collectIsFocusedAsState()
-                            TvShowCard(
-                                tvShow = TvShow(
-                                    id = item.id,
-                                    name = item.title,
-                                    overview = "",
-                                    posterPath = item.posterPath,
-                                    backdropPath = null,
-                                    voteAverage = item.voteAverage,
-                                    firstAirDate = null,
-                                    genreIds = null,
-                                    popularity = 0.0
-                                ),
-                                isSelected = isFocused,
-                                onClick = { onTvShowClick(item.id) },
-                                modifier = Modifier
-                                    .width(calculatedCardWidth)
-                                    .height(calculatedCardHeight)
-                            )
-                        }
-                    }
-
-                    // Companies Section
-                    if (companies.isNotEmpty()) {
-                        item(span = { GridItemSpan(actualColumns) }) {
-                            Text(
-                                text = "Saved Companies",
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 20.sp
-                                ),
-                                color = TextPrimary,
-                                modifier = Modifier.padding(top = 24.dp, bottom = 8.dp)
-                            )
-                        }
-                        items(companies) { item ->
-                            val interactionSource = remember { MutableInteractionSource() }
-                            val isFocused by interactionSource.collectIsFocusedAsState()
-
-                            Card(
-                                modifier = Modifier
-                                    .width(calculatedCardWidth)
-                                    .height(calculatedCardHeight / 2)
-                                    .clickable(
-                                        interactionSource = interactionSource,
-                                        indication = null
-                                    ) { onCompanyClick(item.id, item.title) },
-                                colors = CardDefaults.cardColors(
-                                    containerColor = if (isFocused) MaterialTheme.colorScheme.primary else CardDark
-                                ),
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.Center
+                        when (item.type) {
+                            "movie" -> {
+                                MovieCard(
+                                    movie = Movie(
+                                        id = item.id,
+                                        title = item.title,
+                                        overview = "",
+                                        posterPath = item.posterPath,
+                                        backdropPath = null,
+                                        voteAverage = item.voteAverage,
+                                        releaseDate = null,
+                                        genreIds = null,
+                                        popularity = 0.0
+                                    ),
+                                    isSelected = isFocused,
+                                    onClick = { onMovieClick(item.id) },
+                                    modifier = Modifier
+                                        .width(calculatedCardWidth)
+                                        .height(calculatedCardHeight)
+                                )
+                            }
+                            "tv" -> {
+                                TvShowCard(
+                                    tvShow = TvShow(
+                                        id = item.id,
+                                        name = item.title,
+                                        overview = "",
+                                        posterPath = item.posterPath,
+                                        backdropPath = null,
+                                        voteAverage = item.voteAverage,
+                                        firstAirDate = null,
+                                        genreIds = null,
+                                        popularity = 0.0
+                                    ),
+                                    isSelected = isFocused,
+                                    onClick = { onTvShowClick(item.id) },
+                                    modifier = Modifier
+                                        .width(calculatedCardWidth)
+                                        .height(calculatedCardHeight)
+                                )
+                            }
+                            "company", "network" -> {
+                                Card(
+                                    modifier = Modifier
+                                        .width(calculatedCardWidth)
+                                        .height(calculatedCardHeight / 2)
+                                        .clickable(
+                                            interactionSource = interactionSource,
+                                            indication = null
+                                        ) {
+                                            if (item.type == "company") onCompanyClick(item.id, item.title)
+                                            else onNetworkClick(item.id, item.title)
+                                        },
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (isFocused) MaterialTheme.colorScheme.primary else CardDark
+                                    ),
+                                    shape = RoundedCornerShape(8.dp)
                                 ) {
-                                    Text(
-                                        text = item.title,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = TextPrimary,
-                                        modifier = Modifier.padding(8.dp)
-                                    )
+                                    Box(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (!item.posterPath.isNullOrEmpty()) {
+                                            AsyncImage(
+                                                model = "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.LOGO_SIZE}${item.posterPath}",
+                                                contentDescription = item.title,
+                                                contentScale = ContentScale.Fit,
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .padding(12.dp)
+                                            )
+                                        } else {
+                                            Text(
+                                                text = item.title,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                color = TextPrimary,
+                                                modifier = Modifier.padding(8.dp),
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
                                 }
                             }
-                        }
-                    }
-
-                    // Networks Section
-                    if (networks.isNotEmpty()) {
-                        item(span = { GridItemSpan(actualColumns) }) {
-                            Text(
-                                text = "Saved Networks",
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 20.sp
-                                ),
-                                color = TextPrimary,
-                                modifier = Modifier.padding(top = 24.dp, bottom = 8.dp)
-                            )
-                        }
-                        items(networks) { item ->
-                            val interactionSource = remember { MutableInteractionSource() }
-                            val isFocused by interactionSource.collectIsFocusedAsState()
-
-                            Card(
-                                modifier = Modifier
-                                    .width(calculatedCardWidth)
-                                    .height(calculatedCardHeight / 2)
-                                    .clickable(
-                                        interactionSource = interactionSource,
-                                        indication = null
-                                    ) { onNetworkClick(item.id, item.title) },
-                                colors = CardDefaults.cardColors(
-                                    containerColor = if (isFocused) MaterialTheme.colorScheme.primary else CardDark
-                                ),
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Box(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.Center
+                            "cast" -> {
+                                Column(
+                                    modifier = Modifier
+                                        .width(calculatedCardWidth)
+                                        .clickable(
+                                            interactionSource = interactionSource,
+                                            indication = null
+                                        ) {
+                                            onCastClick(
+                                                CastMember(
+                                                    id = item.id,
+                                                    name = item.title,
+                                                    character = null,
+                                                    profilePath = item.posterPath,
+                                                    knownForDepartment = null,
+                                                    popularity = null,
+                                                    order = null,
+                                                    overview = null
+                                                )
+                                            )
+                                        },
+                                    horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .aspectRatio(1f)
+                                            .border(
+                                                width = if (isFocused) 2.dp else 0.dp,
+                                                color = if (isFocused) MaterialTheme.colorScheme.primary else Color.Transparent,
+                                                shape = RoundedCornerShape(8.dp)
+                                            ),
+                                        shape = RoundedCornerShape(8.dp)
+                                    ) {
+                                        AsyncImage(
+                                            model = "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.POSTER_SIZE}${item.posterPath}",
+                                            contentDescription = item.title,
+                                            contentScale = ContentScale.Crop,
+                                            modifier = Modifier.fillMaxSize()
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
                                     Text(
                                         text = item.title,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = TextPrimary,
-                                        modifier = Modifier.padding(8.dp)
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = if (isFocused) MaterialTheme.colorScheme.primary else TextPrimary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }

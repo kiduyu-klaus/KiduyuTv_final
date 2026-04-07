@@ -130,6 +130,11 @@ fun NavGraph(navController: NavHostController) {
                 },
                 onNetworkClick = { id, name ->
                     navController.navigate("media_list/network/$id/$name")
+                },
+                onCastClick = { castMember ->
+                    navController.navigate(
+                        "cast_detail/${castMember.id}/${Uri.encode(castMember.name)}/${Uri.encode(castMember.character ?: "")}/${Uri.encode(castMember.profilePath ?: "")}/${Uri.encode(castMember.knownForDepartment ?: "")}"
+                    )
                 }
             )
         }
