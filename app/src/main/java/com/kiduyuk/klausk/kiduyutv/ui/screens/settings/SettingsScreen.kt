@@ -127,8 +127,12 @@ fun SettingsScreen(
 
                 SettingsSection.APP_VERSION -> {
                     AppVersionContent(
-                        currentVersion = BuildConfig.VERSION_NAME,
-                        whatsNew = "Fixed some minor bugs and improved performance.",
+                        currentVersion = "1.2.1",
+                        whatsNew = "Enhanced Cast Detail Screen with biography display. " +
+                                "Fixed header layout (35% screen height) with cast profile and overview. " +
+                                "New responsive grid view for filmography with Movie/TV badges. " +
+                                "Full TV remote D-pad navigation with visual focus indicators. " +
+                                "Interactive biography dialog with scrollable content.",
                         // Update check states
                         isCheckingForUpdates = uiState.isCheckingForUpdates,
                         updateCheckResult = uiState.updateCheckResult,
@@ -238,8 +242,8 @@ private fun SettingsNavItem(
             .background(
                 when {
                     isSelected -> CardDark
-                    isFocused  -> CardDark.copy(alpha = 0.6f)
-                    else       -> Color.Transparent
+                    isFocused -> CardDark.copy(alpha = 0.6f)
+                    else -> Color.Transparent
                 }
             )
             .then(
@@ -765,7 +769,7 @@ private fun SettingsActionCard(
                             when {
                                 isLoading -> PrimaryRed.copy(alpha = 0.5f)
                                 isFocused -> PrimaryRed.copy(alpha = 0.8f)
-                                else      -> PrimaryRed
+                                else -> PrimaryRed
                             }
                         )
                         .border(

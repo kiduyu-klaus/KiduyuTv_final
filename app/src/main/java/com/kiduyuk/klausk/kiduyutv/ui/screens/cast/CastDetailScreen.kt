@@ -536,17 +536,19 @@ private fun BiographyDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = CardDark,
+        shape = RoundedCornerShape(16.dp),
         title = {
             Text(
                 text = "$name's Biography",
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.titleLarge,
                 color = TextPrimary
             )
         },
         text = {
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .heightIn(max = 200.dp)
                     .verticalScroll(rememberScrollState())
             ) {
                 Text(
