@@ -1,12 +1,17 @@
 package com.kiduyuk.klausk.kiduyutv.ui.screens.cast
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
@@ -15,9 +20,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -35,13 +42,13 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.launch
 
 /**
  * UI State for the Cast Detail screen.
@@ -66,6 +73,7 @@ class CastDetailViewModel : ViewModel() {
 
     /**
      * Loads movies and TV shows for a specific cast member.
+     * Also fetches person details to get the biography/overview.
      * @param castMember The cast member to load credits for.
      */
     fun loadCastDetails(castMember: CastMember) {
@@ -73,12 +81,21 @@ class CastDetailViewModel : ViewModel() {
             _uiState.value = CastDetailUiState(isLoading = true, castMember = castMember)
 
             try {
-                // Fetch both movie and TV credits in parallel
-                val movieCreditsDeferred = launch { repository.getPersonMovieCredits(castMember.id) }
-                val tvCreditsDeferred = launch { repository.getPersonTvCredits(castMember.id) }
+                // Fetch person details, movie credits, and TV credits in parallel using async
+                val personDetailsDeferred = async { repository.getPersonDetails(castMember.id) }
+                val movieCreditsDeferred = async { repository.getPersonMovieCredits(castMember.id) }
+                val tvCreditsDeferred = async { repository.getPersonTvCredits(castMember.id) }
 
-                val movieResult = movieCreditsDeferred.join().let { repository.getPersonMovieCredits(castMember.id) }
-                val tvResult = tvCreditsDeferred.join().let { repository.getPersonTvCredits(castMember.id) }
+                // Wait for all requests to complete
+                val personDetails = personDetailsDeferred.await().getOrNull()
+                val movieResult = movieCreditsDeferred.await()
+                val tvResult = tvCreditsDeferred.await()
+
+                // Get biography/overview from person details
+                val biography = personDetails?.biography
+
+                // Create updated cast member with overview
+                val castMemberWithOverview = castMember.copy(overview = biography)
 
                 val movies = movieResult.getOrNull()?.cast ?: emptyList()
                 val tvShows = tvResult.getOrNull()?.cast ?: emptyList()
@@ -116,7 +133,7 @@ class CastDetailViewModel : ViewModel() {
 
                 _uiState.value = CastDetailUiState(
                     isLoading = false,
-                    castMember = castMember,
+                    castMember = castMemberWithOverview,
                     mediaItems = combinedMedia
                 )
             } catch (e: Exception) {
@@ -127,8 +144,6 @@ class CastDetailViewModel : ViewModel() {
                 )
             }
         }
-
-      //  private fun launch(block: suspend () -> Unit) = viewModelScope.launch { block() }
     }
 }
 
@@ -187,6 +202,7 @@ fun CastDetailScreen(
 
 /**
  * Content composable for the cast detail screen.
+ * Uses a single Box with header at top (fixed) and scrollable grid below.
  */
 @Composable
 private fun CastDetailContent(
@@ -196,18 +212,31 @@ private fun CastDetailContent(
     onMovieClick: (Int) -> Unit,
     onTvShowClick: (Int) -> Unit
 ) {
+    val configuration = LocalConfiguration.current
+    val screenHeight = configuration.screenHeightDp.dp
+    val screenWidth = configuration.screenWidthDp.dp
+    val headerHeight = screenHeight * 0.25f // 25% of screen height
+
+    // Responsive grid calculation
+    val horizontalPadding = 16.dp
+    val spacing = 12.dp
+    val availableWidth = screenWidth - (horizontalPadding * 2)
+    val minCardWidth = 100.dp
+    val actualColumns = maxOf(4, minOf(8, ((availableWidth + spacing) / (minCardWidth + spacing)).toInt()))
+    val calculatedCardWidth = (availableWidth - (spacing * (actualColumns - 1))) / actualColumns
+    val calculatedCardHeight = calculatedCardWidth * 1.8f
+
     val profileUrl = castMember.profilePath?.let { path ->
         "${TmdbApiService.IMAGE_BASE_URL}h632$path"
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        // Header with backdrop and profile info
+    // Single Box containing header (fixed) and scrollable content
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Fixed header section at the top
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(200.dp)
+                .height(headerHeight)
         ) {
             // Backdrop image (blurred)
             if (profileUrl != null) {
@@ -256,14 +285,15 @@ private fun CastDetailContent(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 50.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .padding(top = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
             ) {
                 // Circular profile image
                 Box(
                     modifier = Modifier
-                        .size(120.dp)
-                        .clip(RoundedCornerShape(60.dp))
+                        .size(80.dp)
+                        .clip(RoundedCornerShape(40.dp))
                         .background(Color(0xFF333333)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -274,179 +304,277 @@ private fun CastDetailContent(
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
                                 .fillMaxSize()
-                                .clip(RoundedCornerShape(60.dp))
+                                .clip(RoundedCornerShape(40.dp))
                         )
                     } else {
                         Text(
                             text = castMember.name.take(1).uppercase(),
-                            style = MaterialTheme.typography.displayMedium,
+                            style = MaterialTheme.typography.headlineMedium,
                             color = TextPrimary
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // Name
                 Text(
                     text = castMember.name,
                     style = MaterialTheme.typography.headlineSmall,
                     color = TextPrimary,
-                    fontSize = 24.sp
+                    fontSize = 20.sp
                 )
 
                 // Known for department
                 if (!castMember.knownForDepartment.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "Known for: ${castMember.knownForDepartment}",
                         style = MaterialTheme.typography.bodyMedium,
                         color = TextSecondary,
-                        fontSize = 14.sp
+                        fontSize = 12.sp
                     )
                 }
 
                 // Total credits count
-                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "${mediaItems.size} Credits",
                     style = MaterialTheme.typography.bodyMedium,
                     color = PrimaryRed,
-                    fontSize = 14.sp
+                    fontSize = 12.sp
                 )
             }
         }
 
-        // Media items grid
-        if (mediaItems.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "No credits found",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = TextSecondary
-                )
+        // Scrollable content starting below the header
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = headerHeight)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = horizontalPadding)
+        ) {
+            // Overview section (if available)
+            if (!castMember.overview.isNullOrBlank()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = CardDark
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Biography",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = TextPrimary,
+                            fontSize = 16.sp
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = castMember.overview!!,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextSecondary,
+                            fontSize = 13.sp,
+                            maxLines = 6,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
             }
-        } else {
+
             // Section title
             Text(
                 text = "Filmography",
                 style = MaterialTheme.typography.titleLarge,
                 color = TextPrimary,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                fontSize = 18.sp,
+                modifier = Modifier.padding(vertical = 12.dp)
             )
 
-            // Grid of media items
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(4),
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(mediaItems) { mediaItem ->
-                    CastMediaCard(
-                        mediaItem = mediaItem,
-                        onClick = {
-                            when (mediaItem) {
-                                is MediaItem.MovieItem -> onMovieClick(mediaItem.id)
-                                is MediaItem.TvShowItem -> onTvShowClick(mediaItem.id)
-                            }
-                        }
+            // Grid of all media items (movies and TV shows mixed)
+            if (mediaItems.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No credits found",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = TextSecondary
                     )
                 }
+            } else {
+                // Create rows of items for the grid
+                val rows = mediaItems.chunked(actualColumns)
+
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(spacing)
+                ) {
+                    rows.forEach { rowItems ->
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(spacing),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            rowItems.forEach { mediaItem ->
+                                when (mediaItem) {
+                                    is MediaItem.MovieItem -> {
+                                        val movie = Movie(
+                                            id = mediaItem.id,
+                                            title = mediaItem.title,
+                                            overview = mediaItem.overview,
+                                            posterPath = mediaItem.posterPath,
+                                            backdropPath = mediaItem.backdropPath,
+                                            voteAverage = mediaItem.voteAverage,
+                                            releaseDate = mediaItem.releaseDate,
+                                            genreIds = emptyList(),
+                                            popularity = mediaItem.popularity
+                                        )
+                                        MediaGridCard(
+                                            mediaItem = mediaItem,
+                                            cardWidth = calculatedCardWidth,
+                                            cardHeight = calculatedCardHeight,
+                                            onClick = { onMovieClick(mediaItem.id) }
+                                        )
+                                    }
+                                    is MediaItem.TvShowItem -> {
+                                        val tvShow = TvShow(
+                                            id = mediaItem.id,
+                                            name = mediaItem.title,
+                                            overview = mediaItem.overview,
+                                            posterPath = mediaItem.posterPath,
+                                            backdropPath = mediaItem.backdropPath,
+                                            voteAverage = mediaItem.voteAverage,
+                                            firstAirDate = mediaItem.releaseDate,
+                                            genreIds = emptyList(),
+                                            popularity = mediaItem.popularity
+                                        )
+                                        MediaGridCard(
+                                            mediaItem = mediaItem,
+                                            cardWidth = calculatedCardWidth,
+                                            cardHeight = calculatedCardHeight,
+                                            onClick = { onTvShowClick(mediaItem.id) }
+                                        )
+                                    }
+                                }
+                            }
+                            // Fill remaining space in row with spacers if needed
+                            repeat(actualColumns - rowItems.size) {
+                                Spacer(modifier = Modifier.width(calculatedCardWidth))
+                            }
+                        }
+                    }
+                }
             }
+
+            // Bottom spacing for better scrolling experience
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }
 
 /**
- * Card composable for displaying a media item in the cast detail grid.
+ * Card for grid display showing both movies and TV shows with type badge.
  */
 @Composable
-private fun CastMediaCard(
+private fun MediaGridCard(
     mediaItem: MediaItem,
+    cardWidth: androidx.compose.ui.unit.Dp,
+    cardHeight: androidx.compose.ui.unit.Dp,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
     val posterUrl = mediaItem.posterPath?.let { path ->
-        "${TmdbApiService.IMAGE_BASE_URL}w342$path"
+        "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.POSTER_SIZE}$path"
     }
 
-    Column(
+    val isMovie = mediaItem is MediaItem.MovieItem
+
+    Box(
         modifier = Modifier
-            .fillMaxWidth()
+            .width(cardWidth)
+            .height(cardHeight)
+            .then(
+                if (isFocused) {
+                    Modifier.border(
+                        3.dp,
+                        FocusBorder,
+                        RoundedCornerShape(8.dp)
+                    )
+                } else Modifier
+            )
             .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFF222222))
-            .clickable { onClick() }
-            .padding(8.dp)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null
+            ) {
+                onClick()
+            }
     ) {
-        // Poster image
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(2f / 3f)
-                .clip(RoundedCornerShape(6.dp))
-                .background(Color(0xFF333333)),
-            contentAlignment = Alignment.Center
-        ) {
-            if (posterUrl != null) {
-                AsyncImage(
-                    model = posterUrl,
-                    contentDescription = mediaItem.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(6.dp))
-                )
-            } else {
+        // Poster Image
+        if (mediaItem.posterPath != null) {
+            AsyncImage(
+                model = posterUrl,
+                contentDescription = mediaItem.title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(CardDark),
+                contentAlignment = Alignment.Center
+            ) {
                 Text(
                     text = mediaItem.title.take(1).uppercase(),
                     style = MaterialTheme.typography.titleLarge,
                     color = TextPrimary
                 )
             }
-
-            // Media type badge
-            Surface(
-                shape = RoundedCornerShape(4.dp),
-                color = if (mediaItem.mediaType == "movie") PrimaryRed else Purple40,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(4.dp)
-            ) {
-                Text(
-                    text = if (mediaItem.mediaType == "movie") "Movie" else "TV",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextPrimary,
-                    fontSize = 8.sp,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                )
-            }
         }
 
-        Spacer(modifier = Modifier.height(6.dp))
-
-        // Title
-        Text(
-            text = mediaItem.title,
-            style = MaterialTheme.typography.bodySmall,
-            color = TextPrimary,
-            fontSize = 11.sp,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-
-        // Year
-        if (!mediaItem.releaseDate.isNullOrBlank()) {
+        // Rating badge
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(6.dp)
+                .background(
+                    Color.Black.copy(alpha = 0.7f),
+                    RoundedCornerShape(4.dp)
+                )
+                .padding(horizontal = 6.dp, vertical = 2.dp)
+        ) {
             Text(
-                text = mediaItem.releaseDate!!.take(4),
+                text = String.format("%.1f", mediaItem.voteAverage),
                 style = MaterialTheme.typography.labelSmall,
-                color = TextSecondary,
-                fontSize = 10.sp
+                color = TextPrimary
+            )
+        }
+
+        // Type badge (Movie or TV)
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(6.dp)
+                .background(
+                    if (isMovie) PrimaryRed.copy(alpha = 0.9f) else Purple40.copy(alpha = 0.9f),
+                    RoundedCornerShape(4.dp)
+                )
+                .padding(horizontal = 4.dp, vertical = 2.dp)
+        ) {
+            Text(
+                text = if (isMovie) "Movie" else "TV",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextPrimary,
+                fontSize = 8.sp
             )
         }
     }

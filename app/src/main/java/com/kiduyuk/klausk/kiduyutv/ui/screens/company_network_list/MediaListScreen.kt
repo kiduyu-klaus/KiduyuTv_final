@@ -55,7 +55,7 @@ fun MediaListScreen(
     val horizontalPadding = 25.dp
     val spacing = 10.dp
     val availableWidth = screenWidth - (horizontalPadding * 2)
-    val minCardWidth = 120.dp
+    val minCardWidth = 100.dp
     val actualColumns = maxOf(4, minOf(8, ((availableWidth + spacing) / (minCardWidth + spacing)).toInt()))
     val calculatedCardWidth = (availableWidth - (spacing * (actualColumns - 1))) / actualColumns
     val calculatedCardHeight = calculatedCardWidth * 1.8f

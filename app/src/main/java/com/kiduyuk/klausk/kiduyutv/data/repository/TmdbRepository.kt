@@ -365,7 +365,13 @@ class TmdbRepository {
         api.getPersonTvCredits(personId)
     }
 
+    /** Fetches detailed information for a specific person. */
+    suspend fun getPersonDetails(personId: Int): Result<PersonDetail> = runCatching {
+        api.getPersonDetails(personId)
+    }
+
 // ========== Watch History (Now using Room) ==========
+
 
     /**
      * Saves a media item to the watch history using Room database.

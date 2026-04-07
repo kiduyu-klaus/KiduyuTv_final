@@ -225,4 +225,10 @@ interface TmdbApiService {
     suspend fun getPersonTvCredits(
         @Path("person_id") personId: Int
     ): PersonTvCreditsResponse
+
+    /** Fetches detailed information for a specific person. */
+    @GET("person/{person_id}")
+    suspend fun getPersonDetails(
+        @Path("person_id") personId: Int
+    ): PersonDetail
 }

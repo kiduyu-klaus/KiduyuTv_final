@@ -514,6 +514,7 @@ data class MultiSearchItem(
  * @param knownForDepartment The department they're known for (acting, directing, etc.).
  * @param popularity The popularity score of the cast member.
  * @param order The order of the cast member in the credits list.
+ * @param overview The biography/overview of the cast member (from person details endpoint).
  */
 data class CastMember(
     @SerializedName("id") val id: Int,
@@ -522,7 +523,8 @@ data class CastMember(
     @SerializedName("profile_path") val profilePath: String?,
     @SerializedName("known_for_department") val knownForDepartment: String?,
     @SerializedName("popularity") val popularity: Double?,
-    @SerializedName("order") val order: Int?
+    @SerializedName("order") val order: Int?,
+    @SerializedName("overview") val overview: String? = null
 )
 
 /**
@@ -579,6 +581,28 @@ data class PersonMovieCreditsResponse(
  */
 data class PersonTvCreditsResponse(
     @SerializedName("cast") val cast: List<TvShow>
+)
+
+/**
+ * Data class representing detailed information for a person (actor/director/etc.).
+ * @param id The unique identifier for the person.
+ * @param name The name of the person.
+ * @param biography The biography of the person.
+ * @param birthday The birthday of the person.
+ * @param deathday The death day of the person (if deceased).
+ * @param profilePath The path to the profile image.
+ * @param knownForDepartment The department they're known for.
+ * @param popularity The popularity score of the person.
+ */
+data class PersonDetail(
+    @SerializedName("id") val id: Int,
+    @SerializedName("name") val name: String,
+    @SerializedName("biography") val biography: String?,
+    @SerializedName("birthday") val birthday: String?,
+    @SerializedName("deathday") val deathday: String?,
+    @SerializedName("profile_path") val profilePath: String?,
+    @SerializedName("known_for_department") val knownForDepartment: String?,
+    @SerializedName("popularity") val popularity: Double?
 )
 
 /**
