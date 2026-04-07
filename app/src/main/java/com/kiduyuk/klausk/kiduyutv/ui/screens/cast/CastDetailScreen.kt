@@ -6,9 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -19,9 +16,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -202,7 +196,7 @@ fun CastDetailScreen(
 
 /**
  * Content composable for the cast detail screen.
- * Uses a single Box with header at top (fixed) and scrollable grid below.
+ * Uses a single Box with header at top (fixed with profile + overview) and scrollable grid below.
  */
 @Composable
 private fun CastDetailContent(
@@ -215,7 +209,7 @@ private fun CastDetailContent(
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
     val screenWidth = configuration.screenWidthDp.dp
-    val headerHeight = screenHeight * 0.25f // 25% of screen height
+    val headerHeight = screenHeight * 0.35f // 35% of screen height to fit overview
 
     // Responsive grid calculation
     val horizontalPadding = 16.dp
@@ -232,7 +226,7 @@ private fun CastDetailContent(
 
     // Single Box containing header (fixed) and scrollable content
     Box(modifier = Modifier.fillMaxSize()) {
-        // Fixed header section at the top
+        // Fixed header section at the top with profile and overview
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -281,67 +275,101 @@ private fun CastDetailContent(
                 )
             }
 
-            // Profile and info
-            Column(
+            // Header content: Profile on left, info and overview on right
+            Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                    .padding(top = 50.dp, start = 16.dp, end = 16.dp, bottom = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Circular profile image
+                // Left side: Profile image
                 Box(
                     modifier = Modifier
-                        .size(80.dp)
-                        .clip(RoundedCornerShape(40.dp))
-                        .background(Color(0xFF333333)),
+                        .width(100.dp)
+                        .fillMaxHeight(),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (profileUrl != null) {
-                        AsyncImage(
-                            model = profileUrl,
-                            contentDescription = "${castMember.name} profile",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clip(RoundedCornerShape(40.dp))
-                        )
-                    } else {
-                        Text(
-                            text = castMember.name.take(1).uppercase(),
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = TextPrimary
-                        )
+                    Box(
+                        modifier = Modifier
+                            .size(90.dp)
+                            .clip(RoundedCornerShape(45.dp))
+                            .background(Color(0xFF333333)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (profileUrl != null) {
+                            AsyncImage(
+                                model = profileUrl,
+                                contentDescription = "${castMember.name} profile",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(45.dp))
+                            )
+                        } else {
+                            Text(
+                                text = castMember.name.take(1).uppercase(),
+                                style = MaterialTheme.typography.displayMedium,
+                                color = TextPrimary
+                            )
+                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Name
-                Text(
-                    text = castMember.name,
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = TextPrimary,
-                    fontSize = 20.sp
-                )
-
-                // Known for department
-                if (!castMember.knownForDepartment.isNullOrBlank()) {
+                // Right side: Name, info, and overview
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    // Name
                     Text(
-                        text = "Known for: ${castMember.knownForDepartment}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = TextSecondary,
-                        fontSize = 12.sp
+                        text = castMember.name,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = TextPrimary,
+                        fontSize = 18.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
-                }
 
-                // Total credits count
-                Text(
-                    text = "${mediaItems.size} Credits",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = PrimaryRed,
-                    fontSize = 12.sp
-                )
+                    // Known for department
+                    if (!castMember.knownForDepartment.isNullOrBlank()) {
+                        Text(
+                            text = "Known for: ${castMember.knownForDepartment}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = TextSecondary,
+                            fontSize = 11.sp
+                        )
+                    }
+
+                    // Credits count
+                    Text(
+                        text = "${mediaItems.size} Credits",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = PrimaryRed,
+                        fontSize = 11.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Biography section
+                    if (!castMember.overview.isNullOrBlank()) {
+                        Text(
+                            text = "Biography",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = TextPrimary,
+                            fontSize = 12.sp
+                        )
+                        Text(
+                            text = castMember.overview!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary,
+                            fontSize = 11.sp,
+                            maxLines = 4,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
             }
         }
 
@@ -353,39 +381,6 @@ private fun CastDetailContent(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = horizontalPadding)
         ) {
-            // Overview section (if available)
-            if (!castMember.overview.isNullOrBlank()) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = CardDark
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
-                    ) {
-                        Text(
-                            text = "Biography",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = TextPrimary,
-                            fontSize = 16.sp
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = castMember.overview!!,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = TextSecondary,
-                            fontSize = 13.sp,
-                            maxLines = 6,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            }
-
             // Section title
             Text(
                 text = "Filmography",
@@ -424,17 +419,6 @@ private fun CastDetailContent(
                             rowItems.forEach { mediaItem ->
                                 when (mediaItem) {
                                     is MediaItem.MovieItem -> {
-                                        val movie = Movie(
-                                            id = mediaItem.id,
-                                            title = mediaItem.title,
-                                            overview = mediaItem.overview,
-                                            posterPath = mediaItem.posterPath,
-                                            backdropPath = mediaItem.backdropPath,
-                                            voteAverage = mediaItem.voteAverage,
-                                            releaseDate = mediaItem.releaseDate,
-                                            genreIds = emptyList(),
-                                            popularity = mediaItem.popularity
-                                        )
                                         MediaGridCard(
                                             mediaItem = mediaItem,
                                             cardWidth = calculatedCardWidth,
@@ -443,17 +427,6 @@ private fun CastDetailContent(
                                         )
                                     }
                                     is MediaItem.TvShowItem -> {
-                                        val tvShow = TvShow(
-                                            id = mediaItem.id,
-                                            name = mediaItem.title,
-                                            overview = mediaItem.overview,
-                                            posterPath = mediaItem.posterPath,
-                                            backdropPath = mediaItem.backdropPath,
-                                            voteAverage = mediaItem.voteAverage,
-                                            firstAirDate = mediaItem.releaseDate,
-                                            genreIds = emptyList(),
-                                            popularity = mediaItem.popularity
-                                        )
                                         MediaGridCard(
                                             mediaItem = mediaItem,
                                             cardWidth = calculatedCardWidth,
