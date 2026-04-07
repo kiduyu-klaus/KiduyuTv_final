@@ -182,6 +182,18 @@ interface TmdbApiService {
         @Query("page") page: Int = 1
     ): MultiSearchResponse
 
+    /** Fetches TV shows with the "time travel" keyword (ID: 4379). */
+    @GET("discover/tv")
+    suspend fun getTimeTravelTvShows(
+        @Query("include_adult") includeAdult: Boolean = false,
+        @Query("include_null_first_air_dates") includeNullFirstAirDates: Boolean = false,
+        @Query("language") language: String = "en-US",
+        @Query("page") page: Int = 1,
+        @Query("sort_by") sortBy: String = "popularity.desc",
+        @Query("with_keywords") withKeywords: String = "4379",
+        @Query("with_original_language") withOriginalLanguage: String = "en"
+    ): TvShowResponse
+
     /** Fetches a list of recommended movies for a specific movie. */
     @GET("movie/{movie_id}/recommendations")
     suspend fun getRecommendedMovies(

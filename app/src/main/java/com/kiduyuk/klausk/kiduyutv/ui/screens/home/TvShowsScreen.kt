@@ -108,7 +108,7 @@ fun TvShowsScreen(
                         .weight(1f)
                         .verticalScroll(scrollState)
                 ) {
-                                        // Content Row for Trending TV Shows.
+                    // Content Row for Trending TV Shows.
                     ContentRow(
                         title = "Trending TV Shows",
                         items = uiState.trendingTvShows,
@@ -144,6 +144,22 @@ fun TvShowsScreen(
                         ContentRow(
                             title = "Best Sitcoms Ever",
                             items = uiState.bestSitcoms,
+                            onItemFocus = { tvShow -> viewModel.onItemSelected(tvShow) },
+                            onItemClick = { tvShow -> onTvShowClick(tvShow.id) }
+                        ) { tvShow, isFocused, onClick ->
+                            TvShowCard(
+                                tvShow = tvShow,
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
+                        }
+                    }
+
+                    // Content Row for Time Travel TV Shows
+                    if (uiState.timeTravelTvShows.isNotEmpty()) {
+                        ContentRow(
+                            title = "Time Travel TV Shows",
+                            items = uiState.timeTravelTvShows,
                             onItemFocus = { tvShow -> viewModel.onItemSelected(tvShow) },
                             onItemClick = { tvShow -> onTvShowClick(tvShow.id) }
                         ) { tvShow, isFocused, onClick ->

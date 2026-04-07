@@ -49,6 +49,7 @@ class TmdbRepository {
         const val CACHE_TYPE_TOP_RATED = "top_rated"
         const val CACHE_TYPE_NOW_PLAYING = "now_playing"
         const val CACHE_TYPE_GITHUB_LIST = "github_list"
+        const val CACHE_TYPE_TIME_TRAVEL = "time_travel"
 
         // OkHttpClient for GitHub JSON fetching
 // Uses longer timeouts suitable for larger JSON payloads
@@ -207,6 +208,20 @@ class TmdbRepository {
 
         val result = api.getPopularTvShows().results
         cacheTvShows(result, CACHE_TYPE_POPULAR)
+
+        result
+    }
+
+    /** Fetches TV shows with the "time travel" keyword with caching. */
+    suspend fun getTimeTravelTvShows(): Result<List<TvShow>> = runCatching {
+        val cached = tryGetCachedTvShows(CACHE_TYPE_TIME_TRAVEL)
+        if (cached.isNotEmpty()) {
+            Log.i(TAG, "Returning cached time travel TV shows")
+            return@runCatching cached
+        }
+
+        val result = api.getTimeTravelTvShows().results
+        cacheTvShows(result, CACHE_TYPE_TIME_TRAVEL)
 
         result
     }
