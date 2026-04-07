@@ -55,7 +55,9 @@ object MyListManager {
                         title = entity.title ?: "",
                         posterPath = entity.posterPath,
                         type = entity.mediaType,
-                        voteAverage = entity.voteAverage
+                        voteAverage = entity.voteAverage,
+                        character = entity.character,
+                        knownForDepartment = entity.knownForDepartment
                     )
                 }
             }
@@ -81,7 +83,9 @@ object MyListManager {
                         title = entity.title ?: "",
                         posterPath = entity.posterPath,
                         type = entity.mediaType,
-                        voteAverage = entity.voteAverage
+                        voteAverage = entity.voteAverage,
+                        character = entity.character,
+                        knownForDepartment = entity.knownForDepartment
                     )
                 }
             }
@@ -114,7 +118,9 @@ object MyListManager {
                 mediaType = item.type,
                 title = item.title,
                 posterPath = item.posterPath,
-                voteAverage = item.voteAverage
+                voteAverage = item.voteAverage,
+                character = item.character,
+                knownForDepartment = item.knownForDepartment
             )
         }
     }

@@ -25,6 +25,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.MovieCard
 import com.kiduyuk.klausk.kiduyutv.ui.components.TvShowCard
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
+import com.kiduyuk.klausk.kiduyutv.ui.theme.SurfaceDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.viewmodel.MediaListViewModel
 
@@ -133,7 +134,7 @@ fun MediaListScreen(
                 Button(
                     onClick = { viewModel.toggleSave(context, type, id, name) },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (uiState.isSaved) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
+                        containerColor = if (uiState.isSaved) MaterialTheme.colorScheme.secondary else SurfaceDark
                     ),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                 ) {

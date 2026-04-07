@@ -80,7 +80,9 @@ object DatabaseManager {
         title: String,
         posterPath: String?,
         voteAverage: Double = 0.0,
-        category: String? = null
+        category: String? = null,
+        character: String? = null,
+        knownForDepartment: String? = null
     ) {
         applicationScope.launch {
             val entity = SavedMediaEntity(
@@ -90,7 +92,9 @@ object DatabaseManager {
                 posterPath = posterPath,
                 voteAverage = voteAverage,
                 category = category,
-                savedTimestamp = System.currentTimeMillis()
+                savedTimestamp = System.currentTimeMillis(),
+                character = character,
+                knownForDepartment = knownForDepartment
             )
             savedMediaDao().insertSavedMedia(entity)
         }
@@ -128,7 +132,9 @@ object DatabaseManager {
             title = entity.title ?: "",
             posterPath = entity.posterPath,
             type = entity.mediaType,
-            voteAverage = entity.voteAverage
+            voteAverage = entity.voteAverage,
+            character = entity.character,
+            knownForDepartment = entity.knownForDepartment
         )
     }
 

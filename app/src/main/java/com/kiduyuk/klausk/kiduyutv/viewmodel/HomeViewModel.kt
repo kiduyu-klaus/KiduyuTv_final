@@ -60,7 +60,9 @@ data class MyListItem(
     val title: String,
     val posterPath: String?,
     val type: String,
-    val voteAverage: Double = 0.0
+    val voteAverage: Double = 0.0,
+    val character: String? = null,
+    val knownForDepartment: String? = null
 )
 
 /**
@@ -72,6 +74,10 @@ class HomeViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+    init {
+        // loadHomeContent will be called from the UI with context
+    }
 
     fun loadHomeContent(context: Context) {
         viewModelScope.launch {
@@ -246,8 +252,8 @@ class HomeViewModel : ViewModel() {
      */
     private fun triggerRandomRecommendation(
         context: Context,
-        movies: List<Movie>,
-        tvShows: List<TvShow>
+        movies: List<com.kiduyuk.klausk.kiduyutv.data.model.Movie>,
+        tvShows: List<com.kiduyuk.klausk.kiduyutv.data.model.TvShow>
     ) {
         val allMedia = mutableListOf<Pair<Any, String>>()
         allMedia.addAll(movies.map { it to "movie" })
@@ -259,7 +265,7 @@ class HomeViewModel : ViewModel() {
             val type = randomItem.second
 
             if (type == "movie") {
-                val movie = media as Movie
+                val movie = media as com.kiduyuk.klausk.kiduyutv.data.model.Movie
                 NotificationHelper.postMediaNotification(
                     context,
                     movie.id,
@@ -268,7 +274,7 @@ class HomeViewModel : ViewModel() {
                     movie.overview ?: "Check out this movie on Kiduyu TV!"
                 )
             } else {
-                val tvShow = media as TvShow
+                val tvShow = media as com.kiduyuk.klausk.kiduyutv.data.model.TvShow
                 NotificationHelper.postMediaNotification(
                     context,
                     tvShow.id,

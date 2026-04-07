@@ -32,5 +32,7 @@ data class SavedMediaEntity(
     val posterPath: String?,
     val voteAverage: Double = 0.0,
     val savedTimestamp: Long = System.currentTimeMillis(),
-    val category: String? = null
+    val category: String? = null,
+    val character: String? = null,
+    val knownForDepartment: String? = null
 )

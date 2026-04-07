@@ -45,6 +45,12 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import kotlinx.coroutines.launch
+import android.content.Context
+import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
+import com.kiduyuk.klausk.kiduyutv.viewmodel.MyListItem
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.ui.platform.LocalContext
 
 /**
  * UI State for the Cast Detail screen.
@@ -53,6 +59,7 @@ data class CastDetailUiState(
     val isLoading: Boolean = true,
     val castMember: CastMember? = null,
     val mediaItems: List<MediaItem> = emptyList(),
+    val isSaved: Boolean = false,
     val error: String? = null
 )
 
@@ -74,7 +81,8 @@ class CastDetailViewModel : ViewModel() {
      */
     fun loadCastDetails(castMember: CastMember) {
         viewModelScope.launch {
-            _uiState.value = CastDetailUiState(isLoading = true, castMember = castMember)
+            val isSaved = MyListManager.isInList(castMember.id, "cast")
+            _uiState.value = CastDetailUiState(isLoading = true, castMember = castMember, isSaved = isSaved)
 
             try {
                 // Fetch person details, movie credits, and TV credits in parallel using async
@@ -127,18 +135,42 @@ class CastDetailViewModel : ViewModel() {
                 val combinedMedia = (movieItems + tvShowItems)
                     .sortedByDescending { it.voteAverage ?: 0.0 }
 
-                _uiState.value = CastDetailUiState(
+                _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     castMember = castMemberWithOverview,
                     mediaItems = combinedMedia
                 )
             } catch (e: Exception) {
-                _uiState.value = CastDetailUiState(
+                _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     castMember = castMember,
                     error = e.message ?: "Failed to load cast details"
                 )
             }
+        }
+    }
+
+    /**
+     * Toggles the current cast member in/out of My List.
+     */
+    fun toggleSave(context: Context, castMember: CastMember) {
+        val isSaved = MyListManager.isInList(castMember.id, "cast")
+        if (isSaved) {
+            MyListManager.removeItem(castMember.id, "cast", context)
+            _uiState.value = _uiState.value.copy(isSaved = false)
+        } else {
+            MyListManager.addItem(
+                MyListItem(
+                    id = castMember.id,
+                    title = castMember.name,
+                    posterPath = castMember.profilePath,
+                    type = "cast",
+                    character = castMember.character,
+                    knownForDepartment = castMember.knownForDepartment
+                ),
+                context
+            )
+            _uiState.value = _uiState.value.copy(isSaved = true)
         }
     }
 }
@@ -162,6 +194,7 @@ fun CastDetailScreen(
     viewModel: CastDetailViewModel = remember { CastDetailViewModel() }
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
 
     LaunchedEffect(castMember) {
         viewModel.loadCastDetails(castMember)
@@ -188,6 +221,8 @@ fun CastDetailScreen(
             CastDetailContent(
                 castMember = uiState.castMember ?: castMember,
                 mediaItems = uiState.mediaItems,
+                isSaved = uiState.isSaved,
+                onSaveClick = { viewModel.toggleSave(context, uiState.castMember ?: castMember) },
                 onBackClick = onBackClick,
                 onMovieClick = onMovieClick,
                 onTvShowClick = onTvShowClick
@@ -204,6 +239,8 @@ fun CastDetailScreen(
 private fun CastDetailContent(
     castMember: CastMember,
     mediaItems: List<MediaItem>,
+    isSaved: Boolean,
+    onSaveClick: () -> Unit,
     onBackClick: () -> Unit,
     onMovieClick: (Int) -> Unit,
     onTvShowClick: (Int) -> Unit
@@ -211,7 +248,7 @@ private fun CastDetailContent(
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
     val screenWidth = configuration.screenWidthDp.dp
-    val headerHeight = screenHeight * 0.35f // 35% of screen height to fit overview
+    val headerHeight = screenHeight * 0.40f // 35% of screen height to fit overview
 
     // Dialog state for biography
     var showBiographyDialog by remember { mutableStateOf(false) }
@@ -293,7 +330,7 @@ private fun CastDetailContent(
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 50.dp, start = 16.dp, end = 16.dp, bottom = 12.dp),
+                    .padding(top = 30.dp, start = 16.dp, end = 16.dp, bottom = 7.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Left side: Profile image
@@ -336,15 +373,38 @@ private fun CastDetailContent(
                         .fillMaxHeight(),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    // Name
-                    Text(
-                        text = castMember.name,
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = TextPrimary,
-                        fontSize = 18.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    // Name and Save Button Row
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text = castMember.name,
+                            style = MaterialTheme.typography.headlineLarge,
+                            color = TextPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        // Save Button
+                        Button(
+                            onClick = onSaveClick,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isSaved) MaterialTheme.colorScheme.secondary else SurfaceDark
+                            ),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isSaved) Icons.Default.Check else Icons.Default.Add,
+                                contentDescription = if (isSaved) "Saved" else "Save to My List",
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = if (isSaved) "Saved" else "Save to List")
+                        }
+                    }
 
                     // Known for department
                     if (!castMember.knownForDepartment.isNullOrBlank()) {

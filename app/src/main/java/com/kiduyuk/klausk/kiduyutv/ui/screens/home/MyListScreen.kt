@@ -3,7 +3,6 @@ package com.kiduyuk.klausk.kiduyutv.ui.screens.home
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -176,89 +175,65 @@ fun MyListScreen(
 
                         when (item.type) {
                             "movie" -> {
-                                Box(
+                                MovieCard(
+                                    movie = Movie(
+                                        id = item.id,
+                                        title = item.title,
+                                        overview = "",
+                                        posterPath = item.posterPath,
+                                        backdropPath = null,
+                                        voteAverage = item.voteAverage,
+                                        releaseDate = null,
+                                        genreIds = null,
+                                        popularity = 0.0
+                                    ),
+                                    isSelected = isFocused,
+                                    onClick = { onMovieClick(item.id) },
                                     modifier = Modifier
                                         .width(calculatedCardWidth)
                                         .height(calculatedCardHeight)
-                                        .focusable(interactionSource = interactionSource)
                                         .clickable(
                                             interactionSource = interactionSource,
                                             indication = null
-                                        ) {
-                                            onMovieClick(item.id)
-                                        }
-                                ) {
-                                    MovieCard(
-                                        movie = Movie(
-                                            id = item.id,
-                                            title = item.title,
-                                            overview = "",
-                                            posterPath = item.posterPath,
-                                            backdropPath = null,
-                                            voteAverage = item.voteAverage,
-                                            releaseDate = null,
-                                            genreIds = null,
-                                            popularity = 0.0
-                                        ),
-                                        isSelected = isFocused,
-                                        onClick = { onMovieClick(item.id) },
-                                        modifier = Modifier.fillMaxSize()
-                                    )
-                                }
+                                        ) { onMovieClick(item.id) }
+                                )
                             }
                             "tv" -> {
-                                Box(
+                                TvShowCard(
+                                    tvShow = TvShow(
+                                        id = item.id,
+                                        name = item.title,
+                                        overview = "",
+                                        posterPath = item.posterPath,
+                                        backdropPath = null,
+                                        voteAverage = item.voteAverage,
+                                        firstAirDate = null,
+                                        genreIds = null,
+                                        popularity = 0.0
+                                    ),
+                                    isSelected = isFocused,
+                                    onClick = { onTvShowClick(item.id) },
                                     modifier = Modifier
                                         .width(calculatedCardWidth)
                                         .height(calculatedCardHeight)
-                                        .focusable(interactionSource = interactionSource)
                                         .clickable(
                                             interactionSource = interactionSource,
                                             indication = null
-                                        ) {
-                                            onTvShowClick(item.id)
-                                        }
-                                ) {
-                                    TvShowCard(
-                                        tvShow = TvShow(
-                                            id = item.id,
-                                            name = item.title,
-                                            overview = "",
-                                            posterPath = item.posterPath,
-                                            backdropPath = null,
-                                            voteAverage = item.voteAverage,
-                                            firstAirDate = null,
-                                            genreIds = null,
-                                            popularity = 0.0
-                                        ),
-                                        isSelected = isFocused,
-                                        onClick = { onTvShowClick(item.id) },
-                                        modifier = Modifier.fillMaxSize()
-                                    )
-                                }
+                                        ) { onTvShowClick(item.id) }
+                                )
                             }
                             "company", "network" -> {
                                 Card(
                                     modifier = Modifier
                                         .width(calculatedCardWidth)
                                         .height(calculatedCardHeight / 2)
-                                        .focusable(interactionSource = interactionSource)
                                         .clickable(
                                             interactionSource = interactionSource,
                                             indication = null
                                         ) {
                                             if (item.type == "company") onCompanyClick(item.id, item.title)
                                             else onNetworkClick(item.id, item.title)
-                                        }
-                                        .then(
-                                            if (isFocused) {
-                                                Modifier.border(
-                                                    2.dp,
-                                                    MaterialTheme.colorScheme.primary,
-                                                    RoundedCornerShape(8.dp)
-                                                )
-                                            } else Modifier
-                                        ),
+                                        },
                                     colors = CardDefaults.cardColors(
                                         containerColor = if (isFocused) MaterialTheme.colorScheme.primary else CardDark
                                     ),
@@ -269,51 +244,23 @@ fun MyListScreen(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         if (!item.posterPath.isNullOrEmpty()) {
-                                            // Show logo if available
                                             AsyncImage(
                                                 model = "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.LOGO_SIZE}${item.posterPath}",
                                                 contentDescription = item.title,
                                                 contentScale = ContentScale.Fit,
                                                 modifier = Modifier
                                                     .fillMaxSize()
-                                                    .padding(16.dp)
+                                                    .padding(12.dp)
                                             )
                                         } else {
-                                            // Show name with icon if no logo
-                                            Column(
-                                                modifier = Modifier
-                                                    .fillMaxSize()
-                                                    .padding(12.dp),
-                                                horizontalAlignment = Alignment.CenterHorizontally,
-                                                verticalArrangement = Arrangement.Center
-                                            ) {
-                                                // Icon indicator for company/network
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(32.dp)
-                                                        .background(
-                                                            color = if (isFocused) CardDark.copy(alpha = 0.3f) else SurfaceDark,
-                                                            shape = RoundedCornerShape(8.dp)
-                                                        ),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Text(
-                                                        text = if (item.type == "company") "C" else "N",
-                                                        style = MaterialTheme.typography.titleLarge,
-                                                        color = if (isFocused) MaterialTheme.colorScheme.primary else TextSecondary,
-                                                        fontWeight = FontWeight.Bold
-                                                    )
-                                                }
-                                                Spacer(modifier = Modifier.height(8.dp))
-                                                Text(
-                                                    text = item.title,
-                                                    style = MaterialTheme.typography.titleMedium,
-                                                    color = if (isFocused) TextPrimary else TextPrimary,
-                                                    maxLines = 2,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                    fontWeight = FontWeight.Medium
-                                                )
-                                            }
+                                            Text(
+                                                text = item.title,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                color = TextPrimary,
+                                                modifier = Modifier.padding(8.dp),
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
                                         }
                                     }
                                 }
@@ -322,7 +269,6 @@ fun MyListScreen(
                                 Column(
                                     modifier = Modifier
                                         .width(calculatedCardWidth)
-                                        .focusable(interactionSource = interactionSource)
                                         .clickable(
                                             interactionSource = interactionSource,
                                             indication = null
@@ -347,7 +293,7 @@ fun MyListScreen(
                                             .fillMaxWidth()
                                             .aspectRatio(1f)
                                             .border(
-                                                width = if (isFocused) 3.dp else 0.dp,
+                                                width = if (isFocused) 2.dp else 0.dp,
                                                 color = if (isFocused) MaterialTheme.colorScheme.primary else Color.Transparent,
                                                 shape = RoundedCornerShape(8.dp)
                                             ),

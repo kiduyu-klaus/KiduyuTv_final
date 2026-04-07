@@ -85,3 +85,63 @@ GitHub: https://github.com/kiduyu-klaus/KiduyuTv_final
 ================================================================================
                          © 2026 Kiduyu Klaus. All rights reserved.
 ================================================================================
+
+
+================================================================================
+                           KIDUYU TV - VERSION 1.2.2
+                          WHAT'S NEW / CHANGELOG
+================================================================================
+
+Release Date: April 7, 2026
+
+================================================================================
+                              NEW FEATURES
+================================================================================
+
+1. ENHANCED "MY LIST" SCREEN WITH TABBED LAYOUT
+   - Introduced a new tabbed interface for the "My List" screen.
+   - Content is now categorized into distinct tabs: Movies, TV Shows, Companies, Networks, and Cast.
+   - Provides a cleaner and more organized way to manage saved content.
+
+2. SAVE COMPANIES AND NETWORKS TO "MY LIST"
+   - Added functionality to save Production Companies and Networks to your personalized "My List."
+   - A "+ Save to List" button is now available on the Media List screen for companies and networks.
+   - Saved companies and networks are displayed in dedicated tabs within "My List."
+
+3. SAVE CAST MEMBERS TO "MY LIST"
+   - Implemented the ability to save individual Cast Members to "My List."
+   - A "+ Save to List" button is now available on the Cast Detail screen.
+   - Saved cast members are displayed in a dedicated tab within "My List."
+
+4. LOGO DISPLAY FOR COMPANIES AND NETWORKS
+   - "My List" now displays official logos for saved companies and networks.
+   - If a logo is not available, the system gracefully falls back to displaying the name.
+
+================================================================================
+                              IMPROVEMENTS
+================================================================================
+
+- Improved navigation from "My List" to Company, Network, and Cast detail screens.
+- Enhanced data persistence for saved cast members, including character and knownForDepartment information.
+- Fixed clickability issues for Movie and TV Show cards within the "My List" screen.
+- Optimized header layout in Cast Detail Screen for better visibility of the save button.
+
+================================================================================
+                              TECHNICAL UPDATES
+================================================================================
+
+- Updated `MyListManager` to handle new media types (company, network, cast).
+- Modified `SavedMediaEntity` and `DatabaseManager` to store additional cast member details.
+- Refactored `MediaListViewModel` and `CastDetailViewModel` to integrate saving logic.
+- Updated `MyListScreen.kt` to implement `ScrollableTabRow` and categorized content display.
+- Corrected `NavGraph.kt` to ensure proper navigation to Cast Detail with full `CastMember` data.
+
+================================================================================
+                              KNOWN ISSUES
+================================================================================
+
+- None reported at this time
+
+================================================================================
+                         © 2026 Kiduyu Klaus. All rights reserved.
+================================================================================
