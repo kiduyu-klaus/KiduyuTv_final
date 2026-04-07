@@ -204,8 +204,8 @@ fun QuitDialogContent(
                     modifier = Modifier
                         .weight(1f)
                         .focusRequester(focusRequester)
-                        .onFocusChanged { isNoFocused = it.isFocused }
-                        .focusable(),
+                        .onFocusChanged { isNoFocused = it.isFocused },
+                        //.focusable(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (isNoFocused) ComposeColor.White else ComposeColor(0xFF333333),
                         contentColor = if (isNoFocused) ComposeColor.Black else ComposeColor.White
@@ -220,8 +220,8 @@ fun QuitDialogContent(
                     onClick = onYes,
                     modifier = Modifier
                         .weight(1f)
-                        .onFocusChanged { isYesFocused = it.isFocused }
-                        .focusable(),
+                        .onFocusChanged { isYesFocused = it.isFocused },
+                        //.focusable(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (isYesFocused) ComposeColor.Red else ComposeColor(0xFF333333),
                         contentColor = ComposeColor.White
