@@ -203,7 +203,7 @@ fun HeroSection(
                     border = BorderStroke(1.dp, if (playFocused) DarkRed else TextPrimary),
                     shape = RoundedCornerShape(4.dp),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    modifier = Modifier.focusable(interactionSource = playInteraction)
+                    //modifier = Modifier.focusable(interactionSource = playInteraction)
                 ) {
                     Icon(Icons.Default.PlayArrow, null, tint = TextPrimary, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(6.dp))
@@ -220,7 +220,7 @@ fun HeroSection(
                     border = BorderStroke(1.dp, if (infoFocused) DarkRed else TextPrimary),
                     shape = RoundedCornerShape(4.dp),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    modifier = Modifier.focusable(interactionSource = infoInteraction),
+                    //modifier = Modifier.focusable(interactionSource = infoInteraction),
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = if (infoFocused) DarkRed.copy(alpha = 0.2f) else Color.Transparent,
                         contentColor = TextPrimary
