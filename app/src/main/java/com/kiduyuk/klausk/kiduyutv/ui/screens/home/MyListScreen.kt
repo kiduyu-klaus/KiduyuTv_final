@@ -7,6 +7,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,8 +22,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
@@ -54,11 +57,19 @@ fun MyListScreen(
     onNavigate: (String) -> Unit = {},
     onSearchClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onCompanyClick: (Int, String) -> Unit = { _, _ -> },
+    onNetworkClick: (Int, String) -> Unit = { _, _ -> },
     viewModel: HomeViewModel = viewModel()
 ) {
     // Collect My List from the global manager.
     val myList by MyListManager.myList.collectAsState()
     val context = LocalContext.current
+
+    // Categorize items
+    val movies = myList.filter { it.type == "movie" }
+    val tvShows = myList.filter { it.type == "tv" }
+    val companies = myList.filter { it.type == "company" }
+    val networks = myList.filter { it.type == "network" }
 
     // Get screen configuration to calculate responsive grid
     val configuration = LocalConfiguration.current
@@ -89,8 +100,6 @@ fun MyListScreen(
                 .fillMaxSize()
                 .padding(horizontal = horizontalPadding) // Padding for the content area.
         ) {
-
-
             Spacer(modifier = Modifier.height(15.dp)) // Vertical spacing.
 
             // Display a message if the list is empty, otherwise show the list.
@@ -110,83 +119,171 @@ fun MyListScreen(
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(actualColumns),
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(bottom = 10.dp),
+                    contentPadding = PaddingValues(bottom = 32.dp),
                     horizontalArrangement = Arrangement.spacedBy(spacing),
                     verticalArrangement = Arrangement.spacedBy(spacing)
                 ) {
-                    items(myList) { item ->
-                        val interactionSource = remember { MutableInteractionSource() }
-                        val isFocused by interactionSource.collectIsFocusedAsState()
+                    // Movies Section
+                    if (movies.isNotEmpty()) {
+                        item(span = { GridItemSpan(actualColumns) }) {
+                            Text(
+                                text = "Movies",
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 20.sp
+                                ),
+                                color = TextPrimary,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+                        items(movies) { item ->
+                            val interactionSource = remember { MutableInteractionSource() }
+                            val isFocused by interactionSource.collectIsFocusedAsState()
+                            MovieCard(
+                                movie = Movie(
+                                    id = item.id,
+                                    title = item.title,
+                                    overview = "",
+                                    posterPath = item.posterPath,
+                                    backdropPath = null,
+                                    voteAverage = item.voteAverage,
+                                    releaseDate = null,
+                                    genreIds = null,
+                                    popularity = 0.0
+                                ),
+                                isSelected = isFocused,
+                                onClick = { onMovieClick(item.id) },
+                                modifier = Modifier
+                                    .width(calculatedCardWidth)
+                                    .height(calculatedCardHeight)
+                            )
+                        }
+                    }
 
-                        Box(
-                            modifier = Modifier
-                                .width(calculatedCardWidth)
-                                .height(calculatedCardHeight)
-                                .clickable(
-                                    interactionSource = interactionSource,
-                                    indication = null
+                    // TV Shows Section
+                    if (tvShows.isNotEmpty()) {
+                        item(span = { GridItemSpan(actualColumns) }) {
+                            Text(
+                                text = "TV Shows",
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 20.sp
+                                ),
+                                color = TextPrimary,
+                                modifier = Modifier.padding(top = 24.dp, bottom = 8.dp)
+                            )
+                        }
+                        items(tvShows) { item ->
+                            val interactionSource = remember { MutableInteractionSource() }
+                            val isFocused by interactionSource.collectIsFocusedAsState()
+                            TvShowCard(
+                                tvShow = TvShow(
+                                    id = item.id,
+                                    name = item.title,
+                                    overview = "",
+                                    posterPath = item.posterPath,
+                                    backdropPath = null,
+                                    voteAverage = item.voteAverage,
+                                    firstAirDate = null,
+                                    genreIds = null,
+                                    popularity = 0.0
+                                ),
+                                isSelected = isFocused,
+                                onClick = { onTvShowClick(item.id) },
+                                modifier = Modifier
+                                    .width(calculatedCardWidth)
+                                    .height(calculatedCardHeight)
+                            )
+                        }
+                    }
+
+                    // Companies Section
+                    if (companies.isNotEmpty()) {
+                        item(span = { GridItemSpan(actualColumns) }) {
+                            Text(
+                                text = "Saved Companies",
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 20.sp
+                                ),
+                                color = TextPrimary,
+                                modifier = Modifier.padding(top = 24.dp, bottom = 8.dp)
+                            )
+                        }
+                        items(companies) { item ->
+                            val interactionSource = remember { MutableInteractionSource() }
+                            val isFocused by interactionSource.collectIsFocusedAsState()
+
+                            Card(
+                                modifier = Modifier
+                                    .width(calculatedCardWidth)
+                                    .height(calculatedCardHeight / 2)
+                                    .clickable(
+                                        interactionSource = interactionSource,
+                                        indication = null
+                                    ) { onCompanyClick(item.id, item.title) },
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isFocused) MaterialTheme.colorScheme.primary else CardDark
+                                ),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    when (item.type) {
-                                        "movie" -> onMovieClick(item.id)
-                                        "tv" -> onTvShowClick(item.id)
-                                    }
+                                    Text(
+                                        text = item.title,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = TextPrimary,
+                                        modifier = Modifier.padding(8.dp)
+                                    )
                                 }
-                        ) {
-                            if (item.type == "movie") {
-                                MovieCard(
-                                    movie = Movie(
-                                        id = item.id,
-                                        title = item.title,
-                                        overview = "",
-                                        posterPath = item.posterPath,
-                                        backdropPath = null,
-                                        voteAverage = item.voteAverage,
-                                        releaseDate = null,
-                                        genreIds = null,
-                                        popularity = 0.0
-                                    ),
-                                    isSelected = isFocused,
-                                    onClick = { onMovieClick(item.id) },
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            } else {
-                                TvShowCard(
-                                    tvShow = TvShow(
-                                        id = item.id,
-                                        name = item.title,
-                                        overview = "",
-                                        posterPath = item.posterPath,
-                                        backdropPath = null,
-                                        voteAverage = item.voteAverage,
-                                        firstAirDate = null,
-                                        genreIds = null,
-                                        popularity = 0.0
-                                    ),
-                                    isSelected = isFocused,
-                                    onClick = { onTvShowClick(item.id) },
-                                    modifier = Modifier.fillMaxSize()
-                                )
                             }
+                        }
+                    }
 
-                            // Remove button overlay
-//                            IconButton(
-//                                onClick = { MyListManager.removeItem(item.id, item.type, context) },
-//                                modifier = Modifier
-//                                    .align(Alignment.TopEnd)
-//                                    .padding(4.dp)
-//                                    .size(24.dp)
-//                                    .background(
-//                                        color = Color.Black.copy(alpha = 0.6f),
-//                                        shape = RoundedCornerShape(12.dp)
-//                                    )
-//                            ) {
-//                                Icon(
-//                                    imageVector = Icons.Default.Close,
-//                                    contentDescription = "Remove from list",
-//                                    tint = Color.White,
-//                                    modifier = Modifier.size(16.dp)
-//                                )
-//                            }
+                    // Networks Section
+                    if (networks.isNotEmpty()) {
+                        item(span = { GridItemSpan(actualColumns) }) {
+                            Text(
+                                text = "Saved Networks",
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 20.sp
+                                ),
+                                color = TextPrimary,
+                                modifier = Modifier.padding(top = 24.dp, bottom = 8.dp)
+                            )
+                        }
+                        items(networks) { item ->
+                            val interactionSource = remember { MutableInteractionSource() }
+                            val isFocused by interactionSource.collectIsFocusedAsState()
+
+                            Card(
+                                modifier = Modifier
+                                    .width(calculatedCardWidth)
+                                    .height(calculatedCardHeight / 2)
+                                    .clickable(
+                                        interactionSource = interactionSource,
+                                        indication = null
+                                    ) { onNetworkClick(item.id, item.title) },
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isFocused) MaterialTheme.colorScheme.primary else CardDark
+                                ),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = item.title,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = TextPrimary,
+                                        modifier = Modifier.padding(8.dp)
+                                    )
+                                }
+                            }
                         }
                     }
                 }

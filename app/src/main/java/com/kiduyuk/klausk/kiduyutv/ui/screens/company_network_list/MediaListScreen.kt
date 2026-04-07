@@ -11,11 +11,14 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
@@ -48,6 +51,7 @@ fun MediaListScreen(
     viewModel: MediaListViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
 
     // Get screen configuration to calculate responsive grid
     val configuration = LocalConfiguration.current
@@ -121,8 +125,26 @@ fun MediaListScreen(
                 Text(
                     text = uiState.title,
                     style = MaterialTheme.typography.headlineMedium,
-                    color = TextPrimary
+                    color = TextPrimary,
+                    modifier = Modifier.weight(1f)
                 )
+
+                // Save Button
+                Button(
+                    onClick = { viewModel.toggleSave(context, type, id, name) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (uiState.isSaved) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
+                    ),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Icon(
+                        imageVector = if (uiState.isSaved) Icons.Default.Check else Icons.Default.Add,
+                        contentDescription = if (uiState.isSaved) "Saved" else "Save to My List",
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = if (uiState.isSaved) "Saved" else "Save to List")
+                }
             }
 
             // Main Content: Responsive Grid of items

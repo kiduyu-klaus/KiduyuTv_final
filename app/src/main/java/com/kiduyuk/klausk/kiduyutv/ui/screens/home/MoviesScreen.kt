@@ -126,19 +126,19 @@ fun MoviesScreen(
                     }
 
                     // Content Row for Trending Movies.
-                    ContentRow(
-                        title = "Trending Movies",
-                        items = uiState.trendingMovies,
-                        initialFocusRequester = firstItemFocusRequester,
-                        onItemFocus = { movie -> viewModel.onItemSelected(movie) },
-                        onItemClick = { movie -> onMovieClick(movie.id) } // Handle movie click.
-                    ) { movie, isSelected, onClick ->
-                        MovieCard(
-                            movie = movie,
-                            isSelected = isSelected,
-                            onClick = onClick
-                        )
-                    }
+//                    ContentRow(
+//                        title = "Trending Movies",
+//                        items = uiState.trendingMovies,
+//                        initialFocusRequester = firstItemFocusRequester,
+//                        onItemFocus = { movie -> viewModel.onItemSelected(movie) },
+//                        onItemClick = { movie -> onMovieClick(movie.id) } // Handle movie click.
+//                    ) { movie, isSelected, onClick ->
+//                        MovieCard(
+//                            movie = movie,
+//                            isSelected = isSelected,
+//                            onClick = onClick
+//                        )
+//                    }
 
                     // Content Row for Movies Trending This Week.
                     if (uiState.trendingMoviesThisWeek.isNotEmpty()) {

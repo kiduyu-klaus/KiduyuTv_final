@@ -291,25 +291,25 @@ private fun HomeContent(
                             )
                         }
                     }
-
-                    ContentRow(
-                        title = "Movies Trending Today",
-                        items = uiState.trendingMovies,
-                        restoreFocusItemId = lastClickedItemId,
-                        getItemId = { it.id },
-                        onItemFocus = { movie -> onSelectItem(movie) },
-                        onItemClick = { movie ->
-                            onSelectItem(movie)
-                            onSetLastClickedItemId(movie.id)
-                            onMovieClick(movie.id)
-                        }
-                    ) { movie, isFocused, onClick ->
-                        MovieCard(
-                            movie = movie,
-                            isSelected = isFocused,
-                            onClick = onClick
-                        )
-                    }
+//
+//                    ContentRow(
+//                        title = "Movies Trending Today",
+//                        items = uiState.trendingMovies,
+//                        restoreFocusItemId = lastClickedItemId,
+//                        getItemId = { it.id },
+//                        onItemFocus = { movie -> onSelectItem(movie) },
+//                        onItemClick = { movie ->
+//                            onSelectItem(movie)
+//                            onSetLastClickedItemId(movie.id)
+//                            onMovieClick(movie.id)
+//                        }
+//                    ) { movie, isFocused, onClick ->
+//                        MovieCard(
+//                            movie = movie,
+//                            isSelected = isFocused,
+//                            onClick = onClick
+//                        )
+//                    }
 
                     if (uiState.continueWatching.isNotEmpty()) {
                         ContentRow(

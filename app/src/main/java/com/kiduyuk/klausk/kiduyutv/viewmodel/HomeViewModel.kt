@@ -73,10 +73,6 @@ class HomeViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    init {
-        // loadHomeContent will be called from the UI with context
-    }
-
     fun loadHomeContent(context: Context) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
@@ -103,7 +99,7 @@ class HomeViewModel : ViewModel() {
                 val sortedTrendingTv = trendingTv.sortedByDescending { it.voteAverage }
                 val sortedTrendingMovies = trendingMovies.sortedByDescending { it.voteAverage }
                 val sortedTrendingMoviesThisWeek = trendingMoviesThisWeek.sortedByDescending { it.voteAverage }
-                val sortedNowPlaying = nowPlaying.sortedByDescending { it.voteAverage }
+                val sortedNowPlaying = nowPlaying // No sorting for now playing movies
                 val sortedWatchHistory = watchHistory.sortedByDescending { it.voteAverage }
                 val sortedTopRatedMovies = topRatedMovies.take(30).sortedByDescending { it.voteAverage }
                 val sortedTopRatedTv = topRatedTv.take(30).sortedByDescending { it.voteAverage }
@@ -250,8 +246,8 @@ class HomeViewModel : ViewModel() {
      */
     private fun triggerRandomRecommendation(
         context: Context,
-        movies: List<com.kiduyuk.klausk.kiduyutv.data.model.Movie>,
-        tvShows: List<com.kiduyuk.klausk.kiduyutv.data.model.TvShow>
+        movies: List<Movie>,
+        tvShows: List<TvShow>
     ) {
         val allMedia = mutableListOf<Pair<Any, String>>()
         allMedia.addAll(movies.map { it to "movie" })
@@ -263,7 +259,7 @@ class HomeViewModel : ViewModel() {
             val type = randomItem.second
 
             if (type == "movie") {
-                val movie = media as com.kiduyuk.klausk.kiduyutv.data.model.Movie
+                val movie = media as Movie
                 NotificationHelper.postMediaNotification(
                     context,
                     movie.id,
@@ -272,7 +268,7 @@ class HomeViewModel : ViewModel() {
                     movie.overview ?: "Check out this movie on Kiduyu TV!"
                 )
             } else {
-                val tvShow = media as com.kiduyuk.klausk.kiduyutv.data.model.TvShow
+                val tvShow = media as TvShow
                 NotificationHelper.postMediaNotification(
                     context,
                     tvShow.id,

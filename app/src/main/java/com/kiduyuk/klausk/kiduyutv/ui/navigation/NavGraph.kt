@@ -124,6 +124,12 @@ fun NavGraph(navController: NavHostController) {
                 },
                 onSettingsClick = {
                     navController.navigate(Screen.Settings.route)
+                },
+                onCompanyClick = { id, name ->
+                    navController.navigate("media_list/company/$id/$name")
+                },
+                onNetworkClick = { id, name ->
+                    navController.navigate("media_list/network/$id/$name")
                 }
             )
         }

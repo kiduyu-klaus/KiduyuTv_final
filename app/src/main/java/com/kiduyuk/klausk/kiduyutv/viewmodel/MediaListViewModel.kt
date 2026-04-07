@@ -2,8 +2,10 @@ package com.kiduyuk.klausk.kiduyutv.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.content.Context
 import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
+import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +31,7 @@ data class MediaListUiState(
     val tvShows: List<TvShow> = emptyList(),
     val currentPage: Int = 1,
     val totalPages: Int = 1,
+    val isSaved: Boolean = false,
     val error: String? = null
 )
 
@@ -52,7 +55,8 @@ class MediaListViewModel : ViewModel() {
     fun loadMoviesByCompany(companyId: Int, companyName: String) {
         currentCompanyId = companyId
         viewModelScope.launch {
-            _uiState.value = MediaListUiState(isLoading = true, title = companyName)
+            val isSaved = MyListManager.isInList(companyId, "company")
+            _uiState.value = MediaListUiState(isLoading = true, title = companyName, isSaved = isSaved)
             repository.getMoviesByCompany(companyId)
                 .onSuccess { response ->
                     _uiState.value = _uiState.value.copy(
@@ -76,7 +80,8 @@ class MediaListViewModel : ViewModel() {
     fun loadTvShowsByNetwork(networkId: Int, networkName: String) {
         currentNetworkId = networkId
         viewModelScope.launch {
-            _uiState.value = MediaListUiState(isLoading = true, title = networkName)
+            val isSaved = MyListManager.isInList(networkId, "network")
+            _uiState.value = MediaListUiState(isLoading = true, title = networkName, isSaved = isSaved)
             repository.getTvShowsByNetwork(networkId)
                 .onSuccess { response ->
                     _uiState.value = _uiState.value.copy(
@@ -143,6 +148,28 @@ class MediaListViewModel : ViewModel() {
                 .onFailure {
                     _uiState.value = _uiState.value.copy(isLoadingMore = false)
                 }
+        }
+    }
+
+    /**
+     * Toggles the current company or network in/out of My List.
+     */
+    fun toggleSave(context: Context, type: String, id: Int, name: String) {
+        val isSaved = MyListManager.isInList(id, type)
+        if (isSaved) {
+            MyListManager.removeItem(id, type, context)
+            _uiState.value = _uiState.value.copy(isSaved = false)
+        } else {
+            MyListManager.addItem(
+                MyListItem(
+                    id = id,
+                    title = name,
+                    posterPath = null, // Companies/networks don't have posters in this context
+                    type = type
+                ),
+                context
+            )
+            _uiState.value = _uiState.value.copy(isSaved = true)
         }
     }
 }
