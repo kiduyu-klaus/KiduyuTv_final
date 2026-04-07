@@ -195,13 +195,20 @@ interface WatchHistoryDao {
 
     /**
      * Get all watch history items that need TMDB detail fetching.
-     * Items where poster or backdrop is null/empty.
+     * Items where any critical field is missing or empty:
+     * - posterPath is NULL or empty
+     * - backdropPath is NULL or empty
+     * - title is NULL or empty
+     * - voteAverage is 0.0 (missing)
+     * - overview is NULL or empty
      */
     @Query("""
         SELECT * FROM watch_history 
         WHERE posterPath IS NULL OR posterPath = '' 
            OR backdropPath IS NULL OR backdropPath = ''
            OR title IS NULL OR title = ''
+           OR voteAverage = 0.0
+           OR overview IS NULL OR overview = ''
         ORDER BY lastWatchedTimestamp DESC
     """)
     suspend fun getWatchHistoryItemsNeedingDetails(): List<WatchHistoryEntity>

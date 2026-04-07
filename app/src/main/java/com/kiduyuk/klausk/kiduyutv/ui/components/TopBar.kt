@@ -1,5 +1,7 @@
 package com.kiduyuk.klausk.kiduyutv.ui.components
 
+import android.R.color.transparent
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
@@ -16,9 +18,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
@@ -26,6 +30,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.DarkRed
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
+import com.kiduyuk.klausk.kiduyutv.R
 
 @Composable
 fun TopBar(
@@ -41,7 +46,7 @@ fun TopBar(
         modifier = modifier
             .fillMaxWidth()
             .background(Color.Transparent)
-            .padding(horizontal = 20.dp, vertical = 10.dp)
+            .padding(horizontal = 15.dp, vertical = 10.dp)
         ,
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -49,7 +54,7 @@ fun TopBar(
         // Left: Logo + Nav items
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(32.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier.weight(1f)
         ) {
             // Logo — focused state gives dark red ring
@@ -59,24 +64,23 @@ fun TopBar(
             Box(
                 modifier = Modifier
                     .size(40.dp)
+                    .clip(RoundedCornerShape(8.dp))
                     .background(
-                        color = if (logoFocused) DarkRed.copy(alpha = 0.7f) else DarkRed,
-                        shape = RoundedCornerShape(8.dp)
+                        color = if (logoFocused) DarkRed.copy(alpha = 0.7f) else Color.Transparent
                     )
                     .noRippleClickable(interactionSource = logoInteraction) { onNavItemClick("home") },
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "K",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = TextPrimary,
-                    fontSize = 24.sp
+                Image(
+                    painter = painterResource(id = R.mipmap.ic_launcher11),
+                    contentDescription = "KiduyuTV Logo",
+                    modifier = Modifier.size(32.dp)
                 )
             }
 
             // Nav items
             Row(
-                horizontalArrangement = Arrangement.spacedBy(32.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 navItems.forEachIndexed { index, title ->
@@ -94,13 +98,13 @@ fun TopBar(
                     Text(
                         text = title,
                         color = if (isHighlighted) Color.White else TextPrimary,
-                        fontSize = 16.sp,
+                        fontSize = 15.sp,
                         modifier = Modifier
                             .background(
                                 color = if (isFocused) DarkRed else Color.Transparent,
                                 shape = RoundedCornerShape(4.dp)
                             )
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .padding(horizontal = 5.dp, vertical = 4.dp)
                             .drawBehind {
                                 if (isSelected) { // underline only for selected, not focused
                                     val strokeWidth = 2.dp.toPx()

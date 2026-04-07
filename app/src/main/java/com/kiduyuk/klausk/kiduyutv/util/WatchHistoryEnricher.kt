@@ -46,12 +46,14 @@ object WatchHistoryEnricher {
     /**
      * Checks if a WatchHistoryItem needs enrichment.
      * An item needs enrichment when any of the critical fields are missing or empty.
-     * 
+     * Specifically checks: title, overview, posterPath, backdropPath, voteAverage, and releaseDate.
+     *
      * @param item The WatchHistoryItem to check
      * @return true if the item needs TMDB detail enrichment, false otherwise
      */
     fun itemNeedsEnrichment(item: WatchHistoryItem): Boolean {
         return item.title.isBlank() ||
+                item.overview.isNullOrBlank() ||
                 item.posterPath.isNullOrBlank() ||
                 item.backdropPath.isNullOrBlank() ||
                 item.voteAverage == 0.0 ||
@@ -61,12 +63,14 @@ object WatchHistoryEnricher {
     /**
      * Checks if a WatchHistoryEntity needs enrichment.
      * An entity needs enrichment when any of the critical fields are missing or empty.
-     * 
+     * Specifically checks: title, overview, posterPath, backdropPath, voteAverage, and releaseDate.
+     *
      * @param entity The WatchHistoryEntity to check
      * @return true if the entity needs TMDB detail enrichment, false otherwise
      */
     fun entityNeedsEnrichment(entity: WatchHistoryEntity): Boolean {
         return entity.title.isNullOrBlank() ||
+                entity.overview.isNullOrBlank() ||
                 entity.posterPath.isNullOrBlank() ||
                 entity.backdropPath.isNullOrBlank() ||
                 entity.voteAverage == 0.0 ||
@@ -77,10 +81,10 @@ object WatchHistoryEnricher {
      * Enriches all watch history items that have missing or incomplete data.
      * This method fetches TMDB details for items where any of the following are missing:
      * title, overview, posterPath, backdropPath, voteAverage, or releaseDate.
-     * 
+     *
      * This is the primary method to use for ensuring the "Continue Watching" row
      * displays complete and accurate information for all items.
-     * 
+     *
      * @param context Context required for database operations
      * @return Number of items that were successfully enriched
      */
@@ -277,7 +281,7 @@ object WatchHistoryEnricher {
 
     /**
      * Fetches TMDB details for a media item.
-     * 
+     *
      * @param mediaId The TMDB ID
      * @param mediaType "movie" or "tv"
      * @return MovieDetail, TvShowDetail, or null if fetch failed
@@ -300,7 +304,7 @@ object WatchHistoryEnricher {
 
     /**
      * Extracts relevant details from TMDB response.
-     * 
+     *
      * @param details The TMDB details (MovieDetail or TvShowDetail)
      * @return Tuple of (title, overview, posterPath, backdropPath, voteAverage, releaseDate)
      */
@@ -355,7 +359,7 @@ object WatchHistoryEnricher {
     /**
      * Refreshes the watch history list by re-fetching from the database.
      * Call this after enrichment to get updated items.
-     * 
+     *
      * @param context Context required for database operations
      * @return List of enriched WatchHistoryItem objects
      */
@@ -373,5 +377,67 @@ object WatchHistoryEnricher {
             Log.e(TAG, "Error getting enriched watch history: ${e.message}")
             emptyList()
         }
+    }
+
+    /**
+     * Gets watch history items that specifically have null/empty vote average or overview.
+     * These are the most common missing fields that need to be fetched from TMDB.
+     *
+     * @param context Context required for database operations
+     * @return List of WatchHistoryEntity items needing voteAverage or overview enrichment
+     */
+    suspend fun getItemsWithMissingDetails(context: Context): List<WatchHistoryEntity> {
+        DatabaseManager.init(context)
+
+        return try {
+            val dao = DatabaseManager.watchHistoryDao()
+            withContext(Dispatchers.IO) {
+                dao.getWatchHistoryItemsNeedingDetails()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting items with missing details: ${e.message}")
+            emptyList()
+        }
+    }
+
+    /**
+     * Enriches items in the continue watching list that have null/empty vote average or overview.
+     * This is specifically called when displaying Continue Watching rows on Home, Movies, or TV Shows screens.
+     *
+     * @param context Context required for database operations
+     * @param continueWatchingItems List of WatchHistoryItem currently being displayed
+     * @return Number of items that were successfully enriched
+     */
+    suspend fun enrichContinueWatchingItems(
+        context: Context,
+        continueWatchingItems: List<WatchHistoryItem>
+    ): Int {
+        DatabaseManager.init(context)
+
+        var enrichedCount = 0
+
+        // Find items that need enrichment (voteAverage is 0.0 or overview is null/empty)
+        val itemsToEnrich = continueWatchingItems.filter { item ->
+            item.voteAverage == 0.0 || item.overview.isNullOrBlank()
+        }
+
+        if (itemsToEnrich.isEmpty()) {
+            Log.i(TAG, "No continue watching items need enrichment")
+            return 0
+        }
+
+        Log.i(TAG, "Found ${itemsToEnrich.size} continue watching items needing enrichment")
+
+        for (item in itemsToEnrich) {
+            val mediaType = if (item.isTv) "tv" else "movie"
+            val success = enrichSingleItem(context, item.id, mediaType)
+            if (success) {
+                enrichedCount++
+                Log.i(TAG, "Enriched continue watching item: ${item.title} (${item.id})")
+            }
+        }
+
+        Log.i(TAG, "Successfully enriched $enrichedCount out of ${itemsToEnrich.size} continue watching items")
+        return enrichedCount
     }
 }

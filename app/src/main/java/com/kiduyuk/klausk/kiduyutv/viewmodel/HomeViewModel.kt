@@ -134,12 +134,14 @@ class HomeViewModel : ViewModel() {
                 // 1. refreshAllWatchHistoryImages - Always fetches and overwrites poster/backdrop
                 //    images from TMDB to ensure users see the most current images
                 // 2. enrichAllMissingItems - Fills in other missing fields (title, overview, etc.)
+                //
+                // Items with null/empty vote average or overview will be refreshed when displayed
                 viewModelScope.launch {
                     try {
                         // First, refresh all images from TMDB to ensure fresh images
                         WatchHistoryEnricher.refreshAllWatchHistoryImages(context)
 
-                        // Then, enrich items with missing TMDB details
+                        // Then, enrich items with missing TMDB details (including voteAverage and overview)
                         WatchHistoryEnricher.enrichAllMissingItems(context)
 
                         // Refresh the watch history after enrichment to get updated items
@@ -148,6 +150,29 @@ class HomeViewModel : ViewModel() {
                     } catch (e: Exception) {
                         // Log error but don't fail the entire home screen load
                         android.util.Log.e("HomeViewModel", "Error enriching watch history: ${e.message}")
+                    }
+                }
+
+                // Also enrich items in Continue Watching row that have null/empty vote average or overview
+                // This ensures that items displayed in Continue Watching on any screen (Home, Movies, TV Shows)
+                // will have their details fetched and updated
+                viewModelScope.launch {
+                    try {
+                        // Get items that specifically need voteAverage or overview enrichment
+                        val itemsWithMissingDetails = WatchHistoryEnricher.getItemsWithMissingDetails(context)
+                        for (item in itemsWithMissingDetails) {
+                            // Only enrich items that are in the continue watching list
+                            if (sortedWatchHistory.any { it.id == item.id && it.isTv == (item.mediaType == "tv") }) {
+                                WatchHistoryEnricher.enrichSingleItem(context, item.id, item.mediaType)
+                                android.util.Log.i("HomeViewModel", "Enriched continue watching item: ${item.id} (${item.mediaType})")
+                            }
+                        }
+                        // Refresh the watch history after individual enrichment
+                        val enrichedWatchHistory = WatchHistoryEnricher.getEnrichedWatchHistory(context)
+                        _uiState.value = _uiState.value.copy(continueWatching = enrichedWatchHistory)
+                    } catch (e: Exception) {
+                        // Log error but don't fail the entire home screen load
+                        android.util.Log.e("HomeViewModel", "Error enriching continue watching items: ${e.message}")
                     }
                 }
 

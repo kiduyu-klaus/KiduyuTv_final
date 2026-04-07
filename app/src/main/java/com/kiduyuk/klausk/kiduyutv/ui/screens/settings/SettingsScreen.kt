@@ -129,9 +129,9 @@ fun SettingsScreen(
                         appDescription = "KiduyuTV is a streaming application that allows you to watch movies and TV shows. " +
                                 "The app features a modern, user-friendly interface with support for a wide range of content. " +
                                 "Enjoy seamless navigation, high-quality streaming, and a vast library of entertainment.",
-                        websiteUrl = "https://kiduyutv.app",
+                        websiteUrl = "https://kiduyu-klaus.github.io/KiduyuTv_final/",
                         onWebsiteClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, "https://kiduyutv.app".toUri())
+                            val intent = Intent(Intent.ACTION_VIEW, "https://kiduyu-klaus.github.io/KiduyuTv_final/".toUri())
                             context.startActivity(intent)
                         }
                     )
