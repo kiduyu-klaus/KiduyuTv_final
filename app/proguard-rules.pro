@@ -87,6 +87,16 @@
 
 
 ##############################################
+# ⚙️ JNA / LAZYSODIUM (FIX FOR UnsatisfiedLinkError)
+##############################################
+
+-keep class com.sun.jna.** { *; }
+-keepclassmembers class * extends com.sun.jna.Library { public *; }
+-keep class com.goterl.lazysodium.** { *; }
+-keep class com.github.joshjdevl.libsodiumjni.** { *; }
+-dontwarn com.sun.jna.**
+
+##############################################
 # 🚫 OPTIONAL OPTIMIZATION CONTROL
 ##############################################
 
