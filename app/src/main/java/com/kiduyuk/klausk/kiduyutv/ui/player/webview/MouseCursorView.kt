@@ -5,20 +5,16 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
-import android.graphics.drawable.Drawable
 import android.util.AttributeSet
 import android.view.View
-import androidx.core.content.ContextCompat
 
 /**
  * A custom view that renders a mouse cursor on screen.
- * Supports both custom drawable pointers and the default path-based cursor.
  */
 class MouseCursorView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
-    defStyleAttr: Int = 0,
-    private var cursorDrawable: Drawable? = null
+    defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
     private val cursorPath = Path()
@@ -44,37 +40,14 @@ class MouseCursorView @JvmOverloads constructor(
         cursorPath.close()
     }
 
-    /**
-     * Sets the cursor drawable to display.
-     * @param drawableResId The resource ID of the drawable to use as cursor
-     */
-    fun setCursorDrawable(drawableResId: Int) {
-        cursorDrawable = ContextCompat.getDrawable(context, drawableResId)
-        invalidate()
-    }
-
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        
-        // If a custom drawable is set, draw it instead of the path
-        cursorDrawable?.let { drawable ->
-            // Draw the custom cursor image
-            drawable.setBounds(0, 0, drawable.intrinsicWidth, drawable.intrinsicHeight)
-            drawable.draw(canvas)
-        } ?: run {
-            // Fall back to the default path-based cursor
-            canvas.drawPath(cursorPath, fillPaint)
-            canvas.drawPath(cursorPath, strokePaint)
-        }
+        canvas.drawPath(cursorPath, fillPaint)
+        canvas.drawPath(cursorPath, strokePaint)
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        // Use custom drawable dimensions if available, otherwise use default size
-        val cursorDrawable = this.cursorDrawable
-        if (cursorDrawable != null) {
-            setMeasuredDimension(cursorDrawable.intrinsicWidth, cursorDrawable.intrinsicHeight)
-        } else {
-            setMeasuredDimension(30, 50)
-        }
+        // Fixed size for the cursor
+        setMeasuredDimension(30, 50)
     }
 }
