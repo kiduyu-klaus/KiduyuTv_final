@@ -52,7 +52,7 @@ object SingletonDnsResolver {
         // Bootstrap client - uses system DNS only for the initial DoH server lookup
         val bootstrapClient = OkHttpClient.Builder()
             .retryOnConnectionFailure(true)
-            .protocols(listOf(okhttp3.Protocol.HTTP_2))
+            .protocols(listOf(okhttp3.Protocol.HTTP_2, okhttp3.Protocol.HTTP_1_1))
             .build()
         
         // Resolve bootstrap addresses
