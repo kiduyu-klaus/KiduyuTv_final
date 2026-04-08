@@ -5,8 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import android.util.Log
-import androidx.compose.material3.AlertDialogDefaults
-import androidx.compose.material3.MaterialAlertDialogBuilder
 
 /**
  * Dialog manager for displaying network connectivity status.
@@ -104,7 +102,8 @@ object NetworkStateDialog {
         
         currentDialog?.dismiss()
         
-        currentDialog = MaterialAlertDialogBuilder(context).apply {
+        // Use standard AlertDialog instead of MaterialAlertDialogBuilder to avoid theme dependency issues
+        currentDialog = AlertDialog.Builder(context).apply {
             setTitle("No Network Connection")
             setMessage(
                 "Your device is not connected to any network.\n\n" +
@@ -140,7 +139,8 @@ object NetworkStateDialog {
         
         currentDialog?.dismiss()
         
-        currentDialog = MaterialAlertDialogBuilder(context).apply {
+        // Use standard AlertDialog instead of MaterialAlertDialogBuilder to avoid theme dependency issues
+        currentDialog = AlertDialog.Builder(context).apply {
             setTitle("No Internet Access")
             setMessage(
                 "Your device is connected to a network but cannot reach the internet.\n\n" +
