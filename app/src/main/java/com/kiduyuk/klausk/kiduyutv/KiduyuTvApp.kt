@@ -12,6 +12,8 @@ import com.kiduyuk.klausk.kiduyutv.data.api.ApiClient
 import com.kiduyuk.klausk.kiduyutv.data.local.database.DatabaseManager
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.util.AdvancedAdBlocker
+import com.kiduyuk.klausk.kiduyutv.util.AndroidApp
+import com.kiduyuk.klausk.kiduyutv.util.NetworkConnectivityChecker
 import com.kiduyuk.klausk.kiduyutv.util.NotificationHelper
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.database.FirebaseDatabase
@@ -46,6 +48,23 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
 
         // Initialize Firebase Realtime Database with persistence
         FirebaseDatabase.getInstance().setPersistenceEnabled(true)
+
+        // Initialize AndroidApp reference for singleton access
+        AndroidApp.instance = this
+
+        // Start network connectivity monitoring
+        NetworkConnectivityChecker.startMonitoring(this)
+    }
+
+    override fun onTerminate() {
+        super.onTerminate()
+
+        // Stop network monitoring when app is terminated
+        try {
+            NetworkConnectivityChecker.stopMonitoring(this)
+        } catch (e: Exception) {
+            // Log warning
+        }
     }
 
     /**

@@ -26,6 +26,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.navigation.NavGraph
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
+import com.kiduyuk.klausk.kiduyutv.util.NetworkConnectivityObserver
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 
 class MainActivity : ComponentActivity() {
@@ -83,6 +84,9 @@ class MainActivity : ComponentActivity() {
                         .fillMaxSize()
                         .background(BackgroundDark)
                 ) {
+                    // Network connectivity observer at root level
+                    NetworkConnectivityObserver()
+
                     NavGraph(navController = navController)
                 }
             }

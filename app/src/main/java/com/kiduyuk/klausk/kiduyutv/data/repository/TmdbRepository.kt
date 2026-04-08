@@ -22,6 +22,7 @@ import okhttp3.Cache
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
+import com.kiduyuk.klausk.kiduyutv.util.SingletonDnsResolver
 import java.util.concurrent.TimeUnit
 
 /**
@@ -70,6 +71,7 @@ class TmdbRepository {
 
             return OkHttpClient.Builder()
                 .cache(cache)
+                .dns(SingletonDnsResolver.getDns()) // Cloudflare DNS over HTTPS
 // Longer timeouts for fetching larger JSON payloads
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)

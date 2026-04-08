@@ -13,6 +13,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.io.File
 import java.io.IOException
 import java.net.SocketTimeoutException
+import com.kiduyuk.klausk.kiduyutv.util.SingletonDnsResolver
 import java.util.concurrent.TimeUnit
 
 object ApiClient {
@@ -140,6 +141,7 @@ object ApiClient {
             .addNetworkInterceptor(cacheInterceptor) // For online requests with proper cache headers
             .addInterceptor(forceCacheInterceptor) // For offline requests - fallback to cached data
             //.addInterceptor(loggingInterceptor)
+            .dns(SingletonDnsResolver.getDns()) // Cloudflare DNS over HTTPS
             .connectTimeout(30, TimeUnit.SECONDS) // Updated from 60 to 30
             .readTimeout(30, TimeUnit.SECONDS)    // Updated from 60 to 30
             .writeTimeout(30, TimeUnit.SECONDS)   // Updated from 60 to 30
@@ -164,6 +166,7 @@ object ApiClient {
             .addInterceptor(authInterceptor)
             .addInterceptor(retryInterceptor) // Added global retry logic
             //.addInterceptor(loggingInterceptor)
+            .dns(SingletonDnsResolver.getDns()) // Cloudflare DNS over HTTPS
             .connectTimeout(30, TimeUnit.SECONDS) // Updated from 60 to 30
             .readTimeout(30, TimeUnit.SECONDS)    // Updated from 60 to 30
             .writeTimeout(30, TimeUnit.SECONDS)   // Updated from 60 to 30

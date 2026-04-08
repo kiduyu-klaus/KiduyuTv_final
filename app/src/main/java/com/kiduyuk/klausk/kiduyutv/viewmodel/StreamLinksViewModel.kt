@@ -14,6 +14,7 @@ import okhttp3.Cache
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
+import com.kiduyuk.klausk.kiduyutv.util.SingletonDnsResolver
 import java.util.concurrent.TimeUnit
 
 class StreamLinksViewModel : ViewModel() {
@@ -40,6 +41,7 @@ class StreamLinksViewModel : ViewModel() {
 
             return OkHttpClient.Builder()
                 .cache(cache)
+                .dns(SingletonDnsResolver.getDns()) // Cloudflare DNS over HTTPS
                 .connectTimeout(5, TimeUnit.SECONDS)
                 .readTimeout(5, TimeUnit.SECONDS)
                 .writeTimeout(5, TimeUnit.SECONDS)

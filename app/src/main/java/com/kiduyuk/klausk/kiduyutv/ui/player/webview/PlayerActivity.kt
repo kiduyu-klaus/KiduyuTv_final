@@ -380,11 +380,19 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         // ── Cursor ────────────────────────────────────────────────────────────
+        // Randomly select one of the two custom pointer images
+        val pointerDrawableRes = if (kotlin.random.Random.nextBoolean()) {
+            R.drawable.pointer_1
+        } else {
+            R.drawable.pointer_2
+        }
+        
         cursorView = MouseCursorView(this).apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT
             )
+            setCursorDrawable(pointerDrawableRes)
         }
 
         rootLayout.addView(webView)
