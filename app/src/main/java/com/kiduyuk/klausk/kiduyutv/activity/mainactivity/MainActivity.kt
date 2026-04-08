@@ -46,6 +46,16 @@ class MainActivity : ComponentActivity() {
         // Note: DatabaseManager and MyListManager are now initialized in KiduyuTvApp
 
         checkAndRequestStoragePermissions()
+        
+        // Perform initial network check to prevent crashes during eager repository initialization
+        val initialNetworkState = NetworkConnectivityChecker.networkState.value
+        if (initialNetworkState is NetworkState.NotConnected || initialNetworkState is NetworkState.ConnectedNoInternet) {
+            NetworkStateDialog.showIfNeeded(this, initialNetworkState) {
+                // Retry: force refresh and recreate activity if now connected
+                NetworkConnectivityChecker.forceRefresh(this)
+            }
+        }
+
         setContent {
             KiduyuTvTheme {
                 val navController = rememberNavController()

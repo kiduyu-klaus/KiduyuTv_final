@@ -90,14 +90,40 @@ object NetworkConnectivityChecker {
             Log.e(TAG, "Failed to register receiver: ${e.message}")
         }
         
+        // Perform immediate synchronous check for initial state
+        val initialState = checkNetworkSync(context)
+        updateState(initialState)
+        
         // Start periodic reachability checks
         handler.postDelayed(
             periodicCheckRunnable,
             INITIAL_CHECK_DELAY
         )
-        
-        // Perform initial check
-        performReachabilityCheck()
+    }
+
+    /**
+     * Synchronous network interface check (no internet reachability test).
+     * Used for immediate initial state detection.
+     */
+    private fun checkNetworkSync(context: Context): NetworkState {
+        return try {
+            val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) 
+                as ConnectivityManager
+            
+            val network = connectivityManager.activeNetwork
+            val networkCapabilities = connectivityManager.getNetworkCapabilities(network)
+            
+            if (network == null || networkCapabilities == null) {
+                NetworkState.NotConnected
+            } else if (!networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
+                NetworkState.ConnectedNoInternet
+            } else {
+                // Assume connected until reachability test completes
+                NetworkState.Connected
+            }
+        } catch (e: Exception) {
+            NetworkState.Unknown
+        }
     }
     
     /**
