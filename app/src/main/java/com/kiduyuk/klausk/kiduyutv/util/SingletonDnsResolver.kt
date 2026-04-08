@@ -2,10 +2,10 @@ package com.kiduyuk.klausk.kiduyutv.util
 
 import android.util.Log
 import okhttp3.Dns
-import okhttp3.DnsOverHttps
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
+import okhttp3.dnsoverhttps.DnsOverHttps
 import java.net.InetAddress
-import java.net.URL
 
 /**
  * Singleton DNS over HTTPS resolver using Cloudflare's 1.1.1.1 service.
@@ -47,12 +47,12 @@ object SingletonDnsResolver {
      * Creates the DnsOverHttps resolver with Cloudflare endpoint.
      */
     private fun createDnsOverHttpsResolver(): Dns {
-        Log.d(TAG, "Initializing Cloudflare DNS over HTTPS resolver")
+        Log.i(TAG, "Initializing Cloudflare DNS over HTTPS resolver")
         
         // Bootstrap client - uses system DNS only for the initial DoH server lookup
         val bootstrapClient = OkHttpClient.Builder()
             .retryOnConnectionFailure(true)
-            .protocols(listOf(okhttp3.Protocol.HTTP_2, okhttp3.Protocol.HTTP_1_1))
+            .protocols(listOf(okhttp3.Protocol.HTTP_2, okhttp3.Protocol.HTTP_1_1 ))
             .build()
         
         // Resolve bootstrap addresses
@@ -65,15 +65,16 @@ object SingletonDnsResolver {
             }
         }.filterNotNull()
         
-        Log.d(TAG, "Bootstrap DNS resolved: ${bootstrapAddresses.size} addresses")
+        Log.i(TAG, "Bootstrap DNS resolved: ${bootstrapAddresses.size} addresses")
         
         // Build DnsOverHttps resolver
-        val dnsOverHttps = DnsOverHttps.Builder(bootstrapClient)
-            .url(URL(CLOUDFLARE_DOH_URL))
+        val dnsOverHttps = DnsOverHttps.Builder()
+            .client(bootstrapClient)                    // ← client goes here
+            .url(CLOUDFLARE_DOH_URL.toHttpUrl())        // ← use .toHttpUrl(), not URL()
             .bootstrapDnsHosts(bootstrapAddresses)
             .build()
         
-        Log.d(TAG, "Cloudflare DoH resolver initialized successfully")
+        Log.i(TAG, "Cloudflare DoH resolver initialized successfully")
         
         return dnsOverHttps
     }
@@ -88,9 +89,9 @@ object SingletonDnsResolver {
      * Useful for debugging and verification.
      */
     fun testResolution(hostname: String): List<InetAddress> {
-        Log.d(TAG, "Testing DNS resolution for: $hostname")
+        Log.i(TAG, "Testing DNS resolution for: $hostname")
         val result = dnsResolver.lookup(hostname)
-        Log.d(TAG, "Resolved $hostname -> ${result.joinToString()}")
+        Log.i(TAG, "Resolved $hostname -> ${result.joinToString()}")
         return result
     }
 }

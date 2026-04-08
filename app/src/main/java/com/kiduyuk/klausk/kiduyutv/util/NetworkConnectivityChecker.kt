@@ -69,12 +69,12 @@ object NetworkConnectivityChecker {
      */
     fun startMonitoring(context: Context) {
         if (isMonitoring) {
-            Log.d(TAG, "Monitoring already active")
+            Log.i(TAG, "Monitoring already active")
             return
         }
         
         isMonitoring = true
-        Log.d(TAG, "Starting network connectivity monitoring")
+        Log.i(TAG, "Starting network connectivity monitoring")
         
         // Register for connectivity change broadcasts
         val intentFilter = IntentFilter().apply {
@@ -136,7 +136,7 @@ object NetworkConnectivityChecker {
         if (!isMonitoring) return
         
         isMonitoring = false
-        Log.d(TAG, "Stopping network connectivity monitoring")
+        Log.i(TAG, "Stopping network connectivity monitoring")
         
         // Unregister receiver
         try {
@@ -182,7 +182,7 @@ object NetworkConnectivityChecker {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action != ConnectivityManager.CONNECTIVITY_ACTION) return
             
-            Log.d(TAG, "Connectivity change detected")
+            Log.i(TAG, "Connectivity change detected")
             
             // Perform immediate reachability check
             scope.launch {
@@ -207,7 +207,7 @@ object NetworkConnectivityChecker {
                 val networkCapabilities = connectivityManager.getNetworkCapabilities(network)
                 
                 if (network == null || networkCapabilities == null) {
-                    Log.d(TAG, "No active network")
+                    Log.i(TAG, "No active network")
                     return@withContext NetworkState.NotConnected
                 }
                 
@@ -217,7 +217,7 @@ object NetworkConnectivityChecker {
                 )
                 
                 if (!hasInternet) {
-                    Log.d(TAG, "Network has no INTERNET capability")
+                    Log.i(TAG, "Network has no INTERNET capability")
                     return@withContext NetworkState.ConnectedNoInternet
                 }
                 
@@ -225,10 +225,10 @@ object NetworkConnectivityChecker {
                 val isReachable = testInternetReachability()
                 
                 if (isReachable) {
-                    Log.d(TAG, "Internet is reachable")
+                    Log.i(TAG, "Internet is reachable")
                     NetworkState.Connected
                 } else {
-                    Log.d(TAG, "Network active but internet not reachable")
+                    Log.i(TAG, "Network active but internet not reachable")
                     NetworkState.ConnectedNoInternet
                 }
             } catch (e: Exception) {
@@ -265,7 +265,7 @@ object NetworkConnectivityChecker {
         return try {
             val address = InetAddress.getByName(host)
             val reachable = address.isReachable(REACHABILITY_TIMEOUT.toInt())
-            Log.d(TAG, "Host $host reachable: $reachable")
+            Log.i(TAG, "Host $host reachable: $reachable")
             reachable
         } catch (e: Exception) {
             Log.w(TAG, "Error checking host $host: ${e.message}")
@@ -279,7 +279,7 @@ object NetworkConnectivityChecker {
     private fun updateState(state: NetworkState) {
         val currentState = _networkState.value
         if (currentState != state) {
-            Log.d(TAG, "State changed: $currentState → $state")
+            Log.i(TAG, "State changed: $currentState → $state")
             _networkState.value = state
         }
     }

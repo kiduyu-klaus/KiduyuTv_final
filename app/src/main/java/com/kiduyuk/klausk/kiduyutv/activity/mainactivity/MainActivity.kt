@@ -9,6 +9,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.OptIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,6 +21,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.NavGraph
@@ -40,6 +42,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @androidx.media3.common.util.UnstableApi
+    @OptIn(UnstableApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -48,13 +52,13 @@ class MainActivity : ComponentActivity() {
         checkAndRequestStoragePermissions()
         
         // Perform initial network check to prevent crashes during eager repository initialization
-        val initialNetworkState = NetworkConnectivityChecker.networkState.value
-        if (initialNetworkState is NetworkState.NotConnected || initialNetworkState is NetworkState.ConnectedNoInternet) {
-            NetworkStateDialog.showIfNeeded(this, initialNetworkState) {
-                // Retry: force refresh and recreate activity if now connected
-                NetworkConnectivityChecker.forceRefresh(this)
-            }
-        }
+//        val initialNetworkState = NetworkConnectivityChecker.networkState.value
+//        if (initialNetworkState is NetworkState.NotConnected || initialNetworkState is NetworkState.ConnectedNoInternet) {
+//            NetworkStateDialog.showIfNeeded(this, initialNetworkState) {
+//                // Retry: force refresh and recreate activity if now connected
+//                NetworkConnectivityChecker.forceRefresh(this)
+//            }
+//        }
 
         setContent {
             KiduyuTvTheme {
