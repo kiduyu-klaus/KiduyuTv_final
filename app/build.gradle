@@ -91,7 +91,7 @@ dependencies {
     // ─────────────────────────────────────────────
     // Core Android
     // ─────────────────────────────────────────────
-    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'androidx.core:core-ktx:1.15.0'
     implementation 'androidx.core:core-splashscreen:1.2.0'
     implementation 'androidx.appcompat:appcompat:1.7.0'
     implementation 'androidx.activity:activity-ktx:1.9.3'
@@ -203,8 +203,8 @@ dependencies {
 
 configurations.all {
     resolutionStrategy {
-        force 'androidx.core:core-ktx:1.13.1'
-        force 'androidx.core:core:1.13.1'
+        force 'androidx.core:core-ktx:1.15.0'
+        force 'androidx.core:core:1.15.0'
         force "androidx.appcompat:appcompat:1.7.0"
         force "androidx.activity:activity-ktx:1.9.3"
         force "androidx.fragment:fragment-ktx:1.8.5"

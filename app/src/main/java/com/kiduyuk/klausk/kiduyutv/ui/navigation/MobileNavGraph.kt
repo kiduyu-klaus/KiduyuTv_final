@@ -1,5 +1,6 @@
 package com.kiduyuk.klausk.kiduyutv.ui.navigation
 
+import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.compose.runtime.Composable
 import androidx.media3.common.util.UnstableApi
@@ -10,8 +11,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.*
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.*
-import com.kiduyuk.klausk.kiduyutv.ui.screens.search.SearchScreen
-import com.kiduyuk.klausk.kiduyutv.ui.screens.settings.SettingsScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.search.MobileSearchScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.settings.MobileSettingsScreen
 
 @androidx.media3.common.util.UnstableApi
 @OptIn(UnstableApi::class)
@@ -42,7 +43,7 @@ fun MobileNavGraph(navController: NavHostController) {
         }
 
         composable(Screen.Search.route) {
-            SearchScreen(
+            MobileSearchScreen(
                 onBackClick = { navController.popBackStack() },
                 onMovieClick = { movieId -> navController.navigate(Screen.MovieDetail.createRoute(movieId)) },
                 onTvShowClick = { tvShowId -> navController.navigate(Screen.TvShowDetail.createRoute(tvShowId)) }
@@ -50,7 +51,7 @@ fun MobileNavGraph(navController: NavHostController) {
         }
 
         composable(Screen.Settings.route) {
-            SettingsScreen(
+            MobileSettingsScreen(
                 onBackClick = { navController.popBackStack() }
             )
         }
@@ -122,9 +123,10 @@ fun MobileNavGraph(navController: NavHostController) {
                 },
                 onCastClick = { castId, castName, character, profilePath, knownForDepartment ->
                     navController.navigate(
-                        "cast_detail/$castId/${android.net.Uri.encode(castName)}/${android.net.Uri.encode(character ?: "")}/${android.net.Uri.encode(profilePath ?: "")}/${android.net.Uri.encode(knownForDepartment ?: "")}"
+                        "cast_detail/$castId/${Uri.encode(castName)}/${Uri.encode(character ?: "")}/${Uri.encode(profilePath ?: "")}/${Uri.encode(knownForDepartment ?: "")}"
                     )
-                }
+                },
+                onNavigateToCastDetail = { route -> navController.navigate(route) }
             )
         }
 
@@ -148,7 +150,8 @@ fun MobileNavGraph(navController: NavHostController) {
                     navController.navigate(
                         "cast_detail/$castId/${android.net.Uri.encode(castName)}/${android.net.Uri.encode(character ?: "")}/${android.net.Uri.encode(profilePath ?: "")}/${android.net.Uri.encode(knownForDepartment ?: "")}"
                     )
-                }
+                },
+                onNavigateToCastDetail = { route -> navController.navigate(route) }
             )
         }
 

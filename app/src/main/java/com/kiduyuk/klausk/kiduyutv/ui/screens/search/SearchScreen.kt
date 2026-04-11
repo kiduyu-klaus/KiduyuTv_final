@@ -43,6 +43,7 @@ import com.kiduyuk.klausk.kiduyutv.data.model.SearchResult
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.viewmodel.SearchUiState
 import com.kiduyuk.klausk.kiduyutv.viewmodel.SearchViewModel
+import com.kiduyuk.klausk.kiduyutv.viewmodel.SearchViewModelFactory
 
 /**
  * Search screen composable that allows users to search for movies and TV shows.

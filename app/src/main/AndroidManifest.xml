@@ -45,7 +45,6 @@
             android:name=".ui.player.webview.PlayerActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:hardwareAccelerated="true"
-            android:screenOrientation="landscape"
             android:theme="@style/Theme.KiduyuTv.Player" />
         <activity
             android:name=".activity.splashactivity.SplashActivity"
