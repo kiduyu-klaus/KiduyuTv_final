@@ -1,53 +1,67 @@
 package com.kiduyuk.klausk.kiduyutv.ui.player.webview
 
 import android.content.Context
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.Path
+import android.graphics.*
 import android.util.AttributeSet
 import android.view.View
+import androidx.core.graphics.toColorInt
 
-/**
- * A custom view that renders a mouse cursor on screen.
- */
 class MouseCursorView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
-    private val cursorPath = Path()
-    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE
-        style = Paint.Style.FILL
-    }
-    private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.BLACK
-        style = Paint.Style.STROKE
-        strokeWidth = 2f
+    private val cursorSize = 120f // px — tweak to taste
+
+    private val cursorPath = Path().apply {
+        // Tip at top-left
+        moveTo(0f, 0f)
+        // Right point (the sharp tail-right)
+        lineTo(cursorSize * 0.95f, cursorSize * 0.42f)
+        // Bottom-right inner notch (creates the concave tail)
+        lineTo(cursorSize * 0.62f, cursorSize * 0.62f)
+        // Bottom tip of tail
+        lineTo(cursorSize * 0.42f, cursorSize * 0.95f)
+        close()
     }
 
-    init {
-        // Define a classic cursor shape
-        cursorPath.moveTo(0f, 0f)
-        cursorPath.lineTo(0f, 40f)
-        cursorPath.lineTo(10f, 30f)
-        cursorPath.lineTo(18f, 45f)
-        cursorPath.lineTo(22f, 43f)
-        cursorPath.lineTo(14f, 28f)
-        cursorPath.lineTo(25f, 28f)
-        cursorPath.close()
+    // Shadow paint for soft drop shadow
+    private val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = Color.argb(60, 80, 0, 180)
+        maskFilter = BlurMaskFilter(14f, BlurMaskFilter.Blur.NORMAL)
+    }
+
+    // Gradient fill — cyan top-left → purple bottom-right
+    private val gradientPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        shader = LinearGradient(
+            0f, 0f,
+            cursorSize * 0.95f, cursorSize * 0.95f,
+            intArrayOf(
+                "#00CFFF".toColorInt(), // cyan
+                "#7B4FFF".toColorInt(), // violet
+                "#E040FB".toColorInt()  // magenta
+            ),
+            floatArrayOf(0f, 0.55f, 1f),
+            Shader.TileMode.CLAMP
+        )
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        canvas.drawPath(cursorPath, fillPaint)
-        canvas.drawPath(cursorPath, strokePaint)
+        // Draw shadow slightly offset
+        canvas.save()
+        canvas.translate(6f, 8f)
+        canvas.drawPath(cursorPath, shadowPaint)
+        canvas.restore()
+        // Draw gradient cursor
+        canvas.drawPath(cursorPath, gradientPaint)
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        // Fixed size for the cursor
-        setMeasuredDimension(30, 50)
+        val size = (cursorSize * 1.1f).toInt()
+        setMeasuredDimension(size, size)
     }
 }
