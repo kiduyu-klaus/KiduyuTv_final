@@ -29,7 +29,7 @@ import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.ui.components.CastRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
-import com.kiduyuk.klausk.kiduyutv.ui.components.MobileCategoryRow
+import com.kiduyuk.klausk.kiduyutv.ui.screens.home.MobileCategoryRow
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
 
@@ -40,6 +40,7 @@ fun MobileMovieDetailScreen(
     onMovieClick: (Int) -> Unit,
     onPlayClick: (String) -> Unit,
     onCastClick: (Int, String, String?, String?, String?) -> Unit,
+    onNavigateToCastDetail: (String) -> Unit,
     viewModel: DetailViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -178,9 +179,20 @@ fun MobileMovieDetailScreen(
                     Spacer(modifier = Modifier.height(24.dp))
 
                     if (uiState.cast.isNotEmpty()) {
-                        Text(text = "Cast", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
-                        Spacer(modifier = Modifier.height(8.dp))
-                        CastRow(castMembers = uiState.cast, onCastClick = onCastClick)
+                        CastRow(
+                            title = "Cast",
+                            cast = uiState.cast,
+                            onCastClick = { castMember ->
+                                val route = com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen.MobileCastDetail.createRoute(
+                                    castId = castMember.id,
+                                    castName = castMember.name,
+                                    character = castMember.character,
+                                    profilePath = castMember.profilePath,
+                                    knownForDepartment = castMember.knownForDepartment
+                                )
+                                onNavigateToCastDetail(route)
+                            }
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))

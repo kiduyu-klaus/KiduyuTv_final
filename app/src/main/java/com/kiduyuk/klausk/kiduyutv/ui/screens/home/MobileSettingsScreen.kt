@@ -161,7 +161,7 @@ private fun SettingsGroup(
             colors = CardDefaults.cardColors(containerColor = CardDark),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Column(content = content) { }
+            Column(content = content)
         }
     }
 }

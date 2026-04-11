@@ -22,6 +22,21 @@ sealed class Screen(val route: String) {
         }
     }
     object Settings : Screen("settings")
+    object MobileCastDetail : Screen("mobile_cast_detail/{castId}?castName={castName}&character={character}&profilePath={profilePath}&knownForDepartment={knownForDepartment}") {
+        fun createRoute(
+            castId: Int,
+            castName: String,
+            character: String?,
+            profilePath: String?,
+            knownForDepartment: String?
+        ): String {
+            val encodedName = android.net.Uri.encode(castName)
+            val encodedChar = android.net.Uri.encode(character ?: "")
+            val encodedProfile = android.net.Uri.encode(profilePath ?: "")
+            val encodedKnown = android.net.Uri.encode(knownForDepartment ?: "")
+            return "mobile_cast_detail/$castId?castName=$encodedName&character=$encodedChar&profilePath=$encodedProfile&knownForDepartment=$encodedKnown"
+        }
+    }
     object CastDetail : Screen("cast_detail/{castId}/{castName}/{character}/{profilePath}/{knownForDepartment}")
     object StreamLinks : Screen("stream_links/{tmdbId}/{isTv}?season={season}&episode={episode}&title={title}&overview={overview}&posterPath={posterPath}&backdropPath={backdropPath}&voteAverage={voteAverage}&releaseDate={releaseDate}&timestamp={timestamp}") {
         fun createRoute(

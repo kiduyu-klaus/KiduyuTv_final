@@ -107,14 +107,14 @@ fun MobileSearchScreen(
                         onClearAll = viewModel::clearRecentSearches
                     )
                 }
-                uiState.searchResults.isNotEmpty() -> {
+                uiState.results.isNotEmpty() -> {
                     SearchResultsGrid(
-                        results = uiState.searchResults,
+                        results = uiState.results,
                         onMovieClick = onMovieClick,
                         onTvShowClick = onTvShowClick
                     )
                 }
-                uiState.hasSearched && uiState.searchResults.isEmpty() -> {
+                uiState.hasSearched && uiState.results.isEmpty() -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text("No results found for \"${uiState.query}\"", color = TextSecondary)
                     }
