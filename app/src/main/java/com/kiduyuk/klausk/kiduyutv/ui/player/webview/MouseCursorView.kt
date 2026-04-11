@@ -12,7 +12,7 @@ class MouseCursorView @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : View(context, attrs, defStyleAttr) {
 
-    private val cursorSize = 120f // px — tweak to taste
+    private val cursorSize = 75f // px — tweak to taste
 
     private val cursorPath = Path().apply {
         // Tip at top-left
