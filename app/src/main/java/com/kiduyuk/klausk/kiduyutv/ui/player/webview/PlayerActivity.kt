@@ -53,6 +53,7 @@ class PlayerActivity : AppCompatActivity() {
                 if (json.has("type") && json.getString("type") == "PLAYER_EVENT" && json.has("data")) {
                     val data = json.getJSONObject("data")
                     // Process player events as needed
+                    Log.i(TAG, "Player event received: $data")
                 } else {
                     // Process other message formats as needed
                 }

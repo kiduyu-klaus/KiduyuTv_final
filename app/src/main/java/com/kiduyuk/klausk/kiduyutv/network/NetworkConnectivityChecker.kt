@@ -1,5 +1,6 @@
-package com.kiduyuk.klausk.kiduyutv.util
+package com.kiduyuk.klausk.kiduyutv.network
 
+import android.app.Application
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -303,5 +304,5 @@ object NetworkConnectivityChecker {
  * Replace AndroidApp with your actual Application class name.
  */
 object AndroidApp {
-    lateinit var instance: android.app.Application
+    lateinit var instance: Application
 }

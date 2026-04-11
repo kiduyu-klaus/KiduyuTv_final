@@ -1,6 +1,5 @@
 package com.kiduyuk.klausk.kiduyutv
 
-import android.app.Application
 import androidx.multidex.MultiDexApplication
 import coil.ImageLoader
 import coil.ImageLoaderFactory
@@ -12,8 +11,8 @@ import com.kiduyuk.klausk.kiduyutv.data.api.ApiClient
 import com.kiduyuk.klausk.kiduyutv.data.local.database.DatabaseManager
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.util.AdvancedAdBlocker
-import com.kiduyuk.klausk.kiduyutv.util.AndroidApp
-import com.kiduyuk.klausk.kiduyutv.util.NetworkConnectivityChecker
+import com.kiduyuk.klausk.kiduyutv.network.AndroidApp
+import com.kiduyuk.klausk.kiduyutv.network.NetworkConnectivityChecker
 import com.kiduyuk.klausk.kiduyutv.util.NotificationHelper
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.database.FirebaseDatabase

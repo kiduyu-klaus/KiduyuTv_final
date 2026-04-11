@@ -1,7 +1,6 @@
 package com.kiduyuk.klausk.kiduyutv.activity.mainactivity
 
 import android.Manifest
-import android.app.AlertDialog
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -28,7 +27,10 @@ import com.kiduyuk.klausk.kiduyutv.ui.navigation.NavGraph
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
-import com.kiduyuk.klausk.kiduyutv.util.NetworkConnectivityObserver
+import com.kiduyuk.klausk.kiduyutv.network.NetworkConnectivityChecker
+import com.kiduyuk.klausk.kiduyutv.network.NetworkConnectivityObserver
+import com.kiduyuk.klausk.kiduyutv.network.NetworkState
+import com.kiduyuk.klausk.kiduyutv.network.NetworkStateDialog
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 
 class MainActivity : ComponentActivity() {
@@ -50,15 +52,15 @@ class MainActivity : ComponentActivity() {
         // Note: DatabaseManager and MyListManager are now initialized in KiduyuTvApp
 
         checkAndRequestStoragePermissions()
-        
+
         // Perform initial network check to prevent crashes during eager repository initialization
-//        val initialNetworkState = NetworkConnectivityChecker.networkState.value
-//        if (initialNetworkState is NetworkState.NotConnected || initialNetworkState is NetworkState.ConnectedNoInternet) {
-//            NetworkStateDialog.showIfNeeded(this, initialNetworkState) {
-//                // Retry: force refresh and recreate activity if now connected
-//                NetworkConnectivityChecker.forceRefresh(this)
-//            }
-//        }
+        val initialNetworkState = NetworkConnectivityChecker.networkState.value
+        if (initialNetworkState is NetworkState.NotConnected || initialNetworkState is NetworkState.ConnectedNoInternet) {
+            NetworkStateDialog.showIfNeeded(this, initialNetworkState) {
+                // Retry: force refresh and check again
+                NetworkConnectivityChecker.forceRefresh(this)
+            }
+        }
 
         setContent {
             KiduyuTvTheme {

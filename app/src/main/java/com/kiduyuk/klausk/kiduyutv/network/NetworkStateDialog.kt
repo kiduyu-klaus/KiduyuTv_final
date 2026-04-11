@@ -1,14 +1,24 @@
-package com.kiduyuk.klausk.kiduyutv.util
+package com.kiduyuk.klausk.kiduyutv.network
 
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import android.os.Process
 import android.provider.Settings
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 /**
  * Dialog manager for displaying network connectivity status.
  * Shows appropriate message and actions based on the current state.
+ * Includes retry functionality that checks network status after retry
+ * and shows the dialog again if still unavailable.
  */
 object NetworkStateDialog {
 
@@ -19,6 +29,18 @@ object NetworkStateDialog {
 
     // Callback for retry action
     private var retryCallback: (() -> Unit)? = null
+
+    // Coroutine scope for retry operations
+    private val dialogScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    // Job for ongoing retry operation
+    private var retryJob: Job? = null
+
+    // Store the last known bad state for retry re-display
+    private var lastBadState: NetworkState? = null
+
+    // Delay before checking network after retry (milliseconds)
+    private val RETRY_CHECK_DELAY = 1500L
 
     /**
      * Shows or updates the dialog based on network state.
@@ -43,10 +65,14 @@ object NetworkStateDialog {
             }
 
             is NetworkState.NotConnected -> {
+                // Store the bad state for potential retry re-display
+                lastBadState = state
                 showNoConnectionDialog(context)
             }
 
             is NetworkState.ConnectedNoInternet -> {
+                // Store the bad state for potential retry re-display
+                lastBadState = state
                 showNoInternetDialog(context)
             }
 
@@ -82,6 +108,7 @@ object NetworkStateDialog {
         }
         currentDialog = null
         retryCallback = null
+        // Don't clear lastBadState on dismiss - we might need it for retry
     }
 
     /**
@@ -170,15 +197,58 @@ object NetworkStateDialog {
     }
 
     /**
-     * Performs the retry action.
+     * Performs the retry action with proper network state checking.
+     * After refreshing network, checks if still disconnected and shows dialog again.
+     *
+     * @param context Context for network operations
      */
     private fun performRetry() {
-        retryCallback?.invoke() ?: run {
+        // Cancel any ongoing retry operation
+        retryJob?.cancel()
+
+        retryJob = dialogScope.launch {
+            Log.i(TAG, "Performing retry...")
+
+            // First, invoke the callback if provided
+            retryCallback?.invoke()
+
             // Default retry: force refresh connectivity check
             try {
                 NetworkConnectivityChecker.forceRefresh(AndroidApp.instance)
             } catch (e: Exception) {
                 Log.e(TAG, "Error performing retry: ${e.message}")
+            }
+
+            // Wait for network state to update
+            delay(RETRY_CHECK_DELAY)
+
+            // Check the current network state
+            val currentState = NetworkConnectivityChecker.networkState.first()
+            Log.i(TAG, "Network state after retry: $currentState")
+
+            when (currentState) {
+                is NetworkState.Connected -> {
+                    // Network is back, dismiss the dialog
+                    Log.i(TAG, "Network restored, dismissing dialog")
+                    dismiss()
+                    lastBadState = null
+                }
+
+                is NetworkState.NotConnected,
+                is NetworkState.ConnectedNoInternet -> {
+                    // Still no network, show the dialog again if needed
+                    Log.i(TAG, "Network still unavailable, showing dialog again")
+                    // Store the current bad state
+                    lastBadState = currentState
+                    // Show the appropriate dialog
+                    showIfNeeded(AndroidApp.instance, currentState, null)
+                }
+
+                is NetworkState.Unknown -> {
+                    // Unknown state, try showing the last known bad state if available
+                    Log.i(TAG, "Network state unknown after retry")
+                    lastBadState?.let { showIfNeeded(AndroidApp.instance, it, null) }
+                }
             }
         }
     }
@@ -211,7 +281,7 @@ object NetworkStateDialog {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
             context.startActivity(intent)
-            android.os.Process.killProcess(android.os.Process.myPid())
+            Process.killProcess(Process.myPid())
         } catch (e: Exception) {
             Log.e(TAG, "Error closing app: ${e.message}")
         }
