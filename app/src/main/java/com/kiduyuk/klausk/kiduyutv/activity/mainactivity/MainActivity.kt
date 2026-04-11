@@ -24,7 +24,11 @@ import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.NavGraph
+import com.kiduyuk.klausk.kiduyutv.ui.navigation.MobileNavGraph
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
+import android.app.UiModeManager
+import android.content.Context
+import android.content.res.Configuration
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
 import com.kiduyuk.klausk.kiduyutv.network.NetworkConnectivityChecker
@@ -103,7 +107,14 @@ class MainActivity : ComponentActivity() {
                     // Network connectivity observer at root level
                     NetworkConnectivityObserver()
 
-                    NavGraph(navController = navController)
+                    val uiModeManager = getSystemService(Context.UI_MODE_SERVICE) as UiModeManager
+                    val isTv = uiModeManager.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION
+
+                    if (isTv) {
+                        NavGraph(navController = navController)
+                    } else {
+                        MobileNavGraph(navController = navController)
+                    }
                 }
             }
         }

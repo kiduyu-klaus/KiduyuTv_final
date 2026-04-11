@@ -2,7 +2,9 @@ package com.kiduyuk.klausk.kiduyutv.ui.navigation
 
 import android.app.Application
 import android.net.Uri
+import android.os.Build
 import androidx.annotation.OptIn
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -34,6 +36,7 @@ import com.kiduyuk.klausk.kiduyutv.viewmodel.SearchViewModelFactory
  *
  * @param navController The [NavHostController] responsible for managing app navigation.
  */
+@RequiresApi(Build.VERSION_CODES.O)
 @androidx.media3.common.util.UnstableApi
 @OptIn(UnstableApi::class)
 @Composable
