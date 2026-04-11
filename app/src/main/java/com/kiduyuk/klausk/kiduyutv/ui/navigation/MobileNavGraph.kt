@@ -10,9 +10,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.MovieDetailScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.TvShowDetailScreen
-import com.kiduyuk.klausk.kiduyutv.ui.screens.home.MobileHomeScreen
-import com.kiduyuk.klausk.kiduyutv.ui.screens.home.MoviesScreen
-import com.kiduyuk.klausk.kiduyutv.ui.screens.home.TvShowsScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.home.*
 import com.kiduyuk.klausk.kiduyutv.ui.screens.search.SearchScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.settings.SettingsScreen
 
@@ -31,20 +29,16 @@ fun MobileNavGraph(navController: NavHostController) {
         }
 
         composable(Screen.Movies.route) {
-            MoviesScreen(
-                onMovieClick = { movieId -> navController.navigate(Screen.MovieDetail.createRoute(movieId)) },
-                onNavigate = { route -> navController.navigate(route) },
-                onSearchClick = { navController.navigate(Screen.Search.route) },
-                onSettingsClick = { navController.navigate(Screen.Settings.route) }
+            MobileMoviesScreen(
+                navController = navController,
+                onMovieClick = { movieId -> navController.navigate(Screen.MovieDetail.createRoute(movieId)) }
             )
         }
 
         composable(Screen.TvShows.route) {
-            TvShowsScreen(
-                onTvShowClick = { tvShowId -> navController.navigate(Screen.TvShowDetail.createRoute(tvShowId)) },
-                onNavigate = { route -> navController.navigate(route) },
-                onSearchClick = { navController.navigate(Screen.Search.route) },
-                onSettingsClick = { navController.navigate(Screen.Settings.route) }
+            MobileTvShowsScreen(
+                navController = navController,
+                onTvShowClick = { tvShowId -> navController.navigate(Screen.TvShowDetail.createRoute(tvShowId)) }
             )
         }
 
@@ -59,6 +53,58 @@ fun MobileNavGraph(navController: NavHostController) {
         composable(Screen.Settings.route) {
             SettingsScreen(
                 onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        // See All Screen
+        composable(
+            route = "see_all/{category}",
+            arguments = listOf(navArgument("category") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val category = backStackEntry.arguments?.getString("category") ?: ""
+            SeeAllScreen(
+                category = category,
+                onBackClick = { navController.popBackStack() },
+                onMovieClick = { movieId -> navController.navigate(Screen.MovieDetail.createRoute(movieId)) },
+                onTvShowClick = { tvShowId -> navController.navigate(Screen.TvShowDetail.createRoute(tvShowId)) }
+            )
+        }
+
+        // Genres Screen
+        composable(
+            route = "genres/{mediaType}",
+            arguments = listOf(navArgument("mediaType") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val mediaType = backStackEntry.arguments?.getString("mediaType") ?: "movie"
+            GenresScreen(
+                mediaType = mediaType,
+                onBackClick = { navController.popBackStack() },
+                onGenreClick = { genreId, genreName ->
+                    navController.navigate("genre_content/$mediaType/$genreId/$genreName")
+                }
+            )
+        }
+
+        // Genre Content Screen (See All for a specific genre)
+        composable(
+            route = "genre_content/{mediaType}/{genreId}/{genreName}",
+            arguments = listOf(
+                navArgument("mediaType") { type = NavType.StringType },
+                navArgument("genreId") { type = NavType.IntType },
+                navArgument("genreName") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val mediaType = backStackEntry.arguments?.getString("mediaType") ?: "movie"
+            val genreId = backStackEntry.arguments?.getInt("genreId") ?: 0
+            val genreName = backStackEntry.arguments?.getString("genreName") ?: ""
+
+            GenreContentScreen(
+                mediaType = mediaType,
+                genreId = genreId,
+                genreName = genreName,
+                onBackClick = { navController.popBackStack() },
+                onMovieClick = { movieId -> navController.navigate(Screen.MovieDetail.createRoute(movieId)) },
+                onTvShowClick = { tvShowId -> navController.navigate(Screen.TvShowDetail.createRoute(tvShowId)) }
             )
         }
 

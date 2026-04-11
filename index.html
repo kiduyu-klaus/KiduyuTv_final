@@ -698,10 +698,98 @@
             font-size: 0.85rem;
         }
 
+        /* Hamburger */
+        .nav-toggle {
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            gap: 5px;
+            width: 40px;
+            height: 40px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 8px;
+            cursor: pointer;
+            padding: 8px;
+            transition: background 0.2s ease;
+            z-index: 1100;
+        }
+
+        .nav-toggle:hover {
+            background: rgba(229,9,20,0.2);
+            border-color: rgba(229,9,20,0.3);
+        }
+
+        .nav-toggle span {
+            display: block;
+            height: 2px;
+            background: var(--text-primary);
+            border-radius: 2px;
+            transition: all 0.3s ease;
+            transform-origin: center;
+        }
+
+        .nav-toggle.open span:nth-child(1) {
+            transform: translateY(7px) rotate(45deg);
+        }
+
+        .nav-toggle.open span:nth-child(2) {
+            opacity: 0;
+            transform: scaleX(0);
+        }
+
+        .nav-toggle.open span:nth-child(3) {
+            transform: translateY(-7px) rotate(-45deg);
+        }
+
+        /* Mobile drawer */
+        .mobile-menu {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 999;
+            background: rgba(10,10,10,0.97);
+            backdrop-filter: blur(16px);
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2rem;
+            opacity: 0;
+            transform: translateY(-12px);
+            transition: opacity 0.25s ease, transform 0.25s ease;
+            pointer-events: none;
+        }
+
+        .mobile-menu.open {
+            display: flex;
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: all;
+        }
+
+        .mobile-menu a {
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: 1.6rem;
+            font-weight: 600;
+            transition: color 0.2s ease;
+        }
+
+        .mobile-menu a:hover {
+            color: var(--primary);
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .nav-links {
                 display: none;
+            }
+
+            .nav-toggle {
+                display: flex;
             }
 
             .hero {
@@ -767,7 +855,22 @@
         <li><a href="#changelog">Updates</a></li>
         <li><a href="#download">Download</a></li>
     </ul>
+    <button class="nav-toggle" id="navToggle" aria-label="Open menu" aria-expanded="false">
+        <span></span>
+        <span></span>
+        <span></span>
+    </button>
 </nav>
+
+<!-- Mobile Menu Drawer -->
+<div class="mobile-menu" id="mobileMenu">
+    <a href="#features"  class="mobile-nav-link">Features</a>
+    <a href="#categories" class="mobile-nav-link">Categories</a>
+    <a href="#tech"      class="mobile-nav-link">Tech Stack</a>
+    <a href="#screenshots" class="mobile-nav-link">Screenshots</a>
+    <a href="#changelog" class="mobile-nav-link">Updates</a>
+    <a href="#download"  class="mobile-nav-link">Download</a>
+</div>
 
 <!-- Hero Section -->
 <section class="hero">
@@ -1377,6 +1480,30 @@
             document.getElementById('imgModal').classList.remove('active');
             document.body.style.overflow = '';
         }
+    });
+
+    // Hamburger menu
+    const navToggle = document.getElementById('navToggle');
+    const mobileMenu = document.getElementById('mobileMenu');
+
+    function toggleMenu(open) {
+        navToggle.classList.toggle('open', open);
+        navToggle.setAttribute('aria-expanded', open);
+        if (open) {
+            mobileMenu.style.display = 'flex';
+            requestAnimationFrame(() => mobileMenu.classList.add('open'));
+            document.body.style.overflow = 'hidden';
+        } else {
+            mobileMenu.classList.remove('open');
+            document.body.style.overflow = '';
+            setTimeout(() => { if (!mobileMenu.classList.contains('open')) mobileMenu.style.display = 'none'; }, 260);
+        }
+    }
+
+    navToggle.addEventListener('click', () => toggleMenu(!navToggle.classList.contains('open')));
+
+    document.querySelectorAll('.mobile-nav-link').forEach(link => {
+        link.addEventListener('click', () => toggleMenu(false));
     });
 
     // Navigation scroll effect
