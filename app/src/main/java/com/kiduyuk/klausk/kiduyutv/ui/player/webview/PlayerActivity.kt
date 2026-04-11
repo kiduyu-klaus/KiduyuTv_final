@@ -3,6 +3,8 @@ package com.kiduyuk.klausk.kiduyutv.ui.player.webview
 import android.annotation.SuppressLint
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.Message
 import android.os.SystemClock
 import android.util.Log
@@ -38,96 +40,203 @@ class PlayerActivity : AppCompatActivity() {
     private var isCursorDisabled = false
     private var currentProviderName: String = "VidLink"
 
+    // Track latest playback info from player messages
+    private var latestTimestamp: Long = 0L
+    private var latestDuration: Long = 0L
+    private var latestProgress: Double = 0.0
+    private var latestSeason: Int = 1
+    private var latestEpisode: Int = 1
+    private var latestContentType: String = "movie"
+    private var latestContentId: Int = -1
+
     companion object {
         private const val TAG = "VideasyPlayer"
+        private const val PROGRESS_UPDATE_INTERVAL = 15_000L // 15 seconds
     }
 
     // JavaScript interface to receive messages from WebView (supports Videasy, VidKing, and VidLink)
+    // The player sends progress updates via window.postMessage with these fields:
+    // id, type (movie/tv/anime), progress, timestamp, duration, season, episode
     @Suppress("UNUSED")
     inner class VideasyJavaScriptInterface {
         @JavascriptInterface
         fun postMessage(message: String) {
             try {
+                //Log.i(TAG, "[JS Message] Received: $message")
+
                 val json = org.json.JSONObject(message)
 
-                if (json.has("type") && json.getString("type") == "PLAYER_EVENT" && json.has("data")) {
-                    val data = json.getJSONObject("data")
-                    // Process player events as needed
-                    Log.i(TAG, "Player event received: $data")
-                } else {
-                    // Process other message formats as needed
-                }
+                // Handle different message formats
+                when {
+                    // Format 1: { type: "PLAYER_EVENT", data: { ... } }
+                    json.has("type") && json.getString("type") == "PLAYER_EVENT" && json.has("data") -> {
+                        val data = json.getJSONObject("data")
+                        processPlayerProgressData(data)
+                    }
 
-                runOnUiThread {
-                    // Update UI or save progress as needed
+                    // Format 2: Direct progress object { id, type, progress, timestamp, duration, season, episode }
+                    json.has("progress") && json.has("timestamp") -> {
+                        processPlayerProgressData(json)
+                    }
+
+                    // Format 3: Simple format { id, type, currentTime, duration }
+                    json.has("currentTime") -> {
+                        processPlayerProgressData(json)
+                    }
+
+                    else -> {
+                        Log.i(TAG, "[JS Message] Unrecognized message format, attempting generic parse")
+                        // Try to extract any progress-like data
+                        if (json.has("progress") || json.has("timestamp") || json.has("currentTime")) {
+                            processPlayerProgressData(json)
+                        }
+                    }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Error parsing message: ${e.message}")
+                Log.e(TAG, "[JS Message] Error parsing message: ${e.message}")
             }
         }
     }
 
+    /**
+     * Process player progress data received from the JavaScript message listener.
+     * Extracts and stores the latest playback info for periodic saving to watch history.
+     */
+    private fun processPlayerProgressData(data: org.json.JSONObject) {
+        try {
+            // Extract content info
+            if (data.has("id")) {
+                latestContentId = data.getInt("id")
+            }
+
+            if (data.has("type")) {
+                latestContentType = data.getString("type")
+            }
+
+            // Extract progress info
+            latestProgress = if (data.has("progress")) {
+                data.getDouble("progress")
+            } else if (data.has("currentTime") && data.has("duration")) {
+                val currentTime = data.getDouble("currentTime")
+                val duration = data.getDouble("duration")
+                if (duration > 0) (currentTime / duration) * 100 else 0.0
+            } else {
+                0.0
+            }
+
+            // Extract timestamp (playback position in seconds)
+            latestTimestamp = if (data.has("timestamp")) {
+                data.getLong("timestamp")
+            } else if (data.has("currentTime")) {
+                data.getDouble("currentTime").toLong()
+            } else {
+                0L
+            }
+
+            // Extract duration
+            latestDuration = if (data.has("duration")) {
+                data.getLong("duration")
+            } else {
+                0L
+            }
+
+            // Extract season and episode (for TV/Anime content)
+            if (data.has("season")) {
+                latestSeason = data.getInt("season")
+            }
+            if (data.has("episode")) {
+                latestEpisode = data.getInt("episode")
+            }
+
+            Log.i(TAG, String.format(
+                "[Player Progress] id=%d type=%s progress=%.1f%% timestamp=%ds duration=%ds season=%d episode=%d",
+                latestContentId, latestContentType, latestProgress, latestTimestamp,
+                latestDuration, latestSeason, latestEpisode
+            ))
+
+        } catch (e: Exception) {
+            Log.e(TAG, "[Player Progress] Error processing data: ${e.message}")
+        }
+    }
+
     // ── Cursor hide timer ──────────────────────────────────────────────────────
-    private val cursorHideHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val cursorHideHandler = Handler(Looper.getMainLooper())
     private val cursorHideRunnable = Runnable {
         if (!isCursorDisabled) {
             cursorView.animate().alpha(0f).setDuration(500).start()
         }
     }
 
-    // ── 15-second Kotlin-side progress logger ─────────────────────────────────
-    private val progressHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    // ── 15-second progress saver using data from setupMessageListener ─────────────────────────────────
+    private val progressHandler = Handler(Looper.getMainLooper())
     private val progressRunnable = object : Runnable {
         override fun run() {
-            webView.evaluateJavascript("""
-                (function() {
-                    var v = document.querySelector('video');
-                    if (v && v.duration > 0 && !isNaN(v.duration)) {
-                        return JSON.stringify({
-                            currentTime: v.currentTime,
-                            duration:    v.duration,
-                            progress:    (v.currentTime / v.duration) * 100,
-                            paused:      v.paused,
-                            ended:       v.ended
-                        });
-                    }
-                    return null;
-                })();
-            """.trimIndent()) { result ->
-                if (result != null && result != "null") {
-                    try {
-                        val clean = result.trim('"').replace("\\\"", "\"")
-                        val json = org.json.JSONObject(clean)
-                        val progress = json.getDouble("progress")
-                        val currentTime = json.getDouble("currentTime")
-                        val duration = json.getDouble("duration")
-                        val paused = json.getBoolean("paused")
-                        val ended = json.getBoolean("ended")
+            val tmdbId = intent.getIntExtra("TMDB_ID", -1)
+            val isTv = intent.getBooleanExtra("IS_TV", false)
 
+            if (tmdbId != -1 && latestTimestamp > 0) {
+                try {
+                    val repository = TmdbRepository()
+
+                    // Determine media type - prefer message data if available
+                    val mediaType = when {
+                        latestContentType.isNotEmpty() && latestContentType != "null" -> latestContentType
+                        isTv -> "tv"
+                        else -> "movie"
+                    }
+
+                    // Use message timestamp if available, otherwise use duration-based calculation
+                    val playbackPosition = if (latestTimestamp > 0) {
+                        latestTimestamp
+                    } else if (latestDuration > 0 && latestProgress > 0) {
+                        ((latestProgress / 100.0) * latestDuration).toLong()
+                    } else {
+                        0L
+                    }
+
+                    // Update playback position
+                    repository.updatePlaybackPosition(tmdbId, mediaType, playbackPosition)
+
+                    // Determine season and episode - prefer message data if available
+                    val seasonToSave = if (latestSeason > 0 && (mediaType == "tv" || mediaType == "anime")) {
+                        latestSeason
+                    } else {
+                        currentSeason
+                    }
+
+                    val episodeToSave = if (latestEpisode > 0 && (mediaType == "tv" || mediaType == "anime")) {
+                        latestEpisode
+                    } else {
+                        currentEpisode
+                    }
+
+                    // Update episode info for TV/Anime content
+                    if (mediaType == "tv" || mediaType == "anime" || isTv) {
+                        repository.updateEpisodeInfo(tmdbId, mediaType, seasonToSave, episodeToSave)
                         Log.i(TAG, String.format(
-                            "[Progress] %.1f%% — %.1fs / %.1fs | paused=%b ended=%b",
-                            progress, currentTime, duration, paused, ended
+                            "[Progress Save] position=%ds (%.1f%%), S%dE%d saved",
+                            playbackPosition, latestProgress, seasonToSave, episodeToSave
                         ))
-
-                        // Save progress to watch history every 15 seconds
-                        val tmdbId = intent.getIntExtra("TMDB_ID", -1)
-                        val isTv = intent.getBooleanExtra("IS_TV", false)
-                        if (tmdbId != -1) {
-                            val repository = TmdbRepository()
-                            repository.updatePlaybackPosition(tmdbId, if (isTv) "tv" else "movie", currentTime.toLong())
-
-                            if (isTv) {
-                                repository.updateEpisodeInfo(tmdbId, "tv", currentSeason, currentEpisode)
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Log.w(TAG, "Progress parse error: ${e.message}")
+                    } else {
+                        Log.i(TAG, String.format(
+                            "[Progress Save] position=%ds (%.1f%%) saved for movie",
+                            playbackPosition, latestProgress
+                        ))
                     }
-                } else {
-                    Log.i(TAG, "[Progress] No video element found yet")
+
+                    // Update local state with latest from message
+                    if (seasonToSave > 0) currentSeason = seasonToSave
+                    if (episodeToSave > 0) currentEpisode = episodeToSave
+
+                } catch (e: Exception) {
+                    Log.e(TAG, "[Progress Save] Error saving progress: ${e.message}")
                 }
+            } else {
+                Log.i(TAG, "[Progress Save] No valid timestamp received yet from player")
             }
-            progressHandler.postDelayed(this, 15_000L)
+
+            // Schedule next update
+            progressHandler.postDelayed(this, PROGRESS_UPDATE_INTERVAL)
         }
     }
 
@@ -301,20 +410,7 @@ class PlayerActivity : AppCompatActivity() {
                             function setupMessageListener() {
                                 console.log('Player message listener initialized');
                                 
-                                window.addEventListener('message', function(event) {
-                                    try {
-                                        if (window.VideasyInterface) {
-                                            if (typeof event.data === 'string') {
-                                                window.VideasyInterface.postMessage(event.data);
-                                            } else {
-                                                window.VideasyInterface.postMessage(JSON.stringify(event.data));
-                                            }
-                                        }
-                                    } catch (e) {
-                                        console.log('Error processing message: ' + e);
-                                    }
-                                });
-                                
+                                // Intercept window.postMessage to capture player events
                                 (function() {
                                     var originalPostMessage = window.postMessage;
                                     window.postMessage = function(message, targetOrigin, transfer) {
@@ -333,20 +429,134 @@ class PlayerActivity : AppCompatActivity() {
                                     };
                                 })();
                                 
+                                // Listen for messages from the player frame
+                                window.addEventListener('message', function(event) {
+                                    try {
+                                        if (window.VideasyInterface) {
+                                            if (typeof event.data === 'string') {
+                                                window.VideasyInterface.postMessage(event.data);
+                                            } else {
+                                                window.VideasyInterface.postMessage(JSON.stringify(event.data));
+                                            }
+                                        }
+                                    } catch (e) {
+                                        console.log('Error processing message: ' + e);
+                                    }
+                                });
+                                
+                                // Monitor video events and send periodic progress updates
+                                function sendVideoProgress() {
+                                    var videos = document.getElementsByTagName('video');
+                                    for (var i = 0; i < videos.length; i++) {
+                                        var v = videos[i];
+                                        if (v.duration > 0 && !isNaN(v.duration)) {
+                                            // Try to extract content info from page
+                                            var contentInfo = getContentInfo();
+                                            
+                                            var progressData = {
+                                                progress: (v.currentTime / v.duration) * 100,
+                                                timestamp: Math.floor(v.currentTime),
+                                                duration: Math.floor(v.duration),
+                                                currentTime: v.currentTime,
+                                                paused: v.paused,
+                                                ended: v.ended
+                                            };
+                                            
+                                            // Merge content info if available
+                                            if (contentInfo) {
+                                                progressData.id = contentInfo.id;
+                                                progressData.type = contentInfo.type;
+                                                progressData.season = contentInfo.season;
+                                                progressData.episode = contentInfo.episode;
+                                            }
+                                            
+                                            // Send to Kotlin via postMessage
+                                            if (window.VideasyInterface) {
+                                                window.VideasyInterface.postMessage(JSON.stringify(progressData));
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+                                
+                                // Extract content info from page elements/URL
+                                function getContentInfo() {
+                                    var info = { type: 'movie', id: null, season: 1, episode: 1 };
+                                    
+                                    // Try to get from URL parameters or page title
+                                    try {
+                                        var url = window.location.href;
+                                        var urlMatch;
+                                        
+                                        // TV show pattern: /tv/{id}/{season}/{episode}
+                                        urlMatch = url.match(/\\/tv\\/(\\d+)\\/(\\d+)\\/(\\d+)/);
+                                        if (urlMatch) {
+                                            info.type = 'tv';
+                                            info.id = parseInt(urlMatch[1]);
+                                            info.season = parseInt(urlMatch[2]);
+                                            info.episode = parseInt(urlMatch[3]);
+                                            return info;
+                                        }
+                                        
+                                        // Movie pattern: /movie/{id}
+                                        urlMatch = url.match(/\\/movie\\/(\\d+)/);
+                                        if (urlMatch) {
+                                            info.type = 'movie';
+                                            info.id = parseInt(urlMatch[1]);
+                                            return info;
+                                        }
+                                        
+                                        // Anime pattern: /anime/{id}/{season}/{episode}
+                                        urlMatch = url.match(/\\/anime\\/(\\d+)\\/(\\d+)\\/(\\d+)/);
+                                        if (urlMatch) {
+                                            info.type = 'anime';
+                                            info.id = parseInt(urlMatch[1]);
+                                            info.season = parseInt(urlMatch[2]);
+                                            info.episode = parseInt(urlMatch[3]);
+                                            return info;
+                                        }
+                                    } catch (e) {
+                                        console.log('Error extracting content info: ' + e);
+                                    }
+                                    
+                                    return info;
+                                }
+                                
                                 function monitorVideoEvents() {
                                     var videos = document.getElementsByTagName('video');
                                     for (var i = 0; i < videos.length; i++) {
                                         (function(video) {
                                             if (video._monitored) return;
                                             video._monitored = true;
+                                            
                                             video.addEventListener('loadedmetadata', function() {
                                                 console.log('Video loaded: duration=' + video.duration);
+                                                // Send initial progress
+                                                sendVideoProgress();
+                                            });
+                                            
+                                            video.addEventListener('timeupdate', function() {
+                                                // Throttle to avoid too many messages
+                                                if (!video._lastProgressUpdate || (Date.now() - video._lastProgressUpdate > 1000)) {
+                                                    sendVideoProgress();
+                                                    video._lastProgressUpdate = Date.now();
+                                                }
+                                            });
+                                            
+                                            video.addEventListener('ended', function() {
+                                                console.log('Video playback ended');
+                                                sendVideoProgress();
                                             });
                                         })(videos[i]);
                                     }
                                 }
+                                
+                                // Monitor for new video elements every 3 seconds
                                 monitorVideoEvents();
                                 setInterval(monitorVideoEvents, 3000);
+                                
+                                // Send periodic progress updates every 15 seconds as backup
+                                setInterval(sendVideoProgress, 15000);
                             }
                             """ else """
                             function setupMessageListener() {
