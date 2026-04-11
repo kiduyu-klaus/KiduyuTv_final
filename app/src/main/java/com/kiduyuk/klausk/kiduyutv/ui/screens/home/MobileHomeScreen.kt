@@ -24,6 +24,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.components.*
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeViewModel
+import android.net.Uri
 
 @Composable
 fun MobileHomeScreen(
@@ -230,6 +231,24 @@ fun MobileHomeScreen(
                         }
                     }
 
+                    // Popular Networks
+                    if (uiState.popularNetworks.isNotEmpty()) {
+                        item {
+                            MobileCategoryRow("Popular Networks", uiState.popularNetworks) { network ->
+                                onNavigate("media_list/${network.type}/${network.id}/${Uri.encode(network.name)}")
+                            }
+                        }
+                    }
+
+                    // Popular Companies
+                    if (uiState.popularCompanies.isNotEmpty()) {
+                        item {
+                            MobileCategoryRow("Production Companies", uiState.popularCompanies) { company ->
+                                onNavigate("media_list/${company.type}/${company.id}/${Uri.encode(company.name)}")
+                            }
+                        }
+                    }
+
                     //Spacer(modifier = Modifier.height(16.dp))
                 }
             }
@@ -377,6 +396,9 @@ fun <T> MobileCategoryRow(
                             ),
                             onClick = { onItemClick(item) }
                         )
+                    }
+                    is com.kiduyuk.klausk.kiduyutv.viewmodel.NetworkItem -> {
+                        MobileNetworkCard(networkItem = item, onClick = { onItemClick(item) })
                     }
                 }
             }

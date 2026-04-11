@@ -19,6 +19,7 @@ import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
 import com.kiduyuk.klausk.kiduyutv.ui.theme.CardDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
+import com.kiduyuk.klausk.kiduyutv.viewmodel.NetworkItem
 
 @Composable
 fun MobileMovieCard(
@@ -121,5 +122,55 @@ fun MobileTvShowCard(
                 color = TextPrimary
             )
         }
+    }
+}
+
+@Composable
+fun MobileNetworkCard(
+    networkItem: NetworkItem,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val imageUrl = if (networkItem.logoPath != null) {
+        "https://image.tmdb.org/t/p/w200${networkItem.logoPath}"
+    } else null
+
+    Column(
+        modifier = modifier
+            .width(100.dp)
+            .clickable { onClick() },
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(80.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(CardDark),
+            contentAlignment = Alignment.Center
+        ) {
+            if (imageUrl != null) {
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = networkItem.name,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(8.dp)
+                )
+            } else {
+                Text(
+                    text = networkItem.name.take(2).uppercase(),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextPrimary
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = networkItem.name,
+            style = MaterialTheme.typography.labelSmall,
+            color = TextPrimary,
+            maxLines = 1
+        )
     }
 }

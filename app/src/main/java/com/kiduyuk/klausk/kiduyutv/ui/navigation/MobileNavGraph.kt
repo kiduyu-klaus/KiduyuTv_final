@@ -203,6 +203,41 @@ fun MobileNavGraph(navController: NavHostController) {
             )
         }
 
+        // Mobile Cast Detail Screen
+        composable(
+            route = Screen.MobileCastDetail.route,
+            arguments = listOf(
+                navArgument("castId") { type = NavType.IntType },
+                navArgument("castName") { type = NavType.StringType; defaultValue = "" },
+                navArgument("character") { type = NavType.StringType; defaultValue = "" },
+                navArgument("profilePath") { type = NavType.StringType; defaultValue = "" },
+                navArgument("knownForDepartment") { type = NavType.StringType; defaultValue = "" }
+            )
+        ) { backStackEntry ->
+            val castId = backStackEntry.arguments?.getInt("castId") ?: 0
+            val castName = backStackEntry.arguments?.getString("castName") ?: ""
+            val character = backStackEntry.arguments?.getString("character")
+            val profilePath = backStackEntry.arguments?.getString("profilePath")
+            val knownForDepartment = backStackEntry.arguments?.getString("knownForDepartment")
+
+            val castMember = com.kiduyuk.klausk.kiduyutv.data.model.CastMember(
+                id = castId,
+                name = android.net.Uri.decode(castName),
+                character = android.net.Uri.decode(character ?: ""),
+                profilePath = if (profilePath.isNullOrBlank()) null else android.net.Uri.decode(profilePath),
+                knownForDepartment = android.net.Uri.decode(knownForDepartment ?: ""),
+                popularity = null,
+                order = null
+            )
+
+            com.kiduyuk.klausk.kiduyutv.ui.screens.cast.MobileCastDetailScreen(
+                castMember = castMember,
+                onBackClick = { navController.popBackStack() },
+                onMovieClick = { movieId -> navController.navigate(Screen.MovieDetail.createRoute(movieId)) },
+                onTvShowClick = { tvId -> navController.navigate(Screen.TvShowDetail.createRoute(tvId)) }
+            )
+        }
+
         // Cast Detail Screen
         composable(
             route = Screen.CastDetail.route,

@@ -11,11 +11,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
+import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
 import com.kiduyuk.klausk.kiduyutv.ui.components.MobileMovieCard
 import com.kiduyuk.klausk.kiduyutv.ui.components.MobileTvShowCard
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
@@ -32,6 +34,11 @@ fun SeeAllScreen(
     viewModel: HomeViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val repository = remember { TmdbRepository() }
+
+    var items by remember { mutableStateOf<List<Any>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
 
     val title = when (category) {
         "trending_movies" -> "Trending Movies"
@@ -41,20 +48,71 @@ fun SeeAllScreen(
         "watched_tv" -> "Watched TV Shows"
         "popular_tv" -> "Popular TV Shows"
         "favorite_tv" -> "All Time Favorite TV Shows"
+        "continue_watching" -> "Continue Watching"
+        "now_playing" -> "Now Playing"
+        "time_travel_movies" -> "Time Travel Movies"
+        "time_travel_tv" -> "Time Travel TV Shows"
+        "oscar_winners" -> "2026 Oscar Winners"
+        "hallmark" -> "Hallmark Movies"
+        "true_story" -> "True Story Movies"
+        "classics" -> "Best Classics"
+        "spy_movies" -> "Spy Movies"
+        "statham_movies" -> "Jason Statham Movies"
+        "networks" -> "Popular Networks"
+        "companies" -> "Production Companies"
         else -> "All Content"
     }
 
-    val items = when (category) {
-        "trending_movies" -> uiState.trendingMovies
-        "latest_movies" -> if (uiState.trendingMoviesThisWeek.isNotEmpty()) uiState.trendingMoviesThisWeek else uiState.latestMovies
-        "box_office" -> uiState.latestMovies
-        "trending_tv" -> uiState.trendingTvShows
-        "watched_tv" -> uiState.continueWatching.filter { it.isTv }.map {
-            TvShow(id = it.id, name = it.title, overview = it.overview ?: "", posterPath = it.posterPath, backdropPath = it.backdropPath, voteAverage = it.voteAverage, firstAirDate = it.releaseDate ?: "", genreIds = emptyList(), popularity = 0.0)
+    // Try to get items from ViewModel first, otherwise fetch from TMDB
+    LaunchedEffect(category) {
+        isLoading = true
+        items = when (category) {
+            "trending_movies" -> uiState.trendingMovies.ifEmpty { 
+                repository.getTrendingMoviesToday().getOrNull() ?: emptyList() 
+            }
+            "latest_movies" -> (uiState.trendingMoviesThisWeek.ifEmpty { uiState.latestMovies }).ifEmpty { 
+                repository.getTrendingMoviesThisWeek().getOrNull() ?: emptyList() 
+            }
+            "box_office" -> uiState.latestMovies.ifEmpty { 
+                repository.getTopRatedMovies().getOrNull() ?: emptyList() 
+            }
+            "trending_tv" -> uiState.trendingTvShows.ifEmpty { 
+                repository.getTrendingTvToday().getOrNull() ?: emptyList() 
+            }
+            "watched_tv" -> uiState.continueWatching.filter { it.isTv }.map {
+                TvShow(id = it.id, name = it.title, overview = it.overview ?: "", posterPath = it.posterPath, backdropPath = it.backdropPath, voteAverage = it.voteAverage, firstAirDate = it.releaseDate ?: "", genreIds = emptyList(), popularity = 0.0)
+            }
+            "popular_tv" -> uiState.topTvShows.ifEmpty { 
+                repository.getPopularTvShows().getOrNull() ?: emptyList() 
+            }
+            "favorite_tv" -> uiState.bestSitcoms.ifEmpty { 
+                repository.getTopRatedTvShows().getOrNull() ?: emptyList() 
+            }
+            "continue_watching" -> uiState.continueWatching.map { history ->
+                if (history.isTv) {
+                    TvShow(id = history.id, name = history.title, overview = history.overview ?: "", posterPath = history.posterPath, backdropPath = history.backdropPath, voteAverage = history.voteAverage, firstAirDate = history.releaseDate ?: "", genreIds = emptyList(), popularity = 0.0)
+                } else {
+                    Movie(id = history.id, title = history.title, overview = history.overview ?: "", posterPath = history.posterPath, backdropPath = history.backdropPath, voteAverage = history.voteAverage, releaseDate = history.releaseDate ?: "", genreIds = emptyList(), popularity = 0.0)
+                }
+            }
+            "now_playing" -> uiState.nowPlayingMovies.ifEmpty { 
+                repository.getNowPlayingMovies().getOrNull() ?: emptyList() 
+            }
+            "time_travel_movies" -> uiState.timeTravelMovies.ifEmpty { 
+                repository.getTimeTravelTvShows().getOrNull()?.map { 
+                    Movie(id = it.id, title = it.name ?: "", overview = it.overview, posterPath = it.posterPath, backdropPath = it.backdropPath, voteAverage= it.voteAverage, releaseDate = it.firstAirDate, genreIds = emptyList(), popularity = it.popularity)
+                } ?: emptyList() 
+            }
+            "time_travel_tv" -> uiState.timeTravelTvShows
+            "oscar_winners" -> uiState.oscarWinners2026
+            "hallmark" -> uiState.hallmarkMovies
+            "true_story" -> uiState.trueStoryMovies
+            "classics" -> uiState.bestClassics
+            "spy_movies" -> uiState.spyMovies
+            "statham_movies" -> uiState.stathamMovies
+            else -> emptyList<Any>()
         }
-        "popular_tv" -> uiState.topTvShows
-        "favorite_tv" -> uiState.bestSitcoms
-        else -> emptyList<Any>()
+        isLoading = false
     }
 
     Scaffold(
@@ -76,22 +134,30 @@ fun SeeAllScreen(
                 .background(BackgroundDark)
                 .padding(innerPadding)
         ) {
-            if (items.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(text = "No content available", color = TextPrimary)
+            when {
+                isLoading -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = TextPrimary)
+                    }
                 }
-            } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
-                    contentPadding = PaddingValues(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    items(items) { item ->
-                        when (item) {
-                            is Movie -> MobileMovieCard(movie = item, onClick = { onMovieClick(item.id) })
-                            is TvShow -> MobileTvShowCard(tvShow = item, onClick = { onTvShowClick(item.id) })
+                items.isEmpty() -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(text = "No content available", color = TextPrimary)
+                    }
+                }
+                else -> {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(3),
+                        contentPadding = PaddingValues(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(items) { item ->
+                            when (item) {
+                                is Movie -> MobileMovieCard(movie = item, onClick = { onMovieClick(item.id) })
+                                is TvShow -> MobileTvShowCard(tvShow = item, onClick = { onTvShowClick(item.id) })
+                            }
                         }
                     }
                 }
