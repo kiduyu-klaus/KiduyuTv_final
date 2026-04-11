@@ -32,7 +32,7 @@ fun SeeAllScreen(
     viewModel: HomeViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    
+
     val title = when (category) {
         "trending_movies" -> "Trending Movies"
         "latest_movies" -> "Latest Releases"
@@ -49,7 +49,7 @@ fun SeeAllScreen(
         "latest_movies" -> if (uiState.trendingMoviesThisWeek.isNotEmpty()) uiState.trendingMoviesThisWeek else uiState.latestMovies
         "box_office" -> uiState.latestMovies
         "trending_tv" -> uiState.trendingTvShows
-        "watched_tv" -> uiState.continueWatching.filter { it.isTv }.map { 
+        "watched_tv" -> uiState.continueWatching.filter { it.isTv }.map {
             TvShow(id = it.id, name = it.title, overview = it.overview ?: "", posterPath = it.posterPath, backdropPath = it.backdropPath, voteAverage = it.voteAverage, firstAirDate = it.releaseDate ?: "", genreIds = emptyList(), popularity = 0.0)
         }
         "popular_tv" -> uiState.topTvShows

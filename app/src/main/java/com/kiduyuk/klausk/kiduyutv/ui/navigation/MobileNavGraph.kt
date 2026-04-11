@@ -8,8 +8,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.MovieDetailScreen
-import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.TvShowDetailScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.*
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.*
 import com.kiduyuk.klausk.kiduyutv.ui.screens.search.SearchScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.settings.SettingsScreen
@@ -114,13 +113,10 @@ fun MobileNavGraph(navController: NavHostController) {
             arguments = listOf(navArgument("movieId") { type = NavType.IntType })
         ) { backStackEntry ->
             val movieId = backStackEntry.arguments?.getInt("movieId") ?: return@composable
-            MovieDetailScreen(
+            MobileMovieDetailScreen(
                 movieId = movieId,
                 onBackClick = { navController.popBackStack() },
                 onMovieClick = { newMovieId -> navController.navigate(Screen.MovieDetail.createRoute(newMovieId)) },
-                onCompanyClick = { id, name ->
-                    navController.navigate("media_list/company/$id/$name")
-                },
                 onPlayClick = { route ->
                     navController.navigate(route)
                 },
@@ -138,15 +134,12 @@ fun MobileNavGraph(navController: NavHostController) {
             arguments = listOf(navArgument("tvId") { type = NavType.IntType })
         ) { backStackEntry ->
             val tvId = backStackEntry.arguments?.getInt("tvId") ?: return@composable
-            TvShowDetailScreen(
+            MobileTvShowDetailScreen(
                 tvId = tvId,
                 onBackClick = { navController.popBackStack() },
                 onTvShowClick = { newTvId -> navController.navigate(Screen.TvShowDetail.createRoute(newTvId)) },
                 onEpisodesClick = { id, name, totalSeasons ->
                     navController.navigate(Screen.SeasonEpisodes.createRoute(id, name, totalSeasons))
-                },
-                onNetworkClick = { id, name ->
-                    navController.navigate("media_list/network/$id/$name")
                 },
                 onPlayClick = { route ->
                     navController.navigate(route)

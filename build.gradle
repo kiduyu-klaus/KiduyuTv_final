@@ -1,6 +1,7 @@
 buildscript {
     ext {
-        kotlin_version = '2.1.10'
+        // root build.gradle
+        ext.kotlin_version = '1.9.23'
     }
 }
 
