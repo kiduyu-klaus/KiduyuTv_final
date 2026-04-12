@@ -1,4 +1,4 @@
-name: Android Release CI
+name: Android Release CI (Separated Builds)
 
 on:
   push:
@@ -6,20 +6,24 @@ on:
       - main
 
 permissions:
-  contents: write # Required to create a release
-  packages: write # Required to upload release assets
-  pages: write    # Required to deploy to GitHub Pages
-  id-token: write # Required for OIDC auth with GitHub Pages
+  contents: write
+  packages: write
+  pages: write
+  id-token: write
 
 jobs:
-  build_and_release:
+  # ══════════════════════════════════════════════════════════════════════
+  # PHONE BUILD
+  # ══════════════════════════════════════════════════════════════════════
+  build_phone:
+    name: Build Phone APK
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Required to fetch all tags for version bumping
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -30,19 +34,28 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Determine Release Tag (incremental patch bump)
+      - name: Get commit info
+        id: commit_info
+        run: |
+          FULL_MSG=$(git log -1 --pretty=%B | tr -d '\r')
+          echo "full_message<<EOF" >> $GITHUB_OUTPUT
+          echo "$FULL_MSG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          FIRST_LINE=$(git log -1 --pretty=%B | grep -m1 '[^[:space:]]' | sed 's/[[:space:]]*$//')
+          echo "title=${FIRST_LINE}" >> $GITHUB_OUTPUT
+          echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Determine Release Tag
         id: tag
         run: |
-          # Find the latest semver tag of the form vX.Y.Z (ignoring build suffixes)
           LATEST=$(git tag --list 'v*.*.*' \
             | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
             | sort -V | tail -1)
 
           if [ -z "$LATEST" ]; then
-            # No prior tag — start at v1.1.1
             NEW_TAG="v1.1.1"
           else
-            # Parse the three components and bump the patch
             MAJOR=$(echo "$LATEST" | cut -d. -f1 | tr -d 'v')
             MINOR=$(echo "$LATEST" | cut -d. -f2)
             PATCH=$(echo "$LATEST" | cut -d. -f3)
@@ -53,76 +66,61 @@ jobs:
           echo "tag=${NEW_TAG}" >> $GITHUB_OUTPUT
           echo "Release tag: ${NEW_TAG}"
 
-      - name: Get commit info
-        id: commit_info
-        run: |
-          # Full commit body (used in the release body)
-          FULL_MSG=$(git log -1 --pretty=%B | tr -d '\r')
-          echo "full_message<<EOF" >> $GITHUB_OUTPUT
-          echo "$FULL_MSG" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+      # ── Debug APK ────────────────────────────────────────────
+      - name: Build Phone Debug APK
+        run: ./gradlew assemblePhoneDebug
 
-          # First sentence / first non-empty line — used as the release title
-          FIRST_LINE=$(git log -1 --pretty=%B | grep -m1 '[^[:space:]]' | sed 's/[[:space:]]*$//')
-          echo "title=${FIRST_LINE}" >> $GITHUB_OUTPUT
-
-          echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug
-
-      - name: Rename Debug APK
-        id: rename_apk
+      - name: Rename Phone Debug APK
+        id: rename_phone_debug
         run: |
           VERSION=$(grep 'versionName' app/build.gradle | sed 's/.*"\(.*\)".*/\1/' | tr -d '[:space:]')
           BUILD=$(git rev-list --count HEAD)
-          APK_PATH="app/build/outputs/apk/debug/app-debug.apk"
-          NEW_APK_NAME="KiduyuTv-debug-${VERSION}-build${BUILD}.apk"
-          mv "$APK_PATH" "app/build/outputs/apk/debug/$NEW_APK_NAME"
-          echo "apk_path=app/build/outputs/apk/debug/$NEW_APK_NAME" >> $GITHUB_OUTPUT
+          APK_PATH="app/build/outputs/apk/phone/debug/app-phone-debug.apk"
+          NEW_APK_NAME="KiduyuTV-phone-debug-${VERSION}-build${BUILD}.apk"
+          mv "$APK_PATH" "app/build/outputs/apk/phone/debug/$NEW_APK_NAME"
+          echo "apk_path=app/build/outputs/apk/phone/debug/$NEW_APK_NAME" >> $GITHUB_OUTPUT
 
-      - name: Upload Debug Artifact
+      - name: Upload Phone Debug Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: ${{ steps.rename_apk.outputs.apk_path }}
+          name: phone-debug
+          path: ${{ steps.rename_phone_debug.outputs.apk_path }}
 
-      # ── Restore keystore & build signed release APK in the same job ──────
+      # ── Release APK ─────────────────────────────────────────
       - name: Restore keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > kiduyutv_final
 
-      - name: Build Release APK
-        run: ./gradlew assembleRelease
+      - name: Build Phone Release APK
+        run: ./gradlew assemblePhoneRelease
 
-      - name: Rename Release APK
-        id: rename_release
+      - name: Rename Phone Release APK
+        id: rename_phone_release
         run: |
           VERSION=$(grep 'versionName' app/build.gradle | sed 's/.*"\(.*\)".*/\1/' | tr -d '[:space:]')
           BUILD=$(git rev-list --count HEAD)
-          APK_PATH="app/build/outputs/apk/release/app-release.apk"
-          NEW_APK_NAME="KiduyuTv-release-${VERSION}-build${BUILD}.apk"
-          mv "$APK_PATH" "app/build/outputs/apk/release/$NEW_APK_NAME"
-          echo "apk_path=app/build/outputs/apk/release/$NEW_APK_NAME" >> $GITHUB_OUTPUT
+          APK_PATH="app/build/outputs/apk/phone/release/app-phone-release.apk"
+          NEW_APK_NAME="KiduyuTV-phone-release-${VERSION}-build${BUILD}.apk"
+          mv "$APK_PATH" "app/build/outputs/apk/phone/release/$NEW_APK_NAME"
+          echo "apk_path=app/build/outputs/apk/phone/release/$NEW_APK_NAME" >> $GITHUB_OUTPUT
 
-      - name: Upload Release Artifact
+      - name: Upload Phone Release Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
-          path: ${{ steps.rename_release.outputs.apk_path }}
+          name: phone-release
+          path: ${{ steps.rename_phone_release.outputs.apk_path }}
 
-      - name: Create GitHub Release (debug + release APKs)
-        id: create_release
+      - name: Create GitHub Release (Phone)
+        id: create_phone_release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
-          name: "${{ steps.commit_info.outputs.title }} — ${{ steps.tag.outputs.tag }}"
+          name: "[Phone] ${{ steps.commit_info.outputs.title }} — ${{ steps.tag.outputs.tag }}"
           body: |
-            ## KiduyuTv ${{ steps.tag.outputs.tag }}
-            **${{ steps.commit_info.outputs.title }}**
+            ## KiduyuTV Phone ${{ steps.tag.outputs.tag }}
 
+            **Platform:** Android Phone / Tablet
             **Commit:** [`${{ steps.commit_info.outputs.short_sha }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
             **Branch:** `${{ github.ref_name }}`
-            **Run:** ${{ github.run_id }}
 
             ---
             ${{ steps.commit_info.outputs.full_message }}
@@ -131,28 +129,163 @@ jobs:
             ### Install
             | APK | Notes |
             |-----|-------|
-            | `KiduyuTv-debug-*.apk` | Debug build — logging enabled |
-            | `KiduyuTv-release-*.apk` | Signed release build |
+            | `KiduyuTV-phone-debug-*.apk` | Debug build — logging enabled |
+            | `KiduyuTV-phone-release-*.apk` | Signed release build |
 
             **Sideload via ADB:**
             ```bash
-            adb connect <device-ip>:5555
-            adb install KiduyuTv-release-*.apk
+            adb install KiduyuTV-phone-release-*.apk
             ```
           files: |
-            ${{ steps.rename_apk.outputs.apk_path }}
-            ${{ steps.rename_release.outputs.apk_path }}
+            ${{ steps.rename_phone_debug.outputs.apk_path }}
+            ${{ steps.rename_phone_release.outputs.apk_path }}
           draft: false
           prerelease: true
           make_latest: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # ── Deploy index.html to GitHub Pages (with live APK download link) ──────
+  # ══════════════════════════════════════════════════════════════════════
+  # TV BUILD
+  # ══════════════════════════════════════════════════════════════════════
+  build_tv:
+    name: Build TV APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Get commit info
+        id: commit_info
+        run: |
+          FULL_MSG=$(git log -1 --pretty=%B | tr -d '\r')
+          echo "full_message<<EOF" >> $GITHUB_OUTPUT
+          echo "$FULL_MSG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          FIRST_LINE=$(git log -1 --pretty=%B | grep -m1 '[^[:space:]]' | sed 's/[[:space:]]*$//')
+          echo "title=${FIRST_LINE}" >> $GITHUB_OUTPUT
+          echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Determine Release Tag
+        id: tag
+        run: |
+          LATEST=$(git tag --list 'v*.*.*' \
+            | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' \
+            | sort -V | tail -1)
+
+          if [ -z "$LATEST" ]; then
+            NEW_TAG="v1.1.1"
+          else
+            MAJOR=$(echo "$LATEST" | cut -d. -f1 | tr -d 'v')
+            MINOR=$(echo "$LATEST" | cut -d. -f2)
+            PATCH=$(echo "$LATEST" | cut -d. -f3)
+            NEW_PATCH=$(( PATCH + 1 ))
+            NEW_TAG="v${MAJOR}.${MINOR}.${NEW_PATCH}"
+          fi
+
+          echo "tag=${NEW_TAG}" >> $GITHUB_OUTPUT
+          echo "Release tag: ${NEW_TAG}"
+
+      # ── Debug APK ────────────────────────────────────────────
+      - name: Build TV Debug APK
+        run: ./gradlew assembleTvDebug
+
+      - name: Rename TV Debug APK
+        id: rename_tv_debug
+        run: |
+          VERSION=$(grep 'versionName' app/build.gradle | sed 's/.*"\(.*\)".*/\1/' | tr -d '[:space:]')
+          BUILD=$(git rev-list --count HEAD)
+          APK_PATH="app/build/outputs/apk/tv/debug/app-tv-debug.apk"
+          NEW_APK_NAME="KiduyuTV-tv-debug-${VERSION}-build${BUILD}.apk"
+          mv "$APK_PATH" "app/build/outputs/apk/tv/debug/$NEW_APK_NAME"
+          echo "apk_path=app/build/outputs/apk/tv/debug/$NEW_APK_NAME" >> $GITHUB_OUTPUT
+
+      - name: Upload TV Debug Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tv-debug
+          path: ${{ steps.rename_tv_debug.outputs.apk_path }}
+
+      # ── Release APK ─────────────────────────────────────────
+      - name: Restore keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > kiduyutv_final
+
+      - name: Build TV Release APK
+        run: ./gradlew assembleTvRelease
+
+      - name: Rename TV Release APK
+        id: rename_tv_release
+        run: |
+          VERSION=$(grep 'versionName' app/build.gradle | sed 's/.*"\(.*\)".*/\1/' | tr -d '[:space:]')
+          BUILD=$(git rev-list --count HEAD)
+          APK_PATH="app/build/outputs/apk/tv/release/app-tv-release.apk"
+          NEW_APK_NAME="KiduyuTV-tv-release-${VERSION}-build${BUILD}.apk"
+          mv "$APK_PATH" "app/build/outputs/apk/tv/release/$NEW_APK_NAME"
+          echo "apk_path=app/build/outputs/apk/tv/release/$NEW_APK_NAME" >> $GITHUB_OUTPUT
+
+      - name: Upload TV Release Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tv-release
+          path: ${{ steps.rename_tv_release.outputs.apk_path }}
+
+      - name: Create GitHub Release (TV)
+        id: create_tv_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: "[TV] ${{ steps.commit_info.outputs.title }} — ${{ steps.tag.outputs.tag }}"
+          body: |
+            ## KiduyuTV Android TV ${{ steps.tag.outputs.tag }}
+
+            **Platform:** Android TV / Fire TV
+            **Commit:** [`${{ steps.commit_info.outputs.short_sha }}`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+            **Branch:** `${{ github.ref_name }}`
+
+            ---
+            ${{ steps.commit_info.outputs.full_message }}
+            ---
+
+            ### Install
+            | APK | Notes |
+            |-----|-------|
+            | `KiduyuTV-tv-debug-*.apk` | Debug build — logging enabled |
+            | `KiduyuTV-tv-release-*.apk` | Signed release build |
+
+            **Sideload via ADB:**
+            ```bash
+            adb connect <device-ip>:5555
+            adb install KiduyuTV-tv-release-*.apk
+            ```
+          files: |
+            ${{ steps.rename_tv_debug.outputs.apk_path }}
+            ${{ steps.rename_tv_release.outputs.apk_path }}
+          draft: false
+          prerelease: true
+          make_latest: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ══════════════════════════════════════════════════════════════════════
+  # DEPLOY TO GITHUB PAGES (after all builds complete)
+  # ══════════════════════════════════════════════════════════════════════
   deploy_pages:
     name: Deploy to GitHub Pages
     runs-on: ubuntu-latest
-    needs: build_and_release   # runs AFTER release is published so the API has the new tag
+    needs: [build_phone, build_tv]
 
     permissions:
       pages: write
@@ -166,81 +299,103 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Fetch the latest prerelease from the GitHub API so we always resolve
-      # the real APK download URL — even if the build step renamed the file.
+      - name: Download all APK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./apks
+
+      - name: List downloaded APKs
+        run: |
+          echo "=== Downloaded APKs ==="
+          find ./apks -name "*.apk" -type f
+
       - name: Resolve latest release info
         id: release_info
         run: |
+          # Get the latest prerelease tag
           RELEASE=$(curl -s \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${{ github.repository }}/releases" \
             | jq '[ .[] | select(.prerelease == true) ] | first')
 
-          TAG=$(echo "$RELEASE"    | jq -r '.tag_name')
-          TITLE=$(echo "$RELEASE"  | jq -r '.name')
+          TAG=$(echo "$RELEASE" | jq -r '.tag_name')
+          TITLE=$(echo "$RELEASE" | jq -r '.name')
 
-          # Grab the signed release APK (excludes the debug one)
-          APK_URL=$(echo "$RELEASE" | jq -r \
-            '[.assets[] | select(.name | test("release"))] | first | .browser_download_url')
-          APK_NAME=$(echo "$RELEASE" | jq -r \
-            '[.assets[] | select(.name | test("release"))] | first | .name')
+          # Get TV release APK (the most important for streaming)
+          TV_APK_URL=$(echo "$RELEASE" | jq -r \
+            '[.assets[] | select(.name | test("tv-release"))] | first | .browser_download_url')
+          TV_APK_NAME=$(echo "$RELEASE" | jq -r \
+            '[.assets[] | select(.name | test("tv-release"))] | first | .name')
 
-          echo "tag=${TAG}"           >> $GITHUB_OUTPUT
-          echo "title=${TITLE}"       >> $GITHUB_OUTPUT
-          echo "apk_url=${APK_URL}"   >> $GITHUB_OUTPUT
-          echo "apk_name=${APK_NAME}" >> $GITHUB_OUTPUT
-          echo "Resolved: ${APK_NAME} @ ${APK_URL}"
+          # Get Phone release APK
+          PHONE_APK_URL=$(echo "$RELEASE" | jq -r \
+            '[.assets[] | select(.name | test("phone-release"))] | first | .browser_download_url')
+          PHONE_APK_NAME=$(echo "$RELEASE" | jq -r \
+            '[.assets[] | select(.name | test("phone-release"))] | first | .name')
 
-      # Surgically update the href and download attributes on the existing
-      # .btn-primary anchor inside .download-buttons — no new HTML is added.
-      - name: Update APK download link in index.html
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "title=${TITLE}" >> $GITHUB_OUTPUT
+          echo "tv_apk_url=${TV_APK_URL}" >> $GITHUB_OUTPUT
+          echo "tv_apk_name=${TV_APK_NAME}" >> $GITHUB_OUTPUT
+          echo "phone_apk_url=${PHONE_APK_URL}" >> $GITHUB_OUTPUT
+          echo "phone_apk_name=${PHONE_APK_NAME}" >> $GITHUB_OUTPUT
+          echo "Resolved: ${TV_APK_NAME} @ ${TV_APK_URL}"
+
+      - name: Update APK download links in index.html
         env:
-          APK_URL:  ${{ steps.release_info.outputs.apk_url }}
-          APK_NAME: ${{ steps.release_info.outputs.apk_name }}
+          TV_APK_URL: ${{ steps.release_info.outputs.tv_apk_url }}
+          TV_APK_NAME: ${{ steps.release_info.outputs.tv_apk_name }}
+          PHONE_APK_URL: ${{ steps.release_info.outputs.phone_apk_url }}
+          PHONE_APK_NAME: ${{ steps.release_info.outputs.phone_apk_name }}
         run: |
           python3 - <<'PYEOF'
           import os, re, pathlib
 
-          apk_url  = os.environ["APK_URL"]
-          apk_name = os.environ["APK_NAME"]
+          tv_apk_url = os.environ["TV_APK_URL"]
+          tv_apk_name = os.environ["TV_APK_NAME"]
+          phone_apk_url = os.environ["PHONE_APK_URL"]
+          phone_apk_name = os.environ["PHONE_APK_NAME"]
 
           html = pathlib.Path("index.html").read_text(encoding="utf-8")
 
-          # Replace href="..." — matches any releases/download URL
+          # Replace TV release APK URL
           html = re.sub(
               r'(href=")https://github\.com/[^/]+/[^/]+/releases/download/[^"]+(")',
-              rf'\g<1>{apk_url}\2',
+              rf'\g<1>{tv_apk_url}\2',
               html,
               flags=re.IGNORECASE
           )
 
-          # Replace download="KiduyuTv-release-..." attribute value
+          # Replace TV APK name in download attribute
           html = re.sub(
-              r'(download=")KiduyuTv-release-[^"]+(")',
-              rf'\g<1>{apk_name}\2',
+              r'(download=")KiduyuTV-[^"]+(")',
+              rf'\g<1>{tv_apk_name}\2',
               html,
               flags=re.IGNORECASE
           )
 
           pathlib.Path("index.html").write_text(html, encoding="utf-8")
-          print(f"✅ Updated download link → {apk_name}")
+          print(f"✅ Updated download link → {tv_apk_name}")
+          print(f"📱 Phone APK: {phone_apk_name}")
           PYEOF
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.' # Change to 'docs' or 'web' if index.html lives in a subfolder
+          path: '.'
 
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
 
-  # ── Cleanup: delete all failed workflow runs ─────────────────────────────
+  # ══════════════════════════════════════════════════════════════════════
+  # CLEANUP: delete all failed workflow runs
+  # ══════════════════════════════════════════════════════════════════════
   cleanup_failed_runs:
     name: Delete Failed Workflow Runs
     runs-on: ubuntu-latest
-    needs: build_and_release
+    needs: [build_phone, build_tv]
     if: always()
     steps:
       - name: Check for failed runs
@@ -295,4 +450,4 @@ jobs:
                 console.warn(`⚠️  Could not delete run #${id}: ${err.message}`);
               }
             }
-            console.log(`\nSummary: ${deleted} deleted, ${skipped} skipped (current run).`);
+            console.log(`\nSummary: ${deleted} deleted, ${skipped} skipped (current run).`);h
