@@ -297,14 +297,6 @@ class SplashActivity : ComponentActivity() {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                LottieAnimation(
-                    composition = composition,
-                    progress = { progress },
-                    modifier = Modifier.size(200.dp)
-                )
-                
-                Spacer(modifier = Modifier.height(24.dp))
-                
                 Text(
                     text = "Kiduyu TV",
                     color = Color.White,
@@ -316,6 +308,12 @@ class SplashActivity : ComponentActivity() {
                     text = "Streaming Simplified",
                     color = Color.Gray,
                     fontSize = 14.sp
+                )
+
+                LottieAnimation(
+                    composition = composition,
+                    progress = { progress },
+                    modifier = Modifier.size(200.dp)
                 )
             }
             
