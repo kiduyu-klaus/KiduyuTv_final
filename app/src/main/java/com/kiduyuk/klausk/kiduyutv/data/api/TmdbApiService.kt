@@ -92,6 +92,14 @@ interface TmdbApiService {
         @Query("page") page: Int = 1
     ): TvShowResponse
 
+    /** Fetches TV shows belonging to a specific genre. */
+    @GET("discover/tv")
+    suspend fun getTvShowsByGenre(
+        @Query("with_genres") genreId: Int,
+        @Query("sort_by") sortBy: String = "popularity.desc",
+        @Query("page") page: Int = 1
+    ): TvShowResponse
+
     /** Fetches popular movies. */
     @GET("movie/popular")
     suspend fun getPopularMovies(

@@ -76,7 +76,7 @@ fun MobileNavGraph(navController: NavHostController) {
             arguments = listOf(navArgument("mediaType") { type = NavType.StringType })
         ) { backStackEntry ->
             val mediaType = backStackEntry.arguments?.getString("mediaType") ?: "movie"
-            GenresScreen(
+            MobileGenresScreen(
                 mediaType = mediaType,
                 onBackClick = { navController.popBackStack() },
                 onGenreClick = { genreId, genreName ->
@@ -98,7 +98,7 @@ fun MobileNavGraph(navController: NavHostController) {
             val genreId = backStackEntry.arguments?.getInt("genreId") ?: 0
             val genreName = backStackEntry.arguments?.getString("genreName") ?: ""
 
-            GenreContentScreen(
+            MobileGenreContentScreen(
                 mediaType = mediaType,
                 genreId = genreId,
                 genreName = genreName,
@@ -181,7 +181,7 @@ fun MobileNavGraph(navController: NavHostController) {
             )
         }
 
-        // Media List Screen (for company/network browse)
+        // Mobile Media List Screen (for company/network browse)
         composable(
             route = "media_list/{type}/{id}/{name}",
             arguments = listOf(
@@ -193,7 +193,7 @@ fun MobileNavGraph(navController: NavHostController) {
             val type = backStackEntry.arguments?.getString("type") ?: "company"
             val id = backStackEntry.arguments?.getInt("id") ?: 0
             val name = backStackEntry.arguments?.getString("name") ?: ""
-            com.kiduyuk.klausk.kiduyutv.ui.screens.company_network_list.MediaListScreen(
+            com.kiduyuk.klausk.kiduyutv.ui.screens.company_network_list.MobileMediaListScreen(
                 type = type,
                 id = id,
                 name = name,

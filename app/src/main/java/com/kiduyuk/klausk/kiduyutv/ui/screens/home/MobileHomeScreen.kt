@@ -185,6 +185,23 @@ fun MobileHomeScreen(
                             }
                         }
                     }
+                    // Popular Networks
+                    if (uiState.popularNetworks.isNotEmpty()) {
+                        item {
+                            MobileCategoryRow("Popular Networks", uiState.popularNetworks) { network ->
+                                onNavigate("media_list/${network.type}/${network.id}/${Uri.encode(network.name)}")
+                            }
+                        }
+                    }
+
+                    // Popular Companies
+                    if (uiState.popularCompanies.isNotEmpty()) {
+                        item {
+                            MobileCategoryRow("Production Companies", uiState.popularCompanies) { company ->
+                                onNavigate("media_list/${company.type}/${company.id}/${Uri.encode(company.name)}")
+                            }
+                        }
+                    }
 
                     // Popular Movies
                     if (uiState.trendingMovies.isNotEmpty()) {
@@ -231,23 +248,7 @@ fun MobileHomeScreen(
                         }
                     }
 
-                    // Popular Networks
-                    if (uiState.popularNetworks.isNotEmpty()) {
-                        item {
-                            MobileCategoryRow("Popular Networks", uiState.popularNetworks) { network ->
-                                onNavigate("media_list/${network.type}/${network.id}/${Uri.encode(network.name)}")
-                            }
-                        }
-                    }
 
-                    // Popular Companies
-                    if (uiState.popularCompanies.isNotEmpty()) {
-                        item {
-                            MobileCategoryRow("Production Companies", uiState.popularCompanies) { company ->
-                                onNavigate("media_list/${company.type}/${company.id}/${Uri.encode(company.name)}")
-                            }
-                        }
-                    }
 
                     //Spacer(modifier = Modifier.height(16.dp))
                 }

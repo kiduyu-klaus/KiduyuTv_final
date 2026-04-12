@@ -301,6 +301,19 @@ class TmdbRepository {
             api.getTvShowsByNetwork(networkId, page = page)
         }
 
+    /** Fetches movies filtered by a specific genre. */
+    suspend fun getMoviesByGenre(genreId: Int, page: Int = 1): Result<MovieResponse> =
+        runCatching {
+            api.getMoviesByGenre(genreId, page = page)
+        }
+
+
+    /** Fetches TV shows filtered by a specific genre. */
+    suspend fun getTvShowsByGenre(genreId: Int, page: Int = 1): Result<TvShowResponse> =
+        runCatching {
+            api.getTvShowsByGenre(genreId, page = page)
+        }
+
     /** Fetches details for a specific network. */
     suspend fun getNetworkDetails(networkId: Int): Result<Network> = runCatching {
         api.getNetworkDetails(networkId)
