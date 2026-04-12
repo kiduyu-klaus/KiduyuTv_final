@@ -1,7 +1,9 @@
 package com.kiduyuk.klausk.kiduyutv.util
 
+import android.app.UiModeManager
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -156,27 +158,41 @@ object UpdateUtil {
     }
 
     /**
-     * Detects if the current device is a TV based on system features.
-     * Uses multiple checks to ensure accurate TV detection.
+     * Determines if the current device is a TV.
+     * Uses UiModeManager as the primary (authoritative) check,
+     * with system feature and model string checks as fallbacks.
      */
     fun isTvDevice(context: Context): Boolean {
+        // Primary check: UiModeManager is the official Android API for this
+        val uiModeManager = context.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
+        if (uiModeManager?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION) {
+            Log.d(TAG, "TV detected via UiModeManager")
+            return true
+        }
+
         val packageManager = context.packageManager
-        
-        // Primary TV detection methods
-        val hasFireTv = packageManager.hasSystemFeature("amazon.hardware.fire_tv")
-        val hasLeanback = packageManager.hasSystemFeature("android.software.leanback")
-        
-        // Additional TV detection: check for TV-related system features
-        val hasTvFeature = packageManager.hasSystemFeature("android.hardware.type.tv")
-        
-        // Also check the Build properties for TV indicators
-        val isTvBuild = Build.MODEL.contains("TV", ignoreCase = true) ||
-                        Build.MODEL.contains("AFT", ignoreCase = true) || // Amazon Fire TV models
-                        Build.MODEL.contains("Chromecast", ignoreCase = true)
-        
-        Log.d(TAG, "Device detection - FireTV: $hasFireTv, Leanback: $hasLeanback, TV Feature: $hasTvFeature, Model: ${Build.MODEL}")
-        
-        return hasFireTv || hasLeanback || hasTvFeature || isTvBuild
+
+        // Secondary: system feature flags
+        if (packageManager.hasSystemFeature("amazon.hardware.fire_tv")) {
+            Log.d(TAG, "TV detected via Fire TV feature")
+            return true
+        }
+        if (packageManager.hasSystemFeature("android.software.leanback") ||
+            packageManager.hasSystemFeature("android.software.leanback_only") ||
+            packageManager.hasSystemFeature("android.hardware.type.tv")
+        ) {
+            Log.d(TAG, "TV detected via leanback/tv feature")
+            return true
+        }
+
+        // Tertiary: model string heuristics (least reliable, keep as last resort)
+        val model = Build.MODEL
+        val isTvBuild = model.contains("TV", ignoreCase = true) ||
+                        model.contains("AFT", ignoreCase = true) ||
+                        model.contains("Chromecast", ignoreCase = true)
+
+        Log.d(TAG, "TV model heuristic for '$model': $isTvBuild")
+        return isTvBuild
     }
 
     /**
