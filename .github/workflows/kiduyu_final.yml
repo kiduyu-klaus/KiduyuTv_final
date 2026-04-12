@@ -323,17 +323,17 @@ jobs:
           TAG=$(echo "$RELEASE" | jq -r '.tag_name')
           TITLE=$(echo "$RELEASE" | jq -r '.name')
 
-          # Get TV release APK (the most important for streaming)
-          TV_APK_URL=$(echo "$RELEASE" | jq -r \
-            '[.assets[] | select(.name | test("tv-release"))] | first | .browser_download_url')
-          TV_APK_NAME=$(echo "$RELEASE" | jq -r \
-            '[.assets[] | select(.name | test("tv-release"))] | first | .name')
+          # Get TV release APK with the highest build number
+          TV_ASSET=$(echo "$RELEASE" | jq -r \
+            '[.assets[] | select(.name | test("tv-release.*\\.apk$"))] | sort_by(.name) | last')
+          TV_APK_URL=$(echo "$TV_ASSET" | jq -r '.browser_download_url')
+          TV_APK_NAME=$(echo "$TV_ASSET" | jq -r '.name')
 
-          # Get Phone release APK
-          PHONE_APK_URL=$(echo "$RELEASE" | jq -r \
-            '[.assets[] | select(.name | test("phone-release"))] | first | .browser_download_url')
-          PHONE_APK_NAME=$(echo "$RELEASE" | jq -r \
-            '[.assets[] | select(.name | test("phone-release"))] | first | .name')
+          # Get Phone release APK with the highest build number
+          PHONE_ASSET=$(echo "$RELEASE" | jq -r \
+            '[.assets[] | select(.name | test("phone-release.*\\.apk$"))] | sort_by(.name) | last')
+          PHONE_APK_URL=$(echo "$PHONE_ASSET" | jq -r '.browser_download_url')
+          PHONE_APK_NAME=$(echo "$PHONE_ASSET" | jq -r '.name')
 
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "title=${TITLE}" >> $GITHUB_OUTPUT
@@ -360,25 +360,33 @@ jobs:
 
           html = pathlib.Path("index.html").read_text(encoding="utf-8")
 
-          # Replace TV release APK URL
+          # Update TV download link
           html = re.sub(
-              r'(href=")https://github\.com/[^/]+/[^/]+/releases/download/[^"]+(")',
+              r'id="download-tv"\s+class="[^"]*"\s+target="[^"]*"\s+rel="[^"]*"\s+download[^>]*>',
+              f'id="download-tv" class="btn btn-primary" target="_blank" rel="noopener noreferrer" download="{tv_apk_name}">',
+              html
+          )
+          html = re.sub(
+              r'(id="download-tv"[^>]*href=")[^"]*(")',
               rf'\g<1>{tv_apk_url}\2',
-              html,
-              flags=re.IGNORECASE
+              html
           )
 
-          # Replace TV APK name in download attribute
+          # Update Mobile download link
           html = re.sub(
-              r'(download=")KiduyuTV-[^"]+(")',
-              rf'\g<1>{tv_apk_name}\2',
-              html,
-              flags=re.IGNORECASE
+              r'id="download-mobile"\s+class="[^"]*"\s+target="[^"]*"\s+rel="[^"]*"\s+download[^>]*>',
+              f'id="download-mobile" class="btn btn-primary" target="_blank" rel="noopener noreferrer" download="{phone_apk_name}">',
+              html
+          )
+          html = re.sub(
+              r'(id="download-mobile"[^>]*href=")[^"]*(")',
+              rf'\g<1>{phone_apk_url}\2',
+              html
           )
 
           pathlib.Path("index.html").write_text(html, encoding="utf-8")
-          print(f"✅ Updated download link → {tv_apk_name}")
-          print(f"📱 Phone APK: {phone_apk_name}")
+          print(f"✅ Updated TV download link → {tv_apk_name}")
+          print(f"✅ Updated Mobile download link → {phone_apk_name}")
           PYEOF
 
       - name: Upload Pages artifact
