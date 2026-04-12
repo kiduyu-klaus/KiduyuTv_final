@@ -1,5 +1,6 @@
 package com.kiduyuk.klausk.kiduyutv.ui.screens.detail
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -31,6 +32,7 @@ import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamLinksViewModel
 import androidx.compose.material3.CircularProgressIndicator
+import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 
 /**
  * Mobile version of StreamLinksScreen.
@@ -192,6 +194,33 @@ fun MobileStreamLinksScreen(
                         MobileStreamProviderCard(
                             provider = provider,
                             onProviderClick = {
+                                // Launch PlayerActivity for webview links
+                                val intent = Intent(context, PlayerActivity::class.java).apply {
+                                    putExtra("TMDB_ID", tmdbId)
+                                    putExtra("IS_TV", isTv)
+                                    putExtra("SEASON_NUMBER", season ?: 0)
+                                    putExtra("EPISODE_NUMBER", episode ?: 0)
+                                    putExtra("TITLE", title)
+                                    putExtra("OVERVIEW", overview)
+                                    putExtra("POSTER_PATH", posterPath)
+                                    putExtra("BACKDROP_PATH", backdropPath)
+                                    putExtra("VOTE_AVERAGE", voteAverage)
+                                    putExtra("RELEASE_DATE", releaseDate)
+
+                                    val finalUrl = if (timestamp > 0) {
+                                        when (provider.name) {
+                                            "VidLink" -> "${provider.urlTemplate}&startAt=$timestamp"
+                                            "VidKing" -> "${provider.urlTemplate}&progress=$timestamp"
+                                            "Videasy" -> "${provider.urlTemplate}&progress=$timestamp"
+                                            "VidFast" -> "${provider.urlTemplate}&startAt=$timestamp"
+                                            else -> provider.urlTemplate
+                                        }
+                                    } else {
+                                        provider.urlTemplate
+                                    }
+                                    putExtra("STREAM_URL", finalUrl)
+                                }
+                                context.startActivity(intent)
                                 onProviderClick(provider.urlTemplate)
                             }
                         )
