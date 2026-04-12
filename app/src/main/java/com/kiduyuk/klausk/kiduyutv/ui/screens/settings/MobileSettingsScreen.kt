@@ -27,6 +27,7 @@ import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
+import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.SettingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,6 +41,7 @@ fun MobileSettingsScreen(
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
     val myList by MyListManager.myList.collectAsState()
+    var showProviderPicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.loadSettingsData(context)
@@ -73,6 +75,20 @@ fun MobileSettingsScreen(
                     title = "My List",
                     subtitle = "${myList.size} items saved",
                     onClick = onMyListClick
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            SettingsGroup(title = "Playback") {
+                SettingsItem(
+                    icon = Icons.Default.PlayCircle,
+                    title = "Default Provider",
+                    subtitle = if (uiState.defaultProvider == SettingsManager.AUTO)
+                        "Ask each time"
+                    else
+                        uiState.defaultProvider,
+                    onClick = { showProviderPicker = true }
                 )
             }
 
@@ -196,6 +212,80 @@ fun MobileSettingsScreen(
             }
             Spacer(modifier = Modifier.height(16.dp))
         }
+    }
+
+    // ── Default Provider Picker Dialog ────────────────────────────────────────
+    if (showProviderPicker) {
+        val options = listOf(SettingsManager.AUTO) + SettingsManager.PROVIDERS
+        AlertDialog(
+            onDismissRequest = { showProviderPicker = false },
+            containerColor = CardDark,
+            title = {
+                Text(
+                    "Default Provider",
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        "Choose which provider opens automatically when you tap Play. " +
+                                "Select \"Auto\" to always see the full list.",
+                        color = TextSecondary,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    options.forEach { option ->
+                        val isSelected = option == uiState.defaultProvider
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    viewModel.setDefaultProvider(context, option)
+                                    showProviderPicker = false
+                                }
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = isSelected,
+                                onClick = {
+                                    viewModel.setDefaultProvider(context, option)
+                                    showProviderPicker = false
+                                },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = PrimaryRed,
+                                    unselectedColor = TextSecondary
+                                )
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = option,
+                                    color = if (isSelected) TextPrimary else TextSecondary,
+                                    fontSize = 15.sp,
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                )
+                                if (option == SettingsManager.AUTO) {
+                                    Text(
+                                        "Show provider list each time",
+                                        color = TextSecondary,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showProviderPicker = false }) {
+                    Text("Done", color = PrimaryRed)
+                }
+            }
+        )
     }
 }
 

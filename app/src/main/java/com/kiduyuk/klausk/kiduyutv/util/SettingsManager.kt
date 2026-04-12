@@ -11,12 +11,19 @@ class SettingsManager(context: Context) {
         preferences.edit().putString(KEY_DEFAULT_PROVIDER, provider).apply()
     }
 
-    fun getDefaultProvider(): String? {
-        return preferences.getString(KEY_DEFAULT_PROVIDER, null)
+    /** Returns the saved default provider name, or [AUTO] if none is set. */
+    fun getDefaultProvider(): String {
+        return preferences.getString(KEY_DEFAULT_PROVIDER, AUTO) ?: AUTO
     }
 
     companion object {
         private const val PREFS_NAME = "app_settings"
         private const val KEY_DEFAULT_PROVIDER = "default_provider"
+
+        /** Sentinel value meaning "ask me each time" — no automatic selection. */
+        const val AUTO = "Auto"
+
+        /** All active providers in display order. */
+        val PROVIDERS = listOf("Videasy", "VidLink", "VidFast", "VidKing", "Flixer")
     }
 }

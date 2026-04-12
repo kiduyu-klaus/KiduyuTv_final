@@ -16,6 +16,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.PlaylistRemove
 import androidx.compose.material.icons.filled.Update
 import androidx.compose.material3.CircularProgressIndicator
@@ -39,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
+import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.SettingsViewModel
 import androidx.compose.foundation.Image
 import com.kiduyuk.klausk.kiduyutv.R
@@ -120,6 +123,13 @@ fun SettingsScreen(
                         isClearingWatchHistory = uiState.isClearingWatchHistory,
                         watchHistoryClearSuccess = uiState.watchHistoryClearSuccess,
                         onClearWatchHistoryClick = { viewModel.clearWatchHistory() }
+                    )
+                }
+
+                SettingsSection.PLAYBACK -> {
+                    PlaybackContent(
+                        defaultProvider = uiState.defaultProvider,
+                        onProviderSelect = { viewModel.setDefaultProvider(context, it) }
                     )
                 }
 
@@ -764,6 +774,123 @@ private fun AppVersionContent(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Playback — default provider selector
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Content for the Playback section.
+ * Shows a D-pad-navigable list of provider options; the active selection is
+ * highlighted with a red border and a checkmark icon.
+ */
+@Composable
+private fun PlaybackContent(
+    defaultProvider: String,
+    onProviderSelect: (String) -> Unit
+) {
+    val options = listOf(SettingsManager.AUTO) + SettingsManager.PROVIDERS
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.Top
+    ) {
+        Text(
+            text = "Playback",
+            color = TextPrimary,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 24.dp)
+        )
+
+        SettingsSectionLabel(text = "Default Provider")
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(CardDark)
+                .padding(24.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "Choose which provider opens automatically when you press Play. " +
+                            "Set to \"Auto\" to always see the full provider list.",
+                    color = TextSecondary,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                options.forEach { option ->
+                    val isSelected = option == defaultProvider
+                    val interactionSource = remember { MutableInteractionSource() }
+                    val isFocused by interactionSource.collectIsFocusedAsState()
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                when {
+                                    isSelected -> PrimaryRed.copy(alpha = 0.12f)
+                                    isFocused -> SurfaceDark
+                                    else -> Color.Transparent
+                                }
+                            )
+                            .border(
+                                width = if (isSelected || isFocused) 2.dp else 1.dp,
+                                color = when {
+                                    isSelected -> PrimaryRed
+                                    isFocused -> DarkRed.copy(alpha = 0.6f)
+                                    else -> TextTertiary.copy(alpha = 0.2f)
+                                },
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .clickable(
+                                interactionSource = interactionSource,
+                                indication = null,
+                                onClick = { onProviderSelect(option) }
+                            )
+                            .focusable(interactionSource = interactionSource)
+                            .padding(horizontal = 20.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.PlayCircle,
+                                contentDescription = null,
+                                tint = if (isSelected) PrimaryRed else TextSecondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Column {
+                                Text(
+                                    text = option,
+                                    color = if (isSelected || isFocused) TextPrimary else TextSecondary,
+                                    fontSize = 16.sp,
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                )
+                                if (option == SettingsManager.AUTO) {
+                                    Text(
+                                        text = "Show provider list each time",
+                                        color = TextSecondary,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Shared UI components
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -905,6 +1032,7 @@ private fun SettingsActionCard(
  */
 private enum class SettingsSection(val title: String) {
     APP_SETTINGS("App Settings"),
+    PLAYBACK("Playback"),
     APP_INFORMATION("App Information"),
     APP_VERSION("App Version")
 }

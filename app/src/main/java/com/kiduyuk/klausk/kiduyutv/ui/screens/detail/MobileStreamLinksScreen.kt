@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamLinksViewModel
@@ -75,6 +76,33 @@ fun MobileStreamLinksScreen(
 
     LaunchedEffect(tmdbId, isTv, season, episode) {
         viewModel.loadStreamProviders(tmdbId, isTv, season, episode, context)
+    }
+
+    // Auto-launch if a default provider is set and providers have loaded
+    val defaultProvider = remember { SettingsManager(context).getDefaultProvider() }
+    LaunchedEffect(uiState.streamProviders) {
+        if (defaultProvider != SettingsManager.AUTO && uiState.streamProviders.isNotEmpty()) {
+            val match = uiState.streamProviders.find { it.name == defaultProvider }
+            if (match != null) {
+                val url = when (match.name) {
+                    "VidLink" -> "${match.urlTemplate}&startAt=$timestamp"
+                    "VidKing" -> "${match.urlTemplate}&progress=$timestamp"
+                    "Videasy" -> "${match.urlTemplate}&progress=$timestamp"
+                    "VidFast" -> "${match.urlTemplate}&startAt=$timestamp"
+                    else -> match.urlTemplate
+                }
+                val intent = Intent(context, PlayerActivity::class.java).apply {
+                    putExtra("url", url)
+                    putExtra("title", title)
+                    putExtra("tmdbId", tmdbId)
+                    putExtra("isTv", isTv)
+                    putExtra("season", season ?: 0)
+                    putExtra("episode", episode ?: 0)
+                    putExtra("timestamp", timestamp)
+                }
+                context.startActivity(intent)
+            }
+        }
     }
 
     Box(

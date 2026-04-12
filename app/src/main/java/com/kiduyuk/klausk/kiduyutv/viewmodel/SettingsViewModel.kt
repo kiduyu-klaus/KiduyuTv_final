@@ -10,6 +10,7 @@ import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.data.local.database.DatabaseManager
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
+import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.util.UpdateUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -31,6 +32,10 @@ class SettingsViewModel : ViewModel() {
      */
     fun loadSettingsData(context: Context) {
         viewModelScope.launch {
+            // Load default provider preference
+            val settingsManager = SettingsManager(context)
+            _uiState.update { it.copy(defaultProvider = settingsManager.getDefaultProvider()) }
+
             // Fetch cache size
             val size = withContext(Dispatchers.IO) {
                 getFolderSize(context.cacheDir)
@@ -43,6 +48,14 @@ class SettingsViewModel : ViewModel() {
                 _uiState.update { it.copy(releaseTitle = title) }
             }
         }
+    }
+
+    /**
+     * Persist and update the default stream provider preference.
+     */
+    fun setDefaultProvider(context: Context, provider: String) {
+        SettingsManager(context).saveDefaultProvider(provider)
+        _uiState.update { it.copy(defaultProvider = provider) }
     }
 
     /**
@@ -334,6 +347,8 @@ data class SettingsUiState(
     val castsClearSuccess: Boolean = false,
     val isClearingWatchHistory: Boolean = false,
     val watchHistoryClearSuccess: Boolean = false,
+    // Default provider preference
+    val defaultProvider: String = com.kiduyuk.klausk.kiduyutv.util.SettingsManager.AUTO,
     // Update check states
     val isCheckingForUpdates: Boolean = false,
     val updateCheckResult: String? = null,
