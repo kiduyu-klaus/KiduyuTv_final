@@ -72,6 +72,52 @@ class SplashActivity : ComponentActivity() {
     // Tracks every dialog shown so onDestroy can safely dismiss them all
     private val activeDialogs = mutableListOf<Dialog>()
 
+    // APK file reference for installation result handling
+    private var pendingApkFile: File? = null
+
+    // Activity result launcher for APK installation
+    private val installLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        Log.i(TAG, "Installation result received: ${result.resultCode}")
+        pendingApkFile?.let { apkFile ->
+            // Check if the app was actually updated (package version changed)
+            if (isPackageInstalled(packageName)) {
+                Log.i(TAG, "Package installed successfully, restarting app")
+                restartApp()
+            } else {
+                Log.i(TAG, "Installation was cancelled or failed")
+                // User cancelled or installation failed, exit
+                finish()
+            }
+        }
+        pendingApkFile = null
+    }
+
+    /**
+     * Checks if the given package name is installed on the device.
+     */
+    private fun isPackageInstalled(packageName: String): Boolean {
+        return try {
+            packageManager.getPackageInfo(packageName, 0)
+            true
+        } catch (e: PackageManager.NameNotFoundException) {
+            false
+        }
+    }
+
+    /**
+     * Restarts the application by launching MainActivity and finishing SplashActivity.
+     */
+    private fun restartApp() {
+        Log.i(TAG, "Restarting application...")
+        val intent = Intent(this, MainActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        }
+        startActivity(intent)
+        finish()
+    }
+
     private fun Dialog.showTracked() {
         activeDialogs.add(this)
         show()
@@ -298,12 +344,45 @@ class SplashActivity : ComponentActivity() {
             negativeButtonText = "Exit",
             lottieAnimRes = R.raw.splash_loading,
             onYes = {
-                UpdateUtil.checkPermissionAndInstall(this, apkFile) {
-                    showPermissionDialog(apkFile)
+                // Store the APK file reference for result handling
+                pendingApkFile = apkFile
+                
+                // Check permission and launch installation
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    if (packageManager.canRequestPackageInstalls()) {
+                        launchInstallation(apkFile)
+                    } else {
+                        showPermissionDialog(apkFile)
+                    }
+                } else {
+                    launchInstallation(apkFile)
                 }
             },
             onNo = { finish() }
         ).showTracked()
+    }
+
+    /**
+     * Launches the APK installation intent using Activity Result API.
+     */
+    private fun launchInstallation(apkFile: File) {
+        val installIntent = UpdateUtil.getInstallIntent(this, apkFile)
+        if (installIntent != null) {
+            installLauncher.launch(installIntent)
+        } else {
+            // Fallback to direct installation if intent creation fails
+            UpdateUtil.installApk(this, apkFile)
+            // For fallback, we need to poll or rely on user interaction
+            // Schedule a check after a delay to restart the app
+            Log.w(TAG, "Using fallback install method, scheduling restart check")
+            android.os.Handler(mainLooper).postDelayed({
+                if (isPackageInstalled(packageName)) {
+                    restartApp()
+                } else {
+                    finish()
+                }
+            }, 5000) // Wait 5 seconds for user to complete installation
+        }
     }
 
     private fun showPermissionDialog(apkFile: File) {
@@ -316,10 +395,30 @@ class SplashActivity : ComponentActivity() {
             lottieAnimRes = R.raw.exit,
             onNo = { finish() },
             onYes = {
+                // Store the APK file before opening settings
+                pendingApkFile = apkFile
                 UpdateUtil.openInstallPermissionSettings(this)
-                finish()
+                // Don't finish - we'll check permission when user returns
             }
         ).showTracked()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Check if we returned from settings and now have permission
+        pendingApkFile?.let { apkFile ->
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || 
+                packageManager.canRequestPackageInstalls()) {
+                Log.i(TAG, "Permission granted after returning from settings, launching installation")
+                // Clear pending file first to avoid recursion
+                pendingApkFile = null
+                // Dismiss any active dialogs before launching installation
+                activeDialogs.forEach { if (it.isShowing) it.dismiss() }
+                activeDialogs.clear()
+                // Launch installation
+                launchInstallation(apkFile)
+            }
+        }
     }
 
     // ── Composable ────────────────────────────────────────────────────────────

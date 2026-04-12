@@ -653,6 +653,30 @@ object UpdateUtil {
     }
 
     /**
+     * Creates an intent for APK installation that can be launched with ActivityResultLauncher.
+     * Returns the intent to be used with activity result APIs.
+     */
+    fun getInstallIntent(context: Context, apkFile: File): Intent? {
+        return try {
+            val uri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.provider",
+                apkFile
+            )
+            Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+                data = uri
+                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or 
+                        Intent.FLAG_ACTIVITY_NEW_TASK
+                putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+                putExtra(Intent.EXTRA_RETURN_RESULT, true)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to create install intent", e)
+            null
+        }
+    }
+
+    /**
      * Checks if the app has permission to install packages from unknown sources.
      * For Android 8.0+ (API 26), this permission must be granted at runtime.
      */
