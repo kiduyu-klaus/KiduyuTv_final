@@ -91,8 +91,8 @@ class SplashActivity : ComponentActivity() {
         when {
             // Fire TV: notification permission dialogs are not surfaced to the user
             // on most Fire OS builds — skip the request and proceed immediately.
-            isFireTv() -> {
-                Log.i(TAG, "Fire TV detected — skipping notification permission request")
+            UpdateUtil.isTvDevice(this) -> {
+                Log.i(TAG, "TV detected — skipping notification permission request")
                 permissionHandled = true
             }
 
@@ -118,14 +118,9 @@ class SplashActivity : ComponentActivity() {
 
     // ── Device detection ──────────────────────────────────────────────────────────
 
-    private fun isFireTv(): Boolean =
-        packageManager.hasSystemFeature("amazon.hardware.fire_tv")
-
-    /**
-     * Determines the device type string for logging and display purposes.
-     */
     private fun getDeviceTypeString(): String {
-        return if (isFireTv() || UpdateUtil.isTvDevice(this)) "TV" else "Phone/Tablet"
+        // Single source of truth — same method used to select the APK
+        return if (UpdateUtil.isTvDevice(this)) "TV" else "Phone/Tablet"
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
