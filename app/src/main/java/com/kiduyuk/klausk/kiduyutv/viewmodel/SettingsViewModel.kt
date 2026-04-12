@@ -223,6 +223,7 @@ class SettingsViewModel : ViewModel() {
 
     /**
      * Check for app updates.
+     * Uses the same approach as SplashActivity for consistency.
      */
     fun checkForUpdates(context: Context) {
         if (_uiState.value.isCheckingForUpdates) return
@@ -237,7 +238,13 @@ class SettingsViewModel : ViewModel() {
 
         viewModelScope.launch {
             try {
-                val remoteVersion = UpdateUtil.fetchRemoteVersion()
+                // Try GitHub API first (same as SplashActivity)
+                var remoteVersion = UpdateUtil.fetchLatestGitHubReleaseVersion()
+                if (remoteVersion == null) {
+                    // Fallback to VERSION file
+                    remoteVersion = UpdateUtil.fetchRemoteVersion()
+                }
+
                 val localVersionName = BuildConfig.VERSION_NAME
                 Log.i("SettingsViewModel", "Remote version: $remoteVersion, Local version: $localVersionName")
 
@@ -277,6 +284,7 @@ class SettingsViewModel : ViewModel() {
 
     /**
      * Download and install the latest update.
+     * Uses the same approach as SplashActivity for consistency.
      */
     fun downloadAndInstallUpdate(context: Context) {
         if (_uiState.value.isDownloadingUpdate) return
@@ -284,27 +292,61 @@ class SettingsViewModel : ViewModel() {
         _uiState.update { it.copy(isDownloadingUpdate = true, downloadProgress = 0) }
 
         viewModelScope.launch {
-            val apkUrl = UpdateUtil.fetchLatestApkUrl()
-            if (apkUrl != null) {
-                val apkFile = UpdateUtil.downloadApk(context, apkUrl) { progress ->
-                    _uiState.update { it.copy(downloadProgress = progress) }
-                }
+            try {
+                // Get device-specific APK info (same as SplashActivity)
+                val apkInfo = UpdateUtil.fetchBestApkInfo(context)
+                if (apkInfo != null) {
+                    // Check for existing cached APK before downloading (same as SplashActivity)
+                    val localFile = UpdateUtil.getLocalApkFile(context)
+                    when {
+                        UpdateUtil.isLocalApkValid(context, apkInfo) -> {
+                            // Cached file is valid - skip download
+                            Log.i("SettingsViewModel", "Valid cached APK found, skipping download")
+                            _uiState.update { it.copy(isDownloadingUpdate = false, downloadProgress = 0) }
+                            UpdateUtil.checkPermissionAndInstall(context, localFile) {
+                                showPermissionDialog(context, localFile)
+                            }
+                            return@launch
+                        }
+                        localFile.exists() -> {
+                            // Delete stale cached APK
+                            localFile.delete()
+                            Log.i("SettingsViewModel", "Deleted stale cached APK")
+                        }
+                    }
 
-                _uiState.update { it.copy(isDownloadingUpdate = false, downloadProgress = 0) }
+                    // Download APK with progress
+                    val apkFile = UpdateUtil.downloadApk(context, apkInfo) { progress, _ ->
+                        _uiState.update { it.copy(downloadProgress = progress) }
+                    }
 
-                if (apkFile != null) {
-                    UpdateUtil.checkPermissionAndInstall(context, apkFile) {
-                        showPermissionDialog(context, apkFile)
+                    _uiState.update { it.copy(isDownloadingUpdate = false, downloadProgress = 0) }
+
+                    if (apkFile != null) {
+                        // Save APK metadata for future cache validation
+                        UpdateUtil.saveDownloadedApkMeta(context, apkInfo)
+                        UpdateUtil.checkPermissionAndInstall(context, apkFile) {
+                            showPermissionDialog(context, apkFile)
+                        }
+                    } else {
+                        _uiState.update { it.copy(updateCheckResult = "Download failed. Please try again.") }
                     }
                 } else {
-                    _uiState.update { it.copy(updateCheckResult = "Download failed. Please try again.") }
+                    // Fallback: open releases page in browser
+                    Log.w("SettingsViewModel", "No APK found for device, opening releases page")
+                    _uiState.update { it.copy(isDownloadingUpdate = false) }
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/kiduyu-klaus/KiduyuTv_final/releases/latest"))
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(intent)
                 }
-            } else {
-                // Fallback: open releases page in browser
-                _uiState.update { it.copy(isDownloadingUpdate = false) }
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/kiduyu-klaus/KiduyuTv_final/releases/latest"))
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                context.startActivity(intent)
+            } catch (e: Exception) {
+                Log.e("SettingsViewModel", "Error downloading update", e)
+                _uiState.update {
+                    it.copy(
+                        isDownloadingUpdate = false,
+                        updateCheckResult = "Download failed: ${e.message}"
+                    )
+                }
             }
         }
     }
