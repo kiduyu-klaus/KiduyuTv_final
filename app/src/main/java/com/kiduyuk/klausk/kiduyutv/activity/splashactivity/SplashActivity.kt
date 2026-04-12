@@ -9,11 +9,11 @@ import android.os.Build
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -41,11 +41,18 @@ import java.io.File
 @SuppressLint("CustomSplashScreen")
 class SplashActivity : ComponentActivity() {
 
+    companion object {
+        private const val TAG = "SplashActivity"
+    }
+
     // Compose-observable flag — when true, SplashScreen will NOT navigate to MainActivity
     private var updateAvailable by mutableStateOf(false)
 
     // Flag to ensure we only proceed after permission is handled (if applicable)
     private var permissionHandled by mutableStateOf(false)
+
+    // Current remote version for display in update dialog
+    private var currentRemoteVersion: String? = null
 
     // Tracks every dialog shown so onDestroy can safely dismiss them all
     private val activeDialogs = mutableListOf<Dialog>()
@@ -68,9 +75,9 @@ class SplashActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
         if (isGranted) {
-            Log.i("SplashActivity", "Notification permission granted")
+            Log.i(TAG, "Notification permission granted")
         } else {
-            Log.i("SplashActivity", "Notification permission denied")
+            Log.i(TAG, "Notification permission denied")
         }
         permissionHandled = true
     }
@@ -80,7 +87,7 @@ class SplashActivity : ComponentActivity() {
             // Fire TV: notification permission dialogs are not surfaced to the user
             // on most Fire OS builds — skip the request and proceed immediately.
             isFireTv() -> {
-                Log.i("SplashActivity", "Fire TV detected — skipping notification permission request")
+                Log.i(TAG, "Fire TV detected — skipping notification permission request")
                 permissionHandled = true
             }
 
@@ -109,6 +116,13 @@ class SplashActivity : ComponentActivity() {
     private fun isFireTv(): Boolean =
         packageManager.hasSystemFeature("amazon.hardware.fire_tv")
 
+    /**
+     * Determines the device type string for logging purposes.
+     */
+    private fun getDeviceTypeString(): String {
+        return if (isFireTv() || UpdateUtil.isTvDevice(this)) "TV" else "Phone/Tablet"
+    }
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -130,37 +144,64 @@ class SplashActivity : ComponentActivity() {
 
     // ── Update check ──────────────────────────────────────────────────────────
 
+    /**
+     * Enhanced update check using GitHub Releases API with OkHttpClient.
+     * Fetches the latest release version and compares with local version.
+     */
     private fun checkForUpdates() {
         lifecycleScope.launch {
-            val remoteVersion = UpdateUtil.fetchRemoteVersion()
+            Log.i(TAG, "Starting update check for ${getDeviceTypeString()} device...")
+            
+            // Try the new GitHub Releases API first
+            var remoteVersion = UpdateUtil.fetchLatestGitHubReleaseVersion()
+            
+            // Fallback to legacy VERSION file if GitHub API fails
+            if (remoteVersion == null) {
+                Log.w(TAG, "GitHub API failed, falling back to VERSION file")
+                remoteVersion = UpdateUtil.fetchRemoteVersion()
+            }
+            
             if (remoteVersion != null) {
                 val localVersionName = BuildConfig.VERSION_NAME
-                Log.i("SplashActivity", "Remote version: $remoteVersion, Local version: $localVersionName")
-                if (UpdateUtil.isNewerVersion(remoteVersion, localVersionName)) {
+                val isNewer = UpdateUtil.isNewerVersion(remoteVersion, localVersionName)
+                
+                Log.i(TAG, "Remote version: $remoteVersion, Local version: $localVersionName, Is newer: $isNewer")
+                
+                if (isNewer) {
+                    currentRemoteVersion = remoteVersion
                     updateAvailable = true   // gate the splash timeout BEFORE showing the dialog
                     showUpdateDialog(remoteVersion)
                 }
+            } else {
+                Log.w(TAG, "Could not fetch remote version, skipping update check")
             }
         }
     }
 
     // ── Dialogs ───────────────────────────────────────────────────────────────
 
+    /**
+     * Shows the update available dialog to the user.
+     * User can choose to download the update or exit the app.
+     */
     private fun showUpdateDialog(remoteVersion: String) {
         QuitDialog(
             context = this,
             title = "v$remoteVersion Update Available",
-            message = "A newer version of Kiduyu TV (v$remoteVersion) is available. Would you like to download it now?",
+            message = "A newer version of Kiduyu TV (v$remoteVersion) is available for your ${getDeviceTypeString()}.\nWould you like to download it now?",
             positiveButtonText = "Download",
             negativeButtonText = "Exit",
             lottieAnimRes = R.raw.exit,
             onNo = { finish() }, // User chose Exit, close the app
             onYes = {
                 lifecycleScope.launch {
-                    val apkUrl = UpdateUtil.fetchLatestApkUrl()
+                    // Use device-specific APK fetching
+                    val apkUrl = UpdateUtil.fetchBestApkUrl(this@SplashActivity)
                     if (apkUrl != null) {
+                        Log.i(TAG, "Found APK for download: $apkUrl")
                         downloadAndInstallApk(apkUrl)
                     } else {
+                        Log.w(TAG, "Could not find APK for this device type, opening releases page")
                         // Fallback: open releases page in browser
                         startActivity(
                             Intent(
@@ -174,17 +215,24 @@ class SplashActivity : ComponentActivity() {
         ).showTracked()
     }
 
+    /**
+     * Downloads the APK file and shows progress to the user.
+     * After successful download, prompts user to install.
+     */
     private fun downloadAndInstallApk(apkUrl: String) {
         // ── Build the progress dialog ─────────────────────────────────────────
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(72, 40, 72, 24)
+            setBackgroundColor(android.graphics.Color.parseColor("#1A1A1A"))
         }
+        
         val statusText = TextView(this).apply {
-            text = "Starting download…"
+            text = "Starting download..."
             textSize = 13f
             setTextColor(android.graphics.Color.WHITE)
         }
+        
         val progressBar = ProgressBar(
             this, null, android.R.attr.progressBarStyleHorizontal
         ).apply {
@@ -196,7 +244,15 @@ class SplashActivity : ComponentActivity() {
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { topMargin = 20 }
         }
+        
+        val deviceTypeText = TextView(this).apply {
+            text = "Downloading ${getDeviceTypeString()} version..."
+            textSize = 11f
+            setTextColor(android.graphics.Color.GRAY)
+        }
+        
         layout.addView(statusText)
+        layout.addView(deviceTypeText)
         layout.addView(progressBar)
 
         val progressDialog = AlertDialog.Builder(this)
@@ -210,7 +266,7 @@ class SplashActivity : ComponentActivity() {
         lifecycleScope.launch {
             val apkFile = UpdateUtil.downloadApk(this@SplashActivity, apkUrl) { pct ->
                 progressBar.progress = pct
-                statusText.text = "Downloading… $pct%"
+                statusText.text = "Downloading... $pct%"
             }
 
             // Dismiss and remove from tracker before showing the next dialog
@@ -219,13 +275,14 @@ class SplashActivity : ComponentActivity() {
 
             // ── Post-download QuitDialog ──────────────────────────────────────
             if (apkFile != null) {
+                Log.i(TAG, "Download complete, prompting user to install")
                 QuitDialog(
                     context = this@SplashActivity,
                     title = "Download Complete",
-                    message = "KiduyuTV has been downloaded.\nTap Install to apply the update.",
+                    message = "KiduyuTV (${getDeviceTypeString()} version) has been downloaded.\nTap Install to apply the update.",
                     positiveButtonText = "Install",
                     negativeButtonText = "Exit",
-                    lottieAnimRes = R.raw.splash_loading,  // swap for a success Lottie if available
+                    lottieAnimRes = R.raw.splash_loading,
                     onYes = { 
                         UpdateUtil.checkPermissionAndInstall(this@SplashActivity, apkFile) {
                             showPermissionDialog(apkFile)
@@ -234,6 +291,7 @@ class SplashActivity : ComponentActivity() {
                     onNo = { finish() } // Exit if user declines installation after download
                 ).showTracked()
             } else {
+                Log.e(TAG, "Download failed")
                 QuitDialog(
                     context = this@SplashActivity,
                     title = "Download Failed",
@@ -248,19 +306,23 @@ class SplashActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Shows a dialog guiding the user to enable unknown app installation.
+     * Required for Android 8.0+ to install APKs outside the Play Store.
+     */
     private fun showPermissionDialog(apkFile: File) {
         QuitDialog(
             context = this,
             title = "Permission Required",
-            message = "To install the update, Kiduyu TV needs permission to install unknown apps. Please enable it in the settings.",
+            message = "To install the update, Kiduyu TV needs permission to install unknown apps.\n\nPlease enable 'Install unknown apps' for Kiduyu TV in Settings.",
             positiveButtonText = "Settings",
             negativeButtonText = "Exit",
             lottieAnimRes = R.raw.exit,
             onNo = { finish() },
             onYes = {
                 UpdateUtil.openInstallPermissionSettings(this)
-                // They'll have to come back to the app manually or we can't easily track the result here,
-                // or they can restart the app to trigger the check again.
+                // User needs to manually grant permission and return to app
+                // or restart to trigger the check again
                 finish()
             }
         ).showTracked()
@@ -280,6 +342,7 @@ class SplashActivity : ComponentActivity() {
             iterations = LottieConstants.IterateForever
         )
 
+        // Reduce wait time if update is available (user may want to proceed to download)
         LaunchedEffect(updateAvailable, permissionHandled) {
             if (!updateAvailable && permissionHandled) {
                 delay(6000)
@@ -317,14 +380,28 @@ class SplashActivity : ComponentActivity() {
                 )
             }
             
-            Text(
-                text = "v${BuildConfig.VERSION_NAME}",
-                color = Color.DarkGray,
-                fontSize = 12.sp,
+            Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 32.dp)
-            )
+                    .padding(bottom = 32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "v${BuildConfig.VERSION_NAME}",
+                    color = Color.DarkGray,
+                    fontSize = 12.sp
+                )
+                
+                if (updateAvailable && currentRemoteVersion != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Update available: v$currentRemoteVersion",
+                        color = Color(0xFFE65100),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
         }
     }
 }
