@@ -141,7 +141,7 @@ fun MobileSettingsScreen(
                 SettingsItem(
                     icon = Icons.Default.Info,
                     title = "About KiduyuTV",
-                    subtitle = "Version 1.1.70",
+                    subtitle = "Version ${com.kiduyuk.klausk.kiduyutv.BuildConfig.VERSION_NAME}",
                     onClick = { /* Could show a dialog */ }
                 )
                 SettingsItem(
@@ -180,7 +180,7 @@ fun MobileSettingsScreen(
             
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Text(
-                    text = "KiduyuTV v1.1.70",
+                    text = "KiduyuTV v${com.kiduyuk.klausk.kiduyutv.BuildConfig.VERSION_NAME}",
                     color = TextSecondary,
                     fontSize = 12.sp
                 )
