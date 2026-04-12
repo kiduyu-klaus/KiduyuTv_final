@@ -11,6 +11,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
@@ -161,6 +163,28 @@ fun MobileTvShowDetailScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Episodes")
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Button(
+                        onClick = { viewModel.toggleMyList(context) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (uiState.isInMyList) CardDark else SurfaceDark
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(
+                            if (uiState.isInMyList) Icons.Default.Check else Icons.Default.Add,
+                            contentDescription = null,
+                            tint = if (uiState.isInMyList) PrimaryRed else Color.White
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            if (uiState.isInMyList) "In My List" else "Add to My List",
+                            color = if (uiState.isInMyList) PrimaryRed else Color.White
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))

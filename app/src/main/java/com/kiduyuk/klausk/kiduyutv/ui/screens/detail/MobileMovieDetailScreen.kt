@@ -10,6 +10,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
@@ -121,27 +123,49 @@ fun MobileMovieDetailScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Button(
-                        onClick = {
-                            val route = com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen.StreamLinks.createRoute(
-                                tmdbId = movie.id,
-                                isTv = false,
-                                title = movie.title ?: "",
-                                overview = movie.overview,
-                                posterPath = movie.posterPath,
-                                backdropPath = movie.backdropPath,
-                                voteAverage = movie.voteAverage,
-                                releaseDate = movie.releaseDate
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(
+                            onClick = {
+                                val route = com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen.StreamLinks.createRoute(
+                                    tmdbId = movie.id,
+                                    isTv = false,
+                                    title = movie.title ?: "",
+                                    overview = movie.overview,
+                                    posterPath = movie.posterPath,
+                                    backdropPath = movie.backdropPath,
+                                    voteAverage = movie.voteAverage,
+                                    releaseDate = movie.releaseDate
+                                )
+                                onPlayClick(route)
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryRed),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Play Now")
+                        }
+
+                        Button(
+                            onClick = { viewModel.toggleMyList(context) },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (uiState.isInMyList) CardDark else SurfaceDark
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(
+                                if (uiState.isInMyList) Icons.Default.Check else Icons.Default.Add,
+                                contentDescription = null,
+                                tint = if (uiState.isInMyList) PrimaryRed else Color.White
                             )
-                            onPlayClick(route)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryRed),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Play Now")
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                if (uiState.isInMyList) "In My List" else "Add to My List",
+                                color = if (uiState.isInMyList) PrimaryRed else Color.White
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
