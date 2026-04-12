@@ -40,10 +40,11 @@ object UpdateUtil {
 
     fun isNewerVersion(remote: String, local: String = BuildConfig.VERSION_NAME): Boolean {
         return try {
-            val remoteParts = remote.split(".").mapNotNull { it.toIntOrNull() }
-            val localParts = local.split(".").mapNotNull { it.toIntOrNull() }
+            // Helper to extract only numeric part from a version segment (e.g., "73-phone" -> 73)
+            fun String.toNumericPart(): Int = this.takeWhile { it.isDigit() }.toIntOrNull() ?: 0
 
-            if (remoteParts.isEmpty() || localParts.isEmpty()) return remote > local
+            val remoteParts = remote.split(".").map { it.toNumericPart() }
+            val localParts = local.split(".").map { it.toNumericPart() }
 
             val maxLength = maxOf(remoteParts.size, localParts.size)
             for (i in 0 until maxLength) {
@@ -54,7 +55,10 @@ object UpdateUtil {
             }
             false
         } catch (e: Exception) {
-            remote > local
+            // Fallback: strip everything but dots and digits for a basic comparison
+            val rClean = remote.filter { it.isDigit() || it == '.' }
+            val lClean = local.filter { it.isDigit() || it == '.' }
+            rClean > lClean
         }
     }
 
