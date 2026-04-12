@@ -353,39 +353,40 @@ jobs:
           python3 - <<'PYEOF'
           import os, re, pathlib
 
-          tv_apk_url = os.environ["TV_APK_URL"]
-          tv_apk_name = os.environ["TV_APK_NAME"]
+          tv_apk_url    = os.environ["TV_APK_URL"]
+          tv_apk_name   = os.environ["TV_APK_NAME"]
           phone_apk_url = os.environ["PHONE_APK_URL"]
           phone_apk_name = os.environ["PHONE_APK_NAME"]
 
           html = pathlib.Path("index.html").read_text(encoding="utf-8")
 
-          # Update TV download link
-          html = re.sub(
-              r'id="download-tv"\s+class="[^"]*"\s+target="[^"]*"\s+rel="[^"]*"\s+download[^>]*>',
-              f'id="download-tv" class="btn btn-primary" target="_blank" rel="noopener noreferrer" download="{tv_apk_name}">',
-              html
-          )
-          html = re.sub(
-              r'(id="download-tv"[^>]*href=")[^"]*(")',
-              rf'\g<1>{tv_apk_url}\2',
-              html
-          )
+          def patch_anchor(html, anchor_id, new_href, new_download):
+              """
+              Find <a> by id and update its href + download attributes,
+              regardless of attribute order in the tag.
+              """
+              def replacer(m):
+                  tag = m.group(0)
+                  # Update href value
+                  tag = re.sub(r'\bhref="[^"]*"', f'href="{new_href}"', tag)
+                  # Update download="..." if already set, else replace bare 'download'
+                  if re.search(r'\bdownload="[^"]*"', tag):
+                      tag = re.sub(r'\bdownload="[^"]*"', f'download="{new_download}"', tag)
+                  else:
+                      # Match only standalone 'download' attr (preceded by whitespace,
+                      # followed by whitespace or >) — avoids matching 'download-tv' etc.
+                      tag = re.sub(r'(?<=\s)download(?=[\s>])', f'download="{new_download}"', tag)
+                  return tag
 
-          # Update Mobile download link
-          html = re.sub(
-              r'id="download-mobile"\s+class="[^"]*"\s+target="[^"]*"\s+rel="[^"]*"\s+download[^>]*>',
-              f'id="download-mobile" class="btn btn-primary" target="_blank" rel="noopener noreferrer" download="{phone_apk_name}">',
-              html
-          )
-          html = re.sub(
-              r'(id="download-mobile"[^>]*href=")[^"]*(")',
-              rf'\g<1>{phone_apk_url}\2',
-              html
-          )
+              # Lookahead confirms anchor has the target id; match the full opening tag
+              pattern = rf'<a\b(?=[^>]*\bid="{re.escape(anchor_id)}")[^>]*>'
+              return re.sub(pattern, replacer, html, flags=re.DOTALL)
+
+          html = patch_anchor(html, "download-tv",     tv_apk_url,    tv_apk_name)
+          html = patch_anchor(html, "download-mobile", phone_apk_url, phone_apk_name)
 
           pathlib.Path("index.html").write_text(html, encoding="utf-8")
-          print(f"✅ Updated TV download link → {tv_apk_name}")
+          print(f"✅ Updated TV download link    → {tv_apk_name}")
           print(f"✅ Updated Mobile download link → {phone_apk_name}")
           PYEOF
 
