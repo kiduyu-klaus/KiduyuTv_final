@@ -56,6 +56,21 @@ fun MobileNavGraph(navController: NavHostController) {
             )
         }
 
+        composable(Screen.MyList.route) {
+            MobileMyListScreen(
+                navController = navController,
+                onMovieClick = { movieId -> navController.navigate(Screen.MovieDetail.createRoute(movieId)) },
+                onTvShowClick = { tvShowId -> navController.navigate(Screen.TvShowDetail.createRoute(tvShowId)) },
+                onCompanyClick = { id, name -> navController.navigate("media_list/company/$id/${Uri.encode(name)}") },
+                onNetworkClick = { id, name -> navController.navigate("media_list/network/$id/${Uri.encode(name)}") },
+                onCastClick = { id, name, character, profilePath, knownForDepartment ->
+                    navController.navigate(
+                        Screen.MobileCastDetail.createRoute(id, name, character, profilePath, knownForDepartment)
+                    )
+                }
+            )
+        }
+
         // See All Screen
         composable(
             route = "see_all/{category}",

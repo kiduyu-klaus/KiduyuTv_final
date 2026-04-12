@@ -1,6 +1,7 @@
 package com.kiduyuk.klausk.kiduyutv.ui.components
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Search
@@ -25,6 +26,7 @@ fun MobileBottomNavigation(navController: NavController, currentRoute: String?) 
         BottomNavItem(Screen.Home.route, Icons.Default.Home, "Home"),
         BottomNavItem(Screen.Movies.route, Icons.Default.Movie, "Movies"),
         BottomNavItem(Screen.TvShows.route, Icons.Default.Tv, "TV Shows"),
+        BottomNavItem(Screen.MyList.route, Icons.Default.Bookmark, "My List"),
         BottomNavItem(Screen.Search.route, Icons.Default.Search, "Search"),
         BottomNavItem(Screen.Settings.route, Icons.Default.Settings, "Settings")
     )
