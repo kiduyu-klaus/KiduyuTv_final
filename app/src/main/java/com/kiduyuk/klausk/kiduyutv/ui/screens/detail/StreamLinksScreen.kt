@@ -3,10 +3,10 @@ package com.kiduyuk.klausk.kiduyutv.ui.screens.detail
 import android.content.Intent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -31,7 +31,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -44,6 +43,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -110,6 +111,17 @@ fun StreamLinksScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
 
+    // Focus management for D-pad navigation
+    val scrollState = rememberScrollState()
+    val firstCardFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(uiState.streamProviders) {
+        // Request focus on the first provider card when providers are loaded
+        if (uiState.streamProviders.isNotEmpty()) {
+            firstCardFocusRequester.requestFocus()
+        }
+    }
+
     LaunchedEffect(tmdbId, isTv, season, episode) {
         viewModel.loadStreamProviders(tmdbId, isTv, season, episode, context)
     }
@@ -144,33 +156,30 @@ fun StreamLinksScreen(
                 )
         )
 
-        // Back button
-        IconButton(
-            onClick = onBackClick,
+        // Back button - made non-focusable to prevent focus trap
+        Box(
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(12.dp)
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.12f))
+                .clickable { onBackClick() },
+            contentAlignment = Alignment.Center
         ) {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
-                    tint = TextPrimary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                tint = TextPrimary,
+                modifier = Modifier.size(20.dp)
+            )
         }
 
+        // Scrollable content area
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(horizontal = 24.dp)
                 .padding(top = 72.dp, bottom = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -312,7 +321,12 @@ fun StreamLinksScreen(
                         StreamProviderCard(
                             provider = provider,
                             index = index + 1,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .then(
+                                    if (index == 0) Modifier.focusRequester(firstCardFocusRequester)
+                                    else Modifier
+                                ),
                             onProviderClick = {
                                 val intent = Intent(context, PlayerActivity::class.java).apply {
                                     putExtra("TMDB_ID", tmdbId)

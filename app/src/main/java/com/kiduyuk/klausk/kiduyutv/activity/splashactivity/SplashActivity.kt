@@ -111,11 +111,43 @@ class SplashActivity : ComponentActivity() {
      */
     private fun restartApp() {
         Log.i(TAG, "Restarting application...")
+        // Clean up downloaded APK files before restarting
+        cleanupDownloadedApk()
         val intent = Intent(this, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         }
         startActivity(intent)
         finish()
+    }
+
+    /**
+     * Deletes the downloaded APK file to free up storage space.
+     */
+    private fun cleanupDownloadedApk() {
+        try {
+            val apkFile = UpdateUtil.getLocalApkFile(this)
+            if (apkFile.exists()) {
+                val deleted = apkFile.delete()
+                Log.i(TAG, "Downloaded APK cleanup: ${if (deleted) "success" else "failed"} - ${apkFile.absolutePath}")
+            }
+            // Also clear the cached metadata
+            clearApkCacheMetadata()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error cleaning up APK files", e)
+        }
+    }
+
+    /**
+     * Clears the APK cache metadata from SharedPreferences.
+     */
+    private fun clearApkCacheMetadata() {
+        try {
+            val prefs = getSharedPreferences("apk_cache_meta", MODE_PRIVATE)
+            prefs.edit().clear().apply()
+            Log.i(TAG, "APK cache metadata cleared")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error clearing APK cache metadata", e)
+        }
     }
 
     private fun Dialog.showTracked() {
