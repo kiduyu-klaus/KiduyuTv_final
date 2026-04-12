@@ -12,6 +12,9 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.app.UiModeManager
+import android.content.Context
+import android.content.res.Configuration
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.webkit.*
@@ -258,6 +261,15 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         val repository = TmdbRepository()
+
+        // Detect device type and disable cursor for mobile
+        val uiModeManager = getSystemService(Context.UI_MODE_SERVICE) as UiModeManager
+        if (uiModeManager.currentModeType != Configuration.UI_MODE_TYPE_TELEVISION) {
+            isCursorDisabled = true
+            Log.i(TAG, "[Device] Mobile/Tablet detected, disabling cursor")
+        } else {
+            Log.i(TAG, "[Device] TV detected, cursor enabled")
+        }
 
         val existsInHistory = repository.isInWatchHistory(this, tmdbId, isTv)
 
@@ -599,7 +611,9 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         rootLayout.addView(webView)
-        rootLayout.addView(cursorView)
+        if (!isCursorDisabled) {
+            rootLayout.addView(cursorView)
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.insetsController?.let {
@@ -623,10 +637,12 @@ class PlayerActivity : AppCompatActivity() {
         rootLayout.post {
             screenWidth = rootLayout.width
             screenHeight = rootLayout.height
-            cursorX = screenWidth / 2f
-            cursorY = screenHeight / 2f
-            updateCursorPosition()
-            showCursorAndResetTimer()
+            if (!isCursorDisabled) {
+                cursorX = screenWidth / 2f
+                cursorY = screenHeight / 2f
+                updateCursorPosition()
+                showCursorAndResetTimer()
+            }
         }
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -710,6 +726,7 @@ class PlayerActivity : AppCompatActivity() {
     // ── D-pad input ───────────────────────────────────────────────────────────
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (isCursorDisabled) return super.dispatchKeyEvent(event)
         if (event.action == KeyEvent.ACTION_DOWN) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_DPAD_UP,
@@ -761,6 +778,7 @@ class PlayerActivity : AppCompatActivity() {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private fun updateCursorPosition() {
+        if (isCursorDisabled) return
         cursorView.x = cursorX
         cursorView.y = cursorY
         cursorView.invalidate()
