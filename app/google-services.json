@@ -23,6 +23,44 @@
           "other_platform_oauth_client": []
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:109926033937:android:113ea4200ce3fc69f2dfb0",
+        "android_client_info": {
+          "package_name": "com.kiduyuk.klausk.kiduyutv.phone"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDNXqfgr68VzLaBsQ4hpULUdspS6uB4Sxw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:109926033937:android:113ea4200ce3fc69f2dfb0",
+        "android_client_info": {
+          "package_name": "com.kiduyuk.klausk.kiduyutv.tv"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDNXqfgr68VzLaBsQ4hpULUdspS6uB4Sxw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
     }
   ],
   "configuration_version": "1"
