@@ -51,6 +51,29 @@ object UpdateUtil {
         .build()
 
     /**
+     * Fetches the latest release title from GitHub Releases API using OkHttpClient.
+     */
+    suspend fun fetchLatestReleaseTitle(): String? = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder()
+                .url("https://api.github.com/repos/kiduyu-klaus/KiduyuTv_final/releases/latest")
+                .header("Accept", "application/vnd.github+json")
+                .header("User-Agent", "KiduyuTV-Android")
+                .build()
+
+            httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext null
+                val jsonString = response.body?.string() ?: return@withContext null
+                val json = JSONObject(jsonString)
+                json.optString("name", null)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching latest release title", e)
+            null
+        }
+    }
+
+    /**
      * Fetches the latest release version from GitHub Releases API using OkHttpClient.
      * Returns the tag_name from the latest release (e.g., "1.1.76" from "v1.1.76").
      */

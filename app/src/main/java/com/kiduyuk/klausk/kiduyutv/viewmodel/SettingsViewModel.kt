@@ -27,14 +27,21 @@ class SettingsViewModel : ViewModel() {
     val uiState: StateFlow<SettingsUiState> = _uiState
 
     /**
-     * Load the current cache size.
+     * Load settings data including cache size and latest release title.
      */
-    fun loadCacheSize(context: Context) {
+    fun loadSettingsData(context: Context) {
         viewModelScope.launch {
+            // Fetch cache size
             val size = withContext(Dispatchers.IO) {
                 getFolderSize(context.cacheDir)
             }
-            _uiState.value = _uiState.value.copy(cacheSize = formatSize(size))
+            _uiState.update { it.copy(cacheSize = formatSize(size)) }
+
+            // Fetch latest release title
+            val title = UpdateUtil.fetchLatestReleaseTitle()
+            if (title != null) {
+                _uiState.update { it.copy(releaseTitle = title) }
+            }
         }
     }
 
@@ -333,5 +340,6 @@ data class SettingsUiState(
     val updateAvailable: Boolean = false,
     val latestVersion: String? = null,
     val isDownloadingUpdate: Boolean = false,
-    val downloadProgress: Int = 0
+    val downloadProgress: Int = 0,
+    val releaseTitle: String? = null
 )

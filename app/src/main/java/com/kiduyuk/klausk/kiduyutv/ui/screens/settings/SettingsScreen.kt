@@ -63,9 +63,9 @@ fun SettingsScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
 
-    // Load cache size when the screen is first shown
+    // Load settings data when the screen is first shown
     LaunchedEffect(Unit) {
-        viewModel.loadCacheSize(context)
+        viewModel.loadSettingsData(context)
     }
 
     Row(
@@ -140,7 +140,7 @@ fun SettingsScreen(
                 SettingsSection.APP_VERSION -> {
                     AppVersionContent(
                         currentVersion = BuildConfig.VERSION_NAME,
-                        whatsNew = "SplashActivity: Check for existing APK before downloading to avoid redundancy — v1.1.81",
+                        whatsNew = uiState.releaseTitle ?: "SplashActivity: Check for existing APK before downloading to avoid redundancy — v1.1.81",
                         // Update check states
                         isCheckingForUpdates = uiState.isCheckingForUpdates,
                         updateCheckResult = uiState.updateCheckResult,

@@ -42,7 +42,7 @@ fun MobileSettingsScreen(
     val myList by MyListManager.myList.collectAsState()
 
     LaunchedEffect(Unit) {
-        viewModel.loadCacheSize(context)
+        viewModel.loadSettingsData(context)
     }
 
     Scaffold(
@@ -158,6 +158,14 @@ fun MobileSettingsScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             SettingsGroup(title = "Updates") {
+                if (uiState.releaseTitle != null) {
+                    SettingsItem(
+                        icon = Icons.Default.NewReleases,
+                        title = "What's New",
+                        subtitle = uiState.releaseTitle!!,
+                        onClick = { /* Already displayed */ }
+                    )
+                }
                 SettingsItem(
                     icon = Icons.Default.Update,
                     title = "Check for Updates",
