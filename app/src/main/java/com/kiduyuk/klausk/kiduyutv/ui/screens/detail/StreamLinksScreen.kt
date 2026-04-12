@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -360,7 +361,7 @@ fun StreamProviderCard(
     val isFocused by interactionSource.collectIsFocusedAsState()
 
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.03f else 1f,
+        targetValue = if (isFocused) 1.04f else 1f,
         animationSpec = tween(durationMillis = 150),
         label = "cardScale"
     )
@@ -375,8 +376,8 @@ fun StreamProviderCard(
                 if (isFocused)
                     Brush.linearGradient(
                         colors = listOf(
-                            PrimaryRed.copy(alpha = 0.22f),
-                            PrimaryRed.copy(alpha = 0.08f)
+                            PrimaryRed.copy(alpha = 0.30f),
+                            PrimaryRed.copy(alpha = 0.12f)
                         )
                     )
                 else
@@ -388,8 +389,8 @@ fun StreamProviderCard(
                     )
             )
             .border(
-                width = 1.dp,
-                color = if (isFocused) PrimaryRed.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.09f),
+                width = if (isFocused) 2.dp else 1.dp,
+                color = if (isFocused) PrimaryRed else Color.White.copy(alpha = 0.09f),
                 shape = RoundedCornerShape(12.dp)
             )
             .clickable(
@@ -397,6 +398,7 @@ fun StreamProviderCard(
                 indication = null,
                 onClick = { onProviderClick(provider) }
             )
+            .focusable(interactionSource = interactionSource)
             .padding(horizontal = 14.dp, vertical = 14.dp)
     ) {
         Column {
