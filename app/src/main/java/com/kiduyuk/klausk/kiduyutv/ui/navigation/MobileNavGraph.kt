@@ -364,7 +364,19 @@ fun MobileNavGraph(navController: NavHostController) {
                 timestamp = timestamp,
                 onBackClick = { navController.popBackStack() },
                 onProviderClick = { providerUrl ->
-                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(providerUrl))
+                    val intent = android.content.Intent(navController.context, com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity::class.java).apply {
+                        putExtra("TMDB_ID", tmdbId)
+                        putExtra("IS_TV", isTv)
+                        putExtra("SEASON_NUMBER", season ?: 0)
+                        putExtra("EPISODE_NUMBER", episode ?: 0)
+                        putExtra("TITLE", title)
+                        putExtra("OVERVIEW", overview)
+                        putExtra("POSTER_PATH", posterPath ?: "")
+                        putExtra("BACKDROP_PATH", backdropPath ?: "")
+                        putExtra("VOTE_AVERAGE", voteAverage)
+                        putExtra("RELEASE_DATE", releaseDate ?: "")
+                        putExtra("STREAM_URL", providerUrl)
+                    }
                     navController.context.startActivity(intent)
                 }
             )
