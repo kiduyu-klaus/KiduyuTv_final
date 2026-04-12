@@ -1,13 +1,18 @@
 package com.kiduyuk.klausk.kiduyutv.ui.screens.detail
 
 import android.content.Intent
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,15 +20,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -36,11 +41,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.util.UnstableApi
 import coil.compose.AsyncImage
@@ -60,6 +70,25 @@ data class StreamProvider(
     val type: String // "movie" or "tv"
 )
 
+private data class ProviderBadge(val label: String, val color: Color, val textColor: Color)
+
+private fun getBadgesForProvider(name: String): List<ProviderBadge> = when {
+    name.contains("VidLink") -> listOf(
+        ProviderBadge("FAST", Color(0xFF22C55E), Color.White),
+        ProviderBadge("BEST FOR MOVIES", Color(0xFFF59E0B), Color(0xFF1A1A1A))
+    )
+    name.contains("Videasy") -> listOf(
+        ProviderBadge("FAST", Color(0xFF22C55E), Color.White),
+        ProviderBadge("BEST FOR TV", Color(0xFFF59E0B), Color(0xFF1A1A1A))
+    )
+    name.contains("VidFast") -> listOf(
+        ProviderBadge("FAST", Color(0xFF22C55E), Color.White),
+        ProviderBadge("MOVIES & TV", Color(0xFFF59E0B), Color(0xFF1A1A1A))
+    )
+    else -> emptyList()
+}
+
+@OptIn(ExperimentalLayoutApi::class)
 @UnstableApi
 @Composable
 fun StreamLinksScreen(
@@ -99,16 +128,16 @@ fun StreamLinksScreen(
             )
         }
 
-        // Gradient overlay
+        // Gradient overlay — heavier at bottom
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            BackgroundDark.copy(alpha = 0.7f),
-                            BackgroundDark
+                        colorStops = arrayOf(
+                            0.0f to BackgroundDark.copy(alpha = 0.55f),
+                            0.35f to BackgroundDark.copy(alpha = 0.82f),
+                            1.0f to BackgroundDark
                         )
                     )
                 )
@@ -119,51 +148,171 @@ fun StreamLinksScreen(
             onClick = onBackClick,
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(8.dp)
+                .padding(12.dp)
         ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
-                tint = TextPrimary,
-                modifier = Modifier.size(24.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = TextPrimary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 32.dp, vertical = 16.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp)
+                .padding(top = 72.dp, bottom = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(64.dp))
+            // ── Header: poster + title/meta ──────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.Start
+            ) {
+                if (posterPath != null) {
+                    AsyncImage(
+                        model = "${TmdbApiService.IMAGE_BASE_URL}w185${posterPath}",
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(width = 72.dp, height = 108.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .border(
+                                width = 1.dp,
+                                color = Color.White.copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                }
 
-            Text(
-                text = "Select a Stream Provider",
-                style = MaterialTheme.typography.headlineMedium,
-                color = TextPrimary,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
+                Column(modifier = Modifier.weight(1f)) {
+                    if (isTv && season != null && episode != null) {
+                        Text(
+                            text = "SEASON $season  ·  EPISODE $episode",
+                            color = PrimaryRed,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.5.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                    Text(
+                        text = title,
+                        color = TextPrimary,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (releaseDate != null) {
+                            Text(
+                                text = releaseDate.take(4),
+                                color = TextSecondary,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                text = "·",
+                                color = TextSecondary,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Text(
+                            text = "★ ${String.format("%.1f", voteAverage)}",
+                            color = Color(0xFFF59E0B),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
 
-            if (uiState.isLoading) {
-                LottieLoadingView(size = 200.dp)
-            } else if (uiState.streamProviders.isEmpty()) {
+            Spacer(modifier = Modifier.height(28.dp))
+            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // ── Section header ───────────────────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
                 Text(
-                    text = "No streaming providers available.",
-                    color = TextSecondary,
-                    style = MaterialTheme.typography.bodyLarge
+                    text = "Choose a Provider",
+                    color = TextPrimary,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
                 )
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth(0.6f),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    items(uiState.streamProviders) { provider ->
-                        StreamProviderItem(
-                            provider = provider,
-                            onProviderClick = {
+                if (!uiState.isLoading) {
+                    Surface(
+                        color = Color.White.copy(alpha = 0.08f),
+                        shape = RoundedCornerShape(20.dp)
+                    ) {
+                        Text(
+                            text = "${uiState.streamProviders.size} sources",
+                            color = TextSecondary,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
 
-                                // Launch PlayerActivity for webview links
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ── Provider list ────────────────────────────────────────────────
+            if (uiState.isLoading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(300.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    LottieLoadingView(size = 160.dp)
+                }
+            } else if (uiState.streamProviders.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No streaming providers available.",
+                        color = TextSecondary,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+            } else {
+                // Two-column grid
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    maxItemsInEachRow = 2
+                ) {
+                    uiState.streamProviders.forEachIndexed { index, provider ->
+                        StreamProviderCard(
+                            provider = provider,
+                            index = index + 1,
+                            modifier = Modifier.weight(1f),
+                            onProviderClick = {
                                 val intent = Intent(context, PlayerActivity::class.java).apply {
                                     putExtra("TMDB_ID", tmdbId)
                                     putExtra("IS_TV", isTv)
@@ -190,7 +339,6 @@ fun StreamLinksScreen(
                                     putExtra("STREAM_URL", finalUrl)
                                 }
                                 context.startActivity(intent)
-
                             }
                         )
                     }
@@ -200,133 +348,133 @@ fun StreamLinksScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun StreamProviderItem(
+fun StreamProviderCard(
     provider: StreamProvider,
+    index: Int,
+    modifier: Modifier = Modifier,
     onProviderClick: (StreamProvider) -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
-    Card(
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isFocused) PrimaryRed.copy(alpha = 0.8f) else MaterialTheme.colorScheme.surfaceVariant
-        ),
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(60.dp)
+    val scale by animateFloatAsState(
+        targetValue = if (isFocused) 1.03f else 1f,
+        animationSpec = tween(durationMillis = 150),
+        label = "cardScale"
+    )
+
+    val badges = getBadgesForProvider(provider.name)
+
+    Box(
+        modifier = modifier
+            .scale(scale)
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                if (isFocused)
+                    Brush.linearGradient(
+                        colors = listOf(
+                            PrimaryRed.copy(alpha = 0.22f),
+                            PrimaryRed.copy(alpha = 0.08f)
+                        )
+                    )
+                else
+                    Brush.linearGradient(
+                        colors = listOf(
+                            Color.White.copy(alpha = 0.08f),
+                            Color.White.copy(alpha = 0.04f)
+                        )
+                    )
+            )
+            .border(
+                width = 1.dp,
+                color = if (isFocused) PrimaryRed.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.09f),
+                shape = RoundedCornerShape(12.dp)
+            )
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = { onProviderClick(provider) }
             )
+            .padding(horizontal = 14.dp, vertical = 14.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
+        Column {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.fillMaxWidth()
             ) {
+                // Numbered index circle
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (isFocused) PrimaryRed else Color.White.copy(alpha = 0.10f)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "$index",
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
                 Text(
                     text = provider.name,
                     color = TextPrimary,
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
                 )
-                if (provider.name.contains("VidLink")) {
-                    Surface(
-                        color = Color(0xFF4CAF50), // Green color for "Fast"
-                        shape = RoundedCornerShape(4.dp)
-                    ) {
-                        Text(
-                            text = "FAST",
-                            color = Color.White,
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                        )
-                    }
-                    Surface(
-                        color = Color(0xFFFFC107), // Amber/Gold color for "Best"
-                        shape = RoundedCornerShape(4.dp)
-                    ) {
-                        Text(
-                            text = "BEST FOR MOVIES",
-                            color = Color.Black,
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                        )
-                    }
-                }
-                if (provider.name.contains("Videasy")) {
-                    Surface(
-                        color = Color(0xFF4CAF50), // Green color for "Fast"
-                        shape = RoundedCornerShape(4.dp)
-                    ) {
-                        Text(
-                            text = "FAST",
-                            color = Color.White,
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                        )
-                    }
-                    Surface(
-                        color = Color(0xFFFFC107), // Amber/Gold color for "Best"
-                        shape = RoundedCornerShape(4.dp)
-                    ) {
-                        Text(
-                            text = "BEST FOR TV",
-                            color = Color.Black,
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                        )
-                    }
-                }
 
-                if (provider.name.contains("VidFast")) {
-                    Surface(
-                        color = Color(0xFF4CAF50), // Green color for "Fast"
-                        shape = RoundedCornerShape(4.dp)
-                    ) {
-                        Text(
-                            text = "FAST",
-                            color = Color.White,
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                        )
-                    }
-                    Surface(
-                        color = Color(0xFFFFC107), // Amber/Gold color for "Best"
-                        shape = RoundedCornerShape(4.dp)
-                    ) {
-                        Text(
-                            text = "BEST FOR BOTH MOVIES AND TV",
-                            color = Color.Black,
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                        )
-                    }
+                // Play arrow
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (isFocused) PrimaryRed.copy(alpha = 0.20f) else Color.Transparent
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = "Play",
+                        tint = if (isFocused) PrimaryRed else TextSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
-            if (provider.isAvailable) {
-                Icon(
-                    imageVector = Icons.Default.CheckCircle,
-                    contentDescription = "Available",
-                    tint = Color.Green,
-                    modifier = Modifier.size(24.dp)
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Default.CheckCircle,
-                    contentDescription = "Available",
-                    tint = Color.Green,
-                    modifier = Modifier.size(24.dp)
-                )
+
+            // Badges
+            if (badges.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    badges.forEach { badge ->
+                        Surface(
+                            color = badge.color.copy(alpha = 0.90f),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = badge.label,
+                                color = badge.textColor,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+                }
             }
         }
     }
