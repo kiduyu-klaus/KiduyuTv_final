@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
@@ -32,6 +33,7 @@ import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.activity.mainactivity.MainActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
+import com.kiduyuk.klausk.kiduyutv.util.ApkInfo
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import com.kiduyuk.klausk.kiduyutv.util.UpdateUtil
 import kotlinx.coroutines.delay
@@ -53,6 +55,9 @@ class SplashActivity : ComponentActivity() {
 
     // Current remote version for display in update dialog
     private var currentRemoteVersion: String? = null
+
+    // Current APK info for display during download
+    private var currentApkInfo: ApkInfo? = null
 
     // Tracks every dialog shown so onDestroy can safely dismiss them all
     private val activeDialogs = mutableListOf<Dialog>()
@@ -117,7 +122,7 @@ class SplashActivity : ComponentActivity() {
         packageManager.hasSystemFeature("amazon.hardware.fire_tv")
 
     /**
-     * Determines the device type string for logging purposes.
+     * Determines the device type string for logging and display purposes.
      */
     private fun getDeviceTypeString(): String {
         return if (isFireTv() || UpdateUtil.isTvDevice(this)) "TV" else "Phone/Tablet"
@@ -195,13 +200,14 @@ class SplashActivity : ComponentActivity() {
             onNo = { finish() }, // User chose Exit, close the app
             onYes = {
                 lifecycleScope.launch {
-                    // Use device-specific APK fetching
-                    val apkUrl = UpdateUtil.fetchBestApkUrl(this@SplashActivity)
-                    if (apkUrl != null) {
-                        Log.i(TAG, "Found APK for download: $apkUrl")
-                        downloadAndInstallApk(apkUrl)
+                    // Use device-specific APK fetching with full APK info
+                    val apkInfo = UpdateUtil.fetchBestApkInfo(this@SplashActivity)
+                    if (apkInfo != null) {
+                        currentApkInfo = apkInfo
+                        Log.i(TAG, "Found APK for download: ${apkInfo.fileName}")
+                        downloadAndInstallApk(apkInfo)
                     } else {
-                        Log.w(TAG, "Could not find APK for this device type, opening releases page")
+                        Log.w(TAG, "Could not find APK for this device type (${UpdateUtil.getDeviceTypeString(this@SplashActivity)}), opening releases page")
                         // Fallback: open releases page in browser
                         startActivity(
                             Intent(
@@ -217,9 +223,10 @@ class SplashActivity : ComponentActivity() {
 
     /**
      * Downloads the APK file and shows progress to the user.
+     * Displays the APK filename during download.
      * After successful download, prompts user to install.
      */
-    private fun downloadAndInstallApk(apkUrl: String) {
+    private fun downloadAndInstallApk(apkInfo: ApkInfo) {
         // ── Build the progress dialog ─────────────────────────────────────────
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -231,6 +238,14 @@ class SplashActivity : ComponentActivity() {
             text = "Starting download..."
             textSize = 13f
             setTextColor(android.graphics.Color.WHITE)
+        }
+        
+        // Filename display
+        val fileNameText = TextView(this).apply {
+            text = apkInfo.fileName
+            textSize = 11f
+            setTextColor(android.graphics.Color.GRAY)
+            maxLines = 2
         }
         
         val progressBar = ProgressBar(
@@ -245,15 +260,16 @@ class SplashActivity : ComponentActivity() {
             ).apply { topMargin = 20 }
         }
         
-        val deviceTypeText = TextView(this).apply {
-            text = "Downloading ${getDeviceTypeString()} version..."
-            textSize = 11f
-            setTextColor(android.graphics.Color.GRAY)
+        val versionInfoText = TextView(this).apply {
+            text = "${getDeviceTypeString()} version | Build ${apkInfo.buildNumber}"
+            textSize = 10f
+            setTextColor(android.graphics.Color.DKGRAY)
         }
         
         layout.addView(statusText)
-        layout.addView(deviceTypeText)
+        layout.addView(fileNameText)
         layout.addView(progressBar)
+        layout.addView(versionInfoText)
 
         val progressDialog = AlertDialog.Builder(this)
             .setTitle("Downloading Update")
@@ -264,9 +280,13 @@ class SplashActivity : ComponentActivity() {
         progressDialog.show()
 
         lifecycleScope.launch {
-            val apkFile = UpdateUtil.downloadApk(this@SplashActivity, apkUrl) { pct ->
+            val apkFile = UpdateUtil.downloadApk(this@SplashActivity, apkInfo) { pct, fileName ->
                 progressBar.progress = pct
                 statusText.text = "Downloading... $pct%"
+                // Update filename if it changes (though it shouldn't)
+                if (fileNameText.text != fileName) {
+                    fileNameText.text = fileName
+                }
             }
 
             // Dismiss and remove from tracker before showing the next dialog
@@ -275,11 +295,11 @@ class SplashActivity : ComponentActivity() {
 
             // ── Post-download QuitDialog ──────────────────────────────────────
             if (apkFile != null) {
-                Log.i(TAG, "Download complete, prompting user to install")
+                Log.i(TAG, "Download complete: ${apkInfo.fileName}")
                 QuitDialog(
                     context = this@SplashActivity,
                     title = "Download Complete",
-                    message = "KiduyuTV (${getDeviceTypeString()} version) has been downloaded.\nTap Install to apply the update.",
+                    message = "${apkInfo.fileName}\n\nHas been downloaded.\nTap Install to apply the update.",
                     positiveButtonText = "Install",
                     negativeButtonText = "Exit",
                     lottieAnimRes = R.raw.splash_loading,
@@ -299,7 +319,7 @@ class SplashActivity : ComponentActivity() {
                     positiveButtonText = "Retry",
                     negativeButtonText = "Exit",
                     lottieAnimRes = R.raw.exit,
-                    onYes = { downloadAndInstallApk(apkUrl) },
+                    onYes = { downloadAndInstallApk(apkInfo) },
                     onNo = { finish() } // Exit if user cancels after failure
                 ).showTracked()
             }

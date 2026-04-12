@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
 import com.kiduyuk.klausk.kiduyutv.ui.components.*
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
@@ -68,7 +69,7 @@ fun MobileTvShowsScreen(
                     if (uiState.trendingTvShows.isNotEmpty()) {
                         item {
                             MobileSectionHeader(
-                                title = "Trending",
+                                title = "Trending Now",
                                 onSeeAllClick = { navController.navigate("see_all/trending_tv") }
                             )
                             LazyRow(
@@ -82,21 +83,39 @@ fun MobileTvShowsScreen(
                         }
                     }
 
-                    // Watched (using continueWatching or topTvShows)
-                    val watchedShows = uiState.continueWatching.filter { it.isTv }
-                    if (watchedShows.isNotEmpty()) {
+                    // Popular TV Shows (Top Rated)
+                    if (uiState.topTvShows.isNotEmpty()) {
                         item {
                             MobileSectionHeader(
-                                title = "Watched",
-                                onSeeAllClick = { navController.navigate("see_all/watched_tv") }
+                                title = "Popular TV Shows",
+                                onSeeAllClick = { navController.navigate("see_all/popular_tv") }
                             )
                             LazyRow(
                                 contentPadding = PaddingValues(horizontal = 16.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                items(watchedShows) { historyItem ->
+                                items(uiState.topTvShows) { tvShow ->
+                                    MobileTvShowCard(tvShow = tvShow, onClick = { onTvShowClick(tvShow.id) })
+                                }
+                            }
+                        }
+                    }
+
+                    // Continue Watching for TV Shows
+                    val continueWatchingTv = uiState.continueWatching.filter { it.isTv }
+                    if (continueWatchingTv.isNotEmpty()) {
+                        item {
+                            MobileSectionHeader(
+                                title = "Continue Watching",
+                                onSeeAllClick = { navController.navigate("see_all/continue_watching") }
+                            )
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                items(continueWatchingTv) { historyItem ->
                                     MobileTvShowCard(
-                                        tvShow = com.kiduyuk.klausk.kiduyutv.data.model.TvShow(
+                                        tvShow = TvShow(
                                             id = historyItem.id,
                                             name = historyItem.title,
                                             overview = historyItem.overview ?: "",
@@ -114,36 +133,36 @@ fun MobileTvShowsScreen(
                         }
                     }
 
-                    // IMDB: Popular TV Shows (using topTvShows)
-                    if (uiState.topTvShows.isNotEmpty()) {
-                        item {
-                            MobileSectionHeader(
-                                title = "IMDB: Popular TV Shows",
-                                onSeeAllClick = { navController.navigate("see_all/popular_tv") }
-                            )
-                            LazyRow(
-                                contentPadding = PaddingValues(horizontal = 16.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                items(uiState.topTvShows) { tvShow ->
-                                    MobileTvShowCard(tvShow = tvShow, onClick = { onTvShowClick(tvShow.id) })
-                                }
-                            }
-                        }
-                    }
-
-                    // All Time Favorite TV Shows (using bestSitcoms)
+                    // Best Sitcoms
                     if (uiState.bestSitcoms.isNotEmpty()) {
                         item {
                             MobileSectionHeader(
-                                title = "All Time Favorite TV Shows",
-                                onSeeAllClick = { navController.navigate("see_all/favorite_tv") }
+                                title = "Best Sitcoms",
+                                onSeeAllClick = { navController.navigate("see_all/sitcoms") }
                             )
                             LazyRow(
                                 contentPadding = PaddingValues(horizontal = 16.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 items(uiState.bestSitcoms) { tvShow ->
+                                    MobileTvShowCard(tvShow = tvShow, onClick = { onTvShowClick(tvShow.id) })
+                                }
+                            }
+                        }
+                    }
+
+                    // Time Travel TV Shows
+                    if (uiState.timeTravelTvShows.isNotEmpty()) {
+                        item {
+                            MobileSectionHeader(
+                                title = "Time Travel TV",
+                                onSeeAllClick = { navController.navigate("see_all/time_travel_tv") }
+                            )
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                items(uiState.timeTravelTvShows) { tvShow ->
                                     MobileTvShowCard(tvShow = tvShow, onClick = { onTvShowClick(tvShow.id) })
                                 }
                             }

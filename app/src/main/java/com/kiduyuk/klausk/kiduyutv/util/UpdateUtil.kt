@@ -18,6 +18,16 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
 
+/**
+ * Data class representing APK information from GitHub releases.
+ */
+data class ApkInfo(
+    val url: String,
+    val fileName: String,
+    val version: String?,
+    val buildNumber: Int
+)
+
 object UpdateUtil {
     private const val TAG = "UpdateUtil"
     
@@ -147,11 +157,26 @@ object UpdateUtil {
 
     /**
      * Detects if the current device is a TV based on system features.
+     * Uses multiple checks to ensure accurate TV detection.
      */
     fun isTvDevice(context: Context): Boolean {
         val packageManager = context.packageManager
-        return packageManager.hasSystemFeature("amazon.hardware.fire_tv") ||
-               packageManager.hasSystemFeature("android.software.leanback")
+        
+        // Primary TV detection methods
+        val hasFireTv = packageManager.hasSystemFeature("amazon.hardware.fire_tv")
+        val hasLeanback = packageManager.hasSystemFeature("android.software.leanback")
+        
+        // Additional TV detection: check for TV-related system features
+        val hasTvFeature = packageManager.hasSystemFeature("android.hardware.type.tv")
+        
+        // Also check the Build properties for TV indicators
+        val isTvBuild = Build.MODEL.contains("TV", ignoreCase = true) ||
+                        Build.MODEL.contains("AFT", ignoreCase = true) || // Amazon Fire TV models
+                        Build.MODEL.contains("Chromecast", ignoreCase = true)
+        
+        Log.d(TAG, "Device detection - FireTV: $hasFireTv, Leanback: $hasLeanback, TV Feature: $hasTvFeature, Model: ${Build.MODEL}")
+        
+        return hasFireTv || hasLeanback || hasTvFeature || isTvBuild
     }
 
     /**
@@ -159,7 +184,9 @@ object UpdateUtil {
      * Returns "tv" for TV devices, "phone" for mobile devices.
      */
     fun getDeviceType(context: Context): String {
-        return if (isTvDevice(context)) DEVICE_TYPE_TV else DEVICE_TYPE_PHONE
+        val isTv = isTvDevice(context)
+        Log.i(TAG, "Detected device type: ${if (isTv) "TV" else "PHONE"}")
+        return if (isTv) DEVICE_TYPE_TV else DEVICE_TYPE_PHONE
     }
 
     /**
@@ -183,29 +210,38 @@ object UpdateUtil {
     }
 
     /**
-     * Checks if an APK filename matches the current device type.
-     * TV APKs contain "-tv-" or "tv-release" in the name.
-     * Phone APKs contain "-phone-" or "phone-release" in the name.
+     * Checks if an APK filename matches the current device type based on filename prefix.
+     * TV APKs start with "KiduyuTV-tv-release"
+     * Phone APKs start with "KiduyuTV-phone-release"
+     * 
+     * Note: Both APK names contain "-phone-tv-" in them, so we must check the prefix
+     * instead of just searching for patterns within the filename.
      */
     private fun matchesDeviceType(fileName: String, deviceType: String): Boolean {
         val lowerName = fileName.lowercase()
+        
+        // Check the prefix to determine device type
+        // TV APK: "kiduyutv-tv-release-..."
+        // Phone APK: "kiduyutv-phone-release-..."
         return when (deviceType) {
-            DEVICE_TYPE_TV -> lowerName.contains("-tv-") || lowerName.contains("tv-release")
-            DEVICE_TYPE_PHONE -> lowerName.contains("-phone-") || lowerName.contains("phone-release")
+            DEVICE_TYPE_TV -> lowerName.startsWith("kiduyutv-tv-release")
+            DEVICE_TYPE_PHONE -> lowerName.startsWith("kiduyutv-phone-release")
             else -> true
         }
     }
 
     /**
-     * Fetches the best APK URL from GitHub releases based on device type.
-     * For TV devices: Selects APKs with "tv" in the name, picks highest build number.
-     * For Phone devices: Selects APKs with "phone" in the name, picks highest build number.
+     * Fetches the best APK info from GitHub releases based on device type.
+     * For TV devices: Selects APKs starting with "KiduyuTV-tv-release", picks highest build number.
+     * For Phone devices: Selects APKs starting with "KiduyuTV-phone-release", picks highest build number.
+     * 
+     * Returns ApkInfo containing URL, filename, version, and build number.
      * 
      * APK naming convention:
      * - TV: KiduyuTV-tv-release-X.X.X-phone-tv-buildYYY.apk
      * - Phone: KiduyuTV-phone-release-X.X.X-phone-tv-buildYYY.apk
      */
-    suspend fun fetchBestApkUrl(context: Context): String? = withContext(Dispatchers.IO) {
+    suspend fun fetchBestApkInfo(context: Context): ApkInfo? = withContext(Dispatchers.IO) {
         try {
             val deviceType = getDeviceType(context)
             Log.i(TAG, "Fetching APK for device type: $deviceType")
@@ -225,9 +261,8 @@ object UpdateUtil {
                 val jsonString = response.body?.string() ?: return@withContext null
                 val releases = JSONArray(jsonString)
 
-                var bestApkUrl: String? = null
+                var bestApkInfo: ApkInfo? = null
                 var bestBuildNumber = -1
-                var bestVersion: String? = null
 
                 // Iterate through releases to find the best APK
                 for (i in 0 until releases.length()) {
@@ -240,48 +275,64 @@ object UpdateUtil {
                     
                     for (j in 0 until assets.length()) {
                         val asset = assets.getJSONObject(j)
-                        val name = asset.optString("name", "").lowercase()
+                        val name = asset.optString("name", "")
 
                         // Skip non-APK files and debug builds
-                        if (!name.endsWith(".apk") ||
-                            name.contains("debug") ||
-                            !name.contains("release")) {
+                        if (!name.lowercase().endsWith(".apk") ||
+                            name.lowercase().contains("debug") ||
+                            !name.lowercase().contains("release")) {
                             continue
                         }
 
-                        // Check if APK matches the current device type
+                        // Check if APK matches the current device type by prefix
                         if (!matchesDeviceType(name, deviceType)) {
-                            Log.d(TAG, "Skipping APK (device type mismatch): $name")
+                            Log.d(TAG, "Skipping APK (device type mismatch): $name for device type: $deviceType")
                             continue
                         }
 
                         // Extract version and build number
-                        val version = extractVersionFromApkName(asset.optString("name", ""))
+                        val version = extractVersionFromApkName(name)
                         val buildNumber = extractBuildNumber(name)
 
-                        Log.d(TAG, "Found APK: $name, version: $version, build: $buildNumber")
+                        Log.d(TAG, "Found matching APK: $name, version: $version, build: $buildNumber")
 
                         // Select the APK with the highest build number
                         if (buildNumber > bestBuildNumber) {
                             bestBuildNumber = buildNumber
-                            bestApkUrl = asset.optString("browser_download_url", null)
-                            bestVersion = version
+                            val apkUrl = asset.optString("browser_download_url", null)
+                            if (apkUrl != null) {
+                                bestApkInfo = ApkInfo(
+                                    url = apkUrl,
+                                    fileName = name,
+                                    version = version,
+                                    buildNumber = buildNumber
+                                )
+                            }
                         }
                     }
 
-                    // If we found a valid APK in this release, use it
-                    if (bestApkUrl != null && bestBuildNumber > 0) {
-                        Log.i(TAG, "Selected APK: version=$bestVersion, build=$bestBuildNumber")
+                    // If we found a valid APK in this release, we're done
+                    // (releases are ordered by date, so first match is likely the best)
+                    if (bestApkInfo != null && bestBuildNumber > 0) {
+                        Log.i(TAG, "Selected APK: ${bestApkInfo.fileName}, version=${bestApkInfo.version}, build=${bestApkInfo.buildNumber}")
                         break
                     }
                 }
 
-                bestApkUrl
+                bestApkInfo
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error fetching best APK URL", e)
+            Log.e(TAG, "Error fetching best APK info", e)
             null
         }
+    }
+
+    /**
+     * Legacy method for backward compatibility.
+     * Fetches the best APK URL from GitHub releases based on device type.
+     */
+    suspend fun fetchBestApkUrl(context: Context): String? {
+        return fetchBestApkInfo(context)?.url
     }
 
     /**
@@ -340,6 +391,66 @@ object UpdateUtil {
     /**
      * Downloads an APK file using OkHttpClient with progress reporting.
      * Shows download progress percentage to the user.
+     * 
+     * @param context Application context
+     * @param apkInfo APK information including URL and filename
+     * @param onProgress Callback with progress percentage and filename
+     * @return Downloaded File or null if failed
+     */
+    suspend fun downloadApk(
+        context: Context,
+        apkInfo: ApkInfo,
+        onProgress: (Int, String) -> Unit
+    ): File? = withContext(Dispatchers.IO) {
+        try {
+            Log.i(TAG, "Starting download: ${apkInfo.fileName}")
+            
+            val request = Request.Builder()
+                .url(apkInfo.url)
+                .header("User-Agent", "KiduyuTV-Android")
+                .build()
+
+            httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    Log.e(TAG, "Download request failed with code: ${response.code}")
+                    return@withContext null
+                }
+
+                val body = response.body ?: return@withContext null
+                val totalBytes = body.contentLength()
+                val outFile = File(context.getExternalFilesDir(null), "kiduyutv-update.apk")
+
+                body.byteStream().use { input ->
+                    FileOutputStream(outFile).use { output ->
+                        val buffer = ByteArray(8192)
+                        var downloaded = 0L
+                        var read: Int
+
+                        while (input.read(buffer).also { read = it } != -1) {
+                            output.write(buffer, 0, read)
+                            downloaded += read
+                            if (totalBytes > 0) {
+                                val pct = ((downloaded * 100) / totalBytes).toInt()
+                                withContext(Dispatchers.Main) {
+                                    onProgress(pct.coerceIn(0, 100), apkInfo.fileName)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Log.i(TAG, "APK downloaded successfully: ${outFile.absolutePath}")
+                outFile
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "APK download failed", e)
+            null
+        }
+    }
+
+    /**
+     * Legacy download method for backward compatibility.
+     * Downloads an APK file using the URL string.
      */
     suspend fun downloadApk(
         context: Context,
@@ -347,6 +458,8 @@ object UpdateUtil {
         onProgress: (Int) -> Unit
     ): File? = withContext(Dispatchers.IO) {
         try {
+            Log.i(TAG, "Starting download from URL: $apkUrl")
+            
             val request = Request.Builder()
                 .url(apkUrl)
                 .header("User-Agent", "KiduyuTV-Android")
