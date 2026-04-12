@@ -10,6 +10,7 @@ permissions:
   packages: write
   pages: write
   id-token: write
+  actions: write
 
 jobs:
   # ══════════════════════════════════════════════════════════════════════
@@ -425,7 +426,7 @@ jobs:
             core.setOutput('run_ids', JSON.stringify(failedRuns.map(r => r.id)));
 
       - name: Delete failed runs
-        if: steps.check.outputs.count > 0
+        if: steps.check.outputs.count != '0'
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
