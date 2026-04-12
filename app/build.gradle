@@ -34,6 +34,22 @@ android {
         }
     }
 
+    flavorDimensions += "formfactor"
+    productFlavors {
+        phone {
+            dimension "formfactor"
+            applicationIdSuffix ".phone"
+            versionNameSuffix "-phone"
+            resValue "string", "app_name", "KiduyuTV"
+        }
+        tv {
+            dimension "formfactor"
+            applicationIdSuffix ".tv"
+            versionNameSuffix "-tv"
+            resValue "string", "app_name", "KiduyuTV"
+        }
+    }
+
     buildTypes {
         release {
             signingConfig signingConfigs.release
