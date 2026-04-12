@@ -52,7 +52,16 @@ fun MobileNavGraph(navController: NavHostController) {
 
         composable(Screen.Settings.route) {
             MobileSettingsScreen(
-                onBackClick = { navController.popBackStack() }
+                onBackClick = { navController.popBackStack() },
+                onMovieClick = { movieId -> navController.navigate(Screen.MovieDetail.createRoute(movieId)) },
+                onTvShowClick = { tvShowId -> navController.navigate(Screen.TvShowDetail.createRoute(tvShowId)) },
+                onCompanyClick = { id, name -> navController.navigate("media_list/company/$id/${Uri.encode(name)}") },
+                onNetworkClick = { id, name -> navController.navigate("media_list/network/$id/${Uri.encode(name)}") },
+                onCastClick = { id, name, character, profilePath, knownForDepartment ->
+                    navController.navigate(
+                        Screen.MobileCastDetail.createRoute(id, name, character, profilePath, knownForDepartment)
+                    )
+                }
             )
         }
 

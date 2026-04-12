@@ -31,7 +31,6 @@ import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
-import com.kiduyuk.klausk.kiduyutv.ui.components.MobileBottomNavigation
 import com.kiduyuk.klausk.kiduyutv.ui.components.MobileMovieCard
 import com.kiduyuk.klausk.kiduyutv.ui.components.MobileTvShowCard
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
@@ -84,12 +83,6 @@ fun MobileMyListScreen(
                         }
                     }
                 }
-            )
-        },
-        bottomBar = {
-            MobileBottomNavigation(
-                navController = navController,
-                currentRoute = Screen.MyList.route
             )
         },
         containerColor = BackgroundDark
