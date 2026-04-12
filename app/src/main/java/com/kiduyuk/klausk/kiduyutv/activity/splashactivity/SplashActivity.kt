@@ -412,14 +412,14 @@ class SplashActivity : ComponentActivity() {
             ) {
                 // App icon
                 Image(
-                    painter = painterResource(id = R.mipmap.ic_launcher1),
+                    painter = painterResource(id = R.mipmap.ic_launcher11),
                     contentDescription = "KiduyuTV icon",
                     modifier = Modifier
                         .size(96.dp)
                         .clip(RoundedCornerShape(24.dp))
                 )
 
-                Spacer(Modifier.height(28.dp))
+                Spacer(Modifier.height(10.dp))
 
                 // "KiduyuTV" — white + red split
                 Row(verticalAlignment = Alignment.Bottom) {
@@ -449,7 +449,7 @@ class SplashActivity : ComponentActivity() {
                     letterSpacing = 3.sp
                 )
 
-                Spacer(Modifier.height(40.dp))
+                Spacer(Modifier.height(10.dp))
 
                 // Small Lottie indicator below the wordmark
                 LottieAnimation(
