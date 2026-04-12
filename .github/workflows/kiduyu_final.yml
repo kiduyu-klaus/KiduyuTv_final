@@ -88,27 +88,7 @@ jobs:
       - name: Restore keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > kiduyutv_final
 
-      # ── Phone Debug ───────────────────────────────────────────
-      - name: Build Phone Debug APK
-        run: ./gradlew assemblePhoneDebug
-
-      - name: Rename Phone Debug APK
-        id: rename_phone_debug
-        run: |
-          VERSION=$(grep 'versionName' app/build.gradle | sed 's/.*"\(.*\)".*/\1/' | tr -d '[:space:]')
-          BUILD=$(git rev-list --count HEAD)
-          APK=$(find app/build/outputs/apk/phone/debug -name "*.apk" | head -1)
-          NEW_APK_NAME="KiduyuTV-phone-debug-${VERSION}-build${BUILD}.apk"
-          NEW_APK_PATH="app/build/outputs/apk/phone/debug/$NEW_APK_NAME"
-          mv "$APK" "$NEW_APK_PATH"
-          echo "apk_path=$NEW_APK_PATH" >> $GITHUB_OUTPUT
-
-      - name: Upload Phone Debug Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: phone-debug
-          path: ${{ steps.rename_phone_debug.outputs.apk_path }}
-
+      # ── Phone Release ─────────────────────────────────────────
       # ── Phone Release ─────────────────────────────────────────
       - name: Build Phone Release APK
         run: ./gradlew assemblePhoneRelease
@@ -130,27 +110,7 @@ jobs:
           name: phone-release
           path: ${{ steps.rename_phone_release.outputs.apk_path }}
 
-      # ── TV Debug ──────────────────────────────────────────────
-      - name: Build TV Debug APK
-        run: ./gradlew assembleTvDebug
-
-      - name: Rename TV Debug APK
-        id: rename_tv_debug
-        run: |
-          VERSION=$(grep 'versionName' app/build.gradle | sed 's/.*"\(.*\)".*/\1/' | tr -d '[:space:]')
-          BUILD=$(git rev-list --count HEAD)
-          APK=$(find app/build/outputs/apk/tv/debug -name "*.apk" | head -1)
-          NEW_APK_NAME="KiduyuTV-tv-debug-${VERSION}-build${BUILD}.apk"
-          NEW_APK_PATH="app/build/outputs/apk/tv/debug/$NEW_APK_NAME"
-          mv "$APK" "$NEW_APK_PATH"
-          echo "apk_path=$NEW_APK_PATH" >> $GITHUB_OUTPUT
-
-      - name: Upload TV Debug Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: tv-debug
-          path: ${{ steps.rename_tv_debug.outputs.apk_path }}
-
+      # ── TV Release ────────────────────────────────────────────
       # ── TV Release ────────────────────────────────────────────
       - name: Build TV Release APK
         run: ./gradlew assembleTvRelease
@@ -172,7 +132,7 @@ jobs:
           name: tv-release
           path: ${{ steps.rename_tv_release.outputs.apk_path }}
 
-      # ── Single GitHub Release with all 4 APKs ────────────────
+      # ── Single GitHub Release with all 2 APKs ────────────────
       - name: Create GitHub Release
         id: create_release
         uses: softprops/action-gh-release@v2
@@ -190,12 +150,10 @@ jobs:
             ---
 
             ### Downloads
-            | APK | Platform | Notes |
-            |-----|----------|-------|
-            | `KiduyuTV-phone-release-*.apk` | Android Phone / Tablet | Signed release build |
-            | `KiduyuTV-phone-debug-*.apk`   | Android Phone / Tablet | Debug build — logging enabled |
-            | `KiduyuTV-tv-release-*.apk`    | Android TV / Fire TV   | Signed release build |
-            | `KiduyuTV-tv-debug-*.apk`      | Android TV / Fire TV   | Debug build — logging enabled |
+            | APK | Platform |
+            |-----|----------|
+            | `KiduyuTV-phone-release-*.apk` | Android Phone / Tablet |
+            | `KiduyuTV-tv-release-*.apk`    | Android TV / Fire TV   |
 
             **Sideload via ADB (Phone):**
             ```bash
@@ -208,13 +166,11 @@ jobs:
             adb install KiduyuTV-tv-release-*.apk
             ```
           files: |
-            ${{ steps.rename_phone_debug.outputs.apk_path }}
             ${{ steps.rename_phone_release.outputs.apk_path }}
-            ${{ steps.rename_tv_debug.outputs.apk_path }}
             ${{ steps.rename_tv_release.outputs.apk_path }}
           draft: false
-          prerelease: true
-          make_latest: false
+          prerelease: false
+          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -251,12 +207,12 @@ jobs:
       - name: Resolve latest release info
         id: release_info
         run: |
-          # Get the latest prerelease tag
+          # Get the latest release
           RELEASE=$(curl -s \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${{ github.repository }}/releases" \
-            | jq '[ .[] | select(.prerelease == true) ] | first')
+            | jq 'first')
 
           TAG=$(echo "$RELEASE" | jq -r '.tag_name')
           TITLE=$(echo "$RELEASE" | jq -r '.name')
