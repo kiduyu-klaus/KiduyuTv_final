@@ -210,8 +210,8 @@ fun MobileMediaListScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         if (type == "company") {
-                            // Display movies in 2-column grid rows
-                            val movieRows = uiState.movies.chunked(2)
+                            // Display movies in 3-column grid rows
+                            val movieRows = uiState.movies.chunked(3)
                             items(movieRows) { rowMovies ->
                                 Row(
                                     modifier = Modifier
@@ -233,15 +233,15 @@ fun MobileMediaListScreen(
                                         }
                                     }
 
-                                    // Add spacer if row has only 1 item
-                                    if (rowMovies.size == 1) {
+                                    // Add spacers if row has fewer than 3 items
+                                    repeat(3 - rowMovies.size) {
                                         Spacer(modifier = Modifier.weight(1f))
                                     }
                                 }
                             }
                         } else {
-                            // Display TV shows in 2-column grid rows
-                            val tvShowRows = uiState.tvShows.chunked(2)
+                            // Display TV shows in 3-column grid rows
+                            val tvShowRows = uiState.tvShows.chunked(3)
                             items(tvShowRows) { rowShows ->
                                 Row(
                                     modifier = Modifier
@@ -263,8 +263,8 @@ fun MobileMediaListScreen(
                                         }
                                     }
 
-                                    // Add spacer if row has only 1 item
-                                    if (rowShows.size == 1) {
+                                    // Add spacers if row has fewer than 3 items
+                                    repeat(3 - rowShows.size) {
                                         Spacer(modifier = Modifier.weight(1f))
                                     }
                                 }
