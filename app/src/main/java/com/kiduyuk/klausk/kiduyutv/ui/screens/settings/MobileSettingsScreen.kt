@@ -4,9 +4,6 @@ import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -20,21 +17,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
-import coil.compose.AsyncImage
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.kiduyuk.klausk.kiduyutv.data.model.Movie
-import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
-import com.kiduyuk.klausk.kiduyutv.ui.components.MobileMovieCard
-import com.kiduyuk.klausk.kiduyutv.ui.components.MobileTvShowCard
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.viewmodel.SettingsViewModel
 
@@ -42,11 +31,7 @@ import com.kiduyuk.klausk.kiduyutv.viewmodel.SettingsViewModel
 @Composable
 fun MobileSettingsScreen(
     onBackClick: () -> Unit,
-    onMovieClick: (Int) -> Unit = {},
-    onTvShowClick: (Int) -> Unit = {},
-    onCompanyClick: (Int, String) -> Unit = { _, _ -> },
-    onNetworkClick: (Int, String) -> Unit = { _, _ -> },
-    onCastClick: (Int, String, String?, String?, String?) -> Unit = { _, _, _, _, _ -> },
+    onMyListClick: () -> Unit = {},
     viewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -79,197 +64,14 @@ fun MobileSettingsScreen(
                 .verticalScroll(scrollState)
                 .padding(16.dp)
         ) {
-            // My List Section
+            // My List Section - Button to open My List screen
             SettingsGroup(title = "My List") {
-                if (myList.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "No items in your list yet",
-                            color = TextSecondary,
-                            fontSize = 14.sp,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(3),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 400.dp),
-                        contentPadding = PaddingValues(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(myList) { item ->
-                            when (item.type) {
-                                "movie" -> {
-                                    MobileMovieCard(
-                                        movie = Movie(
-                                            id = item.id,
-                                            title = item.title,
-                                            overview = "",
-                                            posterPath = item.posterPath,
-                                            backdropPath = null,
-                                            voteAverage = item.voteAverage,
-                                            releaseDate = null,
-                                            genreIds = null,
-                                            popularity = 0.0
-                                        ),
-                                        onClick = { onMovieClick(item.id) },
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                }
-                                "tv" -> {
-                                    MobileTvShowCard(
-                                        tvShow = TvShow(
-                                            id = item.id,
-                                            name = item.title,
-                                            overview = "",
-                                            posterPath = item.posterPath,
-                                            backdropPath = null,
-                                            voteAverage = item.voteAverage,
-                                            firstAirDate = null,
-                                            genreIds = null,
-                                            popularity = 0.0
-                                        ),
-                                        onClick = { onTvShowClick(item.id) },
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                }
-                                "company" -> {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable { onCompanyClick(item.id, item.title) },
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .aspectRatio(1f)
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(CardDark),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            if (item.posterPath != null) {
-                                                AsyncImage(
-                                                    model = "https://image.tmdb.org/t/p/w200${item.posterPath}",
-                                                    contentDescription = item.title,
-                                                    contentScale = ContentScale.Fit,
-                                                    modifier = Modifier.padding(8.dp)
-                                                )
-                                            } else {
-                                                Text(
-                                                    text = item.title.take(1).uppercase(),
-                                                    color = TextPrimary,
-                                                    fontSize = 20.sp
-                                                )
-                                            }
-                                        }
-                                        Text(
-                                            text = item.title,
-                                            color = TextPrimary,
-                                            fontSize = 10.sp,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            textAlign = TextAlign.Center
-                                        )
-                                    }
-                                }
-                                "network" -> {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable { onNetworkClick(item.id, item.title) },
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .aspectRatio(1f)
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(CardDark),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            if (item.posterPath != null) {
-                                                AsyncImage(
-                                                    model = "https://image.tmdb.org/t/p/w200${item.posterPath}",
-                                                    contentDescription = item.title,
-                                                    contentScale = ContentScale.Fit,
-                                                    modifier = Modifier.padding(8.dp)
-                                                )
-                                            } else {
-                                                Text(
-                                                    text = item.title.take(1).uppercase(),
-                                                    color = TextPrimary,
-                                                    fontSize = 20.sp
-                                                )
-                                            }
-                                        }
-                                        Text(
-                                            text = item.title,
-                                            color = TextPrimary,
-                                            fontSize = 10.sp,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            textAlign = TextAlign.Center
-                                        )
-                                    }
-                                }
-                                "cast" -> {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                onCastClick(
-                                                    item.id,
-                                                    item.title,
-                                                    item.character,
-                                                    item.posterPath,
-                                                    item.knownForDepartment
-                                                )
-                                            },
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .aspectRatio(1f)
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .background(CardDark),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            if (item.posterPath != null) {
-                                                AsyncImage(
-                                                    model = "https://image.tmdb.org/t/p/w200${item.posterPath}",
-                                                    contentDescription = item.title,
-                                                    contentScale = ContentScale.Crop,
-                                                    modifier = Modifier.fillMaxSize()
-                                                )
-                                            } else {
-                                                Text(
-                                                    text = item.title.take(1).uppercase(),
-                                                    color = TextPrimary,
-                                                    fontSize = 20.sp
-                                                )
-                                            }
-                                        }
-                                        Text(
-                                            text = item.title,
-                                            color = TextPrimary,
-                                            fontSize = 10.sp,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            textAlign = TextAlign.Center
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                SettingsItem(
+                    icon = Icons.Default.Bookmark,
+                    title = "My List",
+                    subtitle = "${myList.size} items saved",
+                    onClick = onMyListClick
+                )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
