@@ -200,7 +200,15 @@ class SplashActivity : ComponentActivity() {
                     if (apkInfo != null) {
                         currentApkInfo = apkInfo
                         Log.i(TAG, "Found APK for download: ${apkInfo.fileName}")
-                        downloadAndInstallApk(apkInfo)
+                        
+                        // Check if the file already exists locally
+                        val localFile = UpdateUtil.getLocalApkFile(this@SplashActivity)
+                        if (localFile.exists()) {
+                            Log.i(TAG, "APK already exists locally, skipping download")
+                            showInstallPrompt(localFile, apkInfo)
+                        } else {
+                            downloadAndInstallApk(apkInfo)
+                        }
                     } else {
                         Log.w(TAG, "Could not find APK for this device type (${getDeviceTypeString()}), opening releases page")
                         // Fallback: open releases page in browser
@@ -288,23 +296,10 @@ class SplashActivity : ComponentActivity() {
             progressDialog.dismiss()
             activeDialogs.remove(progressDialog)
 
-            // ── Post-download QuitDialog ──────────────────────────────────────
+            // ── Post-download logic ──────────────────────────────────────
             if (apkFile != null) {
                 Log.i(TAG, "Download complete: ${apkInfo.fileName}")
-                QuitDialog(
-                    context = this@SplashActivity,
-                    title = "Download Complete",
-                    message = "${apkInfo.fileName}\n\nHas been downloaded.\nTap Install to apply the update.",
-                    positiveButtonText = "Install",
-                    negativeButtonText = "Exit",
-                    lottieAnimRes = R.raw.splash_loading,
-                    onYes = { 
-                        UpdateUtil.checkPermissionAndInstall(this@SplashActivity, apkFile) {
-                            showPermissionDialog(apkFile)
-                        }
-                    },
-                    onNo = { finish() } // Exit if user declines installation after download
-                ).showTracked()
+                showInstallPrompt(apkFile, apkInfo)
             } else {
                 Log.e(TAG, "Download failed")
                 QuitDialog(
@@ -325,19 +320,39 @@ class SplashActivity : ComponentActivity() {
      * Shows a dialog guiding the user to enable unknown app installation.
      * Required for Android 8.0+ to install APKs outside the Play Store.
      */
+    /**
+     * Shows a prompt to install the APK file.
+     */
+    private fun showInstallPrompt(apkFile: File, apkInfo: ApkInfo) {
+        QuitDialog(
+            context = this,
+            title = "Download Complete",
+            message = "${apkInfo.fileName}\n\nHas been downloaded.\nTap Install to apply the update.",
+            positiveButtonText = "Install",
+            negativeButtonText = "Exit",
+            lottieAnimRes = R.raw.splash_loading,
+            onYes = { 
+                UpdateUtil.checkPermissionAndInstall(this, apkFile) {
+                    showPermissionDialog(apkFile)
+                }
+            },
+            onNo = { finish() }
+        ).showTracked()
+    }
+
     private fun showPermissionDialog(apkFile: File) {
         QuitDialog(
             context = this,
             title = "Permission Required",
-            message = "To install the update, Kiduyu TV needs permission to install unknown apps.\n\nPlease enable 'Install unknown apps' for Kiduyu TV in Settings.",
+            message = "To install the update, Kiduyu TV needs permission to install unknown apps. Please enable it in the settings.",
             positiveButtonText = "Settings",
             negativeButtonText = "Exit",
             lottieAnimRes = R.raw.exit,
             onNo = { finish() },
             onYes = {
                 UpdateUtil.openInstallPermissionSettings(this)
-                // User needs to manually grant permission and return to app
-                // or restart to trigger the check again
+                // They'll have to come back to the app manually or we can't easily track the result here,
+                // or they can restart the app to trigger the check again.
                 finish()
             }
         ).showTracked()

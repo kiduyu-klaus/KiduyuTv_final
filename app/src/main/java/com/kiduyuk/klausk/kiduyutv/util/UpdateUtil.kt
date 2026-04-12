@@ -405,13 +405,20 @@ object UpdateUtil {
     }
 
     /**
-     * Downloads an APK file using OkHttpClient with progress reporting.
-     * Shows download progress percentage to the user.
+     * Returns the local APK file path used for updates.
+     */
+    fun getLocalApkFile(context: Context): File {
+        return File(context.getExternalFilesDir(null), "kiduyutv-update.apk")
+    }
+
+    /**
+     * Downloads an APK file and reports progress.
+     * Uses OkHttpClient for better network performance and timeout handling.
      * 
-     * @param context Application context
-     * @param apkInfo APK information including URL and filename
-     * @param onProgress Callback with progress percentage and filename
-     * @return Downloaded File or null if failed
+     * @param context Application context for accessing file storage.
+     * @param apkInfo ApkInfo object containing URL and filename.
+     * @param onProgress Callback function to report download progress (0-100) and filename.
+     * @return The downloaded File object, or null if the download failed.
      */
     suspend fun downloadApk(
         context: Context,
@@ -434,7 +441,7 @@ object UpdateUtil {
 
                 val body = response.body ?: return@withContext null
                 val totalBytes = body.contentLength()
-                val outFile = File(context.getExternalFilesDir(null), "kiduyutv-update.apk")
+                val outFile = getLocalApkFile(context)
 
                 body.byteStream().use { input ->
                     FileOutputStream(outFile).use { output ->
