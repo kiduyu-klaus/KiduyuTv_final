@@ -138,7 +138,7 @@ class SplashActivity : ComponentActivity() {
                 Log.i("SplashActivity", "Remote version: $remoteVersion, Local version: $localVersionName")
                 if (UpdateUtil.isNewerVersion(remoteVersion, localVersionName)) {
                     updateAvailable = true   // gate the splash timeout BEFORE showing the dialog
-                    showUpdateDialog()
+                    showUpdateDialog(remoteVersion)
                 }
             }
         }
@@ -146,11 +146,11 @@ class SplashActivity : ComponentActivity() {
 
     // ── Dialogs ───────────────────────────────────────────────────────────────
 
-    private fun showUpdateDialog() {
+    private fun showUpdateDialog(remoteVersion: String) {
         QuitDialog(
             context = this,
-            title = "Update Available",
-            message = "A newer version of Kiduyu TV is available. Would you like to download it now?",
+            title = "v$remoteVersion Update Available",
+            message = "A newer version of Kiduyu TV (v$remoteVersion) is available. Would you like to download it now?",
             positiveButtonText = "Download",
             negativeButtonText = "Exit",
             lottieAnimRes = R.raw.exit,
