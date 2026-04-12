@@ -16,15 +16,30 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
@@ -36,7 +51,6 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
 import com.kiduyuk.klausk.kiduyutv.util.ApkInfo
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import com.kiduyuk.klausk.kiduyutv.util.UpdateUtil
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -45,24 +59,19 @@ class SplashActivity : ComponentActivity() {
 
     companion object {
         private const val TAG = "SplashActivity"
+        private const val SPLASH_DURATION_MS = 6000
     }
 
-    // Compose-observable flag — when true, SplashScreen will NOT navigate to MainActivity
+    // Compose-observable flags
     private var updateAvailable by mutableStateOf(false)
-
-    // Flag to ensure we only proceed after permission is handled (if applicable)
     private var permissionHandled by mutableStateOf(false)
 
-    // Current remote version for display in update dialog
-    private var currentRemoteVersion: String? = null
-
-    // Current APK info for display during download
-    private var currentApkInfo: ApkInfo? = null
+    // Remote version shown in the status chip
+    private var currentRemoteVersion by mutableStateOf<String?>(null)
 
     // Tracks every dialog shown so onDestroy can safely dismiss them all
     private val activeDialogs = mutableListOf<Dialog>()
 
-    // Extension: show a dialog and register it for cleanup
     private fun Dialog.showTracked() {
         activeDialogs.add(this)
         show()
@@ -79,49 +88,33 @@ class SplashActivity : ComponentActivity() {
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
-        if (isGranted) {
-            Log.i(TAG, "Notification permission granted")
-        } else {
-            Log.i(TAG, "Notification permission denied")
-        }
+        Log.i(TAG, "Notification permission ${if (isGranted) "granted" else "denied"}")
         permissionHandled = true
     }
 
     private fun checkNotificationPermission() {
         when {
-            // Fire TV: notification permission dialogs are not surfaced to the user
-            // on most Fire OS builds — skip the request and proceed immediately.
             UpdateUtil.isTvDevice(this) -> {
                 Log.i(TAG, "TV detected — skipping notification permission request")
                 permissionHandled = true
             }
-
-            // Android 13+ phones/tablets: request POST_NOTIFICATIONS at runtime
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
-                when {
-                    ContextCompat.checkSelfPermission(
-                        this,
-                        android.Manifest.permission.POST_NOTIFICATIONS
-                    ) == PackageManager.PERMISSION_GRANTED -> {
-                        permissionHandled = true
-                    }
-                    else -> {
-                        requestPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
-                    }
+                if (ContextCompat.checkSelfPermission(
+                        this, android.Manifest.permission.POST_NOTIFICATIONS
+                    ) == PackageManager.PERMISSION_GRANTED
+                ) {
+                    permissionHandled = true
+                } else {
+                    requestPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
                 }
             }
-
-            // Below Android 13: permission is granted implicitly
             else -> permissionHandled = true
         }
     }
 
-    // ── Device detection ──────────────────────────────────────────────────────────
+    // ── Device detection ──────────────────────────────────────────────────────
 
-    private fun getDeviceTypeString(): String {
-        // Single source of truth — same method used to select the APK
-        return if (UpdateUtil.isTvDevice(this)) "TV" else "Phone/Tablet"
-    }
+    private fun getDeviceTypeString() = if (UpdateUtil.isTvDevice(this)) "TV" else "Phone/Tablet"
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -133,43 +126,37 @@ class SplashActivity : ComponentActivity() {
             KiduyuTvTheme {
                 SplashScreen(
                     updateAvailable = updateAvailable,
-                    permissionHandled = permissionHandled
-                ) {
-                    startActivity(Intent(this@SplashActivity, MainActivity::class.java))
-                    finish()
-                }
+                    permissionHandled = permissionHandled,
+                    remoteVersion = currentRemoteVersion,
+                    onTimeout = {
+                        startActivity(Intent(this@SplashActivity, MainActivity::class.java))
+                        finish()
+                    }
+                )
             }
         }
     }
 
     // ── Update check ──────────────────────────────────────────────────────────
 
-    /**
-     * Enhanced update check using GitHub Releases API with OkHttpClient.
-     * Fetches the latest release version and compares with local version.
-     */
     private fun checkForUpdates() {
         lifecycleScope.launch {
             Log.i(TAG, "Starting update check for ${getDeviceTypeString()} device...")
-            
-            // Try the new GitHub Releases API first
+
             var remoteVersion = UpdateUtil.fetchLatestGitHubReleaseVersion()
-            
-            // Fallback to legacy VERSION file if GitHub API fails
             if (remoteVersion == null) {
                 Log.w(TAG, "GitHub API failed, falling back to VERSION file")
                 remoteVersion = UpdateUtil.fetchRemoteVersion()
             }
-            
+
             if (remoteVersion != null) {
                 val localVersionName = BuildConfig.VERSION_NAME
                 val isNewer = UpdateUtil.isNewerVersion(remoteVersion, localVersionName)
-                
-                Log.i(TAG, "Remote version: $remoteVersion, Local version: $localVersionName, Is newer: $isNewer")
-                
+                Log.i(TAG, "Remote: $remoteVersion | Local: $localVersionName | Newer: $isNewer")
+
                 if (isNewer) {
                     currentRemoteVersion = remoteVersion
-                    updateAvailable = true   // gate the splash timeout BEFORE showing the dialog
+                    updateAvailable = true       // pause progress bar BEFORE showing dialog
                     showUpdateDialog(remoteVersion)
                 }
             } else {
@@ -180,10 +167,6 @@ class SplashActivity : ComponentActivity() {
 
     // ── Dialogs ───────────────────────────────────────────────────────────────
 
-    /**
-     * Shows the update available dialog to the user.
-     * User can choose to download the update or exit the app.
-     */
     private fun showUpdateDialog(remoteVersion: String) {
         QuitDialog(
             context = this,
@@ -192,26 +175,19 @@ class SplashActivity : ComponentActivity() {
             positiveButtonText = "Download",
             negativeButtonText = "Exit",
             lottieAnimRes = R.raw.exit,
-            onNo = { finish() }, // User chose Exit, close the app
+            onNo = { finish() },
             onYes = {
                 lifecycleScope.launch {
-                    // Use device-specific APK fetching with full APK info
                     val apkInfo = UpdateUtil.fetchBestApkInfo(this@SplashActivity)
                     if (apkInfo != null) {
-                        currentApkInfo = apkInfo
-                        Log.i(TAG, "Found APK for download: ${apkInfo.fileName}")
-                        
-                        // Check if the file already exists locally
                         val localFile = UpdateUtil.getLocalApkFile(this@SplashActivity)
                         if (localFile.exists()) {
-                            Log.i(TAG, "APK already exists locally, skipping download")
                             showInstallPrompt(localFile, apkInfo)
                         } else {
                             downloadAndInstallApk(apkInfo)
                         }
                     } else {
-                        Log.w(TAG, "Could not find APK for this device type (${getDeviceTypeString()}), opening releases page")
-                        // Fallback: open releases page in browser
+                        Log.w(TAG, "No APK found for ${getDeviceTypeString()}, opening releases page")
                         startActivity(
                             Intent(
                                 Intent.ACTION_VIEW,
@@ -224,33 +200,26 @@ class SplashActivity : ComponentActivity() {
         ).showTracked()
     }
 
-    /**
-     * Downloads the APK file and shows progress to the user.
-     * Displays the APK filename during download.
-     * After successful download, prompts user to install.
-     */
     private fun downloadAndInstallApk(apkInfo: ApkInfo) {
-        // ── Build the progress dialog ─────────────────────────────────────────
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(72, 40, 72, 24)
             setBackgroundColor(android.graphics.Color.parseColor("#1A1A1A"))
         }
-        
+
         val statusText = TextView(this).apply {
             text = "Starting download..."
             textSize = 13f
             setTextColor(android.graphics.Color.WHITE)
         }
-        
-        // Filename display
+
         val fileNameText = TextView(this).apply {
             text = apkInfo.fileName
             textSize = 11f
             setTextColor(android.graphics.Color.GRAY)
             maxLines = 2
         }
-        
+
         val progressBar = ProgressBar(
             this, null, android.R.attr.progressBarStyleHorizontal
         ).apply {
@@ -262,13 +231,13 @@ class SplashActivity : ComponentActivity() {
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { topMargin = 20 }
         }
-        
+
         val versionInfoText = TextView(this).apply {
             text = "${getDeviceTypeString()} version | Build ${apkInfo.buildNumber}"
             textSize = 10f
             setTextColor(android.graphics.Color.DKGRAY)
         }
-        
+
         layout.addView(statusText)
         layout.addView(fileNameText)
         layout.addView(progressBar)
@@ -279,29 +248,22 @@ class SplashActivity : ComponentActivity() {
             .setView(layout)
             .setCancelable(false)
             .create()
-            .also { activeDialogs.add(it) }   // track before showing
+            .also { activeDialogs.add(it) }
         progressDialog.show()
 
         lifecycleScope.launch {
             val apkFile = UpdateUtil.downloadApk(this@SplashActivity, apkInfo) { pct, fileName ->
                 progressBar.progress = pct
                 statusText.text = "Downloading... $pct%"
-                // Update filename if it changes (though it shouldn't)
-                if (fileNameText.text != fileName) {
-                    fileNameText.text = fileName
-                }
+                if (fileNameText.text != fileName) fileNameText.text = fileName
             }
 
-            // Dismiss and remove from tracker before showing the next dialog
             progressDialog.dismiss()
             activeDialogs.remove(progressDialog)
 
-            // ── Post-download logic ──────────────────────────────────────
             if (apkFile != null) {
-                Log.i(TAG, "Download complete: ${apkInfo.fileName}")
                 showInstallPrompt(apkFile, apkInfo)
             } else {
-                Log.e(TAG, "Download failed")
                 QuitDialog(
                     context = this@SplashActivity,
                     title = "Download Failed",
@@ -310,19 +272,12 @@ class SplashActivity : ComponentActivity() {
                     negativeButtonText = "Exit",
                     lottieAnimRes = R.raw.exit,
                     onYes = { downloadAndInstallApk(apkInfo) },
-                    onNo = { finish() } // Exit if user cancels after failure
+                    onNo = { finish() }
                 ).showTracked()
             }
         }
     }
 
-    /**
-     * Shows a dialog guiding the user to enable unknown app installation.
-     * Required for Android 8.0+ to install APKs outside the Play Store.
-     */
-    /**
-     * Shows a prompt to install the APK file.
-     */
     private fun showInstallPrompt(apkFile: File, apkInfo: ApkInfo) {
         QuitDialog(
             context = this,
@@ -331,7 +286,7 @@ class SplashActivity : ComponentActivity() {
             positiveButtonText = "Install",
             negativeButtonText = "Exit",
             lottieAnimRes = R.raw.splash_loading,
-            onYes = { 
+            onYes = {
                 UpdateUtil.checkPermissionAndInstall(this, apkFile) {
                     showPermissionDialog(apkFile)
                 }
@@ -351,86 +306,203 @@ class SplashActivity : ComponentActivity() {
             onNo = { finish() },
             onYes = {
                 UpdateUtil.openInstallPermissionSettings(this)
-                // They'll have to come back to the app manually or we can't easily track the result here,
-                // or they can restart the app to trigger the check again.
                 finish()
             }
         ).showTracked()
     }
 
-// ── Composable ────────────────────────────────────────────────────────────────
+    // ── Composable ────────────────────────────────────────────────────────────
 
     @Composable
     fun SplashScreen(
-        updateAvailable: Boolean = false,
-        permissionHandled: Boolean = true,
+        updateAvailable: Boolean,
+        permissionHandled: Boolean,
+        remoteVersion: String?,
         onTimeout: () -> Unit
     ) {
-        val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.splash_loading))
-        val progress by animateLottieCompositionAsState(
-            composition = composition,
-            iterations = LottieConstants.IterateForever
-        )
+        // Progress pauses when a dialog is open or permission hasn't been resolved yet.
+        // LaunchedEffect key change cancels the running coroutine → animation stops.
+        // When isPaused → false, a new effect fires and resumes from current progress.
+        val isPaused = updateAvailable || !permissionHandled
 
-        // Reduce wait time if update is available (user may want to proceed to download)
-        LaunchedEffect(updateAvailable, permissionHandled) {
-            if (!updateAvailable && permissionHandled) {
-                delay(6000)
+        val barProgress = remember { Animatable(0f) }
+
+        LaunchedEffect(isPaused) {
+            if (isPaused) {
+                barProgress.stop()
+            } else {
+                val remainingMs = ((1f - barProgress.value) * SPLASH_DURATION_MS)
+                    .toInt().coerceAtLeast(100)
+                barProgress.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(durationMillis = remainingMs, easing = LinearEasing)
+                )
                 onTimeout()
             }
         }
 
+        // Fade the whole screen in on mount
+        val screenAlpha = remember { Animatable(0f) }
+        LaunchedEffect(Unit) {
+            screenAlpha.animateTo(1f, animationSpec = tween(700, easing = FastOutSlowInEasing))
+        }
+
+        // Slowly pulsing background glow
+        val glowTransition = rememberInfiniteTransition(label = "glow")
+        val glowAlpha by glowTransition.animateFloat(
+            initialValue = 0.08f,
+            targetValue = 0.20f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(2400, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "glow_alpha"
+        )
+
+        // Lottie loading animation
+        val lottieComposition by rememberLottieComposition(
+            LottieCompositionSpec.RawRes(R.raw.splash_loading)
+        )
+        val lottieProgress by animateLottieCompositionAsState(
+            composition = lottieComposition,
+            iterations = LottieConstants.IterateForever
+        )
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF0F0F0F)),
-            contentAlignment = Alignment.Center
+                .background(Color(0xFF0F0F0F))
+                .alpha(screenAlpha.value)
         ) {
+
+            // ── Soft radial glow ─────────────────────────────────────────────
+            Canvas(
+                modifier = Modifier
+                    .size(440.dp)
+                    .align(Alignment.Center)
+            ) {
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color(0xFFE50914).copy(alpha = glowAlpha),
+                            Color.Transparent
+                        )
+                    )
+                )
+            }
+
+            // ── Centre logo block ────────────────────────────────────────────
             Column(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Text(
-                    text = "Kiduyu TV",
-                    color = Color.White,
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                
-                Text(
-                    text = "Streaming Simplified",
-                    color = Color.Gray,
-                    fontSize = 14.sp
+                // App icon
+                Image(
+                    painter = painterResource(id = R.mipmap.ic_launcher1),
+                    contentDescription = "KiduyuTV icon",
+                    modifier = Modifier
+                        .size(96.dp)
+                        .clip(RoundedCornerShape(24.dp))
                 )
 
+                Spacer(Modifier.height(28.dp))
+
+                // "KiduyuTV" — white + red split
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        text = "Kiduyu",
+                        color = Color.White,
+                        fontSize = 42.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = (-1.5).sp
+                    )
+                    Text(
+                        text = "TV",
+                        color = Color(0xFFE50914),
+                        fontSize = 42.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = (-1.5).sp
+                    )
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                Text(
+                    text = "STREAMING SIMPLIFIED",
+                    color = Color(0xFF606060),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 3.sp
+                )
+
+                Spacer(Modifier.height(40.dp))
+
+                // Small Lottie indicator below the wordmark
                 LottieAnimation(
-                    composition = composition,
-                    progress = { progress },
-                    modifier = Modifier.size(200.dp)
+                    composition = lottieComposition,
+                    progress = { lottieProgress },
+                    modifier = Modifier.size(72.dp)
                 )
             }
-            
+
+            // ── Bottom: status chip + progress bar + version ─────────────────
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .fillMaxWidth()
+                    .padding(horizontal = 36.dp, vertical = 44.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
+                // Status chip — only visible while progress is paused
+                if (isPaused) {
+                    val (chipLabel, chipColor) = when {
+                        updateAvailable && remoteVersion != null ->
+                            "Update available: v$remoteVersion" to Color(0xFFE50914)
+                        updateAvailable ->
+                            "Update available" to Color(0xFFE50914)
+                        else ->
+                            "Requesting permissions…" to Color(0xFF808080)
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color(0xFF1E1E1E))
+                            .padding(horizontal = 18.dp, vertical = 7.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = chipLabel,
+                            color = chipColor,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            letterSpacing = 0.3.sp
+                        )
+                    }
+                }
+
+                // Animated progress bar (2dp thin, red fill)
+                LinearProgressIndicator(
+                    progress = { barProgress.value },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(2.dp)
+                        .clip(RoundedCornerShape(1.dp)),
+                    color = Color(0xFFE50914),
+                    trackColor = Color(0xFF2A2A2A)
+                )
+
+                // Version
                 Text(
                     text = "v${BuildConfig.VERSION_NAME}",
-                    color = Color.DarkGray,
-                    fontSize = 12.sp
+                    color = Color(0xFF3A3A3A),
+                    fontSize = 11.sp,
+                    letterSpacing = 0.5.sp
                 )
-                
-                if (updateAvailable && currentRemoteVersion != null) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Update available: v$currentRemoteVersion",
-                        color = Color(0xFFE65100),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
             }
         }
     }
