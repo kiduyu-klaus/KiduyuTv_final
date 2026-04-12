@@ -376,8 +376,8 @@ fun StreamProviderCard(
                 if (isFocused)
                     Brush.linearGradient(
                         colors = listOf(
-                            PrimaryRed.copy(alpha = 0.30f),
-                            PrimaryRed.copy(alpha = 0.12f)
+                            PrimaryRed,
+                            PrimaryRed.copy(alpha = 0.85f)
                         )
                     )
                 else
@@ -412,13 +412,13 @@ fun StreamProviderCard(
                         .size(28.dp)
                         .clip(CircleShape)
                         .background(
-                            if (isFocused) PrimaryRed else Color.White.copy(alpha = 0.10f)
+                            if (isFocused) Color.White else PrimaryRed
                         ),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "$index",
-                        color = Color.White,
+                        color = if (isFocused) PrimaryRed else Color.White,
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold
                     )
@@ -442,14 +442,14 @@ fun StreamProviderCard(
                         .size(28.dp)
                         .clip(CircleShape)
                         .background(
-                            if (isFocused) PrimaryRed.copy(alpha = 0.20f) else Color.Transparent
+                            if (isFocused) Color.White.copy(alpha = 0.25f) else Color.Transparent
                         ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = "Play",
-                        tint = if (isFocused) PrimaryRed else TextSecondary,
+                        tint = if (isFocused) Color.White else TextSecondary,
                         modifier = Modifier.size(18.dp)
                     )
                 }
