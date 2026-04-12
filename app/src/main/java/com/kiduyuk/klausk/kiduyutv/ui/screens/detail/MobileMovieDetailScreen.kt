@@ -43,6 +43,7 @@ fun MobileMovieDetailScreen(
     onPlayClick: (String) -> Unit,
     onCastClick: (Int, String, String?, String?, String?) -> Unit,
     onNavigateToCastDetail: (String) -> Unit,
+    onCompanyClick: (Int, String) -> Unit = { _, _ -> },
     viewModel: DetailViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -126,7 +127,7 @@ fun MobileMovieDetailScreen(
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Button(
                             onClick = {
-                                val route = com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen.StreamLinks.createRoute(
+                                val route = com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen.MobileStreamLinks.createRoute(
                                     tmdbId = movie.id,
                                     isTv = false,
                                     title = movie.title ?: "",
@@ -191,6 +192,33 @@ fun MobileMovieDetailScreen(
                                 ) {
                                     Text(
                                         text = genre.name,
+                                        color = TextPrimary,
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (movie.productionCompanies != null && movie.productionCompanies.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(text = "Production Companies", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            movie.productionCompanies.take(3).forEach { company ->
+                                Surface(
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = CardDark,
+                                    modifier = Modifier
+                                        .padding(vertical = 4.dp)
+                                        .clickable { onCompanyClick(company.id, company.name) }
+                                ) {
+                                    Text(
+                                        text = company.name,
                                         color = TextPrimary,
                                         fontSize = 12.sp,
                                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)

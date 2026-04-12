@@ -46,6 +46,7 @@ fun MobileTvShowDetailScreen(
     onPlayClick: (String) -> Unit,
     onCastClick: (Int, String, String?, String?, String?) -> Unit,
     onNavigateToCastDetail: (String) -> Unit,
+    onNetworkClick: (Int, String) -> Unit = { _, _ -> },
     viewModel: DetailViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -129,7 +130,7 @@ fun MobileTvShowDetailScreen(
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Button(
                             onClick = {
-                                val route = com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen.StreamLinks.createRoute(
+                                val route = com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen.MobileStreamLinks.createRoute(
                                     tmdbId = tvShow.id,
                                     isTv = true,
                                     title = tvShow.name ?: "",
@@ -152,6 +153,11 @@ fun MobileTvShowDetailScreen(
 
                         OutlinedButton(
                             onClick = {
+                                val route = com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen.MobileSeasonEpisodes.createRoute(
+                                    tvId = tvShow.id,
+                                    tvShowName = tvShow.name ?: "",
+                                    totalSeasons = tvShow.numberOfSeasons ?: 1
+                                )
                                 onEpisodesClick(tvShow.id, tvShow.name ?: "", tvShow.numberOfSeasons ?: 1)
                             },
                             modifier = Modifier.weight(1f),
@@ -210,6 +216,33 @@ fun MobileTvShowDetailScreen(
                                 ) {
                                     Text(
                                         text = genre.name,
+                                        color = TextPrimary,
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (tvShow.networks != null && tvShow.networks.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(text = "Networks", style = MaterialTheme.typography.titleMedium, color = TextPrimary)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            tvShow.networks.take(5).forEach { network ->
+                                Surface(
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = CardDark,
+                                    modifier = Modifier
+                                        .padding(vertical = 4.dp)
+                                        .clickable { onNetworkClick(network.id, network.name) }
+                                ) {
+                                    Text(
+                                        text = network.name,
                                         color = TextPrimary,
                                         fontSize = 12.sp,
                                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)

@@ -140,7 +140,7 @@ object NetworkStateDialog {
 
             setPositiveButton("Retry") { dialog, _ ->
                 dialog.dismiss()
-                performRetry()
+                performRetry(context)
             }
 
             setNegativeButton("Settings") { dialog, _ ->
@@ -181,7 +181,7 @@ object NetworkStateDialog {
 
             setPositiveButton("Retry") { dialog, _ ->
                 dialog.dismiss()
-                performRetry()
+                performRetry(context)
             }
 
             setNegativeButton("Settings") { dialog, _ ->
@@ -202,7 +202,7 @@ object NetworkStateDialog {
      *
      * @param context Context for network operations
      */
-    private fun performRetry() {
+    private fun performRetry(context: Context) {
         // Cancel any ongoing retry operation
         retryJob?.cancel()
 
@@ -214,7 +214,7 @@ object NetworkStateDialog {
 
             // Default retry: force refresh connectivity check
             try {
-                NetworkConnectivityChecker.forceRefresh(AndroidApp.instance)
+                NetworkConnectivityChecker.forceRefresh(context)
             } catch (e: Exception) {
                 Log.e(TAG, "Error performing retry: ${e.message}")
             }
@@ -241,13 +241,13 @@ object NetworkStateDialog {
                     // Store the current bad state
                     lastBadState = currentState
                     // Show the appropriate dialog
-                    showIfNeeded(AndroidApp.instance, currentState, null)
+                    showIfNeeded(context, currentState, null)
                 }
 
                 is NetworkState.Unknown -> {
                     // Unknown state, try showing the last known bad state if available
                     Log.i(TAG, "Network state unknown after retry")
-                    lastBadState?.let { showIfNeeded(AndroidApp.instance, it, null) }
+                    lastBadState?.let { showIfNeeded(context, it, null) }
                 }
             }
         }

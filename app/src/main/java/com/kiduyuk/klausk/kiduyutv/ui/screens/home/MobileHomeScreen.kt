@@ -105,7 +105,7 @@ fun MobileHomeScreen(
                                 val selectedItem = uiState.selectedItem
                                 when (selectedItem) {
                                     is Movie -> navController.navigate(
-                                        Screen.StreamLinks.createRoute(
+                                        Screen.MobileStreamLinks.createRoute(
                                             tmdbId = selectedItem.id,
                                             isTv = false,
                                             title = selectedItem.title ?: "",
@@ -117,7 +117,7 @@ fun MobileHomeScreen(
                                         )
                                     )
                                     is TvShow -> navController.navigate(
-                                        Screen.StreamLinks.createRoute(
+                                        Screen.MobileStreamLinks.createRoute(
                                             tmdbId = selectedItem.id,
                                             isTv = true,
                                             title = selectedItem.name ?: "",
@@ -129,7 +129,7 @@ fun MobileHomeScreen(
                                         )
                                     )
                                     is WatchHistoryItem -> navController.navigate(
-                                        Screen.StreamLinks.createRoute(
+                                        Screen.MobileStreamLinks.createRoute(
                                             tmdbId = selectedItem.id,
                                             isTv = selectedItem.isTv,
                                             title = selectedItem.title,

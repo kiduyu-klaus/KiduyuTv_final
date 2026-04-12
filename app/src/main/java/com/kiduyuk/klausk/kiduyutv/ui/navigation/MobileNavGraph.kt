@@ -142,7 +142,10 @@ fun MobileNavGraph(navController: NavHostController) {
                         "cast_detail/$castId/${Uri.encode(castName)}/${Uri.encode(character ?: "")}/${Uri.encode(profilePath ?: "")}/${Uri.encode(knownForDepartment ?: "")}"
                     )
                 },
-                onNavigateToCastDetail = { route -> navController.navigate(route) }
+                onNavigateToCastDetail = { route -> navController.navigate(route) },
+                onCompanyClick = { id, name ->
+                    navController.navigate("media_list/company/$id/${Uri.encode(name)}")
+                }
             )
         }
 
@@ -157,7 +160,7 @@ fun MobileNavGraph(navController: NavHostController) {
                 onBackClick = { navController.popBackStack() },
                 onTvShowClick = { newTvId -> navController.navigate(Screen.TvShowDetail.createRoute(newTvId)) },
                 onEpisodesClick = { id, name, totalSeasons ->
-                    navController.navigate(Screen.SeasonEpisodes.createRoute(id, name, totalSeasons))
+                    navController.navigate(Screen.MobileSeasonEpisodes.createRoute(id, name, totalSeasons))
                 },
                 onPlayClick = { route ->
                     navController.navigate(route)
@@ -167,7 +170,36 @@ fun MobileNavGraph(navController: NavHostController) {
                         "cast_detail/$castId/${android.net.Uri.encode(castName)}/${android.net.Uri.encode(character ?: "")}/${android.net.Uri.encode(profilePath ?: "")}/${android.net.Uri.encode(knownForDepartment ?: "")}"
                     )
                 },
-                onNavigateToCastDetail = { route -> navController.navigate(route) }
+                onNavigateToCastDetail = { route -> navController.navigate(route) },
+                onNetworkClick = { id, name ->
+                    navController.navigate("media_list/network/$id/${Uri.encode(name)}")
+                }
+            )
+        }
+
+        // Mobile Season Episodes Screen
+        composable(
+            route = Screen.MobileSeasonEpisodes.route,
+            arguments = listOf(
+                navArgument("tvId") { type = NavType.IntType },
+                navArgument("totalSeasons") { type = NavType.IntType },
+                navArgument("tvShowName") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                }
+            )
+        ) { backStackEntry ->
+            val tvId = backStackEntry.arguments?.getInt("tvId") ?: return@composable
+            val totalSeasons = backStackEntry.arguments?.getInt("totalSeasons") ?: 1
+            val tvShowName = backStackEntry.arguments?.getString("tvShowName") ?: ""
+            MobileSeasonEpisodesScreen(
+                tvShowId = tvId,
+                tvShowName = tvShowName,
+                totalSeasons = totalSeasons,
+                onBackClick = { navController.popBackStack() },
+                onPlayClick = { route ->
+                    navController.navigate(route)
+                }
             )
         }
 
@@ -286,6 +318,55 @@ fun MobileNavGraph(navController: NavHostController) {
                 onBackClick = { navController.popBackStack() },
                 onMovieClick = { movieId -> navController.navigate(Screen.MovieDetail.createRoute(movieId)) },
                 onTvShowClick = { tvId -> navController.navigate(Screen.TvShowDetail.createRoute(tvId)) }
+            )
+        }
+
+        // Mobile Stream Links Screen
+        composable(
+            route = Screen.MobileStreamLinks.route,
+            arguments = listOf(
+                navArgument("tmdbId") { type = NavType.IntType },
+                navArgument("isTv") { type = NavType.BoolType },
+                navArgument("season") { type = NavType.IntType; defaultValue = 0 },
+                navArgument("episode") { type = NavType.IntType; defaultValue = 0 },
+                navArgument("title") { type = NavType.StringType; defaultValue = "" },
+                navArgument("overview") { type = NavType.StringType; defaultValue = "" },
+                navArgument("posterPath") { type = NavType.StringType; defaultValue = "" },
+                navArgument("backdropPath") { type = NavType.StringType; defaultValue = "" },
+                navArgument("voteAverage") { type = NavType.FloatType; defaultValue = 0f },
+                navArgument("releaseDate") { type = NavType.StringType; defaultValue = "" },
+                navArgument("timestamp") { type = NavType.LongType; defaultValue = 0L }
+            )
+        ) { backStackEntry ->
+            val tmdbId = backStackEntry.arguments?.getInt("tmdbId") ?: 0
+            val isTv = backStackEntry.arguments?.getBoolean("isTv") ?: false
+            val season = backStackEntry.arguments?.getInt("season")
+            val episode = backStackEntry.arguments?.getInt("episode")
+            val title = backStackEntry.arguments?.getString("title") ?: ""
+            val overview = backStackEntry.arguments?.getString("overview") ?: ""
+            val posterPath = backStackEntry.arguments?.getString("posterPath")
+            val backdropPath = backStackEntry.arguments?.getString("backdropPath")
+            val voteAverage = backStackEntry.arguments?.getFloat("voteAverage")?.toDouble() ?: 0.0
+            val releaseDate = backStackEntry.arguments?.getString("releaseDate")
+            val timestamp = backStackEntry.arguments?.getLong("timestamp") ?: 0L
+
+            MobileStreamLinksScreen(
+                tmdbId = tmdbId,
+                isTv = isTv,
+                title = title,
+                overview = overview,
+                posterPath = posterPath,
+                backdropPath = backdropPath,
+                voteAverage = voteAverage,
+                releaseDate = releaseDate,
+                season = if (season == 0) null else season,
+                episode = if (episode == 0) null else episode,
+                timestamp = timestamp,
+                onBackClick = { navController.popBackStack() },
+                onProviderClick = { providerUrl ->
+                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(providerUrl))
+                    navController.context.startActivity(intent)
+                }
             )
         }
 
