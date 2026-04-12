@@ -215,7 +215,7 @@ fun MobileMoviesScreen(
                         item {
                             MobileSectionHeader(
                                 title = "Jason Statham Action",
-                                onSeeAllClick = { navController.navigate("see_all/statham") }
+                                onSeeAllClick = { navController.navigate("see_all/statham_movies") }
                             )
                             LazyRow(
                                 contentPadding = PaddingValues(horizontal = 16.dp),
@@ -251,7 +251,7 @@ fun MobileMoviesScreen(
                         item {
                             MobileSectionHeader(
                                 title = "Top Rated",
-                                onSeeAllClick = { navController.navigate("see_all/top_rated") }
+                                onSeeAllClick = { navController.navigate("see_all/box_office") }
                             )
                             LazyRow(
                                 contentPadding = PaddingValues(horizontal = 16.dp),

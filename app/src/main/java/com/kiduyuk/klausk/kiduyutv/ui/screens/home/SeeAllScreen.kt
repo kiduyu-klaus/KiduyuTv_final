@@ -37,56 +37,77 @@ fun SeeAllScreen(
     val context = LocalContext.current
     val repository = remember { TmdbRepository() }
 
-    var items by remember { mutableStateOf<List<Any>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-
-    val title = when (category) {
-        "trending_movies" -> "Trending Movies"
-        "latest_movies" -> "Latest Releases"
-        "box_office" -> "Box Office"
-        "trending_tv" -> "Trending TV Shows"
-        "watched_tv" -> "Watched TV Shows"
-        "popular_tv" -> "Popular TV Shows"
-        "favorite_tv" -> "All Time Favorite TV Shows"
-        "continue_watching" -> "Continue Watching"
-        "now_playing" -> "Now Playing"
-        "time_travel_movies" -> "Time Travel Movies"
-        "time_travel_tv" -> "Time Travel TV Shows"
-        "oscar_winners" -> "2026 Oscar Winners"
-        "hallmark" -> "Hallmark Movies"
-        "true_story" -> "True Story Movies"
-        "classics" -> "Best Classics"
-        "spy_movies" -> "Spy Movies"
-        "statham_movies" -> "Jason Statham Movies"
-        "networks" -> "Popular Networks"
-        "companies" -> "Production Companies"
-        else -> "All Content"
+    // Always trigger a load — SeeAllScreen gets its own fresh ViewModel instance
+    // scoped to the NavBackStackEntry, so uiState starts empty.
+    LaunchedEffect(Unit) {
+        viewModel.loadHomeContent(context)
     }
 
-    // Try to get items from ViewModel first, otherwise fetch from TMDB
+    val title = when (category) {
+        "trending_movies"  -> "Trending Movies"
+        "latest_movies"    -> "Latest Releases"
+        "box_office"       -> "Box Office"
+        "trending_tv"      -> "Trending TV Shows"
+        "watched_tv"       -> "Watched TV Shows"
+        "popular_tv"       -> "Popular TV Shows"
+        "favorite_tv"      -> "All Time Favorite TV Shows"
+        "continue_watching"-> "Continue Watching"
+        "now_playing"      -> "Now Playing"
+        "time_travel_movies" -> "Time Travel Movies"
+        "time_travel_tv"   -> "Time Travel TV Shows"
+        "oscar_winners"    -> "2026 Oscar Winners"
+        "hallmark"         -> "Hallmark Movies"
+        "true_story"       -> "True Story Movies"
+        "classics"         -> "Best Classics"
+        "spy_movies"       -> "Spy Movies"
+        "statham_movies"   -> "Jason Statham Movies"
+        "networks"         -> "Popular Networks"
+        "companies"        -> "Production Companies"
+        else               -> "All Content"
+    }
+
+    // ── JSON-backed categories ────────────────────────────────────────────────
+    // Derived directly from uiState so they update as soon as loadHomeContent
+    // finishes — no separate async fetch needed.
+    val jsonItems: List<Any>? = when (category) {
+        "oscar_winners"      -> uiState.oscarWinners2026
+        "hallmark"           -> uiState.hallmarkMovies
+        "true_story"         -> uiState.trueStoryMovies
+        "classics"           -> uiState.bestClassics
+        "spy_movies"         -> uiState.spyMovies
+        "statham_movies"     -> uiState.stathamMovies
+        "time_travel_movies" -> uiState.timeTravelMovies
+        "time_travel_tv"     -> uiState.timeTravelTvShows
+        "favorite_tv"        -> uiState.bestSitcoms
+        else                 -> null  // null = not a JSON category, use async fetch
+    }
+
+    // ── TMDB-backed categories ────────────────────────────────────────────────
+    // Fetched once via repository (with uiState as a warm cache).
+    var asyncItems by remember { mutableStateOf<List<Any>>(emptyList()) }
+    var isAsyncLoading by remember { mutableStateOf(false) }
+
     LaunchedEffect(category) {
-        isLoading = true
-        items = when (category) {
-            "trending_movies" -> uiState.trendingMovies.ifEmpty { 
-                repository.getTrendingMoviesToday().getOrNull() ?: emptyList() 
+        if (jsonItems != null) return@LaunchedEffect  // handled reactively above
+        isAsyncLoading = true
+        asyncItems = when (category) {
+            "trending_movies" -> uiState.trendingMovies.ifEmpty {
+                repository.getTrendingMoviesToday().getOrNull() ?: emptyList()
             }
-            "latest_movies" -> (uiState.trendingMoviesThisWeek.ifEmpty { uiState.latestMovies }).ifEmpty { 
-                repository.getTrendingMoviesThisWeek().getOrNull() ?: emptyList() 
+            "latest_movies" -> (uiState.trendingMoviesThisWeek.ifEmpty { uiState.latestMovies }).ifEmpty {
+                repository.getTrendingMoviesThisWeek().getOrNull() ?: emptyList()
             }
-            "box_office" -> uiState.latestMovies.ifEmpty { 
-                repository.getTopRatedMovies().getOrNull() ?: emptyList() 
+            "box_office" -> uiState.latestMovies.ifEmpty {
+                repository.getTopRatedMovies().getOrNull() ?: emptyList()
             }
-            "trending_tv" -> uiState.trendingTvShows.ifEmpty { 
-                repository.getTrendingTvToday().getOrNull() ?: emptyList() 
+            "trending_tv" -> uiState.trendingTvShows.ifEmpty {
+                repository.getTrendingTvToday().getOrNull() ?: emptyList()
             }
             "watched_tv" -> uiState.continueWatching.filter { it.isTv }.map {
                 TvShow(id = it.id, name = it.title, overview = it.overview ?: "", posterPath = it.posterPath, backdropPath = it.backdropPath, voteAverage = it.voteAverage, firstAirDate = it.releaseDate ?: "", genreIds = emptyList(), popularity = 0.0)
             }
-            "popular_tv" -> uiState.topTvShows.ifEmpty { 
-                repository.getPopularTvShows().getOrNull() ?: emptyList() 
-            }
-            "favorite_tv" -> uiState.bestSitcoms.ifEmpty { 
-                repository.getTopRatedTvShows().getOrNull() ?: emptyList() 
+            "popular_tv" -> uiState.topTvShows.ifEmpty {
+                repository.getPopularTvShows().getOrNull() ?: emptyList()
             }
             "continue_watching" -> uiState.continueWatching.map { history ->
                 if (history.isTv) {
@@ -95,25 +116,18 @@ fun SeeAllScreen(
                     Movie(id = history.id, title = history.title, overview = history.overview ?: "", posterPath = history.posterPath, backdropPath = history.backdropPath, voteAverage = history.voteAverage, releaseDate = history.releaseDate ?: "", genreIds = emptyList(), popularity = 0.0)
                 }
             }
-            "now_playing" -> uiState.nowPlayingMovies.ifEmpty { 
-                repository.getNowPlayingMovies().getOrNull() ?: emptyList() 
+            "now_playing" -> uiState.nowPlayingMovies.ifEmpty {
+                repository.getNowPlayingMovies().getOrNull() ?: emptyList()
             }
-            "time_travel_movies" -> uiState.timeTravelMovies.ifEmpty { 
-                repository.getTimeTravelTvShows().getOrNull()?.map { 
-                    Movie(id = it.id, title = it.name ?: "", overview = it.overview, posterPath = it.posterPath, backdropPath = it.backdropPath, voteAverage= it.voteAverage, releaseDate = it.firstAirDate, genreIds = emptyList(), popularity = it.popularity)
-                } ?: emptyList() 
-            }
-            "time_travel_tv" -> uiState.timeTravelTvShows
-            "oscar_winners" -> uiState.oscarWinners2026
-            "hallmark" -> uiState.hallmarkMovies
-            "true_story" -> uiState.trueStoryMovies
-            "classics" -> uiState.bestClassics
-            "spy_movies" -> uiState.spyMovies
-            "statham_movies" -> uiState.stathamMovies
-            else -> emptyList<Any>()
+            else -> emptyList()
         }
-        isLoading = false
+        isAsyncLoading = false
     }
+
+    // Final list shown in the grid — JSON categories track uiState live;
+    // TMDB categories use the async result.
+    val items: List<Any> = jsonItems ?: asyncItems
+    val isLoading = uiState.isLoading || isAsyncLoading
 
     Scaffold(
         topBar = {

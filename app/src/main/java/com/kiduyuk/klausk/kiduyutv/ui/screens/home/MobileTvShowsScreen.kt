@@ -138,7 +138,7 @@ fun MobileTvShowsScreen(
                         item {
                             MobileSectionHeader(
                                 title = "Best Sitcoms",
-                                onSeeAllClick = { navController.navigate("see_all/sitcoms") }
+                                onSeeAllClick = { navController.navigate("see_all/favorite_tv") }
                             )
                             LazyRow(
                                 contentPadding = PaddingValues(horizontal = 16.dp),
