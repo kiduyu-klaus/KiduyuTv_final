@@ -139,7 +139,7 @@ fun SettingsScreen(
 
                 SettingsSection.APP_VERSION -> {
                     AppVersionContent(
-                        currentVersion = "1.2.1",
+                        currentVersion = BuildConfig.VERSION_NAME,
                         whatsNew = "Enhanced Cast Detail Screen with biography display. " +
                                 "Fixed header layout (35% screen height) with cast profile and overview. " +
                                 "New responsive grid view for filmography with Movie/TV badges. " +

@@ -168,10 +168,11 @@ fun MobileSettingsScreen(
                 if (uiState.updateAvailable) {
                     SettingsItem(
                         icon = Icons.Default.Download,
-                        title = "Download Update",
-                        subtitle = "New version is available",
+                        title = if (uiState.isDownloadingUpdate) "Downloading Update..." else "Download Update",
+                        subtitle = if (uiState.isDownloadingUpdate) "Progress: ${uiState.downloadProgress}%" else "New version is available",
                         onClick = { viewModel.downloadAndInstallUpdate(context) },
-                        isLoading = uiState.isDownloadingUpdate
+                        isLoading = uiState.isDownloadingUpdate,
+                        progress = if (uiState.isDownloadingUpdate) uiState.downloadProgress / 100f else null
                     )
                 }
             }
@@ -220,35 +221,52 @@ private fun SettingsItem(
     subtitle: String,
     onClick: () -> Unit,
     isLoading: Boolean = false,
-    isSuccess: Boolean = false
+    isSuccess: Boolean = false,
+    progress: Float? = null
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(enabled = !isLoading) { onClick() }
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
+        Row(
             modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(SurfaceDark),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(icon, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(20.dp))
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(SurfaceDark),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(20.dp))
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                Text(subtitle, color = TextSecondary, fontSize = 12.sp)
+            }
+            if (isLoading && progress == null) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), color = PrimaryRed, strokeWidth = 2.dp)
+            } else if (isSuccess) {
+                Icon(Icons.Default.Check, contentDescription = "Success", tint = Color.Green, modifier = Modifier.size(20.dp))
+            } else if (progress == null) {
+                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(20.dp))
+            }
         }
-        Spacer(modifier = Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-            Text(subtitle, color = TextSecondary, fontSize = 12.sp)
-        }
-        if (isLoading) {
-            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = PrimaryRed, strokeWidth = 2.dp)
-        } else if (isSuccess) {
-            Icon(Icons.Default.Check, contentDescription = "Success", tint = Color.Green, modifier = Modifier.size(20.dp))
-        } else {
-            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(20.dp))
+        if (progress != null) {
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 16.dp),
+                color = PrimaryRed,
+                trackColor = SurfaceDark,
+            )
         }
     }
 }

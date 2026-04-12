@@ -8,7 +8,6 @@ import android.net.Uri
 import android.os.Build
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.provider.Settings
 import android.util.Log
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -17,7 +16,6 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
@@ -25,28 +23,20 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import com.airbnb.lottie.compose.*
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.activity.mainactivity.MainActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
-import com.kiduyuk.klausk.kiduyutv.util.NotificationHelper
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
-import kotlinx.coroutines.Dispatchers
+import com.kiduyuk.klausk.kiduyutv.util.UpdateUtil
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.FileOutputStream
-import java.net.HttpURLConnection
-import java.net.URL
 
 @SuppressLint("CustomSplashScreen")
 class SplashActivity : ComponentActivity() {
@@ -142,54 +132,15 @@ class SplashActivity : ComponentActivity() {
 
     private fun checkForUpdates() {
         lifecycleScope.launch {
-            val remoteVersion = fetchRemoteVersion()
+            val remoteVersion = UpdateUtil.fetchRemoteVersion()
             if (remoteVersion != null) {
                 val localVersionName = BuildConfig.VERSION_NAME
                 Log.i("SplashActivity", "Remote version: $remoteVersion, Local version: $localVersionName")
-                if (isNewerVersion(remoteVersion, localVersionName)) {
+                if (UpdateUtil.isNewerVersion(remoteVersion, localVersionName)) {
                     updateAvailable = true   // gate the splash timeout BEFORE showing the dialog
                     showUpdateDialog()
                 }
             }
-        }
-    }
-
-    private suspend fun fetchRemoteVersion(): String? = withContext(Dispatchers.IO) {
-        try {
-            val url = URL(
-                "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/VERSION"
-            )
-            val connection = url.openConnection() as HttpURLConnection
-            connection.requestMethod = "GET"
-            connection.connectTimeout = 10_000
-            connection.readTimeout = 10_000
-
-            if (connection.responseCode == HttpURLConnection.HTTP_OK) {
-                connection.inputStream.bufferedReader().use { it.readText().trim() }
-            } else null
-        } catch (e: Exception) {
-            Log.e("SplashActivity", "Error fetching remote version", e)
-            null
-        }
-    }
-
-    private fun isNewerVersion(remote: String, local: String): Boolean {
-        return try {
-            val remoteParts = remote.split(".").mapNotNull { it.toIntOrNull() }
-            val localParts = local.split(".").mapNotNull { it.toIntOrNull() }
-
-            if (remoteParts.isEmpty() || localParts.isEmpty()) return remote > local
-
-            val maxLength = maxOf(remoteParts.size, localParts.size)
-            for (i in 0 until maxLength) {
-                val r = remoteParts.getOrElse(i) { 0 }
-                val l = localParts.getOrElse(i) { 0 }
-                if (r > l) return true
-                if (r < l) return false
-            }
-            false
-        } catch (e: Exception) {
-            remote > local   // fallback: lexicographic comparison
         }
     }
 
@@ -206,7 +157,7 @@ class SplashActivity : ComponentActivity() {
             onNo = { finish() }, // User chose Exit, close the app
             onYes = {
                 lifecycleScope.launch {
-                    val apkUrl = fetchLatestApkUrl()
+                    val apkUrl = UpdateUtil.fetchLatestApkUrl()
                     if (apkUrl != null) {
                         downloadAndInstallApk(apkUrl)
                     } else {
@@ -256,41 +207,10 @@ class SplashActivity : ComponentActivity() {
             .also { activeDialogs.add(it) }   // track before showing
         progressDialog.show()
 
-        // ── Stream APK on IO, push progress to Main ───────────────────────────
         lifecycleScope.launch {
-            val apkFile: File? = withContext(Dispatchers.IO) {
-                try {
-                    val connection = URL(apkUrl).openConnection() as HttpURLConnection
-                    connection.connectTimeout = 15_000
-                    connection.readTimeout = 30_000
-                    connection.connect()
-
-                    val totalBytes = connection.contentLengthLong
-                    val outFile = File(getExternalFilesDir(null), "kiduyutv-update.apk")
-
-                    connection.inputStream.use { input ->
-                        FileOutputStream(outFile).use { output ->
-                            val buffer = ByteArray(8_192)
-                            var downloaded = 0L
-                            var read: Int
-                            while (input.read(buffer).also { read = it } != -1) {
-                                output.write(buffer, 0, read)
-                                downloaded += read
-                                if (totalBytes > 0) {
-                                    val pct = (downloaded * 100 / totalBytes).toInt()
-                                    withContext(Dispatchers.Main) {
-                                        progressBar.progress = pct
-                                        statusText.text = "Downloading… $pct%"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    outFile
-                } catch (e: Exception) {
-                    Log.e("SplashActivity", "APK download failed", e)
-                    null
-                }
+            val apkFile = UpdateUtil.downloadApk(this@SplashActivity, apkUrl) { pct ->
+                progressBar.progress = pct
+                statusText.text = "Downloading… $pct%"
             }
 
             // Dismiss and remove from tracker before showing the next dialog
@@ -306,7 +226,11 @@ class SplashActivity : ComponentActivity() {
                     positiveButtonText = "Install",
                     negativeButtonText = "Exit",
                     lottieAnimRes = R.raw.splash_loading,  // swap for a success Lottie if available
-                    onYes = { checkPermissionAndInstall(apkFile) },
+                    onYes = { 
+                        UpdateUtil.checkPermissionAndInstall(this@SplashActivity, apkFile) {
+                            showPermissionDialog(apkFile)
+                        }
+                    },
                     onNo = { finish() } // Exit if user declines installation after download
                 ).showTracked()
             } else {
@@ -324,16 +248,6 @@ class SplashActivity : ComponentActivity() {
         }
     }
 
-    private fun checkPermissionAndInstall(apkFile: File) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (!packageManager.canRequestPackageInstalls()) {
-                showPermissionDialog(apkFile)
-                return
-            }
-        }
-        installApk(apkFile)
-    }
-
     private fun showPermissionDialog(apkFile: File) {
         QuitDialog(
             context = this,
@@ -344,86 +258,12 @@ class SplashActivity : ComponentActivity() {
             lottieAnimRes = R.raw.exit,
             onNo = { finish() },
             onYes = {
-                val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                    data = Uri.parse("package:$packageName")
-                }
-                startActivity(intent)
-                // We finish here because once they leave to settings, the app state might be lost
+                UpdateUtil.openInstallPermissionSettings(this)
+                // They'll have to come back to the app manually or we can't easily track the result here,
                 // or they can restart the app to trigger the check again.
                 finish()
             }
         ).showTracked()
-    }
-
-    private fun installApk(apkFile: File) {
-        val uri = FileProvider.getUriForFile(
-            this,
-            "${packageName}.provider",
-            apkFile
-        )
-        val intent = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
-            data = uri
-            flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
-            putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
-            putExtra(Intent.EXTRA_RETURN_RESULT, true)
-        }
-        startActivity(intent)
-    }
-
-    // ── GitHub API — resolve direct APK download URL ──────────────────────────
-
-    private suspend fun fetchLatestApkUrl(): String? = withContext(Dispatchers.IO) {
-        try {
-            val url = URL("https://api.github.com/repos/kiduyu-klaus/KiduyuTv_final/releases")
-            val connection = url.openConnection() as HttpURLConnection
-            connection.setRequestProperty("Accept", "application/vnd.github+json")
-            connection.connectTimeout = 10_000
-            connection.readTimeout = 10_000
-
-            if (connection.responseCode != HttpURLConnection.HTTP_OK) return@withContext null
-
-            val json = connection.inputStream.bufferedReader().use { it.readText() }
-            val releases = org.json.JSONArray(json)
-
-            var bestApkUrl: String? = null
-            var maxBuildNumber = -1
-
-            // Mirror the workflow: first prerelease with a "release" APK asset
-            for (i in 0 until releases.length()) {
-                val release = releases.getJSONObject(i)
-                if (!release.optBoolean("prerelease", false)) continue
-
-                val assets = release.getJSONArray("assets")
-                for (j in 0 until assets.length()) {
-                    val asset = assets.getJSONObject(j)
-                    val name = asset.optString("name", "")
-
-                    // Match "release" and exclude "debug"
-                    if (name.contains("release", ignoreCase = true) &&
-                        !name.contains("debug", ignoreCase = true)
-                    ) {
-                        // Extract build number from name like "KiduyuTv-release-1.1.3-build273.apk"
-                        val buildMatch = Regex("build(\\d+)").find(name)
-                        if (buildMatch != null) {
-                            val buildNumber = buildMatch.groupValues[1].toInt()
-                            if (buildNumber > maxBuildNumber) {
-                                maxBuildNumber = buildNumber
-                                bestApkUrl = asset.optString("browser_download_url", null)
-                            }
-                        } else if (bestApkUrl == null) {
-                            // Fallback if no build number found but it's a valid release APK
-                            bestApkUrl = asset.optString("browser_download_url", null)
-                        }
-                    }
-                }
-                // If we found any APK in the first prerelease we encountered, we use it (as it's the latest release)
-                if (bestApkUrl != null) break
-            }
-            bestApkUrl
-        } catch (e: Exception) {
-            Log.e("SplashActivity", "Error fetching APK URL", e)
-            null
-        }
     }
 
 // ── Composable ────────────────────────────────────────────────────────────────
@@ -450,40 +290,43 @@ class SplashActivity : ComponentActivity() {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black),
+                .background(Color(0xFF0F0F0F)),
             contentAlignment = Alignment.Center
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = R.mipmap.ic_launcher11),
-                        contentDescription = "App Icon",
-                        modifier = Modifier
-                            .size(48.dp)
-                            .padding(end = 12.dp)
-                    )
-                    Text(
-                        text = stringResource(id = R.string.app_name).uppercase(),
-                        color = Color(0xFFE65100),
-                        fontSize = 25.sp,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(5.dp))
-
                 LottieAnimation(
                     composition = composition,
                     progress = { progress },
-                    modifier = Modifier.height(15.dp)
+                    modifier = Modifier.size(200.dp)
+                )
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Text(
+                    text = "Kiduyu TV",
+                    color = Color.White,
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                Text(
+                    text = "Streaming Simplified",
+                    color = Color.Gray,
+                    fontSize = 14.sp
                 )
             }
+            
+            Text(
+                text = "v${BuildConfig.VERSION_NAME}",
+                color = Color.DarkGray,
+                fontSize = 12.sp,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 32.dp)
+            )
         }
     }
 }
