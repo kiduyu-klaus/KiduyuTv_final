@@ -45,6 +45,7 @@ import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.SettingsViewModel
 import androidx.compose.foundation.Image
 import com.kiduyuk.klausk.kiduyutv.R
+import com.kiduyuk.klausk.kiduyutv.ui.util.QuitDialog
 import androidx.core.net.toUri
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -98,31 +99,92 @@ fun SettingsScreen(
             when (selectedSection) {
                 SettingsSection.APP_SETTINGS -> {
                     AppSettingsContent(
+                        context = context,
                         // Cache
                         isClearingCache = uiState.isClearingCache,
                         cacheClearSuccess = uiState.cacheClearSuccess,
                         cacheSize = uiState.cacheSize,
-                        onClearCacheClick = { viewModel.clearCache(context) },
+                        onClearCacheClick = {
+                            QuitDialog(
+                                context = context,
+                                title = "Clear Cache?",
+                                message = "Are you sure you want to clear the app cache? This will free up space but may slow down initial loading.",
+                                positiveButtonText = "Clear",
+                                negativeButtonText = "Cancel",
+                                lottieAnimRes = R.raw.exit,
+                                onYes = { viewModel.clearCache(context) }
+                            ).show()
+                        },
                         // My List
                         isClearingMyList = uiState.isClearingMyList,
                         myListClearSuccess = uiState.myListClearSuccess,
-                        onClearMyListClick = { viewModel.clearMyList() },
+                        onClearMyListClick = {
+                            QuitDialog(
+                                context = context,
+                                title = "Clear My List?",
+                                message = "Are you sure you want to remove all items from your list? This action cannot be undone.",
+                                positiveButtonText = "Clear",
+                                negativeButtonText = "Cancel",
+                                lottieAnimRes = R.raw.exit,
+                                onYes = { viewModel.clearMyList() }
+                            ).show()
+                        },
                         // Companies
                         isClearingCompanies = uiState.isClearingCompanies,
                         companiesClearSuccess = uiState.companiesClearSuccess,
-                        onClearCompaniesClick = { viewModel.clearCompanies() },
+                        onClearCompaniesClick = {
+                            QuitDialog(
+                                context = context,
+                                title = "Clear Companies?",
+                                message = "Are you sure you want to remove all saved companies? This action cannot be undone.",
+                                positiveButtonText = "Clear",
+                                negativeButtonText = "Cancel",
+                                lottieAnimRes = R.raw.exit,
+                                onYes = { viewModel.clearCompanies() }
+                            ).show()
+                        },
                         // Networks
                         isClearingNetworks = uiState.isClearingNetworks,
                         networksClearSuccess = uiState.networksClearSuccess,
-                        onClearNetworksClick = { viewModel.clearNetworks() },
+                        onClearNetworksClick = {
+                            QuitDialog(
+                                context = context,
+                                title = "Clear Networks?",
+                                message = "Are you sure you want to remove all saved networks? This action cannot be undone.",
+                                positiveButtonText = "Clear",
+                                negativeButtonText = "Cancel",
+                                lottieAnimRes = R.raw.exit,
+                                onYes = { viewModel.clearNetworks() }
+                            ).show()
+                        },
                         // Casts
                         isClearingCasts = uiState.isClearingCasts,
                         castsClearSuccess = uiState.castsClearSuccess,
-                        onClearCastsClick = { viewModel.clearCasts() },
+                        onClearCastsClick = {
+                            QuitDialog(
+                                context = context,
+                                title = "Clear Cast?",
+                                message = "Are you sure you want to remove all saved cast members? This action cannot be undone.",
+                                positiveButtonText = "Clear",
+                                negativeButtonText = "Cancel",
+                                lottieAnimRes = R.raw.exit,
+                                onYes = { viewModel.clearCasts() }
+                            ).show()
+                        },
                         // Watch History
                         isClearingWatchHistory = uiState.isClearingWatchHistory,
                         watchHistoryClearSuccess = uiState.watchHistoryClearSuccess,
-                        onClearWatchHistoryClick = { viewModel.clearWatchHistory() }
+                        onClearWatchHistoryClick = {
+                            QuitDialog(
+                                context = context,
+                                title = "Clear History?",
+                                message = "Are you sure you want to clear your entire watch history? This action cannot be undone.",
+                                positiveButtonText = "Clear",
+                                negativeButtonText = "Cancel",
+                                lottieAnimRes = R.raw.exit,
+                                onYes = { viewModel.clearWatchHistory() }
+                            ).show()
+                        }
                     )
                 }
 
@@ -300,6 +362,7 @@ private fun SettingsNavItem(
  */
 @Composable
 private fun AppSettingsContent(
+    context: android.content.Context,
     // Cache
     isClearingCache: Boolean,
     cacheClearSuccess: Boolean,
