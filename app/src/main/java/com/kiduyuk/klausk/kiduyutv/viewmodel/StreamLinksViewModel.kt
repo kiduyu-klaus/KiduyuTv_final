@@ -80,11 +80,11 @@ class StreamLinksViewModel : ViewModel() {
                     urlTemplate = if (isTv) "https://vidfast.pro/tv/${tmdbId}/${season}/${episode}?autoPlay=true&nextButton=true&autoNext=true" else "https://vidfast.pro/movie/${tmdbId}?autoPlay=true",
                     type = if (isTv) "tv" else "movie"
                 ),
-//                StreamProvider(
-//                    name = "VidSrc",
-//                    urlTemplate = if (isTv) "https://vidsrc.icu/embed/tv/${tmdbId}/${season}/${episode}" else "https://vidsrc.icu/embed/movie/${tmdbId}",
-//                    type = if (isTv) "tv" else "movie"
-//                ),
+                StreamProvider(
+                    name = "VidSrc",
+                    urlTemplate = if (isTv) "https://vidsrc-embed.ru/embed/tv/?tmdb=${tmdbId}&season=${season}&episode=${episode}&autoplay=1&autonext=1" else "https://vidsrc.icu/embed/movie?tmdb=${tmdbId}&autoplay=1",
+                    type = if (isTv) "tv" else "movie"
+                ),
                 StreamProvider(
                     name = "VidKing",
                     urlTemplate = if (isTv) "https://www.vidking.net/embed/tv/${tmdbId}/${season}/${episode}?autoPlay=true&nextEpisode=true&episodeSelector=true" else "https://www.vidking.net/embed/movie/${tmdbId}?autoPlay=true",

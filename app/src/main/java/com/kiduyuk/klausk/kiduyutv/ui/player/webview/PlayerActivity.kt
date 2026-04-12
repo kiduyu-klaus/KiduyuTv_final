@@ -88,7 +88,10 @@ class PlayerActivity : AppCompatActivity() {
                     }
 
                     else -> {
-                        Log.i(TAG, "[JS Message] Unrecognized message format, attempting generic parse")
+                        Log.i(
+                            TAG,
+                            "[JS Message] Unrecognized message format, attempting generic parse"
+                        )
                         // Try to extract any progress-like data
                         if (json.has("progress") || json.has("timestamp") || json.has("currentTime")) {
                             processPlayerProgressData(json)
@@ -151,11 +154,13 @@ class PlayerActivity : AppCompatActivity() {
                 latestEpisode = data.getInt("episode")
             }
 
-            Log.i(TAG, String.format(
-                "[Player Progress] id=%d type=%s progress=%.1f%% timestamp=%ds duration=%ds season=%d episode=%d",
-                latestContentId, latestContentType, latestProgress, latestTimestamp,
-                latestDuration, latestSeason, latestEpisode
-            ))
+            Log.i(
+                TAG, String.format(
+                    "[Player Progress] id=%d type=%s progress=%.1f%% timestamp=%ds duration=%ds season=%d episode=%d",
+                    latestContentId, latestContentType, latestProgress, latestTimestamp,
+                    latestDuration, latestSeason, latestEpisode
+                )
+            )
 
         } catch (e: Exception) {
             Log.e(TAG, "[Player Progress] Error processing data: ${e.message}")
@@ -201,30 +206,36 @@ class PlayerActivity : AppCompatActivity() {
                     repository.updatePlaybackPosition(tmdbId, mediaType, playbackPosition)
 
                     // Determine season and episode - prefer message data if available
-                    val seasonToSave = if (latestSeason > 0 && (mediaType == "tv" || mediaType == "anime")) {
-                        latestSeason
-                    } else {
-                        currentSeason
-                    }
+                    val seasonToSave =
+                        if (latestSeason > 0 && (mediaType == "tv" || mediaType == "anime")) {
+                            latestSeason
+                        } else {
+                            currentSeason
+                        }
 
-                    val episodeToSave = if (latestEpisode > 0 && (mediaType == "tv" || mediaType == "anime")) {
-                        latestEpisode
-                    } else {
-                        currentEpisode
-                    }
+                    val episodeToSave =
+                        if (latestEpisode > 0 && (mediaType == "tv" || mediaType == "anime")) {
+                            latestEpisode
+                        } else {
+                            currentEpisode
+                        }
 
                     // Update episode info for TV/Anime content
                     if (mediaType == "tv" || mediaType == "anime" || isTv) {
                         repository.updateEpisodeInfo(tmdbId, mediaType, seasonToSave, episodeToSave)
-                        Log.i(TAG, String.format(
-                            "[Progress Save] position=%ds (%.1f%%), S%dE%d saved",
-                            playbackPosition, latestProgress, seasonToSave, episodeToSave
-                        ))
+                        Log.i(
+                            TAG, String.format(
+                                "[Progress Save] position=%ds (%.1f%%), S%dE%d saved",
+                                playbackPosition, latestProgress, seasonToSave, episodeToSave
+                            )
+                        )
                     } else {
-                        Log.i(TAG, String.format(
-                            "[Progress Save] position=%ds (%.1f%%) saved for movie",
-                            playbackPosition, latestProgress
-                        ))
+                        Log.i(
+                            TAG, String.format(
+                                "[Progress Save] position=%ds (%.1f%%) saved for movie",
+                                playbackPosition, latestProgress
+                            )
+                        )
                     }
 
                     // Update local state with latest from message
@@ -274,7 +285,10 @@ class PlayerActivity : AppCompatActivity() {
         val existsInHistory = repository.isInWatchHistory(this, tmdbId, isTv)
 
         if (existsInHistory) {
-            Log.i(TAG, "[WatchHistory] Item exists, updating season $currentSeason episode $currentEpisode")
+            Log.i(
+                TAG,
+                "[WatchHistory] Item exists, updating season $currentSeason episode $currentEpisode"
+            )
             repository.updateEpisodeInfo(tmdbId, "tv", currentSeason, currentEpisode)
         } else {
             Log.i(TAG, "[WatchHistory] New item, saving to history")
@@ -302,7 +316,8 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         val isVideasyPlayer = url.startsWith("https://player.videasy.net")
-        val isVidKingPlayer = url.startsWith("https://www.vidking.net") || url.startsWith("https://vidking.")
+        val isVidKingPlayer =
+            url.startsWith("https://www.vidking.net") || url.startsWith("https://vidking.")
         val isVidLinkPlayer = url.startsWith("https://vidlink.pro")
         val isTrackingEnabled = isVideasyPlayer || isVidKingPlayer || isVidLinkPlayer
 
@@ -389,202 +404,188 @@ class PlayerActivity : AppCompatActivity() {
                     }
 
                     val advancedJs = """
-                        (function() {
-                            function removeAdsAdvanced() {
-                                const elements = document.querySelectorAll('*');
-                                elements.forEach(el => {
-                                    const text = (el.innerText || '').toLowerCase();
-                                    const cls = (el.className || '').toString().toLowerCase();
-                                    if (
-                                        text.includes('advert') ||
-                                        text.includes('sponsored') ||
-                                        cls.includes('ad') ||
-                                        cls.includes('popup')
-                                    ) {
-                                        el.remove();
-                                    }
-                                });
-                            }
-                            function blockRedirects() {
-                                window.open = () => null;
-                                window.location.assign = () => {};
-                                window.location.replace = () => {};
-                            }
-                            function setMaxVolume() {
-                                var videos = document.getElementsByTagName('video');
-                                for (var i = 0; i < videos.length; i++) {
-                                    videos[i].volume = 1.0;
-                                    videos[i].muted = false;
+                            (function() {
+                                function removeAdsAdvanced() {
+                                    const elements = document.querySelectorAll('*');
+                                    elements.forEach(el => {
+                                        const text = (el.innerText || '').toLowerCase();
+                                        const cls = (el.className || '').toString().toLowerCase();
+                                        if (
+                                            text.includes('advert') ||
+                                            text.includes('sponsored') ||
+                                            cls.includes('ad') ||
+                                            cls.includes('popup')
+                                        ) {
+                                            el.remove();
+                                        }
+                                    });
                                 }
-                            }
                             
-                            ${if (isTrackingEnabled) """
-                            function setupMessageListener() {
-                                console.log('Player message listener initialized');
-                                
-                                // Intercept window.postMessage to capture player events
-                                (function() {
-                                    var originalPostMessage = window.postMessage;
-                                    window.postMessage = function(message, targetOrigin, transfer) {
+                                function blockRedirects() {
+                                    window.open = () => null;
+                                    window.location.assign = () => {};
+                                    window.location.replace = () => {};
+                                }
+                            
+                                function setupMessageListener() {
+                                    console.log('Player message listener initialized');
+                            
+                                    // Intercept postMessage
+                                    (function() {
+                                        var originalPostMessage = window.postMessage;
+                                        window.postMessage = function(message, targetOrigin, transfer) {
+                                            try {
+                                                if (window.VideasyInterface) {
+                                                    if (typeof message === 'string') {
+                                                        window.VideasyInterface.postMessage(message);
+                                                    } else {
+                                                        window.VideasyInterface.postMessage(JSON.stringify(message));
+                                                    }
+                                                }
+                                            } catch (e) {}
+                                            return originalPostMessage.apply(this, arguments);
+                                        };
+                                    })();
+                            
+                                    // Listen to iframe/player messages
+                                    window.addEventListener('message', function(event) {
                                         try {
                                             if (window.VideasyInterface) {
-                                                if (typeof message === 'string') {
-                                                    window.VideasyInterface.postMessage(message);
+                                                if (typeof event.data === 'string') {
+                                                    window.VideasyInterface.postMessage(event.data);
                                                 } else {
-                                                    window.VideasyInterface.postMessage(JSON.stringify(message));
+                                                    window.VideasyInterface.postMessage(JSON.stringify(event.data));
                                                 }
                                             }
-                                        } catch (e) {
-                                            console.log('Error capturing postMessage: ' + e);
-                                        }
-                                        return originalPostMessage.apply(this, arguments);
-                                    };
-                                })();
-                                
-                                // Listen for messages from the player frame
-                                window.addEventListener('message', function(event) {
-                                    try {
-                                        if (window.VideasyInterface) {
-                                            if (typeof event.data === 'string') {
-                                                window.VideasyInterface.postMessage(event.data);
-                                            } else {
-                                                window.VideasyInterface.postMessage(JSON.stringify(event.data));
+                                        } catch (e) {}
+                                    });
+                            
+                                    function getContentInfo() {
+                                        var info = { type: 'movie', id: null, season: 1, episode: 1 };
+                                        try {
+                                            var url = window.location.href;
+                                            var match;
+                            
+                                            match = url.match(/\/tv\/(\d+)\/(\d+)\/(\d+)/);
+                                            if (match) {
+                                                info.type = 'tv';
+                                                info.id = parseInt(match[1]);
+                                                info.season = parseInt(match[2]);
+                                                info.episode = parseInt(match[3]);
+                                                return info;
+                                            }
+                            
+                                            match = url.match(/\/movie\/(\d+)/);
+                                            if (match) {
+                                                info.type = 'movie';
+                                                info.id = parseInt(match[1]);
+                                                return info;
+                                            }
+                            
+                                            match = url.match(/\/anime\/(\d+)\/(\d+)\/(\d+)/);
+                                            if (match) {
+                                                info.type = 'anime';
+                                                info.id = parseInt(match[1]);
+                                                info.season = parseInt(match[2]);
+                                                info.episode = parseInt(match[3]);
+                                                return info;
+                                            }
+                                        } catch (e) {}
+                                        return info;
+                                    }
+                            
+                                    function sendVideoProgress() {
+                                        var videos = document.getElementsByTagName('video');
+                                        for (var i = 0; i < videos.length; i++) {
+                                            var v = videos[i];
+                                            if (v.duration > 0 && !isNaN(v.duration)) {
+                            
+                                                var contentInfo = getContentInfo();
+                            
+                                                var progressData = {
+                                                    progress: (v.currentTime / v.duration) * 100,
+                                                    timestamp: Math.floor(v.currentTime),
+                                                    duration: Math.floor(v.duration),
+                                                    currentTime: v.currentTime,
+                                                    paused: v.paused,
+                                                    ended: v.ended
+                                                };
+                            
+                                                if (contentInfo) {
+                                                    progressData.id = contentInfo.id;
+                                                    progressData.type = contentInfo.type;
+                                                    progressData.season = contentInfo.season;
+                                                    progressData.episode = contentInfo.episode;
+                                                }
+                            
+                                                if (window.VideasyInterface) {
+                                                    window.VideasyInterface.postMessage(JSON.stringify(progressData));
+                                                }
+                                                break;
                                             }
                                         }
-                                    } catch (e) {
-                                        console.log('Error processing message: ' + e);
                                     }
-                                });
-                                
-                                // Monitor video events and send periodic progress updates
-                                function sendVideoProgress() {
-                                    var videos = document.getElementsByTagName('video');
-                                    for (var i = 0; i < videos.length; i++) {
-                                        var v = videos[i];
-                                        if (v.duration > 0 && !isNaN(v.duration)) {
-                                            // Try to extract content info from page
-                                            var contentInfo = getContentInfo();
-                                            
-                                            var progressData = {
-                                                progress: (v.currentTime / v.duration) * 100,
-                                                timestamp: Math.floor(v.currentTime),
-                                                duration: Math.floor(v.duration),
-                                                currentTime: v.currentTime,
-                                                paused: v.paused,
-                                                ended: v.ended
-                                            };
-                                            
-                                            // Merge content info if available
-                                            if (contentInfo) {
-                                                progressData.id = contentInfo.id;
-                                                progressData.type = contentInfo.type;
-                                                progressData.season = contentInfo.season;
-                                                progressData.episode = contentInfo.episode;
+                            
+                                    function enforceVolume(video) {
+                                        video.volume = 1.0;
+                                        video.muted = false;
+                            
+                                        video.addEventListener('volumechange', function() {
+                                            if (video.volume < 1.0 || video.muted) {
+                                                video.volume = 1.0;
+                                                video.muted = false;
                                             }
-                                            
-                                            // Send to Kotlin via postMessage
-                                            if (window.VideasyInterface) {
-                                                window.VideasyInterface.postMessage(JSON.stringify(progressData));
-                                            }
-                                            break;
-                                        }
+                                        });
                                     }
-                                }
-                                
-                                // Extract content info from page elements/URL
-                                function getContentInfo() {
-                                    var info = { type: 'movie', id: null, season: 1, episode: 1 };
-                                    
-                                    // Try to get from URL parameters or page title
-                                    try {
-                                        var url = window.location.href;
-                                        var urlMatch;
-                                        
-                                        // TV show pattern: /tv/{id}/{season}/{episode}
-                                        urlMatch = url.match(/\\/tv\\/(\\d+)\\/(\\d+)\\/(\\d+)/);
-                                        if (urlMatch) {
-                                            info.type = 'tv';
-                                            info.id = parseInt(urlMatch[1]);
-                                            info.season = parseInt(urlMatch[2]);
-                                            info.episode = parseInt(urlMatch[3]);
-                                            return info;
-                                        }
-                                        
-                                        // Movie pattern: /movie/{id}
-                                        urlMatch = url.match(/\\/movie\\/(\\d+)/);
-                                        if (urlMatch) {
-                                            info.type = 'movie';
-                                            info.id = parseInt(urlMatch[1]);
-                                            return info;
-                                        }
-                                        
-                                        // Anime pattern: /anime/{id}/{season}/{episode}
-                                        urlMatch = url.match(/\\/anime\\/(\\d+)\\/(\\d+)\\/(\\d+)/);
-                                        if (urlMatch) {
-                                            info.type = 'anime';
-                                            info.id = parseInt(urlMatch[1]);
-                                            info.season = parseInt(urlMatch[2]);
-                                            info.episode = parseInt(urlMatch[3]);
-                                            return info;
-                                        }
-                                    } catch (e) {
-                                        console.log('Error extracting content info: ' + e);
-                                    }
-                                    
-                                    return info;
-                                }
-                                
-                                function monitorVideoEvents() {
-                                    var videos = document.getElementsByTagName('video');
-                                    for (var i = 0; i < videos.length; i++) {
-                                        (function(video) {
+                            
+                                    function monitorVideoEvents() {
+                                        const videos = document.querySelectorAll('video');
+                            
+                                        videos.forEach(video => {
                                             if (video._monitored) return;
                                             video._monitored = true;
-                                            
-                                            video.addEventListener('loadedmetadata', function() {
-                                                console.log('Video loaded: duration=' + video.duration);
-                                                // Send initial progress
-                                                sendVideoProgress();
-                                            });
-                                            
+                            
+                                            video.addEventListener('loadedmetadata', () => sendVideoProgress());
+                                            video.addEventListener('ended', () => sendVideoProgress());
+                            
                                             video.addEventListener('timeupdate', function() {
-                                                // Throttle to avoid too many messages
-                                                if (!video._lastProgressUpdate || (Date.now() - video._lastProgressUpdate > 1000)) {
+                                                if (!video._lastProgressUpdate || Date.now() - video._lastProgressUpdate > 1000) {
                                                     sendVideoProgress();
                                                     video._lastProgressUpdate = Date.now();
                                                 }
                                             });
-                                            
-                                            video.addEventListener('ended', function() {
-                                                console.log('Video playback ended');
-                                                sendVideoProgress();
-                                            });
-                                        })(videos[i]);
-                                    }
-                                }
-                                
-                                // Monitor for new video elements every 3 seconds
-                                monitorVideoEvents();
-                                setInterval(monitorVideoEvents, 3000);
-                                
-                                // Send periodic progress updates every 15 seconds as backup
-                                setInterval(sendVideoProgress, 15000);
-                            }
-                            """ else """
-                            function setupMessageListener() {
-                                console.log('Non-tracking player, skipping message listener');
-                            }
-                            """}
                             
-                            blockRedirects();
-                            removeAdsAdvanced();
-                            setMaxVolume();
-                            setupMessageListener();
-                            setInterval(function() {
-                                setMaxVolume();
-                            }, 3000);
-                        })();
-                    """.trimIndent()
+                                            enforceVolume(video);
+                                        });
+                                    }
+                            
+                                    function observeVideoElements() {
+                                        const observer = new MutationObserver(() => {
+                                            monitorVideoEvents();
+                                        });
+                            
+                                        observer.observe(document.body, {
+                                            childList: true,
+                                            subtree: true
+                                        });
+                                    }
+                            
+                                    // Initial run
+                                    monitorVideoEvents();
+                                    observeVideoElements();
+                            
+                                    // Fallback (light)
+                                    setInterval(monitorVideoEvents, 10000);
+                            
+                                    // Backup progress reporting
+                                    setInterval(sendVideoProgress, 15000);
+                                }
+                            
+                                blockRedirects();
+                                removeAdsAdvanced();
+                                setupMessageListener();
+                            })();
+                            """.trimIndent()
                     view?.evaluateJavascript(AdvancedAdBlocker.getCss(), null)
                     view?.evaluateJavascript(advancedJs, null)
                 }
@@ -748,29 +749,34 @@ class PlayerActivity : AppCompatActivity() {
                 updateCursorPosition()
                 true
             }
+
             KeyEvent.KEYCODE_DPAD_DOWN -> {
                 showCursorAndResetTimer()
                 cursorY = (cursorY + moveSpeed).coerceAtMost(screenHeight.toFloat())
                 updateCursorPosition()
                 true
             }
+
             KeyEvent.KEYCODE_DPAD_LEFT -> {
                 showCursorAndResetTimer()
                 cursorX = (cursorX - moveSpeed).coerceAtLeast(0f)
                 updateCursorPosition()
                 true
             }
+
             KeyEvent.KEYCODE_DPAD_RIGHT -> {
                 showCursorAndResetTimer()
                 cursorX = (cursorX + moveSpeed).coerceAtMost(screenWidth.toFloat())
                 updateCursorPosition()
                 true
             }
+
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                 showCursorAndResetTimer()
                 simulateClick(cursorX, cursorY)
                 true
             }
+
             else -> super.onKeyDown(keyCode, event)
         }
     }
@@ -817,7 +823,8 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun savePlaybackPosition() {
-        webView.evaluateJavascript("""
+        webView.evaluateJavascript(
+            """
             (function() {
                 var v = document.querySelector('video');
                 if (v && v.duration > 0 && !isNaN(v.duration)) {
@@ -825,7 +832,8 @@ class PlayerActivity : AppCompatActivity() {
                 }
                 return null;
             })();
-        """.trimIndent()) { result ->
+        """.trimIndent()
+        ) { result ->
             if (result != null && result != "null") {
                 try {
                     val currentTime = result.toDouble()
@@ -833,13 +841,25 @@ class PlayerActivity : AppCompatActivity() {
                     val isTv = intent.getBooleanExtra("IS_TV", false)
                     if (tmdbId != -1) {
                         val repository = TmdbRepository()
-                        repository.updatePlaybackPosition(tmdbId, if (isTv) "tv" else "movie", currentTime.toLong())
+                        repository.updatePlaybackPosition(
+                            tmdbId,
+                            if (isTv) "tv" else "movie",
+                            currentTime.toLong()
+                        )
 
                         if (isTv) {
-                            repository.updateEpisodeInfo(tmdbId, "tv", currentSeason, currentEpisode)
+                            repository.updateEpisodeInfo(
+                                tmdbId,
+                                "tv",
+                                currentSeason,
+                                currentEpisode
+                            )
                         }
 
-                        Log.i(TAG, "Final playback position saved: ${currentTime}s (S$currentSeason E$currentEpisode)")
+                        Log.i(
+                            TAG,
+                            "Final playback position saved: ${currentTime}s (S$currentSeason E$currentEpisode)"
+                        )
                     }
                 } catch (e: Exception) {
                     Log.w(TAG, "Error saving final playback position: ${e.message}")
