@@ -32,7 +32,6 @@ import coil.compose.AsyncImage
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
-import com.kiduyuk.klausk.kiduyutv.data.model.SavedMediaItem
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.ui.components.MobileMovieCard
 import com.kiduyuk.klausk.kiduyutv.ui.components.MobileTvShowCard
