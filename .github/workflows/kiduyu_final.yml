@@ -67,6 +67,14 @@ jobs:
           echo "tag=${NEW_TAG}" >> $GITHUB_OUTPUT
           echo "Release tag: ${NEW_TAG}"
 
+      - name: Bump versionName and VERSION file
+        run: |
+          VERSION="${{ steps.tag.outputs.tag }}"
+          VERSION="${VERSION#v}"
+          sed -i "s/versionName \"[^\"]*\"/versionName \"${VERSION}\"/" app/build.gradle
+          echo "${VERSION}" > VERSION
+          echo "Version set to ${VERSION}"
+
       # ── Debug APK ────────────────────────────────────────────
       - name: Build Phone Debug APK
         run: ./gradlew assemblePhoneDebug
@@ -199,6 +207,14 @@ jobs:
 
           echo "tag=${NEW_TAG}" >> $GITHUB_OUTPUT
           echo "Release tag: ${NEW_TAG}"
+
+      - name: Bump versionName and VERSION file
+        run: |
+          VERSION="${{ steps.tag.outputs.tag }}"
+          VERSION="${VERSION#v}"
+          sed -i "s/versionName \"[^\"]*\"/versionName \"${VERSION}\"/" app/build.gradle
+          echo "${VERSION}" > VERSION
+          echo "Version set to ${VERSION}"
 
       # ── Debug APK ────────────────────────────────────────────
       - name: Build TV Debug APK
