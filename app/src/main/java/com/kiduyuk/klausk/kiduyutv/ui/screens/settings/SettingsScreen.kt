@@ -45,7 +45,7 @@ import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.SettingsViewModel
 import androidx.compose.foundation.Image
 import com.kiduyuk.klausk.kiduyutv.R
-import com.kiduyuk.klausk.kiduyutv.ui.util.QuitDialog
+import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import androidx.core.net.toUri
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1121,6 +1121,7 @@ private fun PreviewAppSettingsIdle() {
                 .padding(32.dp)
         ) {
             AppSettingsContent(
+                context = LocalContext.current,
                 isClearingCache = false,
                 cacheClearSuccess = false,
                 cacheSize = "24.6 MB",
@@ -1162,6 +1163,7 @@ private fun PreviewAppSettingsCacheClearing() {
                 .padding(32.dp)
         ) {
             AppSettingsContent(
+                context = LocalContext.current,
                 isClearingCache = true,
                 cacheClearSuccess = false,
                 cacheSize = "24.6 MB",
@@ -1203,6 +1205,7 @@ private fun PreviewAppSettingsAllSuccess() {
                 .padding(32.dp)
         ) {
             AppSettingsContent(
+                context = LocalContext.current,
                 isClearingCache = false,
                 cacheClearSuccess = true,
                 cacheSize = "0 B",
