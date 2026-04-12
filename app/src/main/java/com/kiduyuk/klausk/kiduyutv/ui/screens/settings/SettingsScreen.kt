@@ -140,11 +140,7 @@ fun SettingsScreen(
                 SettingsSection.APP_VERSION -> {
                     AppVersionContent(
                         currentVersion = BuildConfig.VERSION_NAME,
-                        whatsNew = "Enhanced Cast Detail Screen with biography display. " +
-                                "Fixed header layout (35% screen height) with cast profile and overview. " +
-                                "New responsive grid view for filmography with Movie/TV badges. " +
-                                "Full TV remote D-pad navigation with visual focus indicators. " +
-                                "Interactive biography dialog with scrollable content.",
+                        whatsNew = "SplashActivity: Check for existing APK before downloading to avoid redundancy — v1.1.81",
                         // Update check states
                         isCheckingForUpdates = uiState.isCheckingForUpdates,
                         updateCheckResult = uiState.updateCheckResult,
