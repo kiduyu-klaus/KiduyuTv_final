@@ -23,8 +23,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
+import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import com.kiduyuk.klausk.kiduyutv.viewmodel.SettingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -81,7 +83,17 @@ fun MobileSettingsScreen(
                     icon = Icons.Default.Delete,
                     title = "Clear Cache",
                     subtitle = "Current cache: ${uiState.cacheSize}",
-                    onClick = { viewModel.clearCache(context) },
+                    onClick = {
+                        QuitDialog(
+                            context = context,
+                            title = "Clear Cache?",
+                            message = "Are you sure you want to clear the app cache? This will free up space but may slow down initial loading.",
+                            positiveButtonText = "Clear",
+                            negativeButtonText = "Cancel",
+                            lottieAnimRes = R.raw.exit,
+                            onYes = { viewModel.clearCache(context) }
+                        ).show()
+                    },
                     isLoading = uiState.isClearingCache,
                     isSuccess = uiState.cacheClearSuccess
                 )
@@ -89,7 +101,17 @@ fun MobileSettingsScreen(
                     icon = Icons.Default.History,
                     title = "Clear Watch History",
                     subtitle = "Remove all previously watched content",
-                    onClick = { viewModel.clearWatchHistory() },
+                    onClick = {
+                        QuitDialog(
+                            context = context,
+                            title = "Clear History?",
+                            message = "Are you sure you want to clear your entire watch history? This action cannot be undone.",
+                            positiveButtonText = "Clear",
+                            negativeButtonText = "Cancel",
+                            lottieAnimRes = R.raw.exit,
+                            onYes = { viewModel.clearWatchHistory() }
+                        ).show()
+                    },
                     isLoading = uiState.isClearingWatchHistory,
                     isSuccess = uiState.watchHistoryClearSuccess
                 )
@@ -97,7 +119,17 @@ fun MobileSettingsScreen(
                     icon = Icons.Default.PlaylistRemove,
                     title = "Clear My List",
                     subtitle = "Remove all items from your favorites",
-                    onClick = { viewModel.clearMyList() },
+                    onClick = {
+                        QuitDialog(
+                            context = context,
+                            title = "Clear My List?",
+                            message = "Are you sure you want to remove all items from your list? This action cannot be undone.",
+                            positiveButtonText = "Clear",
+                            negativeButtonText = "Cancel",
+                            lottieAnimRes = R.raw.exit,
+                            onYes = { viewModel.clearMyList() }
+                        ).show()
+                    },
                     isLoading = uiState.isClearingMyList,
                     isSuccess = uiState.myListClearSuccess
                 )
@@ -109,7 +141,7 @@ fun MobileSettingsScreen(
                 SettingsItem(
                     icon = Icons.Default.Info,
                     title = "About KiduyuTV",
-                    subtitle = "Version 1.2.1",
+                    subtitle = "Version 1.1.70",
                     onClick = { /* Could show a dialog */ }
                 )
                 SettingsItem(
@@ -148,7 +180,7 @@ fun MobileSettingsScreen(
             
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Text(
-                    text = "KiduyuTV v1.2.1",
+                    text = "KiduyuTV v1.1.70",
                     color = TextSecondary,
                     fontSize = 12.sp
                 )
