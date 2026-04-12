@@ -86,12 +86,14 @@ fun MobileGenresScreen(
         Genre(37, "Western")
     )
 
-    val genres = if (mediaType == "movie") movieGenres else tvGenres
+            val genres = if (mediaType == "movie") movieGenres else tvGenres
     val title = if (mediaType == "movie") "Movie Genres" else "TV Show Genres"
 
     LaunchedEffect(Unit) {
         isLoading = false
     }
+
+    fun encode(value: String): String = java.net.URLEncoder.encode(value, "UTF-8")
 
     Scaffold(
         topBar = {
@@ -144,7 +146,7 @@ fun MobileGenresScreen(
                         MobileGenreChip(
                             genre = genre,
                             onClick = {
-                                onGenreClick(genre.id, genre.name)
+                                onGenreClick(genre.id, encode(genre.name))
                             }
                         )
                     }

@@ -70,6 +70,12 @@ object ApiClient {
                 }
             } catch (e: Exception) {
                 exception = e
+                // Check if the request was canceled (e.g., by Coroutine cancellation)
+                if (e is IOException && e.message?.contains("Canceled", ignoreCase = true) == true) {
+                    Log.i(TAG, "Request was canceled, stopping retries")
+                    throw e
+                }
+
                 if (e is SocketTimeoutException || e is IOException) {
                     Log.w(TAG, "Request failed (attempt $attempt): ${e.message}")
                     // Don't close response here as it might be null or already closed
