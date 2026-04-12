@@ -181,10 +181,20 @@ class SplashActivity : ComponentActivity() {
                     val apkInfo = UpdateUtil.fetchBestApkInfo(this@SplashActivity)
                     if (apkInfo != null) {
                         val localFile = UpdateUtil.getLocalApkFile(this@SplashActivity)
-                        if (localFile.exists()) {
-                            showInstallPrompt(localFile, apkInfo)
-                        } else {
-                            downloadAndInstallApk(apkInfo)
+                        when {
+                            UpdateUtil.isLocalApkValid(this@SplashActivity, apkInfo) -> {
+                                // Cached file is the right version, right device type, right size
+                                Log.i(TAG, "Valid cached APK found, skipping download")
+                                showInstallPrompt(localFile, apkInfo)
+                            }
+                            else -> {
+                                // Stale, wrong device type, incomplete, or missing — delete and re-download
+                                if (localFile.exists()) {
+                                    localFile.delete()
+                                    Log.i(TAG, "Deleted stale cached APK")
+                                }
+                                downloadAndInstallApk(apkInfo)
+                            }
                         }
                     } else {
                         Log.w(TAG, "No APK found for ${getDeviceTypeString()}, opening releases page")
@@ -262,6 +272,7 @@ class SplashActivity : ComponentActivity() {
             activeDialogs.remove(progressDialog)
 
             if (apkFile != null) {
+                UpdateUtil.saveDownloadedApkMeta(this@SplashActivity, apkInfo)
                 showInstallPrompt(apkFile, apkInfo)
             } else {
                 QuitDialog(

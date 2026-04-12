@@ -27,7 +27,9 @@ data class ApkInfo(
     val url: String,
     val fileName: String,
     val version: String?,
-    val buildNumber: Int
+    val buildNumber: Int,
+    /** Exact byte size reported by GitHub — used to validate the local cached file. */
+    val sizeBytes: Long = -1L
 )
 
 object UpdateUtil {
@@ -344,7 +346,8 @@ object UpdateUtil {
                                     url = apkUrl,
                                     fileName = name,
                                     version = version,
-                                    buildNumber = buildNumber
+                                    buildNumber = buildNumber,
+                                    sizeBytes = asset.optLong("size", -1L)
                                 )
                             }
                         }
@@ -425,6 +428,73 @@ object UpdateUtil {
             Log.e(TAG, "Error fetching APK URL", e)
             null
         }
+    }
+
+    // ── Local APK cache validation ────────────────────────────────────────────
+
+    private const val PREFS_APK_CACHE   = "apk_cache_meta"
+    private const val KEY_APK_FILE_NAME = "cached_apk_file_name"
+    private const val KEY_APK_SIZE      = "cached_apk_size_bytes"
+
+    /**
+     * Persists the metadata of a successfully downloaded APK so we can
+     * validate the cached file on the next launch without re-fetching GitHub.
+     */
+    fun saveDownloadedApkMeta(context: Context, apkInfo: ApkInfo) {
+        context.getSharedPreferences(PREFS_APK_CACHE, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_APK_FILE_NAME, apkInfo.fileName)
+            .putLong(KEY_APK_SIZE, apkInfo.sizeBytes)
+            .apply()
+        Log.i(TAG, "Saved APK meta: ${apkInfo.fileName}, size=${apkInfo.sizeBytes}")
+    }
+
+    /**
+     * Returns true only when ALL of the following hold:
+     *
+     * 1. The local APK file exists on disk.
+     * 2. The cached filename matches [apkInfo.fileName] — same version AND same
+     *    device type (TV vs Phone), because the filename encodes both.
+     * 3. The file size on disk matches the expected size from GitHub.
+     *    If GitHub didn't report a size (sizeBytes == -1) the size check is
+     *    skipped so a version/name match alone is sufficient.
+     *
+     * Any failure means the cached file is stale, wrong device type, or
+     * incomplete — caller should delete it and re-download.
+     */
+    fun isLocalApkValid(context: Context, apkInfo: ApkInfo): Boolean {
+        val localFile = getLocalApkFile(context)
+
+        if (!localFile.exists()) {
+            Log.i(TAG, "No local APK file found")
+            return false
+        }
+
+        val prefs = context.getSharedPreferences(PREFS_APK_CACHE, Context.MODE_PRIVATE)
+        val cachedName = prefs.getString(KEY_APK_FILE_NAME, null)
+        val cachedSize = prefs.getLong(KEY_APK_SIZE, -1L)
+
+        // 1. Filename must match exactly (encodes version + device type)
+        if (cachedName != apkInfo.fileName) {
+            Log.i(TAG, "Cached APK name mismatch: cached=$cachedName expected=${apkInfo.fileName}")
+            return false
+        }
+
+        // 2. File size must match (skip if GitHub size unknown)
+        val localSize = localFile.length()
+        if (apkInfo.sizeBytes > 0 && localSize != apkInfo.sizeBytes) {
+            Log.w(TAG, "Cached APK size mismatch: local=$localSize expected=${apkInfo.sizeBytes}")
+            return false
+        }
+
+        // 3. Sanity-check the cached size prefs entry if GitHub size is unavailable
+        if (apkInfo.sizeBytes <= 0 && cachedSize > 0 && localSize != cachedSize) {
+            Log.w(TAG, "Cached APK size mismatch (prefs): local=$localSize cached=$cachedSize")
+            return false
+        }
+
+        Log.i(TAG, "Local APK is valid: ${apkInfo.fileName} ($localSize bytes)")
+        return true
     }
 
     /**
