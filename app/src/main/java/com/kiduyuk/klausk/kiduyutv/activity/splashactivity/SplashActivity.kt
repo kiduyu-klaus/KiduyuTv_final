@@ -207,7 +207,7 @@ class SplashActivity : ComponentActivity() {
                         Log.i(TAG, "Found APK for download: ${apkInfo.fileName}")
                         downloadAndInstallApk(apkInfo)
                     } else {
-                        Log.w(TAG, "Could not find APK for this device type (${UpdateUtil.getDeviceTypeString(this@SplashActivity)}), opening releases page")
+                        Log.w(TAG, "Could not find APK for this device type (${getDeviceTypeString()}), opening releases page")
                         // Fallback: open releases page in browser
                         startActivity(
                             Intent(
