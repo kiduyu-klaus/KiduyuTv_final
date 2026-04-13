@@ -229,8 +229,6 @@ fun StreamProviderItem(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
-    val scale by animateFloatAsState(if (isFocused) 1.05f else 1f)
-
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
@@ -239,10 +237,6 @@ fun StreamProviderItem(
         modifier = Modifier
             .fillMaxWidth()
             .height(90.dp)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
             .border(
                 width = if (isFocused) 2.dp else 0.dp,
                 color = Color.White,
