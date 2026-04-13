@@ -70,21 +70,21 @@ class StreamLinksViewModel : ViewModel() {
                     urlTemplate = if (isTv) "https://vidlink.pro/tv/${tmdbId}/${season}/${episode}?autoPlay=true" else "https://vidlink.pro/movie/${tmdbId}?autoPlay=true",
                     type = if (isTv) "tv" else "movie"
                 ),
-//                StreamProvider(
-//                    name = "Hexa",
-//                    urlTemplate = if (isTv) "https://hexa.su/watch/tv/${tmdbId}/${season}/${episode}" else "https://hexa.su/watch/movie/${tmdbId}",
-//                    type = if (isTv) "tv" else "movie"
-//                ),
+                StreamProvider(
+                    name = "Hexa",
+                    urlTemplate = if (isTv) "https://hexa.su/watch/tv/${tmdbId}/${season}/${episode}" else "https://hexa.su/watch/movie/${tmdbId}",
+                    type = if (isTv) "tv" else "movie"
+                ),
                 StreamProvider(
                     name = "VidFast",
                     urlTemplate = if (isTv) "https://vidfast.pro/tv/${tmdbId}/${season}/${episode}?autoPlay=true&nextButton=true&autoNext=true" else "https://vidfast.pro/movie/${tmdbId}?autoPlay=true",
                     type = if (isTv) "tv" else "movie"
                 ),
-                StreamProvider(
-                    name = "VidSrc",
-                    urlTemplate = if (isTv) "https://vidsrc-embed.ru/embed/tv/?tmdb=${tmdbId}&season=${season}&episode=${episode}&autoplay=1&autonext=1" else "https://vidsrc.icu/embed/movie?tmdb=${tmdbId}&autoplay=1",
-                    type = if (isTv) "tv" else "movie"
-                ),
+//                StreamProvider(
+//                    name = "VidSrc",
+//                    urlTemplate = if (isTv) "https://vidsrc-embed.ru/embed/tv/?tmdb=${tmdbId}&season=${season}&episode=${episode}&autoplay=1&autonext=1" else "https://vidsrc.icu/embed/movie?tmdb=${tmdbId}&autoplay=1",
+//                    type = if (isTv) "tv" else "movie"
+//                ),
                 StreamProvider(
                     name = "VidKing",
                     urlTemplate = if (isTv) "https://www.vidking.net/embed/tv/${tmdbId}/${season}/${episode}?autoPlay=true&nextEpisode=true&episodeSelector=true" else "https://www.vidking.net/embed/movie/${tmdbId}?autoPlay=true",
@@ -95,46 +95,46 @@ class StreamLinksViewModel : ViewModel() {
 //                    urlTemplate = if (isTv) "https://mapple.uk/watch/tv/${tmdbId}-${season}-${episode}" else "https://mapple.uk/watch/movie/${tmdbId}",
 //                    type = if (isTv) "tv" else "movie"
 //                ),
-                StreamProvider(
-                    name = "Flixer",
-                    urlTemplate = if (isTv) "https://flixer.su/watch/tv/${tmdbId}/${season}/${episode}" else "https://flixer.su/watch/movie/${tmdbId}",
-                    type = if (isTv) "tv" else "movie"
-                ),
-                StreamProvider(
-                    name = "Autoembed",
-                    urlTemplate = if (isTv) "https://autoembed.co/tv/tmdb/${tmdbId}-${season}-${episode}" else "https://autoembed.co/movie/tmdb/${tmdbId}",
-                    type = if (isTv) "tv" else "movie"
-                ),
-                StreamProvider(
-                    name = "EmbedMaster",
-                    urlTemplate = if (isTv) "https://embedmaster.link/tv/${tmdbId}/${season}/${episode}" else "https://embedmaster.link/movie/${tmdbId}",
-                    type = if (isTv) "tv" else "movie"
-                ),
-                StreamProvider(
-                    name = "2Embed",
-                    urlTemplate = if (isTv) "https://www.2embed.online/tv-2embed.php?id=${tmdbId}&season=${season}&episode=${episode}" else "https://www.2embed.online/2embed.php?id=${tmdbId}",
-                    type = if (isTv) "tv" else "movie"
-                ),
-                StreamProvider(
-                    name = "MoviesAPI",
-                    urlTemplate = if (isTv) "https://moviesapi.club/tv/${tmdbId}-${season}-${episode}" else "https://moviesapi.club/movie/${tmdbId}",
-                    type = if (isTv) "tv" else "movie"
-                ),
-                StreamProvider(
-                    name = "VidRock",
-                    urlTemplate = if (isTv) "https://vidrock.net/tv/${tmdbId}/${season}/${episode}" else "https://vidrock.net/movie/${tmdbId}",
-                    type = if (isTv) "tv" else "movie"
-                ),
-                StreamProvider(
-                    name = "Vidsync",
-                    urlTemplate = if (isTv) "https://vidsync.xyz/embed/tv/${tmdbId}/${season}/${episode}?autoPlay=true&autoNext=true" else "https://vidsync.xyz/embed/movie/${tmdbId}?autoPlay=true",
-                    type = if (isTv) "tv" else "movie"
-                ),
-                StreamProvider(
-                    name = "VidNest",
-                    urlTemplate = if (isTv) "https://vidnest.fun/tv/${tmdbId}/${season}/${episode}" else "https://vidnest.fun/movie/${tmdbId}",
-                    type = if (isTv) "tv" else "movie"
-                )
+//                StreamProvider(
+//                    name = "Flixer",
+//                    urlTemplate = if (isTv) "https://flixer.su/watch/tv/${tmdbId}/${season}/${episode}" else "https://flixer.su/watch/movie/${tmdbId}",
+//                    type = if (isTv) "tv" else "movie"
+//                ),
+//                StreamProvider(
+//                    name = "Autoembed",
+//                    urlTemplate = if (isTv) "https://autoembed.co/tv/tmdb/${tmdbId}-${season}-${episode}" else "https://autoembed.co/movie/tmdb/${tmdbId}",
+//                    type = if (isTv) "tv" else "movie"
+//                ),
+//                StreamProvider(
+//                    name = "EmbedMaster",
+//                    urlTemplate = if (isTv) "https://embedmaster.link/tv/${tmdbId}/${season}/${episode}" else "https://embedmaster.link/movie/${tmdbId}",
+//                    type = if (isTv) "tv" else "movie"
+//                ),
+//                StreamProvider(
+//                    name = "2Embed",
+//                    urlTemplate = if (isTv) "https://www.2embed.online/tv-2embed.php?id=${tmdbId}&season=${season}&episode=${episode}" else "https://www.2embed.online/2embed.php?id=${tmdbId}",
+//                    type = if (isTv) "tv" else "movie"
+//                ),
+//                StreamProvider(
+//                    name = "MoviesAPI",
+//                    urlTemplate = if (isTv) "https://moviesapi.club/tv/${tmdbId}-${season}-${episode}" else "https://moviesapi.club/movie/${tmdbId}",
+//                    type = if (isTv) "tv" else "movie"
+//                ),
+//                StreamProvider(
+//                    name = "VidRock",
+//                    urlTemplate = if (isTv) "https://vidrock.net/tv/${tmdbId}/${season}/${episode}" else "https://vidrock.net/movie/${tmdbId}",
+//                    type = if (isTv) "tv" else "movie"
+//                ),
+//                StreamProvider(
+//                    name = "Vidsync",
+//                    urlTemplate = if (isTv) "https://vidsync.xyz/embed/tv/${tmdbId}/${season}/${episode}?autoPlay=true&autoNext=true" else "https://vidsync.xyz/embed/movie/${tmdbId}?autoPlay=true",
+//                    type = if (isTv) "tv" else "movie"
+//                ),
+//                StreamProvider(
+//                    name = "VidNest",
+//                    urlTemplate = if (isTv) "https://vidnest.fun/tv/${tmdbId}/${season}/${episode}" else "https://vidnest.fun/movie/${tmdbId}",
+//                    type = if (isTv) "tv" else "movie"
+//                )
             )
 
             val client = getOkHttpClient(context)
