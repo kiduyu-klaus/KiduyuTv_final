@@ -70,11 +70,11 @@ class StreamLinksViewModel : ViewModel() {
                     urlTemplate = if (isTv) "https://vidlink.pro/tv/${tmdbId}/${season}/${episode}?autoPlay=true" else "https://vidlink.pro/movie/${tmdbId}?autoPlay=true",
                     type = if (isTv) "tv" else "movie"
                 ),
-                StreamProvider(
-                    name = "Hexa",
-                    urlTemplate = if (isTv) "https://hexa.su/watch/tv/${tmdbId}/${season}/${episode}" else "https://hexa.su/watch/movie/${tmdbId}",
-                    type = if (isTv) "tv" else "movie"
-                ),
+//                StreamProvider(
+//                    name = "Hexa",
+//                    urlTemplate = if (isTv) "https://hexa.su/watch/tv/${tmdbId}/${season}/${episode}" else "https://hexa.su/watch/movie/${tmdbId}",
+//                    type = if (isTv) "tv" else "movie"
+//                ),
                 StreamProvider(
                     name = "VidFast",
                     urlTemplate = if (isTv) "https://vidfast.pro/tv/${tmdbId}/${season}/${episode}?autoPlay=true&nextButton=true&autoNext=true" else "https://vidfast.pro/movie/${tmdbId}?autoPlay=true",
@@ -95,11 +95,11 @@ class StreamLinksViewModel : ViewModel() {
 //                    urlTemplate = if (isTv) "https://mapple.uk/watch/tv/${tmdbId}-${season}-${episode}" else "https://mapple.uk/watch/movie/${tmdbId}",
 //                    type = if (isTv) "tv" else "movie"
 //                ),
-//                StreamProvider(
-//                    name = "Flixer",
-//                    urlTemplate = if (isTv) "https://flixer.su/watch/tv/${tmdbId}/${season}/${episode}" else "https://flixer.su/watch/movie/${tmdbId}",
-//                    type = if (isTv) "tv" else "movie"
-//                ),
+                StreamProvider(
+                    name = "Flixer",
+                    urlTemplate = if (isTv) "https://flixer.su/watch/tv/${tmdbId}/${season}/${episode}" else "https://flixer.su/watch/movie/${tmdbId}",
+                    type = if (isTv) "tv" else "movie"
+                ),
 //                StreamProvider(
 //                    name = "Autoembed",
 //                    urlTemplate = if (isTv) "https://autoembed.co/tv/tmdb/${tmdbId}-${season}-${episode}" else "https://autoembed.co/movie/tmdb/${tmdbId}",
