@@ -75,34 +75,46 @@ class SplashActivity : ComponentActivity() {
     // APK file reference for installation result handling
     private var pendingApkFile: File? = null
 
+    // Version code of the APK being installed (used to detect successful update)
+    private var pendingVersionCode: Int = -1
+
     // Activity result launcher for APK installation
     private val installLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         Log.i(TAG, "Installation result received: ${result.resultCode}")
+        // Clear pending file first to avoid processing twice
         pendingApkFile?.let { apkFile ->
-            // Check if the app was actually updated (package version changed)
-            if (isPackageInstalled(packageName)) {
-                Log.i(TAG, "Package installed successfully, restarting app")
+            val expectedVersion = pendingVersionCode
+            pendingApkFile = null
+            pendingVersionCode = -1
+
+            // Check if the new version was installed by comparing version codes
+            val installedVersion = getInstalledVersionCode()
+            if (installedVersion == expectedVersion && expectedVersion > 0) {
+                Log.i(TAG, "Package installed successfully (version $installedVersion), restarting app")
                 restartApp()
             } else {
-                Log.i(TAG, "Installation was cancelled or failed")
+                Log.i(TAG, "Installation was cancelled or failed (installed: $installedVersion, expected: $expectedVersion)")
                 // User cancelled or installation failed, exit
                 finish()
             }
         }
-        pendingApkFile = null
     }
 
     /**
-     * Checks if the given package name is installed on the device.
+     * Gets the version code of the currently installed package.
      */
-    private fun isPackageInstalled(packageName: String): Boolean {
+    private fun getInstalledVersionCode(): Int {
         return try {
-            packageManager.getPackageInfo(packageName, 0)
-            true
-        } catch (e: PackageManager.NameNotFoundException) {
-            false
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                packageManager.getPackageInfo(packageName, 0).longVersionCode.toInt()
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getPackageInfo(packageName, 0).versionCode
+            }
+        } catch (e: Exception) {
+            -1
         }
     }
 
@@ -368,6 +380,9 @@ class SplashActivity : ComponentActivity() {
     }
 
     private fun showInstallPrompt(apkFile: File, apkInfo: ApkInfo) {
+        // Extract version code from the APK being installed
+        val versionCode = extractVersionCodeFromFileName(apkInfo.fileName)
+
         QuitDialog(
             context = this,
             title = "Download Complete",
@@ -378,16 +393,16 @@ class SplashActivity : ComponentActivity() {
             onYes = {
                 // Store the APK file reference for result handling
                 pendingApkFile = apkFile
-                
+
                 // Check permission and launch installation
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     if (packageManager.canRequestPackageInstalls()) {
-                        launchInstallation(apkFile)
+                        launchInstallation(apkFile, versionCode)
                     } else {
                         showPermissionDialog(apkFile)
                     }
                 } else {
-                    launchInstallation(apkFile)
+                    launchInstallation(apkFile, versionCode)
                 }
             },
             onNo = { finish() }
@@ -395,9 +410,21 @@ class SplashActivity : ComponentActivity() {
     }
 
     /**
+     * Extracts the version code (build number) from the APK filename.
+     * Example: "KiduyuTV-phone-release-1.1.76-phone-tv-build383.apk" -> 383
+     */
+    private fun extractVersionCodeFromFileName(fileName: String): Int {
+        val buildPattern = Regex("build(\\d+)")
+        return buildPattern.find(fileName)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: -1
+    }
+
+    /**
      * Launches the APK installation intent using Activity Result API.
      */
-    private fun launchInstallation(apkFile: File) {
+    private fun launchInstallation(apkFile: File, versionCode: Int = -1) {
+        // Store the expected version code for result verification
+        pendingVersionCode = versionCode
+
         val installIntent = UpdateUtil.getInstallIntent(this, apkFile)
         if (installIntent != null) {
             installLauncher.launch(installIntent)
@@ -408,16 +435,17 @@ class SplashActivity : ComponentActivity() {
             // Schedule a check after a delay to restart the app
             Log.w(TAG, "Using fallback install method, scheduling restart check")
             android.os.Handler(mainLooper).postDelayed({
-                if (isPackageInstalled(packageName)) {
+                if (pendingVersionCode > 0 && getInstalledVersionCode() == pendingVersionCode) {
                     restartApp()
                 } else {
                     finish()
                 }
+                pendingVersionCode = -1
             }, 5000) // Wait 5 seconds for user to complete installation
         }
     }
 
-    private fun showPermissionDialog(apkFile: File) {
+    private fun showPermissionDialog(apkFile: File, versionCode: Int = -1) {
         QuitDialog(
             context = this,
             title = "Permission Required",
@@ -427,8 +455,9 @@ class SplashActivity : ComponentActivity() {
             lottieAnimRes = R.raw.exit,
             onNo = { finish() },
             onYes = {
-                // Store the APK file before opening settings
+                // Store the APK file and version code before opening settings
                 pendingApkFile = apkFile
+                pendingVersionCode = versionCode
                 UpdateUtil.openInstallPermissionSettings(this)
                 // Don't finish - we'll check permission when user returns
             }
@@ -439,7 +468,8 @@ class SplashActivity : ComponentActivity() {
         super.onResume()
         // Check if we returned from settings and now have permission
         pendingApkFile?.let { apkFile ->
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || 
+            val expectedVersion = pendingVersionCode
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
                 packageManager.canRequestPackageInstalls()) {
                 Log.i(TAG, "Permission granted after returning from settings, launching installation")
                 // Clear pending file first to avoid recursion
@@ -447,8 +477,8 @@ class SplashActivity : ComponentActivity() {
                 // Dismiss any active dialogs before launching installation
                 activeDialogs.forEach { if (it.isShowing) it.dismiss() }
                 activeDialogs.clear()
-                // Launch installation
-                launchInstallation(apkFile)
+                // Launch installation with expected version
+                launchInstallation(apkFile, expectedVersion)
             }
         }
     }
