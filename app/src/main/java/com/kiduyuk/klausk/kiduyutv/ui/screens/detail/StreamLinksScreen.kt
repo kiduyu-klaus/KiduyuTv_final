@@ -3,10 +3,9 @@ package com.kiduyuk.klausk.kiduyutv.ui.screens.detail
 import android.content.Intent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -14,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,15 +22,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -47,6 +50,11 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -111,14 +119,11 @@ fun StreamLinksScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
 
-    // Focus management for D-pad navigation
-    val scrollState = rememberScrollState()
+    // Request focus on first card once providers are loaded
     val firstCardFocusRequester = remember { FocusRequester() }
-
-    LaunchedEffect(uiState.streamProviders) {
-        // Request focus on the first provider card when providers are loaded
+    LaunchedEffect(uiState.streamProviders.isNotEmpty()) {
         if (uiState.streamProviders.isNotEmpty()) {
-            firstCardFocusRequester.requestFocus()
+            try { firstCardFocusRequester.requestFocus() } catch (_: Exception) {}
         }
     }
 
@@ -141,7 +146,7 @@ fun StreamLinksScreen(
             )
         }
 
-        // Gradient overlay — heavier at bottom
+        // Gradient overlay
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -156,208 +161,215 @@ fun StreamLinksScreen(
                 )
         )
 
-        // Back button - made non-focusable to prevent focus trap
-        Box(
+        // LazyVerticalGrid handles both scrolling and d-pad focus natively on TV
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = 24.dp,
+                end = 24.dp,
+                top = 72.dp,
+                bottom = 32.dp
+            ),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // ── Header spans full width ──────────────────────────────────────
+            item(span = { GridItemSpan(2) }) {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.Bottom,
+                        horizontalArrangement = Arrangement.Start
+                    ) {
+                        if (posterPath != null) {
+                            AsyncImage(
+                                model = "${TmdbApiService.IMAGE_BASE_URL}w185${posterPath}",
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(width = 72.dp, height = 108.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .border(
+                                        width = 1.dp,
+                                        color = Color.White.copy(alpha = 0.15f),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            if (isTv && season != null && episode != null) {
+                                Text(
+                                    text = "SEASON $season  ·  EPISODE $episode",
+                                    color = PrimaryRed,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 1.5.sp
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                            }
+                            Text(
+                                text = title,
+                                color = TextPrimary,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                if (releaseDate != null) {
+                                    Text(
+                                        text = releaseDate.take(4),
+                                        color = TextSecondary,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                    Text(
+                                        text = "·",
+                                        color = TextSecondary,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                                Text(
+                                    text = "★ ${String.format("%.1f", voteAverage)}",
+                                    color = Color(0xFFF59E0B),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(28.dp))
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    // Section header
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Choose a Provider",
+                            color = TextPrimary,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        if (!uiState.isLoading) {
+                            Surface(
+                                color = Color.White.copy(alpha = 0.08f),
+                                shape = RoundedCornerShape(20.dp)
+                            ) {
+                                Text(
+                                    text = "${uiState.streamProviders.size} sources",
+                                    color = TextSecondary,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+            }
+
+            // ── Loading / empty states span full width ───────────────────────
+            if (uiState.isLoading) {
+                item(span = { GridItemSpan(2) }) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(300.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        LottieLoadingView(size = 160.dp)
+                    }
+                }
+            } else if (uiState.streamProviders.isEmpty()) {
+                item(span = { GridItemSpan(2) }) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No streaming providers available.",
+                            color = TextSecondary,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+                }
+            } else {
+                // ── Provider cards in 2-column grid ─────────────────────────
+                itemsIndexed(uiState.streamProviders) { index, provider ->
+                    val cardModifier = if (index == 0)
+                        Modifier.focusRequester(firstCardFocusRequester)
+                    else
+                        Modifier
+
+                    StreamProviderCard(
+                        provider = provider,
+                        index = index + 1,
+                        modifier = cardModifier,
+                        onProviderClick = {
+                            val intent = Intent(context, PlayerActivity::class.java).apply {
+                                putExtra("TMDB_ID", tmdbId)
+                                putExtra("IS_TV", isTv)
+                                putExtra("SEASON_NUMBER", season ?: 0)
+                                putExtra("EPISODE_NUMBER", episode ?: 0)
+                                putExtra("TITLE", title)
+                                putExtra("OVERVIEW", overview)
+                                putExtra("POSTER_PATH", posterPath)
+                                putExtra("BACKDROP_PATH", backdropPath)
+                                putExtra("VOTE_AVERAGE", voteAverage)
+                                putExtra("RELEASE_DATE", releaseDate)
+
+                                val finalUrl = if (timestamp > 0) {
+                                    when (provider.name) {
+                                        "VidLink"  -> "${provider.urlTemplate}&startAt=$timestamp"
+                                        "VidKing"  -> "${provider.urlTemplate}&progress=$timestamp"
+                                        "Videasy"  -> "${provider.urlTemplate}&progress=$timestamp"
+                                        "VidFast"  -> "${provider.urlTemplate}&startAt=$timestamp"
+                                        else       -> provider.urlTemplate
+                                    }
+                                } else {
+                                    provider.urlTemplate
+                                }
+                                putExtra("STREAM_URL", finalUrl)
+                            }
+                            context.startActivity(intent)
+                        }
+                    )
+                }
+            }
+        }
+
+        // Back button — sits above the grid, always visible
+        IconButton(
+            onClick = onBackClick,
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(12.dp)
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.12f))
-                .clickable { onBackClick() },
-            contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
-                tint = TextPrimary,
-                modifier = Modifier.size(20.dp)
-            )
-        }
-
-        // Scrollable content area
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(horizontal = 24.dp)
-                .padding(top = 72.dp, bottom = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // ── Header: poster + title/meta ──────────────────────────────────
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.Start
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
             ) {
-                if (posterPath != null) {
-                    AsyncImage(
-                        model = "${TmdbApiService.IMAGE_BASE_URL}w185${posterPath}",
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(width = 72.dp, height = 108.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .border(
-                                width = 1.dp,
-                                color = Color.White.copy(alpha = 0.15f),
-                                shape = RoundedCornerShape(8.dp)
-                            )
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                }
-
-                Column(modifier = Modifier.weight(1f)) {
-                    if (isTv && season != null && episode != null) {
-                        Text(
-                            text = "SEASON $season  ·  EPISODE $episode",
-                            color = PrimaryRed,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.5.sp
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                    }
-                    Text(
-                        text = title,
-                        color = TextPrimary,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        if (releaseDate != null) {
-                            Text(
-                                text = releaseDate.take(4),
-                                color = TextSecondary,
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                            Text(
-                                text = "·",
-                                color = TextSecondary,
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                        Text(
-                            text = "★ ${String.format("%.1f", voteAverage)}",
-                            color = Color(0xFFF59E0B),
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(28.dp))
-            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // ── Section header ───────────────────────────────────────────────
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "Choose a Provider",
-                    color = TextPrimary,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = TextPrimary,
+                    modifier = Modifier.size(20.dp)
                 )
-                if (!uiState.isLoading) {
-                    Surface(
-                        color = Color.White.copy(alpha = 0.08f),
-                        shape = RoundedCornerShape(20.dp)
-                    ) {
-                        Text(
-                            text = "${uiState.streamProviders.size} sources",
-                            color = TextSecondary,
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // ── Provider list ────────────────────────────────────────────────
-            if (uiState.isLoading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(300.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    LottieLoadingView(size = 160.dp)
-                }
-            } else if (uiState.streamProviders.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "No streaming providers available.",
-                        color = TextSecondary,
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                }
-            } else {
-                // Two-column grid
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    maxItemsInEachRow = 2
-                ) {
-                    uiState.streamProviders.forEachIndexed { index, provider ->
-                        StreamProviderCard(
-                            provider = provider,
-                            index = index + 1,
-                            modifier = Modifier
-                                .weight(1f)
-                                .then(
-                                    if (index == 0) Modifier.focusRequester(firstCardFocusRequester)
-                                    else Modifier
-                                ),
-                            onProviderClick = {
-                                val intent = Intent(context, PlayerActivity::class.java).apply {
-                                    putExtra("TMDB_ID", tmdbId)
-                                    putExtra("IS_TV", isTv)
-                                    putExtra("SEASON_NUMBER", season ?: 0)
-                                    putExtra("EPISODE_NUMBER", episode ?: 0)
-                                    putExtra("TITLE", title)
-                                    putExtra("OVERVIEW", overview)
-                                    putExtra("POSTER_PATH", posterPath)
-                                    putExtra("BACKDROP_PATH", backdropPath)
-                                    putExtra("VOTE_AVERAGE", voteAverage)
-                                    putExtra("RELEASE_DATE", releaseDate)
-
-                                    val finalUrl = if (timestamp > 0) {
-                                        when (provider.name) {
-                                            "VidLink" -> "${provider.urlTemplate}&startAt=$timestamp"
-                                            "VidKing" -> "${provider.urlTemplate}&progress=$timestamp"
-                                            "Videasy" -> "${provider.urlTemplate}&progress=$timestamp"
-                                            "VidFast" -> "${provider.urlTemplate}&startAt=$timestamp"
-                                            else -> provider.urlTemplate
-                                        }
-                                    } else {
-                                        provider.urlTemplate
-                                    }
-                                    putExtra("STREAM_URL", finalUrl)
-                                }
-                                context.startActivity(intent)
-                            }
-                        )
-                    }
-                }
             }
         }
     }
@@ -389,10 +401,7 @@ fun StreamProviderCard(
             .background(
                 if (isFocused)
                     Brush.linearGradient(
-                        colors = listOf(
-                            PrimaryRed,
-                            PrimaryRed.copy(alpha = 0.85f)
-                        )
+                        colors = listOf(PrimaryRed, PrimaryRed.copy(alpha = 0.85f))
                     )
                 else
                     Brush.linearGradient(
@@ -407,12 +416,16 @@ fun StreamProviderCard(
                 color = if (isFocused) PrimaryRed else Color.White.copy(alpha = 0.09f),
                 shape = RoundedCornerShape(12.dp)
             )
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = { onProviderClick(provider) }
-            )
+            // focusable BEFORE clickable so TV focus system sees it first
             .focusable(interactionSource = interactionSource)
+            .onKeyEvent { keyEvent ->
+                if (keyEvent.type == KeyEventType.KeyUp &&
+                    (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)
+                ) {
+                    onProviderClick(provider)
+                    true
+                } else false
+            }
             .padding(horizontal = 14.dp, vertical = 14.dp)
     ) {
         Column {
@@ -425,9 +438,7 @@ fun StreamProviderCard(
                     modifier = Modifier
                         .size(28.dp)
                         .clip(CircleShape)
-                        .background(
-                            if (isFocused) Color.White else PrimaryRed
-                        ),
+                        .background(if (isFocused) Color.White else PrimaryRed),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -442,7 +453,7 @@ fun StreamProviderCard(
 
                 Text(
                     text = provider.name,
-                    color = TextPrimary,
+                    color = Color.White,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
