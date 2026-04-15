@@ -126,6 +126,35 @@ fun MoviesScreen(
                         }
                     }
 
+
+                    // Content Row for Continue Watching Movies.
+                    if (uiState.continueWatching.isNotEmpty()) {
+                        val movieHistory = uiState.continueWatching.filter { !it.isTv }
+                        if (movieHistory.isNotEmpty()) {
+                            ContentRow(
+                                title = "Continue Watching",
+                                items = movieHistory,
+                                onItemFocus = { historyItem -> viewModel.onItemSelected(historyItem) },
+                                onItemClick = { historyItem -> onMovieClick(historyItem.id) }
+                            ) { historyItem, isSelected, onClick ->
+                                MovieCard(
+                                    movie = Movie(
+                                        id = historyItem.id,
+                                        title = historyItem.title,
+                                        overview = historyItem.overview ?: "",
+                                        posterPath = historyItem.posterPath,
+                                        backdropPath = historyItem.backdropPath,
+                                        voteAverage = historyItem.voteAverage,
+                                        releaseDate = historyItem.releaseDate ?: "",
+                                        genreIds = emptyList(),
+                                        popularity = 0.0
+                                    ),
+                                    isSelected = isSelected,
+                                    onClick = onClick
+                                )
+                            }
+                        }
+                    }
                     // Content Row for Trending Movies.
 //                    ContentRow(
 //                        title = "Trending Movies",
@@ -154,35 +183,6 @@ fun MoviesScreen(
                                 isSelected = isSelected,
                                 onClick = onClick
                             )
-                        }
-                    }
-
-                    // Content Row for Continue Watching Movies.
-                    if (uiState.continueWatching.isNotEmpty()) {
-                        val movieHistory = uiState.continueWatching.filter { !it.isTv }
-                        if (movieHistory.isNotEmpty()) {
-                            ContentRow(
-                                title = "Continue Watching",
-                                items = movieHistory,
-                                onItemFocus = { historyItem -> viewModel.onItemSelected(historyItem) },
-                                onItemClick = { historyItem -> onMovieClick(historyItem.id) }
-                            ) { historyItem, isSelected, onClick ->
-                                MovieCard(
-                                    movie = Movie(
-                                        id = historyItem.id,
-                                        title = historyItem.title,
-                                        overview = historyItem.overview ?: "",
-                                        posterPath = historyItem.posterPath,
-                                        backdropPath = historyItem.backdropPath,
-                                        voteAverage = historyItem.voteAverage,
-                                        releaseDate = historyItem.releaseDate ?: "",
-                                        genreIds = emptyList(),
-                                        popularity = 0.0
-                                    ),
-                                    isSelected = isSelected,
-                                    onClick = onClick
-                                )
-                            }
                         }
                     }
 

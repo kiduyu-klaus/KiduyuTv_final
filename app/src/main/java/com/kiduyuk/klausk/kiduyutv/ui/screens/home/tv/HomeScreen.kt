@@ -317,6 +317,78 @@ private fun HomeContent(
                         }
                     }
 
+                    if (uiState.continueWatching.isNotEmpty()) {
+                        ContentRow(
+                            title = "Continue Watching",
+                            items = uiState.continueWatching,
+                            restoreFocusItemId = lastClickedItemId,
+                            getItemId = { it.id },
+                            onItemFocus = { item -> onSelectItem(item) },
+                            onItemClick = { item ->
+                                onSetLastClickedItemId(item.id)
+                                if (item.isTv) onTvShowClick(item.id) else onMovieClick(item.id)
+                            }
+                        ) { item, isFocused, onClick ->
+                            if (item.isTv) {
+                                TvShowCard(
+                                    tvShow = TvShow(
+                                        id = item.id,
+                                        name = item.title,
+                                        overview = item.overview ?: "",
+                                        posterPath = item.posterPath,
+                                        backdropPath = item.backdropPath,
+                                        voteAverage = item.voteAverage,
+                                        firstAirDate = item.releaseDate ?: "",
+                                        genreIds = emptyList(),
+                                        popularity = 0.0
+                                    ),
+                                    isSelected = isFocused,
+                                    onClick = onClick
+                                )
+                            } else {
+                                MovieCard(
+                                    movie = Movie(
+                                        id = item.id,
+                                        title = item.title,
+                                        overview = item.overview ?: "",
+                                        posterPath = item.posterPath,
+                                        backdropPath = item.backdropPath,
+                                        voteAverage = item.voteAverage,
+                                        releaseDate = item.releaseDate ?: "",
+                                        genreIds = emptyList(),
+                                        popularity = 0.0
+                                    ),
+                                    isSelected = isFocused,
+                                    onClick = onClick
+                                )
+                            }
+                        }
+                    }
+
+
+                    if (uiState.popularNetworks.isNotEmpty()) {
+                        NetworkRow(
+                            title = "Popular Networks",
+                            items = uiState.popularNetworks,
+                            restoreFocusItemId = lastClickedItemId,  // Added
+                            onItemClick = { network ->
+                                onSetLastClickedItemId(network.id)
+                                onNavigate("media_list/network/${network.id}/${network.name}")
+                            }
+                        )
+                    }
+
+                    if (uiState.popularCompanies.isNotEmpty()) {
+                        NetworkRow(
+                            title = "Popular Companies",
+                            items = uiState.popularCompanies,
+                            restoreFocusItemId = lastClickedItemId,  // Added
+                            onItemClick = { company ->
+                                onSetLastClickedItemId(company.id)
+                                onNavigate("media_list/company/${company.id}/${company.name}")
+                            }
+                        )
+                    }
                     ContentRow(
                         title = "TV Shows Trending Today",
                         items = uiState.trendingTvShows,
@@ -370,77 +442,7 @@ private fun HomeContent(
 //                        )
 //                    }
 
-                    if (uiState.continueWatching.isNotEmpty()) {
-                        ContentRow(
-                            title = "Continue Watching",
-                            items = uiState.continueWatching,
-                            restoreFocusItemId = lastClickedItemId,
-                            getItemId = { it.id },
-                            onItemFocus = { item -> onSelectItem(item) },
-                            onItemClick = { item ->
-                                onSetLastClickedItemId(item.id)
-                                if (item.isTv) onTvShowClick(item.id) else onMovieClick(item.id)
-                            }
-                        ) { item, isFocused, onClick ->
-                            if (item.isTv) {
-                                TvShowCard(
-                                    tvShow = TvShow(
-                                        id = item.id,
-                                        name = item.title,
-                                        overview = item.overview ?: "",
-                                        posterPath = item.posterPath,
-                                        backdropPath = item.backdropPath,
-                                        voteAverage = item.voteAverage,
-                                        firstAirDate = item.releaseDate ?: "",
-                                        genreIds = emptyList(),
-                                        popularity = 0.0
-                                    ),
-                                    isSelected = isFocused,
-                                    onClick = onClick
-                                )
-                            } else {
-                                MovieCard(
-                                    movie = Movie(
-                                        id = item.id,
-                                        title = item.title,
-                                        overview = item.overview ?: "",
-                                        posterPath = item.posterPath,
-                                        backdropPath = item.backdropPath,
-                                        voteAverage = item.voteAverage,
-                                        releaseDate = item.releaseDate ?: "",
-                                        genreIds = emptyList(),
-                                        popularity = 0.0
-                                    ),
-                                    isSelected = isFocused,
-                                    onClick = onClick
-                                )
-                            }
-                        }
-                    }
 
-                    if (uiState.popularNetworks.isNotEmpty()) {
-                        NetworkRow(
-                            title = "Popular Networks",
-                            items = uiState.popularNetworks,
-                            restoreFocusItemId = lastClickedItemId,  // Added
-                            onItemClick = { network ->
-                                onSetLastClickedItemId(network.id)
-                                onNavigate("media_list/network/${network.id}/${network.name}")
-                            }
-                        )
-                    }
-
-                    if (uiState.popularCompanies.isNotEmpty()) {
-                        NetworkRow(
-                            title = "Popular Companies",
-                            items = uiState.popularCompanies,
-                            restoreFocusItemId = lastClickedItemId,  // Added
-                            onItemClick = { company ->
-                                onSetLastClickedItemId(company.id)
-                                onNavigate("media_list/company/${company.id}/${company.name}")
-                            }
-                        )
-                    }
 
                     ContentRow(
                         title = "Top Rated Movies",
