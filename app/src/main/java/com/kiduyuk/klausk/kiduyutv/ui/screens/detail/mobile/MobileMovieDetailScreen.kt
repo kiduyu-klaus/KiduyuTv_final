@@ -1,6 +1,7 @@
 package com.kiduyuk.klausk.kiduyutv.ui.screens.detail.mobile
 
 import android.content.Intent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -31,6 +32,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.components.CastRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
+import com.kiduyuk.klausk.kiduyutv.ui.player.youtube.YouTubePlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileCategoryRow
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
@@ -175,6 +177,31 @@ fun MobileMovieDetailScreen(
                             Icon(Icons.Default.PlayArrow, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Play Now")
+                        }
+
+                        // Watch Trailer Button
+                        if (uiState.trailerKey != null) {
+                            OutlinedButton(
+                                onClick = {
+                                    val intent = Intent(context, YouTubePlayerActivity::class.java).apply {
+                                        putExtra("VIDEO_ID", uiState.trailerKey)
+                                        putExtra("TITLE", movie.title ?: "")
+                                    }
+                                    context.startActivity(intent)
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, TextSecondary)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Star,
+                                    contentDescription = null,
+                                    tint = PrimaryRed
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Trailer")
+                            }
                         }
 
                         Button(

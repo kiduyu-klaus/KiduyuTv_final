@@ -47,6 +47,12 @@
             android:hardwareAccelerated="true"
             android:theme="@style/Theme.KiduyuTv.Player" />
         <activity
+            android:name=".ui.player.youtube.YouTubePlayerActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:hardwareAccelerated="true"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.KiduyuTv.Player" />
+        <activity
             android:name=".activity.splashactivity.SplashActivity"
             android:exported="true"
             android:theme="@style/Theme.KiduyuTv">
