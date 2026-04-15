@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.PlaylistRemove
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Update
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -27,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -1334,6 +1336,7 @@ private fun PreviewAppVersion() {
                 updateAvailable = false,
                 isDownloadingUpdate = false,
                 downloadProgress = 0,
+                onRefreshWhatsNewClick = {},
                 onCheckForUpdatesClick = {},
                 onDownloadUpdateClick = {}
             )
@@ -1366,6 +1369,7 @@ private fun PreviewAppVersionUpdateAvailable() {
                 updateAvailable = true,
                 isDownloadingUpdate = false,
                 downloadProgress = 0,
+                onRefreshWhatsNewClick = {},
                 onCheckForUpdatesClick = {},
                 onDownloadUpdateClick = {}
             )
@@ -1398,6 +1402,7 @@ private fun PreviewAppVersionChecking() {
                 updateAvailable = false,
                 isDownloadingUpdate = false,
                 downloadProgress = 0,
+                onRefreshWhatsNewClick = {},
                 onCheckForUpdatesClick = {},
                 onDownloadUpdateClick = {}
             )
@@ -1430,6 +1435,7 @@ private fun PreviewAppVersionDownloading() {
                 updateAvailable = true,
                 isDownloadingUpdate = true,
                 downloadProgress = 45,
+                onRefreshWhatsNewClick = {},
                 onCheckForUpdatesClick = {},
                 onDownloadUpdateClick = {}
             )
