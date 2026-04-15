@@ -32,8 +32,11 @@ import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.data.model.Episode
 import com.kiduyuk.klausk.kiduyutv.data.model.Season
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
+import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
+import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
+import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamLinksViewModel
 
 /**
  * Composable function for the Season and Episodes screen.
@@ -208,20 +211,48 @@ fun SeasonEpisodesScreen(
                                     episode = episode,
                                     seasonNumber = selectedSeasonIndex + 1,
                                     onEpisodeClick = { sNum, eNum ->
-                                        onPlayClick(
-                                            Screen.StreamLinks.createRoute(
+                                        val defaultProvider = SettingsManager(context).getDefaultProvider()
+                                        val directUrl = if (defaultProvider != SettingsManager.AUTO) {
+                                            StreamLinksViewModel.resolveProviderUrl(
+                                                providerName = defaultProvider,
                                                 tmdbId = tvShowId,
                                                 isTv = true,
-                                                title = tvShowName,
-                                                overview = uiState.tvShowDetail?.overview,
-                                                posterPath = episode.stillPath,
-                                                backdropPath = uiState.tvShowDetail?.backdropPath,
-                                                voteAverage = uiState.tvShowDetail?.voteAverage,
-                                                releaseDate = uiState.tvShowDetail?.firstAirDate,
                                                 season = sNum,
                                                 episode = eNum
                                             )
-                                        )
+                                        } else null
+
+                                        if (directUrl != null) {
+                                            val intent = Intent(context, PlayerActivity::class.java).apply {
+                                                putExtra("STREAM_URL", directUrl)
+                                                putExtra("TMDB_ID", tvShowId)
+                                                putExtra("IS_TV", true)
+                                                putExtra("TITLE", tvShowName)
+                                                putExtra("OVERVIEW", uiState.tvShowDetail?.overview)
+                                                putExtra("POSTER_PATH", episode.stillPath)
+                                                putExtra("BACKDROP_PATH", uiState.tvShowDetail?.backdropPath)
+                                                putExtra("VOTE_AVERAGE", uiState.tvShowDetail?.voteAverage ?: 0.0)
+                                                putExtra("RELEASE_DATE", uiState.tvShowDetail?.firstAirDate)
+                                                putExtra("SEASON_NUMBER", sNum)
+                                                putExtra("EPISODE_NUMBER", eNum)
+                                            }
+                                            context.startActivity(intent)
+                                        } else {
+                                            onPlayClick(
+                                                Screen.StreamLinks.createRoute(
+                                                    tmdbId = tvShowId,
+                                                    isTv = true,
+                                                    title = tvShowName,
+                                                    overview = uiState.tvShowDetail?.overview,
+                                                    posterPath = episode.stillPath,
+                                                    backdropPath = uiState.tvShowDetail?.backdropPath,
+                                                    voteAverage = uiState.tvShowDetail?.voteAverage,
+                                                    releaseDate = uiState.tvShowDetail?.firstAirDate,
+                                                    season = sNum,
+                                                    episode = eNum
+                                                )
+                                            )
+                                        }
                                     }
                                 )
                             }

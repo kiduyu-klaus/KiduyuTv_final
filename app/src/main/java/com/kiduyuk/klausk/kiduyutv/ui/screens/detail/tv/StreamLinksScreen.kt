@@ -183,16 +183,14 @@ fun StreamLinksScreen(
                             index = index + 1,
                             provider = provider
                         ) {
-
-                            val finalUrl = if (timestamp > 0) {
-                                when (provider.name) {
-                                    "VidLink" -> "${provider.urlTemplate}&startAt=$timestamp"
-                                    "VidKing" -> "${provider.urlTemplate}&progress=$timestamp"
-                                    "Videasy" -> "${provider.urlTemplate}&progress=$timestamp"
-                                    "VidFast" -> "${provider.urlTemplate}&startAt=$timestamp"
-                                    else -> provider.urlTemplate
-                                }
-                            } else provider.urlTemplate
+                            val finalUrl = StreamLinksViewModel.resolveProviderUrl(
+                                providerName = provider.name,
+                                tmdbId = tmdbId,
+                                isTv = isTv,
+                                season = season,
+                                episode = episode,
+                                timestamp = timestamp
+                            ) ?: provider.urlTemplate
 
                             val intent = Intent(context, PlayerActivity::class.java).apply {
                                 putExtra("STREAM_URL", finalUrl)

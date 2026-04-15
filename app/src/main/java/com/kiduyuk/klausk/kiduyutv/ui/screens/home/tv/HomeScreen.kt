@@ -1,5 +1,6 @@
 package com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv
 
+import android.content.Intent
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -23,8 +24,11 @@ import com.kiduyuk.klausk.kiduyutv.ui.components.*
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
+import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
+import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeViewModel
 import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeUiState
+import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamLinksViewModel
 
 @Composable
 fun HomeScreen(
@@ -116,39 +120,94 @@ fun HomeScreen(
                         ?: selectedTvShow?.let { onTvShowClick(it.id) }
                 },
                 onHeroPlayClick = {
-                    // Navigate to StreamLinksScreen to choose a stream provider
                     selectedMovie?.let { movie ->
                         movie.title?.let {
-                            onNavigate(
-                                Screen.StreamLinks.createRoute(
+                            val defaultProvider = SettingsManager(context).getDefaultProvider()
+                            val directUrl = if (defaultProvider != SettingsManager.AUTO) {
+                                StreamLinksViewModel.resolveProviderUrl(
+                                    providerName = defaultProvider,
                                     tmdbId = movie.id,
                                     isTv = false,
-                                    title = it,
-                                    overview = movie.overview,
-                                    posterPath = movie.posterPath,
-                                    backdropPath = movie.backdropPath,
-                                    voteAverage = movie.voteAverage,
-                                    releaseDate = movie.releaseDate,
+                                    season = null,
+                                    episode = null,
                                     timestamp = 0L
                                 )
-                            )
+                            } else null
+
+                            if (directUrl != null) {
+                                val intent = Intent(context, PlayerActivity::class.java).apply {
+                                    putExtra("STREAM_URL", directUrl)
+                                    putExtra("TMDB_ID", movie.id)
+                                    putExtra("IS_TV", false)
+                                    putExtra("TITLE", it)
+                                    putExtra("OVERVIEW", movie.overview)
+                                    putExtra("POSTER_PATH", movie.posterPath)
+                                    putExtra("BACKDROP_PATH", movie.backdropPath)
+                                    putExtra("VOTE_AVERAGE", movie.voteAverage)
+                                    putExtra("RELEASE_DATE", movie.releaseDate)
+                                }
+                                context.startActivity(intent)
+                            } else {
+                                onNavigate(
+                                    Screen.StreamLinks.createRoute(
+                                        tmdbId = movie.id,
+                                        isTv = false,
+                                        title = it,
+                                        overview = movie.overview,
+                                        posterPath = movie.posterPath,
+                                        backdropPath = movie.backdropPath,
+                                        voteAverage = movie.voteAverage,
+                                        releaseDate = movie.releaseDate,
+                                        timestamp = 0L
+                                    )
+                                )
+                            }
                         }
                     }
                     selectedTvShow?.let { tvShow ->
                         tvShow.name?.let {
-                            onNavigate(
-                                Screen.StreamLinks.createRoute(
+                            val defaultProvider = SettingsManager(context).getDefaultProvider()
+                            val directUrl = if (defaultProvider != SettingsManager.AUTO) {
+                                StreamLinksViewModel.resolveProviderUrl(
+                                    providerName = defaultProvider,
                                     tmdbId = tvShow.id,
                                     isTv = true,
-                                    title = it,
-                                    overview = tvShow.overview,
-                                    posterPath = tvShow.posterPath,
-                                    backdropPath = tvShow.backdropPath,
-                                    voteAverage = tvShow.voteAverage,
-                                    releaseDate = tvShow.firstAirDate,
+                                    season = 1,
+                                    episode = 1,
                                     timestamp = 0L
                                 )
-                            )
+                            } else null
+
+                            if (directUrl != null) {
+                                val intent = Intent(context, PlayerActivity::class.java).apply {
+                                    putExtra("STREAM_URL", directUrl)
+                                    putExtra("TMDB_ID", tvShow.id)
+                                    putExtra("IS_TV", true)
+                                    putExtra("TITLE", it)
+                                    putExtra("OVERVIEW", tvShow.overview)
+                                    putExtra("POSTER_PATH", tvShow.posterPath)
+                                    putExtra("BACKDROP_PATH", tvShow.backdropPath)
+                                    putExtra("VOTE_AVERAGE", tvShow.voteAverage)
+                                    putExtra("RELEASE_DATE", tvShow.firstAirDate)
+                                    putExtra("SEASON_NUMBER", 1)
+                                    putExtra("EPISODE_NUMBER", 1)
+                                }
+                                context.startActivity(intent)
+                            } else {
+                                onNavigate(
+                                    Screen.StreamLinks.createRoute(
+                                        tmdbId = tvShow.id,
+                                        isTv = true,
+                                        title = it,
+                                        overview = tvShow.overview,
+                                        posterPath = tvShow.posterPath,
+                                        backdropPath = tvShow.backdropPath,
+                                        voteAverage = tvShow.voteAverage,
+                                        releaseDate = tvShow.firstAirDate,
+                                        timestamp = 0L
+                                    )
+                                )
+                            }
                         }
                     }
                 }

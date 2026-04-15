@@ -1,5 +1,6 @@
 package com.kiduyuk.klausk.kiduyutv.ui.screens.detail.mobile
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -29,9 +30,12 @@ import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.ui.components.CastRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
+import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileCategoryRow
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
+import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
+import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamLinksViewModel
 
 @Composable
 fun MobileMovieDetailScreen(
@@ -125,17 +129,44 @@ fun MobileMovieDetailScreen(
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Button(
                             onClick = {
-                                val route = Screen.MobileStreamLinks.createRoute(
-                                    tmdbId = movie.id,
-                                    isTv = false,
-                                    title = movie.title ?: "",
-                                    overview = movie.overview,
-                                    posterPath = movie.posterPath,
-                                    backdropPath = movie.backdropPath,
-                                    voteAverage = movie.voteAverage,
-                                    releaseDate = movie.releaseDate
-                                )
-                                onPlayClick(route)
+                                val defaultProvider = SettingsManager(context).getDefaultProvider()
+                                val directUrl = if (defaultProvider != SettingsManager.AUTO) {
+                                    StreamLinksViewModel.resolveProviderUrl(
+                                        providerName = defaultProvider,
+                                        tmdbId = movie.id,
+                                        isTv = false,
+                                        season = null,
+                                        episode = null,
+                                        timestamp = uiState.watchHistoryItem?.playbackPosition ?: 0L
+                                    )
+                                } else null
+
+                                if (directUrl != null) {
+                                    val intent = Intent(context, PlayerActivity::class.java).apply {
+                                        putExtra("STREAM_URL", directUrl)
+                                        putExtra("TMDB_ID", movie.id)
+                                        putExtra("IS_TV", false)
+                                        putExtra("TITLE", movie.title ?: "")
+                                        putExtra("OVERVIEW", movie.overview)
+                                        putExtra("POSTER_PATH", movie.posterPath)
+                                        putExtra("BACKDROP_PATH", movie.backdropPath)
+                                        putExtra("VOTE_AVERAGE", movie.voteAverage)
+                                        putExtra("RELEASE_DATE", movie.releaseDate)
+                                    }
+                                    context.startActivity(intent)
+                                } else {
+                                    val route = Screen.MobileStreamLinks.createRoute(
+                                        tmdbId = movie.id,
+                                        isTv = false,
+                                        title = movie.title ?: "",
+                                        overview = movie.overview,
+                                        posterPath = movie.posterPath,
+                                        backdropPath = movie.backdropPath,
+                                        voteAverage = movie.voteAverage,
+                                        releaseDate = movie.releaseDate
+                                    )
+                                    onPlayClick(route)
+                                }
                             },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = PrimaryRed),

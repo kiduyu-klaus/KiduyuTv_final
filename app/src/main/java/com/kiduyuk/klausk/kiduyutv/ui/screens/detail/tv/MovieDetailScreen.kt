@@ -37,8 +37,11 @@ import com.kiduyuk.klausk.kiduyutv.ui.components.ContentRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.MovieCard
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
+import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
+import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
+import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamLinksViewModel
 
 /**
  * Composable function for displaying the detailed information of a movie.
@@ -271,19 +274,47 @@ fun MovieDetailScreen(
                             // Play Now
                             Button(
                                 onClick = {
-                                    onPlayClick(
-                                        Screen.StreamLinks.createRoute(
+                                    val timestamp = uiState.watchHistoryItem?.playbackPosition ?: 0L
+                                    val defaultProvider = SettingsManager(context).getDefaultProvider()
+                                    val directUrl = if (defaultProvider != SettingsManager.AUTO) {
+                                        StreamLinksViewModel.resolveProviderUrl(
+                                            providerName = defaultProvider,
                                             tmdbId = movie.id,
                                             isTv = false,
-                                            title = movie.title ?: "",
-                                            overview = movie.overview,
-                                            posterPath = movie.posterPath,
-                                            backdropPath = movie.backdropPath,
-                                            voteAverage = movie.voteAverage,
-                                            releaseDate = movie.releaseDate,
-                                            timestamp = uiState.watchHistoryItem?.playbackPosition ?: 0L
+                                            season = null,
+                                            episode = null,
+                                            timestamp = timestamp
                                         )
-                                    )
+                                    } else null
+
+                                    if (directUrl != null) {
+                                        val intent = Intent(context, PlayerActivity::class.java).apply {
+                                            putExtra("STREAM_URL", directUrl)
+                                            putExtra("TMDB_ID", movie.id)
+                                            putExtra("IS_TV", false)
+                                            putExtra("TITLE", movie.title ?: "")
+                                            putExtra("OVERVIEW", movie.overview)
+                                            putExtra("POSTER_PATH", movie.posterPath)
+                                            putExtra("BACKDROP_PATH", movie.backdropPath)
+                                            putExtra("VOTE_AVERAGE", movie.voteAverage)
+                                            putExtra("RELEASE_DATE", movie.releaseDate)
+                                        }
+                                        context.startActivity(intent)
+                                    } else {
+                                        onPlayClick(
+                                            Screen.StreamLinks.createRoute(
+                                                tmdbId = movie.id,
+                                                isTv = false,
+                                                title = movie.title ?: "",
+                                                overview = movie.overview,
+                                                posterPath = movie.posterPath,
+                                                backdropPath = movie.backdropPath,
+                                                voteAverage = movie.voteAverage,
+                                                releaseDate = movie.releaseDate,
+                                                timestamp = timestamp
+                                            )
+                                        )
+                                    }
                                 },
                                 modifier = Modifier.focusRequester(playFocusRequester),
                                 interactionSource = playInteraction,

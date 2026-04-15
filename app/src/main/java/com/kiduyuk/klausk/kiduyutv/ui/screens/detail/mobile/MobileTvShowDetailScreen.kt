@@ -1,5 +1,6 @@
 package com.kiduyuk.klausk.kiduyutv.ui.screens.detail.mobile
 
+import android.content.Intent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -31,9 +32,12 @@ import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.ui.components.CastRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
+import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileCategoryRow
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
+import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
+import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamLinksViewModel
 
 @Composable
 fun MobileTvShowDetailScreen(
@@ -128,17 +132,49 @@ fun MobileTvShowDetailScreen(
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Button(
                             onClick = {
-                                val route = Screen.MobileStreamLinks.createRoute(
-                                    tmdbId = tvShow.id,
-                                    isTv = true,
-                                    title = tvShow.name ?: "",
-                                    overview = tvShow.overview,
-                                    posterPath = tvShow.posterPath,
-                                    backdropPath = tvShow.backdropPath,
-                                    voteAverage = tvShow.voteAverage,
-                                    releaseDate = tvShow.firstAirDate
-                                )
-                                onPlayClick(route)
+                                val seasonNumber = uiState.watchHistoryItem?.seasonNumber ?: 1
+                                val episodeNumber = uiState.watchHistoryItem?.episodeNumber ?: 1
+                                val timestamp = uiState.watchHistoryItem?.playbackPosition ?: 0L
+                                val defaultProvider = SettingsManager(context).getDefaultProvider()
+                                val directUrl = if (defaultProvider != SettingsManager.AUTO) {
+                                    StreamLinksViewModel.resolveProviderUrl(
+                                        providerName = defaultProvider,
+                                        tmdbId = tvShow.id,
+                                        isTv = true,
+                                        season = seasonNumber,
+                                        episode = episodeNumber,
+                                        timestamp = timestamp
+                                    )
+                                } else null
+
+                                if (directUrl != null) {
+                                    val intent = Intent(context, PlayerActivity::class.java).apply {
+                                        putExtra("STREAM_URL", directUrl)
+                                        putExtra("TMDB_ID", tvShow.id)
+                                        putExtra("IS_TV", true)
+                                        putExtra("TITLE", tvShow.name ?: "")
+                                        putExtra("OVERVIEW", tvShow.overview)
+                                        putExtra("POSTER_PATH", tvShow.posterPath)
+                                        putExtra("BACKDROP_PATH", tvShow.backdropPath)
+                                        putExtra("VOTE_AVERAGE", tvShow.voteAverage)
+                                        putExtra("RELEASE_DATE", tvShow.firstAirDate)
+                                        putExtra("SEASON_NUMBER", seasonNumber)
+                                        putExtra("EPISODE_NUMBER", episodeNumber)
+                                    }
+                                    context.startActivity(intent)
+                                } else {
+                                    val route = Screen.MobileStreamLinks.createRoute(
+                                        tmdbId = tvShow.id,
+                                        isTv = true,
+                                        title = tvShow.name ?: "",
+                                        overview = tvShow.overview,
+                                        posterPath = tvShow.posterPath,
+                                        backdropPath = tvShow.backdropPath,
+                                        voteAverage = tvShow.voteAverage,
+                                        releaseDate = tvShow.firstAirDate
+                                    )
+                                    onPlayClick(route)
+                                }
                             },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = PrimaryRed),

@@ -1,5 +1,6 @@
 package com.kiduyuk.klausk.kiduyutv.ui.screens.detail.mobile
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -27,8 +28,11 @@ import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.data.model.Episode
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
+import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
+import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
+import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamLinksViewModel
 
 /**
  * Mobile version of SeasonEpisodesScreen.
@@ -50,6 +54,7 @@ fun MobileSeasonEpisodesScreen(
     onPlayClick: (String) -> Unit,
     viewModel: DetailViewModel = viewModel()
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     var selectedSeason by remember { mutableIntStateOf(1) }
 
@@ -170,19 +175,47 @@ fun MobileSeasonEpisodesScreen(
                             episode = episode,
                             seasonNumber = selectedSeason,
                             onEpisodeClick = { season, episodeNum ->
-                                val route = Screen.StreamLinks.createRoute(
-                                    tmdbId = tvShowId,
-                                    isTv = true,
-                                    title = "$tvShowName - S${season}E${episodeNum}",
-                                    overview = episode.overview,
-                                    posterPath = episode.stillPath,
-                                    backdropPath = null,
-                                    voteAverage = episode.voteAverage,
-                                    releaseDate = episode.airDate,
-                                    season = season,
-                                    episode = episodeNum
-                                )
-                                onPlayClick(route)
+                                val defaultProvider = SettingsManager(context).getDefaultProvider()
+                                val directUrl = if (defaultProvider != SettingsManager.AUTO) {
+                                    StreamLinksViewModel.resolveProviderUrl(
+                                        providerName = defaultProvider,
+                                        tmdbId = tvShowId,
+                                        isTv = true,
+                                        season = season,
+                                        episode = episodeNum
+                                    )
+                                } else null
+
+                                if (directUrl != null) {
+                                    val intent = Intent(context, PlayerActivity::class.java).apply {
+                                        putExtra("STREAM_URL", directUrl)
+                                        putExtra("TMDB_ID", tvShowId)
+                                        putExtra("IS_TV", true)
+                                        putExtra("TITLE", "$tvShowName - S${season}E${episodeNum}")
+                                        putExtra("OVERVIEW", episode.overview)
+                                        putExtra("POSTER_PATH", episode.stillPath)
+                                        putExtra("BACKDROP_PATH", null as String?)
+                                        putExtra("VOTE_AVERAGE", episode.voteAverage ?: 0.0)
+                                        putExtra("RELEASE_DATE", episode.airDate)
+                                        putExtra("SEASON_NUMBER", season)
+                                        putExtra("EPISODE_NUMBER", episodeNum)
+                                    }
+                                    context.startActivity(intent)
+                                } else {
+                                    val route = Screen.MobileStreamLinks.createRoute(
+                                        tmdbId = tvShowId,
+                                        isTv = true,
+                                        title = "$tvShowName - S${season}E${episodeNum}",
+                                        overview = episode.overview,
+                                        posterPath = episode.stillPath,
+                                        backdropPath = null,
+                                        voteAverage = episode.voteAverage,
+                                        releaseDate = episode.airDate,
+                                        season = season,
+                                        episode = episodeNum
+                                    )
+                                    onPlayClick(route)
+                                }
                             }
                         )
                         Spacer(modifier = Modifier.height(12.dp))

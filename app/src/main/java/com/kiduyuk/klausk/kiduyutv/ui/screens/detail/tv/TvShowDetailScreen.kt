@@ -36,8 +36,11 @@ import com.kiduyuk.klausk.kiduyutv.ui.components.ContentRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.TvShowCard
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
+import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
+import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
+import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamLinksViewModel
 
 /**
  * Composable function for displaying the detailed information of a TV show.
@@ -284,21 +287,53 @@ fun TvShowDetailScreen(
                             // Play Now
                             Button(
                                 onClick = {
-                                    onPlayClick(
-                                        Screen.StreamLinks.createRoute(
+                                    val seasonNumber = uiState.watchHistoryItem?.seasonNumber ?: 1
+                                    val episodeNumber = uiState.watchHistoryItem?.episodeNumber ?: 1
+                                    val timestamp = uiState.watchHistoryItem?.playbackPosition ?: 0L
+                                    val defaultProvider = SettingsManager(context).getDefaultProvider()
+                                    val directUrl = if (defaultProvider != SettingsManager.AUTO) {
+                                        StreamLinksViewModel.resolveProviderUrl(
+                                            providerName = defaultProvider,
                                             tmdbId = tvShow.id,
                                             isTv = true,
-                                            title = tvShow.name ?: "",
-                                            overview = tvShow.overview,
-                                            posterPath = tvShow.posterPath,
-                                            backdropPath = tvShow.backdropPath,
-                                            voteAverage = tvShow.voteAverage,
-                                            releaseDate = tvShow.firstAirDate,
-                                            season = uiState.watchHistoryItem?.seasonNumber ?: 1,
-                                            episode = uiState.watchHistoryItem?.episodeNumber ?: 1,
-                                            timestamp = uiState.watchHistoryItem?.playbackPosition ?: 0L
+                                            season = seasonNumber,
+                                            episode = episodeNumber,
+                                            timestamp = timestamp
                                         )
-                                    )
+                                    } else null
+
+                                    if (directUrl != null) {
+                                        val intent = Intent(context, PlayerActivity::class.java).apply {
+                                            putExtra("STREAM_URL", directUrl)
+                                            putExtra("TMDB_ID", tvShow.id)
+                                            putExtra("IS_TV", true)
+                                            putExtra("TITLE", tvShow.name ?: "")
+                                            putExtra("OVERVIEW", tvShow.overview)
+                                            putExtra("POSTER_PATH", tvShow.posterPath)
+                                            putExtra("BACKDROP_PATH", tvShow.backdropPath)
+                                            putExtra("VOTE_AVERAGE", tvShow.voteAverage)
+                                            putExtra("RELEASE_DATE", tvShow.firstAirDate)
+                                            putExtra("SEASON_NUMBER", seasonNumber)
+                                            putExtra("EPISODE_NUMBER", episodeNumber)
+                                        }
+                                        context.startActivity(intent)
+                                    } else {
+                                        onPlayClick(
+                                            Screen.StreamLinks.createRoute(
+                                                tmdbId = tvShow.id,
+                                                isTv = true,
+                                                title = tvShow.name ?: "",
+                                                overview = tvShow.overview,
+                                                posterPath = tvShow.posterPath,
+                                                backdropPath = tvShow.backdropPath,
+                                                voteAverage = tvShow.voteAverage,
+                                                releaseDate = tvShow.firstAirDate,
+                                                season = seasonNumber,
+                                                episode = episodeNumber,
+                                                timestamp = timestamp
+                                            )
+                                        )
+                                    }
                                 },
                                 modifier = Modifier.focusRequester(playFocusRequester),
                                 interactionSource = playInteraction,
