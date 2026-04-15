@@ -179,31 +179,6 @@ fun MobileMovieDetailScreen(
                             Text("Play Now")
                         }
 
-                        // Watch Trailer Button
-                        if (uiState.trailerKey != null) {
-                            OutlinedButton(
-                                onClick = {
-                                    val intent = Intent(context, YouTubePlayerActivity::class.java).apply {
-                                        putExtra("VIDEO_ID", uiState.trailerKey)
-                                        putExtra("TITLE", movie.title ?: "")
-                                    }
-                                    context.startActivity(intent)
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
-                                shape = RoundedCornerShape(8.dp),
-                                border = BorderStroke(1.dp, TextSecondary)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Star,
-                                    contentDescription = null,
-                                    tint = PrimaryRed
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Trailer")
-                            }
-                        }
-
                         Button(
                             onClick = { viewModel.toggleMyList(context) },
                             modifier = Modifier.weight(1f),
@@ -222,6 +197,32 @@ fun MobileMovieDetailScreen(
                                 if (uiState.isInMyList) "In My List" else "Add to My List",
                                 color = if (uiState.isInMyList) PrimaryRed else Color.White
                             )
+                        }
+                    }
+
+                    // Watch Trailer Button below the primary buttons
+                    if (uiState.trailerKey != null) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedButton(
+                            onClick = {
+                                val intent = Intent(context, YouTubePlayerActivity::class.java).apply {
+                                    putExtra("VIDEO_ID", uiState.trailerKey)
+                                    putExtra("TITLE", movie.title ?: "")
+                                }
+                                context.startActivity(intent)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, TextSecondary)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = null,
+                                tint = PrimaryRed
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Watch Trailer")
                         }
                     }
 

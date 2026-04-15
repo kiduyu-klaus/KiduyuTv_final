@@ -38,6 +38,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.MovieCard
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
+import com.kiduyuk.klausk.kiduyutv.ui.player.youtube.YouTubePlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
@@ -333,10 +334,10 @@ fun MovieDetailScreen(
                             if (uiState.trailerKey != null) {
                                 Button(
                                     onClick = {
-                                        val intent = Intent(
-                                            Intent.ACTION_VIEW,
-                                            Uri.parse("https://www.youtube.com/watch?v=${uiState.trailerKey}")
-                                        )
+                                        val intent = Intent(context, YouTubePlayerActivity::class.java).apply {
+                                            putExtra("VIDEO_ID", uiState.trailerKey)
+                                            putExtra("TITLE", movie.title ?: "")
+                                        }
                                         context.startActivity(intent)
                                     },
                                     interactionSource = trailerInteraction,
