@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KiduyuTV — Changelog</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #080b13;
+      --surface:   rgba(15, 20, 38, 0.94);
+      --surface2:  rgba(20, 28, 55, 0.96);
+      --border:    rgba(255, 255, 255, 0.08);
+      --accent:    #70c4ff;
+      --accent2:   #9a84ff;
+      --green:     #5eead4;
+      --amber:     #fbbf24;
+      --red:       #fb7185;
+      --text:      #eef2ff;
+      --muted:     #94a3b8;
+      --code-bg:   rgba(15, 20, 38, 0.84);
+      --radius:    18px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: radial-gradient(circle at top, rgba(112, 196, 255, 0.14), transparent 30%),
+                  radial-gradient(circle at 20% 20%, rgba(154, 132, 255, 0.18), transparent 22%),
+                  linear-gradient(180deg, #05070f 0%, #080b13 100%);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.75;
+      min-height: 100vh;
+    }
+
+    /* ── Noise grain overlay ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+      opacity: 0.025;
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* ── Header ── */
+    header {
+      position: relative;
+      padding: 72px 0 56px;
+      text-align: center;
+      overflow: hidden;
+    }
+
+    header::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 50% 0%, rgba(112, 196, 255, 0.14), transparent 25%),
+                  radial-gradient(circle at 20% 10%, rgba(154, 132, 255, 0.12), transparent 14%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .logo-ring {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.06);
+      backdrop-filter: blur(10px);
+      box-shadow: inset 0 0 0 1px rgba(112, 196, 255, 0.18);
+      margin-bottom: 20px;
+      font-size: 28px;
+      z-index: 1;
+    }
+
+    h1 {
+      font-family: 'Inter', sans-serif;
+      font-size: clamp(2.2rem, 5vw, 3.4rem);
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      color: #f8fafc;
+      margin-bottom: 12px;
+      z-index: 1;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      margin-top: 8px;
+      z-index: 1;
+    }
+
+    /* ── Layout ── */
+    .container {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 0 24px 100px;
+    }
+
+    /* ── Timeline spine ── */
+    .timeline {
+      position: relative;
+      padding-left: 32px;
+    }
+
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 6px; top: 8px; bottom: 0;
+      width: 2px;
+      background: linear-gradient(to bottom, var(--accent), var(--accent2), transparent);
+      border-radius: 2px;
+    }
+
+    /* ── Release card ── */
+    .release {
+      position: relative;
+      margin-bottom: 48px;
+      opacity: 0;
+      transform: translateY(20px);
+      animation: fadeUp 0.5s ease forwards;
+    }
+
+    .release:nth-child(1)  { animation-delay: 0.05s; }
+    .release:nth-child(2)  { animation-delay: 0.15s; }
+    .release:nth-child(3)  { animation-delay: 0.25s; }
+    .release:nth-child(4)  { animation-delay: 0.35s; }
+    .release:nth-child(5)  { animation-delay: 0.45s; }
+    .release:nth-child(6)  { animation-delay: 0.55s; }
+    .release:nth-child(n+7) { animation-delay: 0.65s; }
+
+    @keyframes fadeUp {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Dot on the spine */
+    .release::before {
+      content: '';
+      position: absolute;
+      left: -29px; top: 18px;
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 2px solid var(--bg);
+      box-shadow: 0 0 12px var(--accent);
+    }
+
+    .release-inner {
+      background: rgba(15, 20, 38, 0.92);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: calc(var(--radius) + 4px);
+      overflow: hidden;
+      transition: transform 0.28s ease, border-color 0.2s, box-shadow 0.2s;
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(10px);
+    }
+
+    .release-inner:hover {
+      transform: translateY(-2px);
+      border-color: rgba(112, 196, 255, 0.22);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.32);
+    }
+
+    /* Card header */
+    .release-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 24px 28px;
+      background: rgba(14, 19, 34, 0.96);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      flex-wrap: wrap;
+    }
+
+    .version-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--accent);
+      background: rgba(112, 196, 255, 0.1);
+      border: 1px solid rgba(112, 196, 255, 0.18);
+      border-radius: 8px;
+      padding: 6px 12px;
+    }
+
+    .release-name {
+      font-weight: 700;
+      font-size: 1.05rem;
+      color: var(--text);
+      flex: 1;
+    }
+
+    .release-date {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    /* Badge */
+    .badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+    .badge.stable { background: rgba(94, 234, 212, 0.16); color: var(--green); border: 1px solid rgba(94, 234, 212, 0.24); }
+    .badge.pre     { background: rgba(251, 191, 36, 0.16); color: var(--amber); border: 1px solid rgba(251, 191, 36, 0.24); }
+    .badge.draft   { background: rgba(251, 113, 133, 0.16); color: var(--red);   border: 1px solid rgba(251, 113, 133, 0.24); }
+
+    /* GitHub link */
+    .gh-link {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-decoration: none;
+      padding: 6px 12px;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 999px;
+      transition: color 0.2s, border-color 0.2s, background-color 0.2s;
+      white-space: nowrap;
+    }
+    .gh-link:hover { color: var(--accent); border-color: rgba(112, 196, 255, 0.3); background: rgba(112, 196, 255, 0.06); }
+
+    /* Card body */
+    .release-body {
+      padding: 24px;
+    }
+
+    .release-body h2 {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 24px 0 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .release-body h2:first-child { margin-top: 0; }
+    .release-body h2::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .release-body h3 {
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--text);
+      margin: 16px 0 6px;
+    }
+
+    .release-body ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .release-body li {
+      position: relative;
+      padding: 5px 0 5px 20px;
+      color: #94a3b8;
+      font-size: 0.9rem;
+    }
+
+    .release-body li::before {
+      content: '›';
+      position: absolute;
+      left: 4px;
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .release-body p {
+      color: #94a3b8;
+      font-size: 0.9rem;
+      margin: 6px 0;
+    }
+
+    .release-body strong { color: var(--text); }
+
+    .release-body code {
+      font-family: 'Space Mono', monospace;
+      font-size: 0.78rem;
+      background: var(--code-bg);
+      color: #93c5fd;
+      padding: 1px 6px;
+      border-radius: 4px;
+      border: 1px solid #1e2435;
+    }
+
+    /* Empty state */
+    .empty {
+      text-align: center;
+      padding: 60px 0;
+      color: var(--muted);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.8rem;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 40px 0;
+      color: var(--muted);
+      font-family: 'Space Mono', monospace;
+      font-size: 0.7rem;
+      border-top: 1px solid var(--border);
+    }
+
+    footer a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo-ring">📺</div>
+  <h1>KiduyuTV Changelog</h1>
+  <p class="subtitle">Release History — Newest to Oldest</p>
+</header>
+
+<div class="container">
+  <div class="timeline">
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.107</span>
+          <span class="release-name">Enhance release notes display in SettingsScreen and UpdateUtil for better user experience — v1.1.107</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 15, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.107" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>Enhance release notes display in SettingsScreen and UpdateUtil for better user experience</p>
+          <p>Key changes:</p>
+          <ul>
+            <li>Wrapped release notes in a scrollable Box in SettingsScreen to improve visibility and accessibility.</li>
+            <li>Updated UpdateUtil to refine the parsing logic for release notes, ensuring only relevant sections are included in the display.</li>
+          </ul>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.106</span>
+          <span class="release-name">Add 'What's New' dialog to MobileSettingsScreen for enhanced user feedback on updates — v1.1.106</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 15, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.106" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>Add 'What's New' dialog to MobileSettingsScreen for enhanced user feedback on updates</p>
+          <p>Key changes:</p>
+          <ul>
+            <li>Introduced a dialog that displays release notes and title when the 'What's New' item is clicked.</li>
+            <li>Added state management for showing and dismissing the dialog.</li>
+            <li>Improved user experience by providing clear information on the latest updates.</li>
+          </ul>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.105</span>
+          <span class="release-name">Enhance MobileMediaListScreen and SettingsScreen with improved UI state management and release notes display. — v1.1.105</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 15, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.105" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>Enhance MobileMediaListScreen and SettingsScreen with improved UI state management and release notes display.</p>
+          <p>Key changes:</p>
+          <ul>
+            <li><strong>MobileMediaListScreen</strong>: Added comments for clarity on UI state observation, scroll position tracking, and infinite-scroll pagination.</li>
+            <li><strong>SettingsScreen</strong>: Updated to fetch and display release title and formatted release notes, improving user feedback on updates.</li>
+            <li><strong>UpdateUtil</strong>: Introduced methods to build annotated strings for release notes and fetch the latest release information.</li>
+            <li><strong>SettingsViewModel</strong>: Modified to handle fetching of release notes alongside the release title, updating the UI state accordingly.</li>
+          </ul>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.104</span>
+          <span class="release-name">Organize screen components into platform-specific packages and refactor navigation to support separate TV and mobile UI flows. — v1.1.104</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 15, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.104" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>Organize screen components into platform-specific packages and refactor navigation to support separate TV and mobile UI flows.</p>
+          <p>Key changes:</p>
+          <ul>
+            <li><strong>Package Reorganization</strong>:</li>
+          </ul>
+          <p>- Relocated TV-specific screens (Home, Movies, TvShows, Search, Settings, Detail, Cast) into new <code>.tv</code> subpackages.</p>
+          <p>- Relocated mobile-specific screens and components into new <code>.mobile</code> subpackages.</p>
+          <p>- Moved mobile UI components like <code>MobileBottomNavigation</code>, <code>MobileMovieCard</code>, and <code>MobileMediaCards</code> to <code>ui.components.mobile</code>.</p>
+          <ul>
+            <li><strong>Navigation Updates</strong>:</li>
+          </ul>
+          <p>- Updated <code>NavGraph.kt</code> and <code>MobileNavGraph.kt</code> to use the new package structures for both TV and mobile destinations.</p>
+          <p>- Refactored <code>MobileNavGraph</code> to improve code readability by standardizing route creation and parameter encoding for movie/TV details and cast views.</p>
+          <p>- Integrated <code>PlayerActivity</code> and mobile-specific detail screens directly into the mobile navigation flow.</p>
+          <ul>
+            <li><strong>Code Refactoring & Cleanup</strong>:</li>
+          </ul>
+          <p>- Standardized imports across multiple files, replacing fully qualified names (e.g., <code>androidx.compose.ui.platform.LocalContext</code>) with simple imports.</p>
+          <p>- Fixed missing imports for <code>Context</code>, <code>URLEncoder</code>, and <code>BorderStroke</code> in mobile screen implementations.</p>
+          <p>- Updated <code>MobileSettingsScreen</code> to use the <code>BuildConfig</code> import for version naming.</p>
+          <p>- Cleaned up unused imports and redundant modifiers (like <code>focusable</code> and <code>graphicsLayer</code>) in several UI components.</p>
+          <ul>
+            <li><strong>View Model Integration</strong>:</li>
+          </ul>
+          <p>- Updated <code>StreamLinksViewModel</code> and <code>MobileCastDetailViewModel</code> to reflect changes in screen locations and state management.</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.102</span>
+          <span class="release-name">Add Christian TV Shows section to UI — v1.1.102</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 15, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.102" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>Add Christian TV Shows section to UI</p>
+          <p>Enhance the MobileTvShowsScreen and TvShowsScreen to display a new section for Christian TV Shows, including a header and a horizontal list of TV show cards. Update the SeeAllScreen to support navigation for Christian TV Shows. Extend HomeUiState and HomeViewModel to fetch and manage Christian TV Shows data from a JSON source, ensuring proper sorting and state management.</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.101</span>
+          <span class="release-name">Add Christian and Bible movie sections — v1.1.101</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 15, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.101" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>Add Christian and Bible movie sections</p>
+          <p>Introduce curated Christian and Movies-from-the-Bible lists: add JSON lists (lists/christian_movies.json, lists/movies_from_the_bible.json), extend HomeUiState with christianMovies and bibleMovies, and fetch them in HomeViewModel (parallel async GitHub raw requests, sort by voteAverage, update UI state). Wire the new lists into UI: MobileMoviesScreen shows LazyRow sections with MobileSectionHeader and MobileMovieCard (see-all navigation to see_all/christian_movies and see_all/bible_movies), and MoviesScreen adds ContentRow sections using MovieCard and focus/selection handlers.</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.103</span>
+          <span class="release-name">Fix: update splash activity — v1.1.103</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 15, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.103" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>Fix: update splash activity</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.100</span>
+          <span class="release-name">Remove focus scaling effect from cards in StreamLinksScreen — v1.1.100</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 13, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.100" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>Remove focus scaling effect from cards in StreamLinksScreen</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.99</span>
+          <span class="release-name">Update StreamLinksScreen to correctly launch PlayerActivity with all required extras — v1.1.99</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 13, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.99" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>Update StreamLinksScreen to correctly launch PlayerActivity with all required extras</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.98</span>
+          <span class="release-name">feat(ui): redesign StreamLinksScreen with Android TV layout — v1.1.98</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 13, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.98" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>feat(ui): redesign StreamLinksScreen with Android TV layout</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.97</span>
+          <span class="release-name">Last Sync: 2026-04-13 04:33 (Mobile) — v1.1.97</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 13, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.97" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>Last Sync: 2026-04-13 04:33 (Mobile)</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.96</span>
+          <span class="release-name">Update StreamLinksViewModel: enable first 3 + fourth + sixth providers — v1.1.96</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 13, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.96" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>Update StreamLinksViewModel: enable first 3 + fourth + sixth providers</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.95</span>
+          <span class="release-name">Fix: fix focus — v1.1.95</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 13, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.95" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>Fix: fix focus</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.94</span>
+          <span class="release-name">fix: resolve compilation errors, enhance UI, fix D-pad navigation, add APK cleanup — v1.1.94</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 12, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.94" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>fix: resolve compilation errors, enhance UI, fix D-pad navigation, add APK cleanup</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.93</span>
+          <span class="release-name">feat: fix compilation errors and enhance UI with auto-restart on update — v1.1.93</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 12, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.93" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>feat: fix compilation errors and enhance UI with auto-restart on update</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.92</span>
+          <span class="release-name">Fix: fix issues in settings screen — v1.1.92</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 12, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.92" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>Fix: fix issues in settings screen</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.91</span>
+          <span class="release-name">fix: make stream provider cards focusable with focus color highlight — v1.1.91</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 12, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.91" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>fix: make stream provider cards focusable with focus color highlight</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.90</span>
+          <span class="release-name">feat: redesign StreamLinksScreen with 2-column grid layout and add new stream providers — v1.1.90</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 12, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.90" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>feat: redesign StreamLinksScreen with 2-column grid layout and add new stream providers</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.89</span>
+          <span class="release-name">Update the splash screen UI by swapping the application icon and adjusting layout spacing. — v1.1.89</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 12, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.89" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>Update the splash screen UI by swapping the application icon and adjusting layout spacing.</p>
+          <p>Key changes:</p>
+          <ul>
+            <li><strong>UI Adjustments</strong>:</li>
+          </ul>
+          <p>- Updated the app icon resource in <code>SplashActivity</code> from <code>ic_launcher1</code> to <code>ic_launcher11</code>.</p>
+          <p>- Reduced the vertical spacing between the app icon and the "KiduyuTV" wordmark from <code>28.dp</code> to <code>10.dp</code>.</p>
+          <p>- Reduced the vertical spacing between the wordmark and the Lottie animation indicator from <code>40.dp</code> to <code>10.dp</code>.</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.88</span>
+          <span class="release-name">Update stream provider configurations and refine the WebView-based video player to improve playback tracking and stability. — v1.1.88</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 12, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.88" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>Update stream provider configurations and refine the WebView-based video player to improve playback tracking and stability.</p>
+          <p>Key changes:</p>
+          <ul>
+            <li><strong>Stream Provider Updates</strong>:</li>
+          </ul>
+          <p>- Updated the <code>VidSrc</code> provider URL to a new endpoint (<code>vidsrc-embed.ru</code>) and added <code>autoplay</code>/<code>autonext</code> parameters for both movies and TV shows.</p>
+          <ul>
+            <li><strong>Player Progress Tracking</strong>:</li>
+          </ul>
+          <p>- Refactored the injected JavaScript in <code>PlayerActivity</code> to use a <code>MutationObserver</code> for more reliable detection of video elements.</p>
+          <p>- Enhanced the JavaScript-to-Native bridge to better extract content metadata (ID, type, season, episode) directly from the URL.</p>
+          <p>- Implemented <code>enforceVolume</code> logic in the player to ensure video is unmuted and set to maximum volume.</p>
+          <p>- Improved the reliability of the 15-second synchronization loop by leveraging cached data from the JavaScript interface.</p>
+          <ul>
+            <li><strong>Code Quality & Formatting</strong>:</li>
+          </ul>
+          <p>- Standardized code formatting and logging alignment across <code>PlayerActivity</code>.</p>
+          <p>- Simplified several conditional expressions for determining season and episode information during progress saves.</p>
+          <p>- Cleaned up redundant JavaScript calls and optimized the ad-blocking and redirect-blocking scripts.</p>
+          <ul>
+            <li><strong>Bug Fixes</strong>:</li>
+          </ul>
+          <p>- Fixed an issue where the <code>VidKing</code> provider detection logic was missing specific URL patterns.</p>
+          <p>- Ensured consistent saving of final playback positions for both movies and TV shows when the activity is destroyed.</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.87</span>
+          <span class="release-name">fix: see all screens showing no content — v1.1.87</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 12, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.87" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>fix: see all screens showing no content</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.86</span>
+          <span class="release-name">fix: see all screens showing no content — v1.1.86</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 12, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.86" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>fix: see all screens showing no content</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.85</span>
+          <span class="release-name">feat: default provider setting, splash redesign, APK cache validation — v1.1.85</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 12, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.85" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>feat: default provider setting, splash redesign, APK cache validation</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.84</span>
+          <span class="release-name">Add the option to set a default provider in settings — v1.1.84</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 12, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.84" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>Add the option to set a default provider in settings</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.83</span>
+          <span class="release-name">Automate GitHub release title fetching in Settings using OkHttpClient — v1.1.83</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 12, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.83" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>Automate GitHub release title fetching in Settings using OkHttpClient</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.82</span>
+          <span class="release-name">Update SettingsScreen with latest release title and prioritize Videasy provider — v1.1.82</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 12, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.82" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>Update SettingsScreen with latest release title and prioritize Videasy provider</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.81</span>
+          <span class="release-name">SplashActivity: Check for existing APK before downloading to avoid redundancy — v1.1.81</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 12, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.81" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>SplashActivity: Check for existing APK before downloading to avoid redundancy</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.80</span>
+          <span class="release-name">Refactor SplashActivity.kt: remove redundant isFireTv() and unify device detection via UpdateUtil — v1.1.80</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 12, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.80" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>Refactor SplashActivity.kt: remove redundant isFireTv() and unify device detection via UpdateUtil</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.79</span>
+          <span class="release-name">Final fixes for SplashActivity function call and MobileMoviesScreen missing import — v1.1.79</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 12, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.79" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>Final fixes for SplashActivity function call and MobileMoviesScreen missing import</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-inner">
+        <div class="release-header">
+          <span class="version-tag">v1.1.78</span>
+          <span class="release-name">Update list — v1.1.78</span>
+          <span class="badge stable">Stable</span>
+          <span class="release-date">April 12, 2026</span>
+          <a class="gh-link" href="https://github.com/kiduyu-klaus/KiduyuTv_final/releases/tag/v1.1.78" target="_blank">↗ View on GitHub</a>
+        </div>
+        <div class="release-body">
+          <p><strong>Branch:</strong> <code>main</code></p>
+          <p>---</p>
+          <p>Update list</p>
+          <p>---</p>
+        </div>
+      </div>
+    </article>
+
+  </div>
+</div>
+
+<footer>
+  Generated April 15, 2026 at 23:04 UTC &nbsp;·&nbsp;
+  <a href="https://github.com/kiduyu-klaus/KiduyuTv_final" target="_blank">github.com/kiduyu-klaus/KiduyuTv_final</a>
+  &nbsp;·&nbsp; © 2026 Kiduyu Klaus
+</footer>
+
+</body>
+</html>
