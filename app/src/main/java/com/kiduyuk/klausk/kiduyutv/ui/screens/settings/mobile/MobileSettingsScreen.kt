@@ -43,6 +43,7 @@ fun MobileSettingsScreen(
     val scrollState = rememberScrollState()
     val myList by MyListManager.myList.collectAsState()
     var showProviderPicker by remember { mutableStateOf(false) }
+    var showWhatsNewDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.loadSettingsData(context)
@@ -180,7 +181,7 @@ fun MobileSettingsScreen(
                         icon = Icons.Default.NewReleases,
                         title = "What's New",
                         subtitle = uiState.releaseTitle!!,
-                        onClick = { /* Already displayed */ }
+                        onClick = { showWhatsNewDialog = true }
                     )
                 }
                 SettingsItem(
@@ -284,6 +285,49 @@ fun MobileSettingsScreen(
             confirmButton = {
                 TextButton(onClick = { showProviderPicker = false }) {
                     Text("Done", color = PrimaryRed)
+                }
+            }
+        )
+    }
+
+    // ── What's New Dialog ──────────────────────────────────────────────────────
+    if (showWhatsNewDialog) {
+        AlertDialog(
+            onDismissRequest = { showWhatsNewDialog = false },
+            containerColor = CardDark,
+            title = {
+                Text(
+                    text = uiState.releaseTitle ?: "What's New",
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 380.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    if (uiState.releaseNotes != null) {
+                        Text(
+                            text = uiState.releaseNotes!!,
+                            color = TextSecondary,
+                            fontSize = 14.sp,
+                            lineHeight = 22.sp
+                        )
+                    } else {
+                        Text(
+                            text = "Loading release notes...",
+                            color = TextSecondary,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showWhatsNewDialog = false }) {
+                    Text("Close", color = PrimaryRed)
                 }
             }
         )
