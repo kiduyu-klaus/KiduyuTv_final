@@ -32,6 +32,8 @@ data class HomeUiState(
     val oscarWinners2026: List<Movie> = emptyList(),
     val hallmarkMovies: List<Movie> = emptyList(),
     val trueStoryMovies: List<Movie> = emptyList(),
+    val christianMovies: List<Movie> = emptyList(),
+    val bibleMovies: List<Movie> = emptyList(),
     val bestSitcoms: List<TvShow> = emptyList(),
     val bestClassics: List<Movie> = emptyList(),
     val spyMovies: List<Movie> = emptyList(),
@@ -211,6 +213,12 @@ class HomeViewModel : ViewModel() {
                     val timeTravelMoviesDeferred = async {
                         repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/time_travel_movies.json").getOrNull() ?: emptyList()
                     }
+                    val christianMoviesDeferred = async {
+                        repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/christian_movies.json").getOrNull() ?: emptyList()
+                    }
+                    val bibleMoviesDeferred = async {
+                        repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/movies_from_the_bible.json").getOrNull() ?: emptyList()
+                    }
 
 
                     // Await all results in parallel
@@ -222,6 +230,8 @@ class HomeViewModel : ViewModel() {
                     val spyMovies = spyMoviesDeferred.await()
                     val stathamMovies = stathamMoviesDeferred.await()
                     val timeTravelMovies = timeTravelMoviesDeferred.await()
+                    val christianMovies = christianMoviesDeferred.await()
+                    val bibleMovies = bibleMoviesDeferred.await()
                     val companiesNetworks = companiesNetworksDeferred.await()
 
                     // Process networks and companies
@@ -244,6 +254,8 @@ class HomeViewModel : ViewModel() {
                     val sortedSpyMovies = spyMovies.sortedByDescending { it.voteAverage }
                     val sortedStathamMovies = stathamMovies.sortedByDescending { it.voteAverage }
                     val sortedTimeTravel = timeTravelMovies.sortedByDescending { it.voteAverage }
+                    val sortedChristianMovies = christianMovies.sortedByDescending { it.voteAverage }
+                    val sortedBibleMovies = bibleMovies.sortedByDescending { it.voteAverage }
 
                     // Update UI with all secondary content at once
                     _uiState.value = _uiState.value.copy(
@@ -255,6 +267,8 @@ class HomeViewModel : ViewModel() {
                         spyMovies = sortedSpyMovies,
                         stathamMovies = sortedStathamMovies,
                         timeTravelMovies = sortedTimeTravel,
+                        christianMovies = sortedChristianMovies,
+                        bibleMovies = sortedBibleMovies,
                         popularNetworks = networks,
                         popularCompanies = companies
                     )

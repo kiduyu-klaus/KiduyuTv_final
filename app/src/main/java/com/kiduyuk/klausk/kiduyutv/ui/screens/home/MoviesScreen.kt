@@ -313,6 +313,38 @@ fun MoviesScreen(
                         }
                     }
 
+                    // Content Row for Christian Movies
+                    if (uiState.christianMovies.isNotEmpty()) {
+                        ContentRow(
+                            title = "Christian Movies",
+                            items = uiState.christianMovies,
+                            onItemFocus = { movie -> viewModel.onItemSelected(movie) },
+                            onItemClick = { movie -> onMovieClick(movie.id) }
+                        ) { movie, isFocused, onClick ->
+                            MovieCard(
+                                movie = movie,
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
+                        }
+                    }
+
+                    // Content Row for Movies from the Bible
+                    if (uiState.bibleMovies.isNotEmpty()) {
+                        ContentRow(
+                            title = "Movies from the Bible",
+                            items = uiState.bibleMovies,
+                            onItemFocus = { movie -> viewModel.onItemSelected(movie) },
+                            onItemClick = { movie -> onMovieClick(movie.id) }
+                        ) { movie, isFocused, onClick ->
+                            MovieCard(
+                                movie = movie,
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(15.dp))
                 }
             }

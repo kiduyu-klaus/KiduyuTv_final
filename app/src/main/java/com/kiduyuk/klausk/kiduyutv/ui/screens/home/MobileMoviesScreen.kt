@@ -246,6 +246,42 @@ fun MobileMoviesScreen(
                         }
                     }
 
+                    // Christian Movies
+                    if (uiState.christianMovies.isNotEmpty()) {
+                        item {
+                            MobileSectionHeader(
+                                title = "Christian Movies",
+                                onSeeAllClick = { navController.navigate("see_all/christian_movies") }
+                            )
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                items(uiState.christianMovies) { movie ->
+                                    MobileMovieCard(movie = movie, onClick = { onMovieClick(movie.id) })
+                                }
+                            }
+                        }
+                    }
+
+                    // Movies from the Bible
+                    if (uiState.bibleMovies.isNotEmpty()) {
+                        item {
+                            MobileSectionHeader(
+                                title = "Movies from the Bible",
+                                onSeeAllClick = { navController.navigate("see_all/bible_movies") }
+                            )
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                items(uiState.bibleMovies) { movie ->
+                                    MobileMovieCard(movie = movie, onClick = { onMovieClick(movie.id) })
+                                }
+                            }
+                        }
+                    }
+
                     // Top Rated / Box Office
                     if (uiState.latestMovies.isNotEmpty()) {
                         item {
