@@ -719,9 +719,22 @@ object UpdateUtil {
     fun buildReleaseAnnotatedString(body: String): AnnotatedString {
         return buildAnnotatedString {
             val lines = body.lines()
+            var reachedDownloadsSection = false
+            var reachedKeyChangesSection = false
     
             lines.forEach { rawLine ->
                 val line = rawLine.trim()
+
+                if (line.startsWith("Key changes", ignoreCase = true)) {
+                    reachedKeyChangesSection = true
+                }
+                if (!reachedKeyChangesSection) return@forEach
+
+                // Ignore everything from "### Downloads" onward.
+                if (line.startsWith("### Downloads", ignoreCase = true)) {
+                    reachedDownloadsSection = true
+                }
+                if (reachedDownloadsSection) return@forEach
     
                 when {
                     // 🔥 Main section header
@@ -754,7 +767,7 @@ object UpdateUtil {
                     // 📌 Nested bullet points
                     line.startsWith("-") -> {
                         val content = line.removePrefix("-").trim()
-                        append("    • $content\n")
+                        append("• $content\n")
                     }
     
                     // Divider

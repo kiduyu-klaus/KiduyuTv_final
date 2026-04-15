@@ -669,12 +669,19 @@ private fun AppVersionContent(
                 }
 
                 if (releaseNotes != null) {
-                    Text(
-                        text = releaseNotes,
-                        color = TextSecondary,
-                        fontSize = 14.sp,
-                        lineHeight = 22.sp
-                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 320.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        Text(
+                            text = releaseNotes,
+                            color = TextSecondary,
+                            fontSize = 14.sp,
+                            lineHeight = 22.sp
+                        )
+                    }
                 } else {
                     Text(
                         text = "Loading release notes...",
