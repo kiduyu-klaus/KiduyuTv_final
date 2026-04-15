@@ -1,5 +1,6 @@
 package com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -223,7 +224,10 @@ fun SeasonEpisodesScreen(
                                         } else null
 
                                         if (directUrl != null) {
-                                            val intent = Intent(context, PlayerActivity::class.java).apply {
+                                            val intent = Intent(
+                                                context,
+                                                PlayerActivity::class.java
+                                            ).apply {
                                                 putExtra("STREAM_URL", directUrl)
                                                 putExtra("TMDB_ID", tvShowId)
                                                 putExtra("IS_TV", true)
