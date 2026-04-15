@@ -4,7 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.StreamProvider
+import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.StreamProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

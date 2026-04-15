@@ -1,5 +1,6 @@
 package com.kiduyuk.klausk.kiduyutv.ui.navigation
 
+import android.content.Intent
 import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.compose.runtime.Composable
@@ -9,10 +10,25 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.*
-import com.kiduyuk.klausk.kiduyutv.ui.screens.home.*
-import com.kiduyuk.klausk.kiduyutv.ui.screens.search.MobileSearchScreen
-import com.kiduyuk.klausk.kiduyutv.ui.screens.settings.MobileSettingsScreen
+import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
+import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.mobile.MobileCastDetailScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.CastDetailScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.company_network_list.mobile.MobileMediaListScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.mobile.MobileMovieDetailScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.mobile.MobileSeasonEpisodesScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.mobile.MobileStreamLinksScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.mobile.MobileTvShowDetailScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.SeasonEpisodesScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.StreamLinksScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileGenreContentScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileGenresScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileHomeScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileMoviesScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileMyListScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileTvShowsScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.SeeAllScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.search.mobile.MobileSearchScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.settings.mobile.MobileSettingsScreen
 
 @androidx.media3.common.util.UnstableApi
 @OptIn(UnstableApi::class)
@@ -22,8 +38,20 @@ fun MobileNavGraph(navController: NavHostController) {
         composable(Screen.Home.route) {
             MobileHomeScreen(
                 navController = navController,
-                onMovieClick = { movieId -> navController.navigate(Screen.MovieDetail.createRoute(movieId)) },
-                onTvShowClick = { tvShowId -> navController.navigate(Screen.TvShowDetail.createRoute(tvShowId)) },
+                onMovieClick = { movieId ->
+                    navController.navigate(
+                        Screen.MovieDetail.createRoute(
+                            movieId
+                        )
+                    )
+                },
+                onTvShowClick = { tvShowId ->
+                    navController.navigate(
+                        Screen.TvShowDetail.createRoute(
+                            tvShowId
+                        )
+                    )
+                },
                 onNavigate = { route -> navController.navigate(route) }
             )
         }
@@ -31,14 +59,26 @@ fun MobileNavGraph(navController: NavHostController) {
         composable(Screen.Movies.route) {
             MobileMoviesScreen(
                 navController = navController,
-                onMovieClick = { movieId -> navController.navigate(Screen.MovieDetail.createRoute(movieId)) }
+                onMovieClick = { movieId ->
+                    navController.navigate(
+                        Screen.MovieDetail.createRoute(
+                            movieId
+                        )
+                    )
+                }
             )
         }
 
         composable(Screen.TvShows.route) {
             MobileTvShowsScreen(
                 navController = navController,
-                onTvShowClick = { tvShowId -> navController.navigate(Screen.TvShowDetail.createRoute(tvShowId)) }
+                onTvShowClick = { tvShowId ->
+                    navController.navigate(
+                        Screen.TvShowDetail.createRoute(
+                            tvShowId
+                        )
+                    )
+                }
             )
         }
 
@@ -60,13 +100,47 @@ fun MobileNavGraph(navController: NavHostController) {
         composable(Screen.MyList.route) {
             MobileMyListScreen(
                 navController = navController,
-                onMovieClick = { movieId -> navController.navigate(Screen.MovieDetail.createRoute(movieId)) },
-                onTvShowClick = { tvShowId -> navController.navigate(Screen.TvShowDetail.createRoute(tvShowId)) },
-                onCompanyClick = { id, name -> navController.navigate("media_list/company/$id/${Uri.encode(name)}") },
-                onNetworkClick = { id, name -> navController.navigate("media_list/network/$id/${Uri.encode(name)}") },
+                onMovieClick = { movieId ->
+                    navController.navigate(
+                        Screen.MovieDetail.createRoute(
+                            movieId
+                        )
+                    )
+                },
+                onTvShowClick = { tvShowId ->
+                    navController.navigate(
+                        Screen.TvShowDetail.createRoute(
+                            tvShowId
+                        )
+                    )
+                },
+                onCompanyClick = { id, name ->
+                    navController.navigate(
+                        "media_list/company/$id/${
+                            Uri.encode(
+                                name
+                            )
+                        }"
+                    )
+                },
+                onNetworkClick = { id, name ->
+                    navController.navigate(
+                        "media_list/network/$id/${
+                            Uri.encode(
+                                name
+                            )
+                        }"
+                    )
+                },
                 onCastClick = { id, name, character, profilePath, knownForDepartment ->
                     navController.navigate(
-                        Screen.MobileCastDetail.createRoute(id, name, character, profilePath, knownForDepartment)
+                        Screen.MobileCastDetail.createRoute(
+                            id,
+                            name,
+                            character,
+                            profilePath,
+                            knownForDepartment
+                        )
                     )
                 }
             )
@@ -81,8 +155,20 @@ fun MobileNavGraph(navController: NavHostController) {
             SeeAllScreen(
                 category = category,
                 onBackClick = { navController.popBackStack() },
-                onMovieClick = { movieId -> navController.navigate(Screen.MovieDetail.createRoute(movieId)) },
-                onTvShowClick = { tvShowId -> navController.navigate(Screen.TvShowDetail.createRoute(tvShowId)) }
+                onMovieClick = { movieId ->
+                    navController.navigate(
+                        Screen.MovieDetail.createRoute(
+                            movieId
+                        )
+                    )
+                },
+                onTvShowClick = { tvShowId ->
+                    navController.navigate(
+                        Screen.TvShowDetail.createRoute(
+                            tvShowId
+                        )
+                    )
+                }
             )
         }
 
@@ -119,8 +205,20 @@ fun MobileNavGraph(navController: NavHostController) {
                 genreId = genreId,
                 genreName = genreName,
                 onBackClick = { navController.popBackStack() },
-                onMovieClick = { movieId -> navController.navigate(Screen.MovieDetail.createRoute(movieId)) },
-                onTvShowClick = { tvShowId -> navController.navigate(Screen.TvShowDetail.createRoute(tvShowId)) }
+                onMovieClick = { movieId ->
+                    navController.navigate(
+                        Screen.MovieDetail.createRoute(
+                            movieId
+                        )
+                    )
+                },
+                onTvShowClick = { tvShowId ->
+                    navController.navigate(
+                        Screen.TvShowDetail.createRoute(
+                            tvShowId
+                        )
+                    )
+                }
             )
         }
 
@@ -133,13 +231,23 @@ fun MobileNavGraph(navController: NavHostController) {
             MobileMovieDetailScreen(
                 movieId = movieId,
                 onBackClick = { navController.popBackStack() },
-                onMovieClick = { newMovieId -> navController.navigate(Screen.MovieDetail.createRoute(newMovieId)) },
+                onMovieClick = { newMovieId ->
+                    navController.navigate(
+                        Screen.MovieDetail.createRoute(
+                            newMovieId
+                        )
+                    )
+                },
                 onPlayClick = { route ->
                     navController.navigate(route)
                 },
                 onCastClick = { castId, castName, character, profilePath, knownForDepartment ->
                     navController.navigate(
-                        "cast_detail/$castId/${Uri.encode(castName)}/${Uri.encode(character ?: "")}/${Uri.encode(profilePath ?: "")}/${Uri.encode(knownForDepartment ?: "")}"
+                        "cast_detail/$castId/${Uri.encode(castName)}/${Uri.encode(character ?: "")}/${
+                            Uri.encode(
+                                profilePath ?: ""
+                            )
+                        }/${Uri.encode(knownForDepartment ?: "")}"
                     )
                 },
                 onNavigateToCastDetail = { route -> navController.navigate(route) },
@@ -158,16 +266,32 @@ fun MobileNavGraph(navController: NavHostController) {
             MobileTvShowDetailScreen(
                 tvId = tvId,
                 onBackClick = { navController.popBackStack() },
-                onTvShowClick = { newTvId -> navController.navigate(Screen.TvShowDetail.createRoute(newTvId)) },
+                onTvShowClick = { newTvId ->
+                    navController.navigate(
+                        Screen.TvShowDetail.createRoute(
+                            newTvId
+                        )
+                    )
+                },
                 onEpisodesClick = { id, name, totalSeasons ->
-                    navController.navigate(Screen.MobileSeasonEpisodes.createRoute(id, name, totalSeasons))
+                    navController.navigate(
+                        Screen.MobileSeasonEpisodes.createRoute(
+                            id,
+                            name,
+                            totalSeasons
+                        )
+                    )
                 },
                 onPlayClick = { route ->
                     navController.navigate(route)
                 },
                 onCastClick = { castId, castName, character, profilePath, knownForDepartment ->
                     navController.navigate(
-                        "cast_detail/$castId/${android.net.Uri.encode(castName)}/${android.net.Uri.encode(character ?: "")}/${android.net.Uri.encode(profilePath ?: "")}/${android.net.Uri.encode(knownForDepartment ?: "")}"
+                        "cast_detail/$castId/${Uri.encode(castName)}/${Uri.encode(character ?: "")}/${
+                            Uri.encode(
+                                profilePath ?: ""
+                            )
+                        }/${Uri.encode(knownForDepartment ?: "")}"
                     )
                 },
                 onNavigateToCastDetail = { route -> navController.navigate(route) },
@@ -218,7 +342,7 @@ fun MobileNavGraph(navController: NavHostController) {
             val tvId = backStackEntry.arguments?.getInt("tvId") ?: return@composable
             val totalSeasons = backStackEntry.arguments?.getInt("totalSeasons") ?: 1
             val tvShowName = backStackEntry.arguments?.getString("tvShowName") ?: ""
-            com.kiduyuk.klausk.kiduyutv.ui.screens.detail.SeasonEpisodesScreen(
+            SeasonEpisodesScreen(
                 tvShowId = tvId,
                 tvShowName = tvShowName,
                 totalSeasons = totalSeasons,
@@ -241,13 +365,25 @@ fun MobileNavGraph(navController: NavHostController) {
             val type = backStackEntry.arguments?.getString("type") ?: "company"
             val id = backStackEntry.arguments?.getInt("id") ?: 0
             val name = backStackEntry.arguments?.getString("name") ?: ""
-            com.kiduyuk.klausk.kiduyutv.ui.screens.company_network_list.MobileMediaListScreen(
+            MobileMediaListScreen(
                 type = type,
                 id = id,
                 name = name,
                 onBackClick = { navController.popBackStack() },
-                onMovieClick = { movieId -> navController.navigate(Screen.MovieDetail.createRoute(movieId)) },
-                onTvShowClick = { tvId -> navController.navigate(Screen.TvShowDetail.createRoute(tvId)) }
+                onMovieClick = { movieId ->
+                    navController.navigate(
+                        Screen.MovieDetail.createRoute(
+                            movieId
+                        )
+                    )
+                },
+                onTvShowClick = { tvId ->
+                    navController.navigate(
+                        Screen.TvShowDetail.createRoute(
+                            tvId
+                        )
+                    )
+                }
             )
         }
 
@@ -278,11 +414,23 @@ fun MobileNavGraph(navController: NavHostController) {
                 order = null
             )
 
-            com.kiduyuk.klausk.kiduyutv.ui.screens.cast.MobileCastDetailScreen(
+            MobileCastDetailScreen(
                 castMember = castMember,
                 onBackClick = { navController.popBackStack() },
-                onMovieClick = { movieId -> navController.navigate(Screen.MovieDetail.createRoute(movieId)) },
-                onTvShowClick = { tvId -> navController.navigate(Screen.TvShowDetail.createRoute(tvId)) }
+                onMovieClick = { movieId ->
+                    navController.navigate(
+                        Screen.MovieDetail.createRoute(
+                            movieId
+                        )
+                    )
+                },
+                onTvShowClick = { tvId ->
+                    navController.navigate(
+                        Screen.TvShowDetail.createRoute(
+                            tvId
+                        )
+                    )
+                }
             )
         }
 
@@ -313,11 +461,23 @@ fun MobileNavGraph(navController: NavHostController) {
                 order = null
             )
 
-            com.kiduyuk.klausk.kiduyutv.ui.screens.cast.CastDetailScreen(
+            CastDetailScreen(
                 castMember = castMember,
                 onBackClick = { navController.popBackStack() },
-                onMovieClick = { movieId -> navController.navigate(Screen.MovieDetail.createRoute(movieId)) },
-                onTvShowClick = { tvId -> navController.navigate(Screen.TvShowDetail.createRoute(tvId)) }
+                onMovieClick = { movieId ->
+                    navController.navigate(
+                        Screen.MovieDetail.createRoute(
+                            movieId
+                        )
+                    )
+                },
+                onTvShowClick = { tvId ->
+                    navController.navigate(
+                        Screen.TvShowDetail.createRoute(
+                            tvId
+                        )
+                    )
+                }
             )
         }
 
@@ -364,7 +524,7 @@ fun MobileNavGraph(navController: NavHostController) {
                 timestamp = timestamp,
                 onBackClick = { navController.popBackStack() },
                 onProviderClick = { providerUrl ->
-                    val intent = android.content.Intent(navController.context, com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity::class.java).apply {
+                    val intent = Intent(navController.context, PlayerActivity::class.java).apply {
                         putExtra("TMDB_ID", tmdbId)
                         putExtra("IS_TV", isTv)
                         putExtra("SEASON_NUMBER", season ?: 0)
@@ -411,7 +571,7 @@ fun MobileNavGraph(navController: NavHostController) {
             val releaseDate = backStackEntry.arguments?.getString("releaseDate")
             val timestamp = backStackEntry.arguments?.getLong("timestamp") ?: 0L
 
-            com.kiduyuk.klausk.kiduyutv.ui.screens.detail.StreamLinksScreen(
+            StreamLinksScreen(
                 tmdbId = tmdbId,
                 isTv = isTv,
                 title = title,
