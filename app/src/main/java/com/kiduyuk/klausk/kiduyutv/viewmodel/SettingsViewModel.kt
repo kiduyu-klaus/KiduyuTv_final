@@ -68,6 +68,23 @@ class SettingsViewModel : ViewModel() {
     }
 
     /**
+     * Refresh latest release title and notes used by "What's new?".
+     */
+    fun refreshWhatsNew() {
+        viewModelScope.launch {
+            val title = UpdateUtil.fetchLatestReleaseTitle()
+            val notes = UpdateUtil.fetchLatestReleaseAnnotated()
+
+            _uiState.update {
+                it.copy(
+                    releaseTitle = title,
+                    releaseNotes = notes
+                )
+            }
+        }
+    }
+
+    /**
      * Clear all application cache including database and internal files.
      */
     fun clearCache(context: Context) {

@@ -222,6 +222,7 @@ fun SettingsScreen(
                         updateAvailable = uiState.updateAvailable,
                         isDownloadingUpdate = uiState.isDownloadingUpdate,
                         downloadProgress = uiState.downloadProgress,
+                        onRefreshWhatsNewClick = { viewModel.refreshWhatsNew() },
                         onCheckForUpdatesClick = { viewModel.checkForUpdates(context) },
                         onDownloadUpdateClick = { viewModel.downloadAndInstallUpdate(context) }
                     )
@@ -615,6 +616,7 @@ private fun AppVersionContent(
     updateAvailable: Boolean,
     isDownloadingUpdate: Boolean,
     downloadProgress: Int,
+    onRefreshWhatsNewClick: () -> Unit,
     onCheckForUpdatesClick: () -> Unit,
     onDownloadUpdateClick: () -> Unit
 ) {
@@ -652,12 +654,34 @@ private fun AppVersionContent(
                     thickness = 1.dp
                 )
 
-                Text(
-                    text = "What's new?",
-                    color = TextPrimary,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "What's new?",
+                        color = TextPrimary,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    TextButton(onClick = onRefreshWhatsNewClick) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = null,
+                            tint = PrimaryRed,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Refresh",
+                            color = PrimaryRed,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
 
                 if (!releaseTitle.isNullOrBlank()) {
                     Text(
