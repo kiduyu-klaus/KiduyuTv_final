@@ -40,6 +40,7 @@ data class HomeUiState(
     val stathamMovies: List<Movie> = emptyList(),
     val timeTravelMovies: List<Movie> = emptyList(),
     val timeTravelTvShows: List<TvShow> = emptyList(),
+    val christianTvShows: List<TvShow> = emptyList(),
     val selectedItem: Any? = null,
     val lastClickedItemId: Int? = null,
     val error: String? = null
@@ -219,6 +220,9 @@ class HomeViewModel : ViewModel() {
                     val bibleMoviesDeferred = async {
                         repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/movies_from_the_bible.json").getOrNull() ?: emptyList()
                     }
+                    val christianTvShowsDeferred = async {
+                        repository.getGitHubTvShowList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/christian_tv_shows.json").getOrNull() ?: emptyList()
+                    }
 
 
                     // Await all results in parallel
@@ -232,6 +236,7 @@ class HomeViewModel : ViewModel() {
                     val timeTravelMovies = timeTravelMoviesDeferred.await()
                     val christianMovies = christianMoviesDeferred.await()
                     val bibleMovies = bibleMoviesDeferred.await()
+                    val christianTvShows = christianTvShowsDeferred.await()
                     val companiesNetworks = companiesNetworksDeferred.await()
 
                     // Process networks and companies
@@ -256,6 +261,7 @@ class HomeViewModel : ViewModel() {
                     val sortedTimeTravel = timeTravelMovies.sortedByDescending { it.voteAverage }
                     val sortedChristianMovies = christianMovies.sortedByDescending { it.voteAverage }
                     val sortedBibleMovies = bibleMovies.sortedByDescending { it.voteAverage }
+                    val sortedChristianTvShows = christianTvShows.sortedByDescending { it.voteAverage }
 
                     // Update UI with all secondary content at once
                     _uiState.value = _uiState.value.copy(
@@ -269,6 +275,7 @@ class HomeViewModel : ViewModel() {
                         timeTravelMovies = sortedTimeTravel,
                         christianMovies = sortedChristianMovies,
                         bibleMovies = sortedBibleMovies,
+                        christianTvShows = sortedChristianTvShows,
                         popularNetworks = networks,
                         popularCompanies = companies
                     )

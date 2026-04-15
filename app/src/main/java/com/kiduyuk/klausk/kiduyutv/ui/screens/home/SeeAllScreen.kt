@@ -63,6 +63,9 @@ fun SeeAllScreen(
         "statham_movies"   -> "Jason Statham Movies"
         "networks"         -> "Popular Networks"
         "companies"        -> "Production Companies"
+        "christian_movies" -> "Christian Movies"
+        "bible_movies"     -> "Movies from the Bible"
+        "christian_tv"     -> "Christian TV Shows"
         else               -> "All Content"
     }
 
@@ -79,6 +82,9 @@ fun SeeAllScreen(
         "time_travel_movies" -> uiState.timeTravelMovies
         "time_travel_tv"     -> uiState.timeTravelTvShows
         "favorite_tv"        -> uiState.bestSitcoms
+        "christian_movies" -> uiState.christianMovies
+        "bible_movies"     -> uiState.bibleMovies
+        "christian_tv"     -> uiState.christianTvShows
         else                 -> null  // null = not a JSON category, use async fetch
     }
 

@@ -168,6 +168,24 @@ fun MobileTvShowsScreen(
                             }
                         }
                     }
+
+                    // Christian TV Shows
+                    if (uiState.christianTvShows.isNotEmpty()) {
+                        item {
+                            MobileSectionHeader(
+                                title = "Christian TV Shows",
+                                onSeeAllClick = { navController.navigate("see_all/christian_tv") }
+                            )
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                items(uiState.christianTvShows) { tvShow ->
+                                    MobileTvShowCard(tvShow = tvShow, onClick = { onTvShowClick(tvShow.id) })
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -171,6 +171,22 @@ fun TvShowsScreen(
                         }
                     }
 
+                    // Content Row for Christian TV Shows
+                    if (uiState.christianTvShows.isNotEmpty()) {
+                        ContentRow(
+                            title = "Christian TV Shows",
+                            items = uiState.christianTvShows,
+                            onItemFocus = { tvShow -> viewModel.onItemSelected(tvShow) },
+                            onItemClick = { tvShow -> onTvShowClick(tvShow.id) }
+                        ) { tvShow, isFocused, onClick ->
+                            TvShowCard(
+                                tvShow = tvShow,
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
+                        }
+                    }
+
                     // Content Row for Continue Watching TV Shows, only shown if not empty.
                     if (uiState.continueWatching.isNotEmpty()) {
                         val tvHistory = uiState.continueWatching.filter { it.isTv }
