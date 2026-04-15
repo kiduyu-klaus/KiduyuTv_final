@@ -283,10 +283,15 @@ jobs:
 
               lines = text.splitlines()
               trimmed = []
+              include_line = False
               for line in lines:
                   if line.strip().startswith("### Downloads"):
                       break
-                  trimmed.append(line)
+                  # Keep the branch line and everything after it
+                  if "**Branch:**" in line:
+                      include_line = True
+                  if include_line:
+                      trimmed.append(line)
               return "\n".join(trimmed).strip()
 
           def release_badge(rel: dict) -> str:
@@ -311,10 +316,10 @@ jobs:
                 <span class="release-name">{name}</span>
                 {badge}
                 <span class="release-date">{date}</span>
-                <a class="gh-link" href="{url}" target="_blank" rel="noopener noreferrer">↗ View on GitHub</a>
+                <a class="gh-link" href="{url}" target="_blank">↗ View on GitHub</a>
               </div>
               <div class="release-body">
-          {body_html}
+                {body_html}
               </div>
             </div>
           </article>"""
