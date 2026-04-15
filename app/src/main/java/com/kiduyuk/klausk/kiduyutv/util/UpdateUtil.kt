@@ -19,6 +19,11 @@ import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 
 /**
  * Data class representing APK information from GitHub releases.
@@ -707,6 +712,86 @@ object UpdateUtil {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
+        }
+    }
+
+    // ── Build Release Annotated String ────────────────────────────────────────────
+    fun buildReleaseAnnotatedString(body: String): AnnotatedString {
+        return buildAnnotatedString {
+            val lines = body.lines()
+    
+            lines.forEach { rawLine ->
+                val line = rawLine.trim()
+    
+                when {
+                    // 🔥 Main section header
+                    line.startsWith("Key changes", ignoreCase = true) -> {
+                        appendLine()
+                        pushStyle(
+                            SpanStyle(
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF4CAF50)
+                            )
+                        )
+                        append("Key changes")
+                        pop()
+                        appendLine("\n")
+                    }
+    
+                    // 🧩 Subsections (e.g. **Package Reorganization**:)
+                    line.startsWith("- **") && line.contains("**:") -> {
+                        val title = line
+                            .removePrefix("- **")
+                            .substringBefore("**:")
+    
+                        append("• ")
+                        pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
+                        append(title)
+                        pop()
+                        append(":\n")
+                    }
+    
+                    // 📌 Nested bullet points
+                    line.startsWith("-") -> {
+                        val content = line.removePrefix("-").trim()
+                        append("    • $content\n")
+                    }
+    
+                    // Divider
+                    line.startsWith("---") -> {
+                        appendLine()
+                    }
+    
+                    // Normal text
+                    line.isNotBlank() -> {
+                        append(line)
+                        appendLine()
+                    }
+                }
+            }
+        }
+    }
+
+    suspend fun fetchLatestReleaseAnnotated(): AnnotatedString? = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder()
+                .url("https://api.github.com/repos/kiduyu-klaus/KiduyuTv_final/releases/latest")
+                .header("Accept", "application/vnd.github+json")
+                .header("User-Agent", "KiduyuTV-Android")
+                .build()
+    
+            httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@withContext null
+    
+                val jsonString = response.body?.string() ?: return@withContext null
+                val json = JSONObject(jsonString)
+    
+                val body = json.optString("body", "")
+                buildReleaseAnnotatedString(body)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching annotated release body", e)
+            null
         }
     }
 }

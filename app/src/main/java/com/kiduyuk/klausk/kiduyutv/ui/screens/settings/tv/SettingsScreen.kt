@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -213,7 +214,8 @@ fun SettingsScreen(
                 SettingsSection.APP_VERSION -> {
                     AppVersionContent(
                         currentVersion = BuildConfig.VERSION_NAME,
-                        whatsNew = uiState.releaseTitle ?: "SplashActivity: Check for existing APK before downloading to avoid redundancy — v1.1.81",
+                        releaseTitle = uiState.releaseTitle,
+                        releaseNotes = uiState.releaseNotes,
                         // Update check states
                         isCheckingForUpdates = uiState.isCheckingForUpdates,
                         updateCheckResult = uiState.updateCheckResult,
@@ -606,7 +608,8 @@ private fun AppInformationContent(
 @Composable
 private fun AppVersionContent(
     currentVersion: String,
-    whatsNew: String,
+    releaseTitle: String?,
+    releaseNotes: AnnotatedString?,
     isCheckingForUpdates: Boolean,
     updateCheckResult: String?,
     updateAvailable: Boolean,
@@ -656,12 +659,29 @@ private fun AppVersionContent(
                     fontWeight = FontWeight.SemiBold
                 )
 
-                Text(
-                    text = "• $whatsNew",
-                    color = TextSecondary,
-                    fontSize = 14.sp,
-                    lineHeight = 22.sp
-                )
+                if (!releaseTitle.isNullOrBlank()) {
+                    Text(
+                        text = releaseTitle,
+                        color = TextPrimary,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                if (releaseNotes != null) {
+                    Text(
+                        text = releaseNotes,
+                        color = TextSecondary,
+                        fontSize = 14.sp,
+                        lineHeight = 22.sp
+                    )
+                } else {
+                    Text(
+                        text = "Loading release notes...",
+                        color = TextSecondary,
+                        fontSize = 14.sp
+                    )
+                }
             }
         }
 
@@ -1276,7 +1296,8 @@ private fun PreviewAppVersion() {
         ) {
             AppVersionContent(
                 currentVersion = "1.4.2",
-                whatsNew = "Fixed some minor bugs and improved performance.",
+                releaseTitle = "Version 1.4.2",
+                releaseNotes = AnnotatedString("Fixed some minor bugs and improved performance."),
                 isCheckingForUpdates = false,
                 updateCheckResult = null,
                 updateAvailable = false,
@@ -1307,7 +1328,8 @@ private fun PreviewAppVersionUpdateAvailable() {
         ) {
             AppVersionContent(
                 currentVersion = "1.4.2",
-                whatsNew = "Fixed some minor bugs and improved performance.",
+                releaseTitle = "Version 1.5.0",
+                releaseNotes = AnnotatedString("Fixed some minor bugs and improved performance."),
                 isCheckingForUpdates = false,
                 updateCheckResult = "Update available: v1.5.0 (current: v1.4.2)",
                 updateAvailable = true,
@@ -1338,7 +1360,8 @@ private fun PreviewAppVersionChecking() {
         ) {
             AppVersionContent(
                 currentVersion = "1.4.2",
-                whatsNew = "Fixed some minor bugs and improved performance.",
+                releaseTitle = "Version 1.4.2",
+                releaseNotes = AnnotatedString("Fixed some minor bugs and improved performance."),
                 isCheckingForUpdates = true,
                 updateCheckResult = null,
                 updateAvailable = false,
@@ -1369,7 +1392,8 @@ private fun PreviewAppVersionDownloading() {
         ) {
             AppVersionContent(
                 currentVersion = "1.4.2",
-                whatsNew = "Fixed some minor bugs and improved performance.",
+                releaseTitle = "Version 1.5.0",
+                releaseNotes = AnnotatedString("Fixed some minor bugs and improved performance."),
                 isCheckingForUpdates = false,
                 updateCheckResult = "Update available: v1.5.0 (current: v1.4.2)",
                 updateAvailable = true,

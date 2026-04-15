@@ -49,8 +49,11 @@ fun MobileMediaListScreen(
     onTvShowClick: (Int) -> Unit,
     viewModel: MediaListViewModel = viewModel()
 ) {
+    // Observe view-model state so the screen recomposes on updates.
     val uiState by viewModel.uiState.collectAsState()
+    // Needed for persistence actions (save/unsave list).
     val context = LocalContext.current
+    // Tracks scroll position and powers infinite-scroll pagination.
     val listState = rememberLazyListState()
 
     // Load content when parameters change
@@ -82,6 +85,7 @@ fun MobileMediaListScreen(
     }
 
     Scaffold(
+        // App bar with list identity, item count, and save toggle.
         topBar = {
             TopAppBar(
                 title = {
@@ -149,6 +153,7 @@ fun MobileMediaListScreen(
                 .background(BackgroundDark)
                 .padding(innerPadding)
         ) {
+            // Render state machine: initial loading -> error -> empty -> content.
             when {
                 uiState.isLoading && (uiState.movies.isEmpty() && uiState.tvShows.isEmpty()) -> {
                     Box(
@@ -198,6 +203,7 @@ fun MobileMediaListScreen(
                 }
 
                 else -> {
+                    // Main media feed rendered as manual 3-column rows.
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),

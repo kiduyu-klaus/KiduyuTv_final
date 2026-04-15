@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.DecimalFormat
+import androidx.compose.ui.text.AnnotatedString
 
 class SettingsViewModel : ViewModel() {
 
@@ -43,9 +44,17 @@ class SettingsViewModel : ViewModel() {
             _uiState.update { it.copy(cacheSize = formatSize(size)) }
 
             // Fetch latest release title
+            // Fetch release title
             val title = UpdateUtil.fetchLatestReleaseTitle()
-            if (title != null) {
-                _uiState.update { it.copy(releaseTitle = title) }
+
+            // Fetch formatted release notes
+            val notes = UpdateUtil.fetchLatestReleaseAnnotated()
+
+            _uiState.update {
+                it.copy(
+                    releaseTitle = title,
+                    releaseNotes = notes
+                )
             }
         }
     }
@@ -398,5 +407,6 @@ data class SettingsUiState(
     val latestVersion: String? = null,
     val isDownloadingUpdate: Boolean = false,
     val downloadProgress: Int = 0,
-    val releaseTitle: String? = null
+    val releaseTitle: String? = null,
+    val releaseNotes: AnnotatedString? = null
 )
