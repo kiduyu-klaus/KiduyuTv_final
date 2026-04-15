@@ -84,21 +84,19 @@ class SplashActivity : ComponentActivity() {
     ) { result ->
         Log.i(TAG, "Installation result received: ${result.resultCode}")
         // Clear pending file first to avoid processing twice
-        pendingApkFile?.let { apkFile ->
-            val expectedVersion = pendingVersionCode
+        pendingApkFile?.let {
             pendingApkFile = null
             pendingVersionCode = -1
-
-            // Check if the new version was installed by comparing version codes
-            val installedVersion = getInstalledVersionCode()
-            if (installedVersion == expectedVersion && expectedVersion > 0) {
-                Log.i(TAG, "Package installed successfully (version $installedVersion), restarting app")
-                restartApp()
-            } else {
-                Log.i(TAG, "Installation was cancelled or failed (installed: $installedVersion, expected: $expectedVersion)")
-                // User cancelled or installation failed, exit
-                finish()
-            }
+            
+            // On modern Android, self-updating kills the process. 
+            // If we are still here, the update either failed, was cancelled, 
+            // or we are running on a version that doesn't kill the app immediately.
+            // UpdateReceiver.kt handles the successful restart via ACTION_MY_PACKAGE_REPLACED.
+            Log.i(TAG, "Return from installation screen. If update was successful, app will restart via UpdateReceiver.")
+            
+            // Optional: You can check if version actually changed here for non-killing updates,
+            // but for most cases, finishing is safer to allow the receiver to take over.
+            finish()
         }
     }
 
@@ -431,17 +429,9 @@ class SplashActivity : ComponentActivity() {
         } else {
             // Fallback to direct installation if intent creation fails
             UpdateUtil.installApk(this, apkFile)
-            // For fallback, we need to poll or rely on user interaction
-            // Schedule a check after a delay to restart the app
-            Log.w(TAG, "Using fallback install method, scheduling restart check")
-            android.os.Handler(mainLooper).postDelayed({
-                if (pendingVersionCode > 0 && getInstalledVersionCode() == pendingVersionCode) {
-                    restartApp()
-                } else {
-                    finish()
-                }
-                pendingVersionCode = -1
-            }, 5000) // Wait 5 seconds for user to complete installation
+            // For fallback, we rely on UpdateReceiver or user interaction
+            Log.w(TAG, "Using fallback install method, app should restart via UpdateReceiver on success")
+            finish()
         }
     }
 

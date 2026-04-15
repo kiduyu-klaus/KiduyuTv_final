@@ -351,6 +351,9 @@ class SettingsViewModel : ViewModel() {
                     if (apkFile != null) {
                         // Save APK metadata for future cache validation
                         UpdateUtil.saveDownloadedApkMeta(context, apkInfo)
+                        
+                        // Use basic install. Successful installation will trigger 
+                        // UpdateReceiver (via ACTION_MY_PACKAGE_REPLACED) to restart the app.
                         UpdateUtil.checkPermissionAndInstall(context, apkFile) {
                             showPermissionDialog(context, apkFile)
                         }
