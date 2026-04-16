@@ -64,6 +64,16 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.window.DialogProperties
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Root Screen
@@ -1519,21 +1529,32 @@ private fun PhoneLoginCodeDialog(
     onDismiss: () -> Unit,
     onCodeSubmit: (String) -> Unit
 ) {
-    var code by remember { mutableStateOf("") }
-    val focusRequesters = remember { List(6) { androidx.compose.ui.focus.FocusRequester() } }
+    var code by remember { mutableStateOf(List(6) { "" }) }
+    val focusRequesters = remember { List(6) { FocusRequester() } }
+    val validateButtonFocusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
 
-    Dialog(onDismissRequest = onDismiss) {
+    // Auto-focus the first box when dialog opens
+    LaunchedEffect(Unit) {
+        focusRequesters[0].requestFocus()
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.8f)),
+                .background(Color.Transparent), // Transparent background as requested
             contentAlignment = Alignment.Center
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .clip(RoundedCornerShape(24.dp))
-                    .background(SurfaceDark)
+                    .background(SurfaceDark.copy(alpha = 0.95f))
                     .padding(48.dp)
             ) {
                 Text(
@@ -1554,14 +1575,14 @@ private fun PhoneLoginCodeDialog(
                 
                 Spacer(modifier = Modifier.height(40.dp))
                 
-                // 6-digit code input
+                // 6-digit code input boxes
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     repeat(6) { index ->
-                        val char = code.getOrNull(index)?.toString() ?: ""
-                        val isFocused = code.length == index
+                        val interactionSource = remember { MutableInteractionSource() }
+                        val isFocused by interactionSource.collectIsFocusedAsState()
                         
                         Box(
                             modifier = Modifier
@@ -1572,33 +1593,64 @@ private fun PhoneLoginCodeDialog(
                                     width = if (isFocused) 2.dp else 1.dp,
                                     color = if (isFocused) PrimaryRed else TextTertiary.copy(alpha = 0.3f),
                                     shape = RoundedCornerShape(8.dp)
-                                ),
+                                )
+                                .focusRequester(focusRequesters[index])
+                                .focusable(interactionSource = interactionSource)
+                                .onKeyEvent { keyEvent ->
+                                    if (keyEvent.type == KeyEventType.KeyDown) {
+                                        when (keyEvent.key) {
+                                            Key.Backspace -> {
+                                                if (code[index].isEmpty() && index > 0) {
+                                                    focusRequesters[index - 1].requestFocus()
+                                                } else {
+                                                    val newCode = code.toMutableList()
+                                                    newCode[index] = ""
+                                                    code = newCode
+                                                }
+                                                true
+                                            }
+                                            else -> false
+                                        }
+                                    } else false
+                                },
                             contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = char,
-                                color = TextPrimary,
-                                fontSize = 28.sp,
-                                fontWeight = FontWeight.Bold
+                            BasicTextField(
+                                value = code[index],
+                                onValueChange = { newValue ->
+                                    if (newValue.length <= 1 && newValue.all { it.isDigit() }) {
+                                        val newCode = code.toMutableList()
+                                        newCode[index] = newValue
+                                        code = newCode
+                                        
+                                        if (newValue.isNotEmpty()) {
+                                            if (index < 5) {
+                                                focusRequesters[index + 1].requestFocus()
+                                            } else {
+                                                // Last digit entered, hide keyboard and focus validate button
+                                                keyboardController?.hide()
+                                                validateButtonFocusRequester.requestFocus()
+                                            }
+                                        }
+                                    }
+                                },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                textStyle = androidx.compose.ui.text.TextStyle(
+                                    color = TextPrimary,
+                                    fontSize = 28.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center
+                                ),
+                                modifier = Modifier.fillMaxSize(),
+                                decorationBox = { innerTextField ->
+                                    Box(contentAlignment = Alignment.Center) {
+                                        innerTextField()
+                                    }
+                                }
                             )
                         }
                     }
                 }
-                
-                // Hidden TextField to capture input
-                BasicTextField(
-                    value = code,
-                    onValueChange = {
-                        if (it.length <= 6 && it.all { char -> char.isDigit() }) {
-                            code = it
-                            if (it.length == 6) {
-                                onCodeSubmit(it)
-                            }
-                        }
-                    },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.size(0.dp) // Hidden but functional
-                )
                 
                 Spacer(modifier = Modifier.height(48.dp))
                 
@@ -1611,6 +1663,49 @@ private fun PhoneLoginCodeDialog(
                 )
                 
                 Spacer(modifier = Modifier.height(24.dp))
+
+                // Validate Code Button
+                val validateInteractionSource = remember { MutableInteractionSource() }
+                val isValidateFocused by validateInteractionSource.collectIsFocusedAsState()
+                val isCodeComplete = code.all { it.isNotEmpty() }
+
+                Box(
+                    modifier = Modifier
+                        .width(200.dp)
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isValidateFocused) PrimaryRed else if (isCodeComplete) SurfaceDark else SurfaceDark.copy(alpha = 0.5f))
+                        .border(
+                            width = if (isValidateFocused) 2.dp else 1.dp,
+                            color = if (isValidateFocused) Color.White else TextTertiary.copy(alpha = 0.3f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .focusRequester(validateButtonFocusRequester)
+                        .clickable(
+                            enabled = isCodeComplete,
+                            interactionSource = validateInteractionSource,
+                            indication = null,
+                            onClick = { onCodeSubmit(code.joinToString("")) }
+                        )
+                        .onKeyEvent { keyEvent ->
+                            if (isCodeComplete && keyEvent.type == KeyEventType.KeyDown && 
+                                (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)) {
+                                onCodeSubmit(code.joinToString(""))
+                                true
+                            } else false
+                        }
+                        .focusable(interactionSource = validateInteractionSource),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Validate Code",
+                        color = if (isCodeComplete) Color.White else TextSecondary,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
                 
                 val cancelInteractionSource = remember { MutableInteractionSource() }
                 val isCancelFocused by cancelInteractionSource.collectIsFocusedAsState()
@@ -1629,8 +1724,15 @@ private fun PhoneLoginCodeDialog(
                         .clickable(
                             interactionSource = cancelInteractionSource,
                             indication = null,
-                            onClick = onDismiss
+                            onClick = { onDismiss() }
                         )
+                        .onKeyEvent { keyEvent ->
+                            if (keyEvent.type == KeyEventType.KeyDown && 
+                                (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)) {
+                                onDismiss()
+                                true
+                            } else false
+                        }
                         .focusable(interactionSource = cancelInteractionSource),
                     contentAlignment = Alignment.Center
                 ) {
