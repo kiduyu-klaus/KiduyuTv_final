@@ -44,6 +44,9 @@ class PlayerActivity : AppCompatActivity() {
     private var isCursorDisabled = false
     private var currentProviderName: String = "VidLink"
 
+    // FIX: Single shared repository instance instead of creating new ones on every tick
+    private val repository = TmdbRepository()
+
     // Track content metadata for Firebase sync
     private var contentTitle: String = "Unknown"
     private var contentOverview: String? = null
@@ -61,9 +64,28 @@ class PlayerActivity : AppCompatActivity() {
     private var latestContentType: String = "movie"
     private var latestContentId: Int = -1
 
+    // Cache intent extras so we don't re-read them on every progress tick
+    private var intentTmdbId: Int = -1
+    private var intentIsTv: Boolean = false
+
     companion object {
         private const val TAG = "VideasyPlayer"
         private const val PROGRESS_UPDATE_INTERVAL = 15_000L // 15 seconds
+
+        // Domains the WebView is allowed to navigate to (redirects permitted).
+        // Covers core providers + SuperEmbed's redirect chain.
+        private val ALLOWED_NAVIGATION_HOSTS = setOf(
+            // Core providers
+            "vidlink.pro",
+            "player.videasy.net",
+            "vidking.net",
+            "www.vidking.net",
+            "vidfast.pro",
+            "flixer.su",
+            // SuperEmbed + its CDN redirect target
+            "multiembed.mov",
+            "streamingnow.mov"
+        )
     }
 
     // JavaScript interface to receive messages from WebView (supports Videasy, VidKing, and VidLink)
@@ -188,13 +210,12 @@ class PlayerActivity : AppCompatActivity() {
     private val progressHandler = Handler(Looper.getMainLooper())
     private val progressRunnable = object : Runnable {
         override fun run() {
-            val tmdbId = intent.getIntExtra("TMDB_ID", -1)
-            val isTv = intent.getBooleanExtra("IS_TV", false)
+            // FIX: Use cached intent values instead of re-reading on every tick
+            val tmdbId = intentTmdbId
+            val isTv = intentIsTv
 
             if (tmdbId != -1 && latestTimestamp > 0) {
                 try {
-                    val repository = TmdbRepository()
-
                     // Determine media type - prefer message data if available
                     val mediaType = when {
                         latestContentType.isNotEmpty() && latestContentType != "null" -> latestContentType
@@ -220,9 +241,9 @@ class PlayerActivity : AppCompatActivity() {
                     val isTvContent = mediaType == "tv" || mediaType == "anime" || isTv
                     val seasonToSync = if (isTvContent) (if (latestSeason > 0) latestSeason else currentSeason) else null
                     val episodeToSync = if (isTvContent) (if (latestEpisode > 0) latestEpisode else currentEpisode) else null
-                    
+
                     Log.d(TAG, "Syncing watch history to Firebase: tmdbId=$tmdbId, isTv=$isTvContent, season=$seasonToSync, episode=$episodeToSync, position=${playbackPosition}s")
-                    
+
                     FirebaseManager.syncWatchHistory(
                         tmdbId = tmdbId,
                         isTv = isTvContent,
@@ -293,11 +314,15 @@ class PlayerActivity : AppCompatActivity() {
 
         super.onCreate(savedInstanceState)
 
-        val tmdbId = intent.getIntExtra("TMDB_ID", -1)
-        val isTv = intent.getBooleanExtra("IS_TV", false)
+        // FIX: Cache intent extras once so progressRunnable doesn't re-read them every tick
+        intentTmdbId = intent.getIntExtra("TMDB_ID", -1)
+        intentIsTv = intent.getBooleanExtra("IS_TV", false)
+
+        val tmdbId = intentTmdbId
+        val isTv = intentIsTv
         currentSeason = intent.getIntExtra("SEASON_NUMBER", 1)
         currentEpisode = intent.getIntExtra("EPISODE_NUMBER", 1)
-        
+
         // Store content metadata for Firebase sync
         contentTitle = intent.getStringExtra("TITLE") ?: "Unknown"
         contentOverview = intent.getStringExtra("OVERVIEW")
@@ -310,8 +335,6 @@ class PlayerActivity : AppCompatActivity() {
             finish()
             return
         }
-
-        val repository = TmdbRepository()
 
         // Detect device type and disable cursor for mobile
         val uiModeManager = getSystemService(Context.UI_MODE_SERVICE) as UiModeManager
@@ -329,7 +352,10 @@ class PlayerActivity : AppCompatActivity() {
                 TAG,
                 "[WatchHistory] Item exists, updating season $currentSeason episode $currentEpisode"
             )
-            repository.updateEpisodeInfo(tmdbId, "tv", currentSeason, currentEpisode)
+            // FIX: Only update episode info for TV content, not movies
+            if (isTv) {
+                repository.updateEpisodeInfo(tmdbId, "tv", currentSeason, currentEpisode)
+            }
         } else {
             Log.i(TAG, "[WatchHistory] New item, saving to history")
             repository.saveToWatchHistory(
@@ -361,14 +387,16 @@ class PlayerActivity : AppCompatActivity() {
         val isVidLinkPlayer = url.startsWith("https://vidlink.pro")
         val isTrackingEnabled = isVideasyPlayer || isVidKingPlayer || isVidLinkPlayer
 
+        // FIX: Added SuperEmbed detection
         currentProviderName = when {
             isVidLinkPlayer -> "VidLink"
             isVidKingPlayer -> "VidKing"
             isVideasyPlayer -> "Videasy"
-            url.contains("vidfast", ignoreCase = true) -> "VidFast"
-            url.contains("vidsrc", ignoreCase = true) -> "VidSrc"
-            url.contains("mapple", ignoreCase = true) -> "Mapple"
-            url.contains("flixer", ignoreCase = true) -> "Flixer"
+            url.contains("vidfast", ignoreCase = true)        -> "VidFast"
+            url.contains("vidsrc", ignoreCase = true)         -> "VidSrc"
+            url.contains("mapple", ignoreCase = true)         -> "Mapple"
+            url.contains("flixer", ignoreCase = true)         -> "Flixer"
+            url.contains("multiembed.mov", ignoreCase = true) -> "SuperEmbed"
             else -> "VidLink"
         }
 
@@ -395,7 +423,6 @@ class PlayerActivity : AppCompatActivity() {
                 javaScriptCanOpenWindowsAutomatically = false
                 setSupportMultipleWindows(false)
                 cacheMode = WebSettings.LOAD_DEFAULT
-                setRenderPriority(WebSettings.RenderPriority.HIGH)
                 useWideViewPort = true
                 loadWithOverviewMode = true
 
@@ -430,7 +457,21 @@ class PlayerActivity : AppCompatActivity() {
                     view: WebView?,
                     request: WebResourceRequest?
                 ): Boolean {
-                    return true
+                    val host = request?.url?.host ?: return true
+
+                    // Allow navigation within trusted streaming domains.
+                    // endsWith(".$it") handles subdomains (e.g. cdn.streamingnow.mov).
+                    val isAllowed = ALLOWED_NAVIGATION_HOSTS.any { allowed ->
+                        host == allowed || host.endsWith(".$allowed")
+                    }
+
+                    return if (isAllowed) {
+                        Log.i(TAG, "[Navigation] Allowing redirect: ${request?.url}")
+                        false // Let WebView follow the URL
+                    } else {
+                        Log.i(TAG, "[Navigation] Blocking navigation: ${request?.url}")
+                        true  // Block everything else
+                    }
                 }
 
                 override fun onPageFinished(view: WebView?, url: String?) {
@@ -877,30 +918,35 @@ class PlayerActivity : AppCompatActivity() {
             if (result != null && result != "null") {
                 try {
                     val currentTime = result.toDouble()
-                    val tmdbId = intent.getIntExtra("TMDB_ID", -1)
-                    val isTv = intent.getBooleanExtra("IS_TV", false)
+                    val tmdbId = intentTmdbId
+                    val isTv = intentIsTv
+
                     if (tmdbId != -1) {
-                        val repository = TmdbRepository()
                         repository.updatePlaybackPosition(
                             tmdbId,
                             if (isTv) "tv" else "movie",
                             currentTime.toLong()
                         )
 
+                        // FIX: Prefer latestSeason/latestEpisode from JS messages over
+                        // currentSeason/currentEpisode which may be stale from the original intent
+                        val seasonToSave = if (latestSeason > 0) latestSeason else currentSeason
+                        val episodeToSave = if (latestEpisode > 0) latestEpisode else currentEpisode
+
                         if (isTv) {
                             repository.updateEpisodeInfo(
                                 tmdbId,
                                 "tv",
-                                currentSeason,
-                                currentEpisode
+                                seasonToSave,
+                                episodeToSave
                             )
                         }
 
                         // Also sync final position to Firebase for cross-device continuity
                         val mediaType = if (isTv) "tv" else "movie"
-                        val seasonToSync = if (isTv) currentSeason else null
-                        val episodeToSync = if (isTv) currentEpisode else null
-                        
+                        val seasonToSync = if (isTv) seasonToSave else null
+                        val episodeToSync = if (isTv) episodeToSave else null
+
                         FirebaseManager.syncWatchHistory(
                             tmdbId = tmdbId,
                             isTv = isTv,
@@ -918,7 +964,7 @@ class PlayerActivity : AppCompatActivity() {
 
                         Log.i(
                             TAG,
-                            "Final playback position saved: ${currentTime}s (S$currentSeason E$currentEpisode) to local and Firebase"
+                            "Final playback position saved: ${currentTime}s (S$seasonToSave E$episodeToSave) to local and Firebase"
                         )
                     }
                 } catch (e: Exception) {

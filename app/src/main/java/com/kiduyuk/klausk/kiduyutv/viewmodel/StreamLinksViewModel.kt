@@ -80,6 +80,16 @@ class StreamLinksViewModel : ViewModel() {
                     name = "Flixer",
                     urlTemplate = if (isTv) "https://flixer.su/watch/tv/${tmdbId}/${season}/${episode}" else "https://flixer.su/watch/movie/${tmdbId}",
                     type = if (isTv) "tv" else "movie"
+                ),
+                StreamProvider(
+                    name = "SuperEmbed",
+                    urlTemplate = if (isTv) "https://multiembed.mov/?video_id=${tmdbId}&tmdb=1&s=${season}&e=${episode}" else "https://multiembed.mov/?video_id=${tmdbId}&tmdb=1",
+                    type = if (isTv) "tv" else "movie"
+                ),
+                StreamProvider(
+                    name = "Autoembed",
+                    urlTemplate = if (isTv) "https://autoembed.co/tv/tmdb/${tmdbId}-${season}-${episode}" else "https://autoembed.co/movie/tmdb/${tmdbId}",
+                    type = if (isTv) "tv" else "movie"
                 )
             )
         }
