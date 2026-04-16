@@ -206,6 +206,9 @@ object FirebaseSyncManager {
                 _syncMessage.value = "Sync complete!"
                 _syncState.value = SyncState.Success(totalItems)
                 
+                // Enable real-time sync after initial sync completes
+                enableRealTimeSync()
+                
                 Log.i(TAG, "Firebase sync completed. Items synced: $totalItems")
                 
             } catch (e: Exception) {
@@ -571,6 +574,7 @@ object FirebaseSyncManager {
     /**
      * Set up real-time listeners for Firebase data changes.
      * Call this after successful sign-in to enable live sync.
+     * When data is added, updated, or deleted in Firebase, local database is immediately synced.
      */
     fun enableRealTimeSync() {
         if (!isInitialized) {
@@ -584,8 +588,10 @@ object FirebaseSyncManager {
         val myListRef = FirebaseManager.getNodeReference(FirebaseManager.Nodes.MY_LIST)
         val myListListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                // Handle real-time My List updates
-                Log.d(TAG, "My List updated in Firebase")
+                Log.d(TAG, "My List changed in Firebase - syncing to local")
+                syncScope.launch {
+                    processFirebaseMyListSnapshot(snapshot)
+                }
             }
             
             override fun onCancelled(error: DatabaseError) {
@@ -594,6 +600,235 @@ object FirebaseSyncManager {
         }
         myListRef.addValueEventListener(myListListener)
         activeListeners.add(myListRef)
+        
+        // Listen to Companies changes
+        val companiesRef = FirebaseManager.getNodeReference(FirebaseManager.Nodes.SAVED_COMPANIES)
+        val companiesListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                Log.d(TAG, "Companies changed in Firebase - syncing to local")
+                syncScope.launch {
+                    processFirebaseCompaniesSnapshot(snapshot)
+                }
+            }
+            
+            override fun onCancelled(error: DatabaseError) {
+                Log.e(TAG, "Companies listener cancelled", error.toException())
+            }
+        }
+        companiesRef.addValueEventListener(companiesListener)
+        activeListeners.add(companiesRef)
+        
+        // Listen to Networks changes
+        val networksRef = FirebaseManager.getNodeReference(FirebaseManager.Nodes.SAVED_NETWORKS)
+        val networksListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                Log.d(TAG, "Networks changed in Firebase - syncing to local")
+                syncScope.launch {
+                    processFirebaseNetworksSnapshot(snapshot)
+                }
+            }
+            
+            override fun onCancelled(error: DatabaseError) {
+                Log.e(TAG, "Networks listener cancelled", error.toException())
+            }
+        }
+        networksRef.addValueEventListener(networksListener)
+        activeListeners.add(networksRef)
+        
+        // Listen to Casts changes
+        val castsRef = FirebaseManager.getNodeReference(FirebaseManager.Nodes.SAVED_CASTS)
+        val castsListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                Log.d(TAG, "Casts changed in Firebase - syncing to local")
+                syncScope.launch {
+                    processFirebaseCastsSnapshot(snapshot)
+                }
+            }
+            
+            override fun onCancelled(error: DatabaseError) {
+                Log.e(TAG, "Casts listener cancelled", error.toException())
+            }
+        }
+        castsRef.addValueEventListener(castsListener)
+        activeListeners.add(castsRef)
+        
+        // Listen to Watch History changes
+        val watchHistoryRef = FirebaseManager.getNodeReference(FirebaseManager.Nodes.WATCH_HISTORY)
+        val watchHistoryListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                Log.d(TAG, "Watch History changed in Firebase - syncing to local")
+                syncScope.launch {
+                    processFirebaseWatchHistorySnapshot(snapshot)
+                }
+            }
+            
+            override fun onCancelled(error: DatabaseError) {
+                Log.e(TAG, "Watch History listener cancelled", error.toException())
+            }
+        }
+        watchHistoryRef.addValueEventListener(watchHistoryListener)
+        activeListeners.add(watchHistoryRef)
+        
+        Log.d(TAG, "Real-time sync enabled for all data types")
+    }
+    
+    /**
+     * Process My List snapshot from Firebase real-time listener.
+     */
+    private suspend fun processFirebaseMyListSnapshot(snapshot: DataSnapshot) {
+        try {
+            if (snapshot.exists()) {
+                val data = snapshot.value as? Map<*, *>
+                if (data != null) {
+                    data.forEach { (tmdbIdStr, itemData) ->
+                        try {
+                            val tmdbId = (tmdbIdStr as? String)?.toIntOrNull() ?: return@forEach
+                            if (itemData is Map<*, *>) {
+                                val isTv = (itemData["isTv"] as? Boolean) ?: false
+                                val title = (itemData["title"] as? String) ?: ""
+                                val posterPath = itemData["posterPath"] as? String
+                                val backdropPath = itemData["backdropPath"] as? String
+                                val voteAverage = (itemData["voteAverage"] as? Number)?.toDouble() ?: 0.0
+                                
+                                MyListManager.addItem(
+                                    id = tmdbId,
+                                    type = if (isTv) "tv" else "movie",
+                                    title = title,
+                                    posterPath = posterPath,
+                                    backdropPath = backdropPath,
+                                    voteAverage = voteAverage
+                                )
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error processing MyList item: $tmdbIdStr", e)
+                        }
+                    }
+                }
+            } else {
+                // Data was deleted in Firebase, optionally clear local
+                Log.d(TAG, "My List is empty in Firebase")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error processing MyList snapshot", e)
+        }
+    }
+    
+    /**
+     * Process Companies snapshot from Firebase real-time listener.
+     */
+    private suspend fun processFirebaseCompaniesSnapshot(snapshot: DataSnapshot) {
+        try {
+            if (snapshot.exists()) {
+                val data = snapshot.value as? Map<*, *>
+                if (data != null) {
+                    data.forEach { (companyIdStr, itemData) ->
+                        try {
+                            val companyId = (companyIdStr as? String)?.toIntOrNull() ?: return@forEach
+                            if (itemData is Map<*, *>) {
+                                val name = (itemData["name"] as? String) ?: ""
+                                val logoPath = itemData["logoPath"] as? String
+                                
+                                FirebaseManager.saveCompany(companyId, name, logoPath)
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error processing Company item: $companyIdStr", e)
+                        }
+                    }
+                }
+            } else {
+                Log.d(TAG, "Companies is empty in Firebase")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error processing Companies snapshot", e)
+        }
+    }
+    
+    /**
+     * Process Networks snapshot from Firebase real-time listener.
+     */
+    private suspend fun processFirebaseNetworksSnapshot(snapshot: DataSnapshot) {
+        try {
+            if (snapshot.exists()) {
+                val data = snapshot.value as? Map<*, *>
+                if (data != null) {
+                    data.forEach { (networkIdStr, itemData) ->
+                        try {
+                            val networkId = (networkIdStr as? String)?.toIntOrNull() ?: return@forEach
+                            if (itemData is Map<*, *>) {
+                                val name = (itemData["name"] as? String) ?: ""
+                                val logoPath = itemData["logoPath"] as? String
+                                
+                                FirebaseManager.saveNetwork(networkId, name, logoPath)
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error processing Network item: $networkIdStr", e)
+                        }
+                    }
+                }
+            } else {
+                Log.d(TAG, "Networks is empty in Firebase")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error processing Networks snapshot", e)
+        }
+    }
+    
+    /**
+     * Process Casts snapshot from Firebase real-time listener.
+     */
+    private suspend fun processFirebaseCastsSnapshot(snapshot: DataSnapshot) {
+        try {
+            if (snapshot.exists()) {
+                val data = snapshot.value as? Map<*, *>
+                if (data != null) {
+                    data.forEach { (castIdStr, itemData) ->
+                        try {
+                            val castId = (castIdStr as? String)?.toIntOrNull() ?: return@forEach
+                            if (itemData is Map<*, *>) {
+                                val name = (itemData["name"] as? String) ?: ""
+                                val profilePath = itemData["profilePath"] as? String
+                                
+                                FirebaseManager.saveCast(castId, name, profilePath)
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error processing Cast item: $castIdStr", e)
+                        }
+                    }
+                }
+            } else {
+                Log.d(TAG, "Casts is empty in Firebase")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error processing Casts snapshot", e)
+        }
+    }
+    
+    /**
+     * Process Watch History snapshot from Firebase real-time listener.
+     */
+    private suspend fun processFirebaseWatchHistorySnapshot(snapshot: DataSnapshot) {
+        try {
+            if (snapshot.exists()) {
+                val data = snapshot.value as? Map<*, *>
+                if (data != null) {
+                    // Process TV watch history
+                    val tvHistory = data["tv"] as? Map<*, *>
+                    if (tvHistory != null) {
+                        processTvWatchHistory(tvHistory)
+                    }
+                    
+                    // Process movie watch history
+                    val movieHistory = data["movies"] as? Map<*, *>
+                    if (movieHistory != null) {
+                        processMovieWatchHistory(movieHistory)
+                    }
+                }
+            } else {
+                Log.d(TAG, "Watch History is empty in Firebase")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error processing Watch History snapshot", e)
+        }
     }
     
     /**
@@ -601,9 +836,9 @@ object FirebaseSyncManager {
      */
     fun disableRealTimeSync() {
         Log.d(TAG, "Disabling real-time Firebase sync...")
-        activeListeners.forEach { listener ->
+        activeListeners.forEach { ref ->
             try {
-                listener.removeEventListener(object : ValueEventListener {
+                ref.removeEventListener(object : ValueEventListener {
                     override fun onDataChange(snapshot: DataSnapshot) {}
                     override fun onCancelled(error: DatabaseError) {}
                 })
@@ -612,6 +847,7 @@ object FirebaseSyncManager {
             }
         }
         activeListeners.clear()
+        Log.d(TAG, "Real-time sync disabled and listeners cleaned up")
     }
     
     /**

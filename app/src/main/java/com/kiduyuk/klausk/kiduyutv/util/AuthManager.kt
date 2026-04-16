@@ -221,6 +221,9 @@ object AuthManager {
     fun signOut(onComplete: (() -> Unit)? = null) {
         _isLoading.value = true
         
+        // Disable real-time sync before signing out
+        FirebaseSyncManager.disableRealTimeSync()
+        
         // Sign out from Firebase
         firebaseAuth?.signOut()
         
@@ -342,6 +345,9 @@ object AuthManager {
      * Reverts to anonymous device ID.
      */
     fun signOutFromPhone(onComplete: (() -> Unit)? = null) {
+        // Disable real-time sync before signing out
+        FirebaseSyncManager.disableRealTimeSync()
+        
         // Update auth state to signed out
         _isSignedIn.value = false
         _userDisplayName.value = null
