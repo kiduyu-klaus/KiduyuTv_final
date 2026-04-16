@@ -5,7 +5,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.ui.text.input.KeyboardActions
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -901,3 +901,4 @@ private fun SettingsItem(
         }
     }
 }
+
