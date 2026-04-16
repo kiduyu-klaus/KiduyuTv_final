@@ -346,6 +346,22 @@ fun MoviesScreen(
                         }
                     }
 
+                    // Content Row for Doctor Who Specials
+                    if (uiState.doctorWhoSpecials.isNotEmpty()) {
+                        ContentRow(
+                            title = "Doctor Who Specials",
+                            items = uiState.doctorWhoSpecials,
+                            onItemFocus = { movie -> viewModel.onItemSelected(movie) },
+                            onItemClick = { movie -> onMovieClick(movie.id) }
+                        ) { movie, isFocused, onClick ->
+                            MovieCard(
+                                movie = movie,
+                                isSelected = isFocused,
+                                onClick = onClick
+                            )
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(15.dp))
                 }
             }

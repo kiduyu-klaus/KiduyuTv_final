@@ -1,3 +1,4 @@
+
 package com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile
 
 import androidx.compose.foundation.background
@@ -298,6 +299,26 @@ fun MobileMoviesScreen(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 items(uiState.bibleMovies) { movie ->
+                                    MobileMovieCard(
+                                        movie = movie,
+                                        onClick = { onMovieClick(movie.id) })
+                                }
+                            }
+                        }
+                    }
+
+                    // Doctor Who Specials
+                    if (uiState.doctorWhoSpecials.isNotEmpty()) {
+                        item {
+                            MobileSectionHeader(
+                                title = "Doctor Who Specials",
+                                onSeeAllClick = { navController.navigate("see_all/doctor_who_specials") }
+                            )
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                items(uiState.doctorWhoSpecials) { movie ->
                                     MobileMovieCard(
                                         movie = movie,
                                         onClick = { onMovieClick(movie.id) })
