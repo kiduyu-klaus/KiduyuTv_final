@@ -51,6 +51,19 @@ import androidx.compose.foundation.Image
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import androidx.core.net.toUri
+import com.kiduyuk.klausk.kiduyutv.util.AuthManager
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.Login
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.shape.CircleShape
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.window.Dialog
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Root Screen
@@ -70,6 +83,25 @@ fun SettingsScreen(
     var selectedSection by remember { mutableStateOf(SettingsSection.APP_SETTINGS) }
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
+    
+    // Auth state from AuthManager
+    val isSignedIn by AuthManager.isSignedIn.collectAsState()
+    val userDisplayName by AuthManager.userDisplayName.collectAsState()
+    val userEmail by AuthManager.userEmail.collectAsState()
+    val userPhotoUrl by AuthManager.userPhotoUrl.collectAsState()
+    val isAuthLoading by AuthManager.isLoading.collectAsState()
+    
+    var showPhoneLoginDialog by remember { mutableStateOf(false) }
+
+    if (showPhoneLoginDialog) {
+        PhoneLoginCodeDialog(
+            onDismiss = { showPhoneLoginDialog = false },
+            onCodeSubmit = { code ->
+                // TODO: Implement phone login logic with code
+                showPhoneLoginDialog = false
+            }
+        )
+    }
 
     // Load settings data when the screen is first shown
     LaunchedEffect(Unit) {
@@ -100,8 +132,38 @@ fun SettingsScreen(
                 .background(SurfaceDark)
                 .padding(32.dp)
         ) {
-            when (selectedSection) {
-                SettingsSection.APP_SETTINGS -> {
+                when (selectedSection) {
+                    SettingsSection.ACCOUNT -> {
+                        AccountContent(
+                            isSignedIn = isSignedIn,
+                            displayName = userDisplayName ?: "User",
+                            email = userEmail ?: "",
+                            photoUrl = userPhotoUrl,
+                            isLoading = isAuthLoading,
+                            onSignInClick = { showPhoneLoginDialog = true },
+                            onSignOutClick = {
+                                QuitDialog(
+                                    context = context,
+                                    title = "Sign Out?",
+                                    message = "Are you sure you want to sign out of your account?",
+                                    positiveButtonText = "Sign Out",
+                                    negativeButtonText = "Cancel",
+                                    lottieAnimRes = R.raw.exit,
+                                    onNo = {},
+                                    onYes = {
+                                        AuthManager.signOut {
+                                            // Handle sign out
+                                        }
+                                    }
+                                ).show()
+                            },
+                            onDeleteAccountClick = {
+                                // Handle delete account
+                            }
+                        )
+                    }
+
+                    SettingsSection.APP_SETTINGS -> {
                     AppSettingsContent(
                         context = context,
                         // Cache
@@ -1148,10 +1210,440 @@ private fun SettingsActionCard(
  * Enum representing the three top-level settings sections.
  */
 private enum class SettingsSection(val title: String) {
+    ACCOUNT("Account"),
     APP_SETTINGS("App Settings"),
     PLAYBACK("Playback"),
     APP_INFORMATION("App Information"),
     APP_VERSION("App Version")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Account Section
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Content for the Account section.
+ */
+@Composable
+private fun AccountContent(
+    isSignedIn: Boolean,
+    displayName: String,
+    email: String,
+    photoUrl: String?,
+    isLoading: Boolean,
+    onSignInClick: () -> Unit,
+    onSignOutClick: () -> Unit,
+    onDeleteAccountClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Top,
+        horizontalAlignment = Alignment.Start
+    ) {
+        Text(
+            text = "Account",
+            color = TextPrimary,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 32.dp)
+        )
+
+        if (isSignedIn) {
+            AccountSignedInCard(
+                displayName = displayName,
+                email = email,
+                photoUrl = photoUrl,
+                onSignOutClick = onSignOutClick,
+                onDeleteAccountClick = onDeleteAccountClick
+            )
+        } else {
+            AccountSignInCard(
+                onSignInClick = onSignInClick,
+                isLoading = isLoading
+            )
+        }
+    }
+}
+
+@Composable
+private fun AccountSignInCard(
+    onSignInClick: () -> Unit,
+    isLoading: Boolean
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
+    Column(
+        modifier = Modifier
+            .width(400.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(CardDark)
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .clip(CircleShape)
+                .background(SurfaceDark),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Phone,
+                contentDescription = null,
+                tint = TextSecondary,
+                modifier = Modifier.size(32.dp)
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        Text(
+            text = "Not signed in",
+            color = TextPrimary,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        Text(
+            text = "Sign in with your phone to sync your data across devices",
+            color = TextSecondary,
+            fontSize = 14.sp,
+            textAlign = TextAlign.Center
+        )
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        // Sign in with Phone button
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (isFocused) PrimaryRed else SurfaceDark)
+                .border(
+                    width = if (isFocused) 2.dp else 0.dp,
+                    color = if (isFocused) Color.White else Color.Transparent,
+                    shape = RoundedCornerShape(12.dp)
+                )
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onSignInClick
+                )
+                .focusable(interactionSource = interactionSource),
+            contentAlignment = Alignment.Center
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    color = Color.White,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Login,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "Login with Phone",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccountSignedInCard(
+    displayName: String,
+    email: String,
+    photoUrl: String?,
+    onSignOutClick: () -> Unit,
+    onDeleteAccountClick: () -> Unit
+) {
+    val signOutInteractionSource = remember { MutableInteractionSource() }
+    val isSignOutFocused by signOutInteractionSource.collectIsFocusedAsState()
+    
+    val deleteInteractionSource = remember { MutableInteractionSource() }
+    val isDeleteFocused by deleteInteractionSource.collectIsFocusedAsState()
+
+    Column(
+        modifier = Modifier
+            .width(400.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(CardDark)
+            .padding(24.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Profile photo or placeholder
+            if (photoUrl != null) {
+                AsyncImage(
+                    model = photoUrl,
+                    contentDescription = "Profile photo",
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(PrimaryRed),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = displayName.firstOrNull()?.uppercase() ?: "U",
+                        color = Color.White,
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.width(20.dp))
+            
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = displayName,
+                    color = TextPrimary,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = email,
+                    color = TextSecondary,
+                    fontSize = 14.sp
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(32.dp))
+        
+        // Sign out button
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (isSignOutFocused) PrimaryRed else SurfaceDark)
+                .border(
+                    width = if (isSignOutFocused) 2.dp else 0.dp,
+                    color = if (isSignOutFocused) Color.White else Color.Transparent,
+                    shape = RoundedCornerShape(12.dp)
+                )
+                .clickable(
+                    interactionSource = signOutInteractionSource,
+                    indication = null,
+                    onClick = onSignOutClick
+                )
+                .focusable(interactionSource = signOutInteractionSource),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Logout,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Sign Out",
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        // Delete account button
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (isDeleteFocused) Color.Red.copy(alpha = 0.1f) else Color.Transparent)
+                .border(
+                    width = if (isDeleteFocused) 2.dp else 0.dp,
+                    color = if (isDeleteFocused) Color.Red else Color.Transparent,
+                    shape = RoundedCornerShape(12.dp)
+                )
+                .clickable(
+                    interactionSource = deleteInteractionSource,
+                    indication = null,
+                    onClick = onDeleteAccountClick
+                )
+                .focusable(interactionSource = deleteInteractionSource),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.DeleteForever,
+                    contentDescription = null,
+                    tint = Color.Red,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Delete Account",
+                    color = Color.Red,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Dialog for entering the 6-digit code generated from the phone.
+ */
+@Composable
+private fun PhoneLoginCodeDialog(
+    onDismiss: () -> Unit,
+    onCodeSubmit: (String) -> Unit
+) {
+    var code by remember { mutableStateOf("") }
+    val focusRequesters = remember { List(6) { androidx.compose.ui.focus.FocusRequester() } }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.8f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(SurfaceDark)
+                    .padding(48.dp)
+            ) {
+                Text(
+                    text = "Enter Code",
+                    color = TextPrimary,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text(
+                    text = "Enter the 6-digit code displayed on your phone",
+                    color = TextSecondary,
+                    fontSize = 16.sp,
+                    textAlign = TextAlign.Center
+                )
+                
+                Spacer(modifier = Modifier.height(40.dp))
+                
+                // 6-digit code input
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    repeat(6) { index ->
+                        val char = code.getOrNull(index)?.toString() ?: ""
+                        val isFocused = code.length == index
+                        
+                        Box(
+                            modifier = Modifier
+                                .size(60.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(CardDark)
+                                .border(
+                                    width = if (isFocused) 2.dp else 1.dp,
+                                    color = if (isFocused) PrimaryRed else TextTertiary.copy(alpha = 0.3f),
+                                    shape = RoundedCornerShape(8.dp)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = char,
+                                color = TextPrimary,
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+                
+                // Hidden TextField to capture input
+                BasicTextField(
+                    value = code,
+                    onValueChange = {
+                        if (it.length <= 6 && it.all { char -> char.isDigit() }) {
+                            code = it
+                            if (it.length == 6) {
+                                onCodeSubmit(it)
+                            }
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.size(0.dp) // Hidden but functional
+                )
+                
+                Spacer(modifier = Modifier.height(48.dp))
+                
+                // TODO: Implement phone login logic later
+                Text(
+                    text = "TODO: Implement phone login logic later",
+                    color = PrimaryRed.copy(alpha = 0.7f),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Light
+                )
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                val cancelInteractionSource = remember { MutableInteractionSource() }
+                val isCancelFocused by cancelInteractionSource.collectIsFocusedAsState()
+                
+                Box(
+                    modifier = Modifier
+                        .width(200.dp)
+                        .height(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isCancelFocused) CardDark else Color.Transparent)
+                        .border(
+                            width = 1.dp,
+                            color = if (isCancelFocused) Color.White else TextTertiary.copy(alpha = 0.3f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .clickable(
+                            interactionSource = cancelInteractionSource,
+                            indication = null,
+                            onClick = onDismiss
+                        )
+                        .focusable(interactionSource = cancelInteractionSource),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Cancel",
+                        color = TextPrimary,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
