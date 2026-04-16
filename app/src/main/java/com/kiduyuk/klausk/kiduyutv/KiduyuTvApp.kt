@@ -16,6 +16,7 @@ import com.kiduyuk.klausk.kiduyutv.network.NetworkConnectivityChecker
 import com.kiduyuk.klausk.kiduyutv.util.NotificationHelper
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.database.FirebaseDatabase
+import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
 
 /**
  * Custom Application class for KiduyuTv.
@@ -47,6 +48,11 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
 
         // Initialize Firebase Realtime Database with persistence
         FirebaseDatabase.getInstance().setPersistenceEnabled(true)
+
+        // Initialize FirebaseManager with device-based user ID
+        // This enables syncing My List, Saved Companies, Networks, etc.
+        val userId = SettingsManager(this).getDeviceId()
+        FirebaseManager.init(userId)
 
         // Initialize AndroidApp reference for singleton access
         AndroidApp.instance = this
