@@ -7,6 +7,7 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.ValueEventListener
 import com.kiduyuk.klausk.kiduyutv.data.local.database.DatabaseManager
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
+import com.kiduyuk.klausk.kiduyutv.viewmodel.MyListItem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -691,12 +692,13 @@ object FirebaseSyncManager {
                                 val voteAverage = (itemData["voteAverage"] as? Number)?.toDouble() ?: 0.0
                                 
                                 MyListManager.addItem(
-                                    id = tmdbId,
-                                    type = if (isTv) "tv" else "movie",
-                                    title = title,
-                                    posterPath = posterPath,
-                                    backdropPath = backdropPath,
-                                    voteAverage = voteAverage
+                                    item = MyListItem(
+                                        id = tmdbId,
+                                        type = if (isTv) "tv" else "movie",
+                                        title = title,
+                                        posterPath = posterPath,
+                                        voteAverage = voteAverage
+                                    )
                                 )
                             }
                         } catch (e: Exception) {
@@ -727,8 +729,9 @@ object FirebaseSyncManager {
                             if (itemData is Map<*, *>) {
                                 val name = (itemData["name"] as? String) ?: ""
                                 val logoPath = itemData["logoPath"] as? String
+                                val originCountry = itemData["originCountry"] as? String
                                 
-                                FirebaseManager.saveCompany(companyId, name, logoPath)
+                                FirebaseManager.saveCompany(companyId, name, logoPath, originCountry)
                             }
                         } catch (e: Exception) {
                             Log.e(TAG, "Error processing Company item: $companyIdStr", e)
@@ -787,8 +790,10 @@ object FirebaseSyncManager {
                             if (itemData is Map<*, *>) {
                                 val name = (itemData["name"] as? String) ?: ""
                                 val profilePath = itemData["profilePath"] as? String
+                                val character = itemData["character"] as? String
+                                val knownForDepartment = itemData["knownForDepartment"] as? String
                                 
-                                FirebaseManager.saveCast(castId, name, profilePath)
+                                FirebaseManager.saveCast(castId, name, profilePath, character, knownForDepartment)
                             }
                         } catch (e: Exception) {
                             Log.e(TAG, "Error processing Cast item: $castIdStr", e)
