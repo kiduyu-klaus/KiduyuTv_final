@@ -168,7 +168,7 @@ object FirebaseSyncManager {
                         if (itemData is Map<*, *>) {
                             val title = itemData["title"] as? String ?: ""
                             val posterPath = itemData["posterPath"] as? String
-                            val voteAverage = (itemData["voteAverage"] as? Number)?.toDouble()
+                            val voteAverage = (itemData["voteAverage"] as? Number)?.toDouble() ?: 0.0
                             val isTv = itemData["isTv"] as? Boolean ?: false
                             val mediaType = if (isTv) "tv" else "movie"
                             

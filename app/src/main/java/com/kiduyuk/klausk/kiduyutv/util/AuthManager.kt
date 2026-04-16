@@ -306,40 +306,9 @@ object AuthManager {
         _userEmail.value = email ?: ""
         _userPhotoUrl.value = photoUrl
         
-        // Also update the auth state flow with a placeholder
-        // This helps maintain consistency with the existing UI expectations
-        val mockUser = object : FirebaseUser() {
-            override fun getUid(): String = uid
-            override fun getDisplayName(): String? = displayName ?: "TV User"
-            override fun getEmail(): String? = email
-            override fun getPhotoUrl(): android.net.Uri? = photoUrl?.let { android.net.Uri.parse(it) }
-            override fun isEmailVerified(): Boolean = false
-            override fun getProviderData(): MutableList<com.google.firebase.auth.UserInfo> = mutableListOf()
-            override fun getTenantId(): String? = null
-            override fun getMetadata(): com.google.firebase.auth.UserMetadata? = null
-            override fun getMultiFactor(): com.google.firebase.auth.MultiFactor? = null
-            override fun plus(codeName: String): com.google.firebase.auth.UserProfileChangeRequest = 
-                com.google.firebase.auth.UserProfileChangeRequest.Builder().build()
-            override fun updateEmail(newEmail: String): com.google.firebase.auth.Task<Void> = 
-                com.google.firebase.auth.Task()
-            override fun updatePassword(newPassword: String): com.google.firebase.auth.Task<Void> = 
-                com.google.firebase.auth.Task()
-            override fun updateProfile(request: com.google.firebase.auth.UserProfileChangeRequest): com.google.firebase.auth.Task<Void> = 
-                com.google.firebase.auth.Task()
-            override fun delete(): com.google.firebase.auth.Task<Void> = 
-                com.google.firebase.auth.Task()
-            override fun reauthenticate(credential: com.google.firebase.auth.AuthCredential): com.google.firebase.auth.Task<Void> = 
-                com.google.firebase.auth.Task()
-            override fun verifyBeforeUpdateEmail(newEmail: String): com.google.firebase.auth.Task<Void> = 
-                com.google.firebase.auth.Task()
-            override fun linkWithCredential(credential: com.google.firebase.auth.AuthCredential): com.google.firebase.auth.Task<com.google.firebase.auth.AuthResult> = 
-                com.google.firebase.auth.Task()
-            override fun unlink(provider: String): com.google.firebase.auth.Task<FirebaseUser> = 
-                com.google.firebase.auth.Task()
-            override fun isLinked(provider: String): Boolean = false
-            override fun getProviderId(): String = "firebase"
-        }
-        _authStateFlow.value = mockUser
+        // Note: We don't set _authStateFlow with a mock user because the UI observes
+        // the individual StateFlows (_isSignedIn, _userDisplayName, etc.) instead.
+        // This simplifies the code and avoids Firebase SDK compatibility issues.
         
         Log.i(TAG, "Phone authorization successful for UID: $uid")
     }
