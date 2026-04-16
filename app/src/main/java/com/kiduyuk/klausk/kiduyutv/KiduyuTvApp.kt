@@ -57,7 +57,7 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
         FirebaseManager.init(userId)
 
         // Initialize AuthManager for Firebase Authentication with Google Sign-In
-        AuthManager.init(this)
+        AuthManager.init(this, webClientId = "109926033937-dsl207opc1lsa3fnonim2sfmnc0o9hjk.apps.googleusercontent.com")
 
         // Initialize AndroidApp reference for singleton access
         AndroidApp.instance = this

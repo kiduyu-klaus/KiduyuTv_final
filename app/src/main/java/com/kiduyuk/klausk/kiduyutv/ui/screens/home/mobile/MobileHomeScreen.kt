@@ -47,6 +47,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileTvShowCard
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.CardDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
+import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.MyListItem
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
@@ -110,22 +111,8 @@ fun MobileHomeScreen(
         }
     }
 
-    Scaffold(
-        bottomBar = { MobileBottomNavigation(navController, currentRoute) }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(BackgroundDark)
-                .padding(innerPadding)
-        ) {
-            if (uiState.isLoading && uiState.trendingTvShows.isEmpty()) {
-                LoadingContent()
-            } else {
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    // Hero Section
-                    val myList by MyListManager.myList.collectAsState()
-
+    // My List state
+    val myList by MyListManager.myList.collectAsState()
 
     val selectedItemId = uiState.selectedItem?.let {
         when (it) {
@@ -141,9 +128,22 @@ fun MobileHomeScreen(
         is WatchHistoryItem -> if ((uiState.selectedItem as WatchHistoryItem).isTv) "tv" else "movie"
         else -> ""
     }
-    val isSelectedItemInMyList = myList.any { it.id == selectedItemId && it.type == selectedItemType }
+    val isSelectedItemInMyList = myList.any { item -> item.id == selectedItemId && item.type == selectedItemType }
 
-
+    Scaffold(
+        bottomBar = { MobileBottomNavigation(navController, currentRoute) }
+    ) { innerPadding ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(BackgroundDark)
+                .padding(innerPadding)
+        ) {
+            if (uiState.isLoading && uiState.trendingTvShows.isEmpty()) {
+                LoadingContent()
+            } else {
+                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    // Hero Section
                     item {
                         MobileHeroSection(
                             movie = selectedMovie,

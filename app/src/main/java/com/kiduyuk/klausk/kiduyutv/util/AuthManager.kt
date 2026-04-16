@@ -42,7 +42,7 @@ object AuthManager {
     
     // Default web client ID - Replace with your actual Google OAuth client ID
     // This is found in google-services.json or Google Cloud Console
-    private const val DEFAULT_WEB_CLIENT_ID = "YOUR_WEB_CLIENT_ID.apps.googleusercontent.com"
+    private const val DEFAULT_WEB_CLIENT_ID = "109926033937-dsl207opc1lsa3fnonim2sfmnc0o9hjk.apps.googleusercontent.com"
     
     private var firebaseAuth: FirebaseAuth? = null
     private var googleSignInClient: GoogleSignInClient? = null
@@ -275,3 +275,4 @@ object AuthManager {
         )
     }
 }
+
