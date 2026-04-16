@@ -188,7 +188,7 @@ fun MobileSettingsScreen(
                         
                         Spacer(modifier = Modifier.height(16.dp))
                         
-                        val onValidateCode = {
+                        val onValidateCode: () -> Unit = {
                             val code = tvCodeInput.trim()
                             if (code.length == 6) {
                                 isAuthorizingTv = true
@@ -859,4 +859,3 @@ private fun SettingsItem(
         }
     }
 }
-
