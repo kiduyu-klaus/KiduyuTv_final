@@ -108,7 +108,8 @@ fun SettingsScreen(
             onDismiss = { showPhoneLoginDialog = false },
             onLoginSuccess = { uid ->
                 // Success! Login on TV with this UID
-                com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.init(uid)
+                // Update AuthManager state to reflect the signed-in status
+                AuthManager.onPhoneAuthorized(uid)
                 showPhoneLoginDialog = false
             }
         )
@@ -162,8 +163,9 @@ fun SettingsScreen(
                                     lottieAnimRes = R.raw.exit,
                                     onNo = {},
                                     onYes = {
-                                        AuthManager.signOut {
-                                            // Handle sign out
+                                        // Use signOutFromPhone for TV since TV doesn't use Firebase Auth
+                                        AuthManager.signOutFromPhone {
+                                            // Handle sign out - UI will auto-update via StateFlow
                                         }
                                     }
                                 ).show()
@@ -1249,17 +1251,14 @@ private fun AccountContent(
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Top,
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.Start
     ) {
         Text(
             text = "Account",
             color = TextPrimary,
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Start,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 32.dp)
+            modifier = Modifier.padding(bottom = 32.dp)
         )
 
         if (isSignedIn) {

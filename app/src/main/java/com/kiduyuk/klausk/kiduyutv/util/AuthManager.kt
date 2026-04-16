@@ -3,6 +3,7 @@ package com.kiduyuk.klausk.kiduyutv.util
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -273,6 +274,96 @@ object AuthManager {
             "photoUrl" to currentUser?.photoUrl?.toString(),
             "isSignedIn" to (currentUser != null)
         )
+    }
+    
+    /**
+     * Handle phone authorization on TV.
+     * When a user authorizes the TV from their phone, this method is called
+     * to update the AuthManager state to reflect the signed-in status.
+     * 
+     * Since TV doesn't use Firebase Auth directly (it receives UID from phone),
+     * we create a mock user object to track the signed-in state.
+     * 
+     * @param uid The Firebase UID received from phone authorization
+     * @param displayName Optional display name (can be fetched from Firebase or passed from phone)
+     * @param email Optional email (can be fetched from Firebase or passed from phone)
+     * @param photoUrl Optional photo URL (can be fetched from Firebase or passed from phone)
+     */
+    fun onPhoneAuthorized(
+        uid: String,
+        displayName: String? = null,
+        email: String? = null,
+        photoUrl: String? = null
+    ) {
+        // Update FirebaseManager with the authorized UID
+        FirebaseManager.init(uid)
+        
+        // Update auth state to signed in
+        // Note: We don't have a real FirebaseUser on TV since TV doesn't use Firebase Auth
+        // Instead, we update the StateFlows directly to reflect the signed-in state
+        _isSignedIn.value = true
+        _userDisplayName.value = displayName ?: "TV User"
+        _userEmail.value = email ?: ""
+        _userPhotoUrl.value = photoUrl
+        
+        // Also update the auth state flow with a placeholder
+        // This helps maintain consistency with the existing UI expectations
+        val mockUser = object : FirebaseUser() {
+            override fun getUid(): String = uid
+            override fun getDisplayName(): String? = displayName ?: "TV User"
+            override fun getEmail(): String? = email
+            override fun getPhotoUrl(): android.net.Uri? = photoUrl?.let { android.net.Uri.parse(it) }
+            override fun isEmailVerified(): Boolean = false
+            override fun getProviderData(): MutableList<com.google.firebase.auth.UserInfo> = mutableListOf()
+            override fun getTenantId(): String? = null
+            override fun getMetadata(): com.google.firebase.auth.UserMetadata? = null
+            override fun getMultiFactor(): com.google.firebase.auth.MultiFactor? = null
+            override fun plus(codeName: String): com.google.firebase.auth.UserProfileChangeRequest = 
+                com.google.firebase.auth.UserProfileChangeRequest.Builder().build()
+            override fun updateEmail(newEmail: String): com.google.firebase.auth.Task<Void> = 
+                com.google.firebase.auth.Task()
+            override fun updatePassword(newPassword: String): com.google.firebase.auth.Task<Void> = 
+                com.google.firebase.auth.Task()
+            override fun updateProfile(request: com.google.firebase.auth.UserProfileChangeRequest): com.google.firebase.auth.Task<Void> = 
+                com.google.firebase.auth.Task()
+            override fun delete(): com.google.firebase.auth.Task<Void> = 
+                com.google.firebase.auth.Task()
+            override fun reauthenticate(credential: com.google.firebase.auth.AuthCredential): com.google.firebase.auth.Task<Void> = 
+                com.google.firebase.auth.Task()
+            override fun verifyBeforeUpdateEmail(newEmail: String): com.google.firebase.auth.Task<Void> = 
+                com.google.firebase.auth.Task()
+            override fun linkWithCredential(credential: com.google.firebase.auth.AuthCredential): com.google.firebase.auth.Task<com.google.firebase.auth.AuthResult> = 
+                com.google.firebase.auth.Task()
+            override fun unlink(provider: String): com.google.firebase.auth.Task<FirebaseUser> = 
+                com.google.firebase.auth.Task()
+            override fun isLinked(provider: String): Boolean = false
+            override fun getProviderId(): String = "firebase"
+        }
+        _authStateFlow.value = mockUser
+        
+        Log.i(TAG, "Phone authorization successful for UID: $uid")
+    }
+    
+    /**
+     * Sign out from phone authorization.
+     * Reverts to anonymous device ID.
+     */
+    fun signOutFromPhone(onComplete: (() -> Unit)? = null) {
+        // Update auth state to signed out
+        _isSignedIn.value = false
+        _userDisplayName.value = null
+        _userEmail.value = null
+        _userPhotoUrl.value = null
+        _authStateFlow.value = null
+        
+        // Revert to anonymous device ID for Firebase Manager
+        if (applicationContext != null) {
+            val deviceId = SettingsManager(applicationContext!!).getDeviceId()
+            FirebaseManager.init(deviceId)
+        }
+        
+        onComplete?.invoke()
+        Log.i(TAG, "Signed out from phone authorization")
     }
 }
 

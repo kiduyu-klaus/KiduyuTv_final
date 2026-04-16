@@ -49,8 +49,10 @@ import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.activity.mainactivity.MainActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
 import com.kiduyuk.klausk.kiduyutv.util.ApkInfo
+import com.kiduyuk.klausk.kiduyutv.util.FirebaseSyncManager
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import com.kiduyuk.klausk.kiduyutv.util.UpdateUtil
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -60,14 +62,20 @@ class SplashActivity : ComponentActivity() {
     companion object {
         private const val TAG = "SplashActivity"
         private const val SPLASH_DURATION_MS = 6000
+        private const val SYNC_TIMEOUT_MS = 10000L // 10 seconds max for sync
     }
 
     // Compose-observable flags
     private var updateAvailable by mutableStateOf(false)
     private var permissionHandled by mutableStateOf(false)
+    private var syncCompleted by mutableStateOf(false)
 
     // Remote version shown in the status chip
     private var currentRemoteVersion by mutableStateOf<String?>(null)
+    
+    // Firebase sync state
+    private var syncProgress by mutableStateOf(0)
+    private var syncMessage by mutableStateOf("")
 
     // Tracks every dialog shown so onDestroy can safely dismiss them all
     private val activeDialogs = mutableListOf<Dialog>()
@@ -208,6 +216,11 @@ class SplashActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Initialize FirebaseSyncManager and start data sync
+        FirebaseSyncManager.init(this)
+        startFirebaseSync()
+        
         checkForUpdates()
         checkNotificationPermission()
         setContent {
@@ -216,13 +229,75 @@ class SplashActivity : ComponentActivity() {
                     updateAvailable = updateAvailable,
                     permissionHandled = permissionHandled,
                     remoteVersion = currentRemoteVersion,
+                    syncCompleted = syncCompleted,
+                    syncProgress = syncProgress,
+                    syncMessage = syncMessage,
                     onTimeout = {
-                        startActivity(Intent(this@SplashActivity, MainActivity::class.java))
-                        finish()
+                        // Navigate to MainActivity regardless of sync status
+                        navigateToMain()
                     }
                 )
             }
         }
+    }
+    
+    /**
+     * Start Firebase data synchronization in the background.
+     * Updates the splash screen with sync progress.
+     */
+    private fun startFirebaseSync() {
+        Log.i(TAG, "Starting Firebase data sync...")
+        
+        // Start sync and observe progress
+        FirebaseSyncManager.startSync()
+        
+        // Observe sync state changes
+        lifecycleScope.launch {
+            FirebaseSyncManager.syncProgress.collect { progress ->
+                syncProgress = progress
+            }
+        }
+        
+        lifecycleScope.launch {
+            FirebaseSyncManager.syncMessage.collect { message ->
+                syncMessage = message
+            }
+        }
+        
+        lifecycleScope.launch {
+            FirebaseSyncManager.syncState.collect { state ->
+                when (state) {
+                    is FirebaseSyncManager.SyncState.Success -> {
+                        Log.i(TAG, "Firebase sync completed with ${state.itemsSynced} items")
+                        syncCompleted = true
+                    }
+                    is FirebaseSyncManager.SyncState.Error -> {
+                        Log.w(TAG, "Firebase sync failed: ${state.message}")
+                        // Continue anyway - sync failure shouldn't block app startup
+                        syncCompleted = true
+                    }
+                    is FirebaseSyncManager.SyncState.Syncing -> {
+                        Log.d(TAG, "Firebase sync in progress...")
+                    }
+                    is FirebaseSyncManager.SyncState.Idle -> {
+                        Log.d(TAG, "Firebase sync idle")
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * Navigate to MainActivity and finish this splash screen.
+     */
+    private fun navigateToMain() {
+        if (isFinishing) return // Prevent navigation if already finishing
+        Log.i(TAG, "Navigating to MainActivity...")
+        val intent = Intent(this, MainActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        }
+        startActivity(intent)
+        finish()
     }
 
     // ── Update check ──────────────────────────────────────────────────────────
@@ -480,12 +555,14 @@ class SplashActivity : ComponentActivity() {
         updateAvailable: Boolean,
         permissionHandled: Boolean,
         remoteVersion: String?,
+        syncCompleted: Boolean,
+        syncProgress: Int,
+        syncMessage: String,
         onTimeout: () -> Unit
     ) {
-        // Progress pauses when a dialog is open or permission hasn't been resolved yet.
-        // LaunchedEffect key change cancels the running coroutine → animation stops.
-        // When isPaused → false, a new effect fires and resumes from current progress.
-        val isPaused = updateAvailable || !permissionHandled
+        // Progress pauses when a dialog is open, permission hasn't been resolved yet,
+        // or sync hasn't completed yet.
+        val isPaused = updateAvailable || !permissionHandled || !syncCompleted
 
         val barProgress = remember { Animatable(0f) }
 
@@ -619,6 +696,25 @@ class SplashActivity : ComponentActivity() {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
+                // Firebase Sync Status Chip
+                if (!syncCompleted && syncMessage.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color(0xFF1E1E1E))
+                            .padding(horizontal = 18.dp, vertical = 7.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = syncMessage,
+                            color = Color(0xFF808080),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            letterSpacing = 0.3.sp
+                        )
+                    }
+                }
+
                 // Status chip — only visible while progress is paused
                 if (isPaused) {
                     val (chipLabel, chipColor) = when {
@@ -626,8 +722,12 @@ class SplashActivity : ComponentActivity() {
                             "Update available: v$remoteVersion" to Color(0xFFE50914)
                         updateAvailable ->
                             "Update available" to Color(0xFFE50914)
-                        else ->
+                        !permissionHandled ->
                             "Requesting permissions…" to Color(0xFF808080)
+                        !syncCompleted ->
+                            "Syncing data..." to Color(0xFF808080)
+                        else ->
+                            "Loading..." to Color(0xFF808080)
                     }
 
                     Box(
