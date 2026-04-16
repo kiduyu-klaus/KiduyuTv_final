@@ -382,7 +382,7 @@ private fun EpisodeListItem(
                     tint = PrimaryRed,
                     modifier = Modifier
                         .size(32.dp)
-                        .graphicsLayer(translationX = 2.dp) // Offset for play arrow centering
+                        .graphicsLayer(translationX = 2f) // Offset for play arrow centering
                 )
             }
         }
