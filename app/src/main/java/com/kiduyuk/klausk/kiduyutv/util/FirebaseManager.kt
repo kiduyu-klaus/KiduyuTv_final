@@ -113,13 +113,6 @@ object FirebaseManager {
         return getUserPath(currentUserId)
     }
     
-    /**
-     * Get the current user path
-     */
-    private fun getCurrentUserPath(): String {
-        return getUserPath(currentUserId)
-    }
-    
     // ─────────────────────────────────────────────────────────────────────────────
     // MY LIST OPERATIONS
     // ─────────────────────────────────────────────────────────────────────────────
