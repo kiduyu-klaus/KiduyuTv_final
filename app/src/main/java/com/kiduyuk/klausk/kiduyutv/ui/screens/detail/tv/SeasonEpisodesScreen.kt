@@ -99,13 +99,10 @@ fun SeasonEpisodesScreen(
                         .fillMaxWidth(0.30f)
                         .fillMaxHeight()
                 ) {
-                    // Header: Show title (bold, uppercase)
+                    // Header: Show title
                     Text(
-                        text = tvShowName.uppercase(),
-                        style = MaterialTheme.typography.headlineLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 2.sp
-                        ),
+                        text = tvShowName,
+                        style = MaterialTheme.typography.titleLarge,
                         color = TextPrimary,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
@@ -115,20 +112,12 @@ fun SeasonEpisodesScreen(
 
                     // Year count
                     Text(
-                        text = if (tvShowYear.isNotEmpty()) "$tvShowYear • $totalSeasons" else "$totalSeasons",
+                        text = if (tvShowYear.isNotEmpty()) "$tvShowYear • $totalSeasons seasons" else "$totalSeasons seasons",
                         style = MaterialTheme.typography.bodyLarge,
                         color = TextSecondary
                     )
 
                     Spacer(modifier = Modifier.height(32.dp))
-
-                    // Seasons label
-                    Text(
-                        text = "Seasons",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = TextSecondary,
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    )
 
                     // Seasons list
                     LazyColumn(
