@@ -427,12 +427,15 @@ object FirebaseManager {
     /**
      * Sync watch history item to Firebase.
      * Useful for continuing playback on another device.
+     * 
+     * For movies: saves to watchHistory/movies/{tmdbId}
+     * For TV shows: saves to watchHistory/tv/{tmdbId} (season/episode stored as data fields)
      */
     fun syncWatchHistory(
         tmdbId: Int,
         isTv: Boolean,
-        seasonNumber: Int?,
-        episodeNumber: Int?,
+        seasonNumber: Int? = null,
+        episodeNumber: Int? = null,
         playbackPosition: Long,
         duration: Long,
         title: String? = null,
@@ -443,8 +446,11 @@ object FirebaseManager {
         releaseDate: String? = null,
         updatedAt: Long = System.currentTimeMillis()
     ) {
+        // For both TV shows and movies, save at path without season/episode in path
+        // TV shows: watchHistory/tv/{tmdbId}
+        // Movies: watchHistory/movies/{tmdbId}
         val path = if (isTv) {
-            "${getCurrentUserPath()}/${Nodes.WATCH_HISTORY}/tv/$tmdbId/$seasonNumber/$episodeNumber"
+            "${getCurrentUserPath()}/${Nodes.WATCH_HISTORY}/tv/$tmdbId"
         } else {
             "${getCurrentUserPath()}/${Nodes.WATCH_HISTORY}/movies/$tmdbId"
         }
@@ -457,16 +463,14 @@ object FirebaseManager {
             "playbackPosition" to playbackPosition,
             "duration" to duration,
             "progress" to if (duration > 0) (playbackPosition.toDouble() / duration * 100) else 0.0,
+            "title" to title,
+            "overview" to overview,
+            "posterPath" to posterPath,
+            "backdropPath" to backdropPath,
+            "voteAverage" to voteAverage,
+            "releaseDate" to releaseDate,
             "updatedAt" to updatedAt
         )
-        
-        // Add optional metadata fields if provided
-        title?.let { item["title"] = it }
-        overview?.let { item["overview"] = it }
-        posterPath?.let { item["posterPath"] = it }
-        backdropPath?.let { item["backdropPath"] = it }
-        voteAverage?.let { item["voteAverage"] = it }
-        releaseDate?.let { item["releaseDate"] = it }
         
         database.getReference(path).setValue(item)
     }

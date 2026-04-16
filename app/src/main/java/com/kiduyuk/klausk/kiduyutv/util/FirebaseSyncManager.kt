@@ -421,56 +421,41 @@ object FirebaseSyncManager {
     
     /**
      * Process TV watch history from Firebase.
+     * New structure: watchHistory/tv/{tmdbId} with season/episode as data fields
      */
     private suspend fun processTvWatchHistory(tvHistory: Map<*, *>) {
-        tvHistory.forEach { (tmdbIdStr, seasonsData) ->
+        tvHistory.forEach { (tmdbIdStr, tvData) ->
             try {
                 val tmdbId = (tmdbIdStr as? String)?.toIntOrNull() ?: return@forEach
-                if (seasonsData is Map<*, *>) {
-                    seasonsData.forEach { (seasonStr, episodesData) ->
-                        try {
-                            val season = (seasonStr as? String)?.toIntOrNull() ?: return@forEach
-                            if (episodesData is Map<*, *>) {
-                                episodesData.forEach { (episodeStr, episodeData) ->
-                                    try {
-                                        val episode = (episodeStr as? String)?.toIntOrNull() ?: return@forEach
-                                        if (episodeData is Map<*, *>) {
-                                            val playbackPosition = (episodeData["playbackPosition"] as? Number)?.toLong() ?: 0L
-                                            val duration = (episodeData["duration"] as? Number)?.toLong() ?: 0L
-                                            val progress = (episodeData["progress"] as? Number)?.toDouble() ?: 0.0
-                                            val title = (episodeData["title"] as? String) ?: "TV Show"
-                                            val overview = episodeData["overview"] as? String
-                                            val posterPath = episodeData["posterPath"] as? String
-                                            val backdropPath = episodeData["backdropPath"] as? String
-                                            val voteAverage = (episodeData["voteAverage"] as? Number)?.toDouble() ?: 0.0
-                                            val releaseDate = episodeData["releaseDate"] as? String
-                                            
-                                            Log.d(TAG, "Syncing TV watch history: ID=$tmdbId S${season}E${episode} position=${playbackPosition}s title=$title")
-                                            
-                                            // Save to local database with watch history and metadata
-                                            DatabaseManager.addToWatchHistoryAsync(
-                                                id = tmdbId,
-                                                mediaType = "tv",
-                                                title = title,
-                                                overview = overview,
-                                                posterPath = posterPath,
-                                                backdropPath = backdropPath,
-                                                voteAverage = voteAverage,
-                                                releaseDate = releaseDate,
-                                                seasonNumber = season,
-                                                episodeNumber = episode,
-                                                playbackPosition = playbackPosition
-                                            )
-                                        }
-                                    } catch (e: Exception) {
-                                        Log.e(TAG, "Error processing episode: $episodeStr", e)
-                                    }
-                                }
-                            }
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error processing season: $seasonStr", e)
-                        }
-                    }
+                if (tvData is Map<*, *>) {
+                    // Extract season and episode from data fields (not path)
+                    val season = (tvData["seasonNumber"] as? Number)?.toInt()
+                    val episode = (tvData["episodeNumber"] as? Number)?.toInt()
+                    val playbackPosition = (tvData["playbackPosition"] as? Number)?.toLong() ?: 0L
+                    val duration = (tvData["duration"] as? Number)?.toLong() ?: 0L
+                    val title = (tvData["title"] as? String) ?: "TV Show"
+                    val overview = tvData["overview"] as? String
+                    val posterPath = tvData["posterPath"] as? String
+                    val backdropPath = tvData["backdropPath"] as? String
+                    val voteAverage = (tvData["voteAverage"] as? Number)?.toDouble() ?: 0.0
+                    val releaseDate = tvData["releaseDate"] as? String
+                    
+                    Log.d(TAG, "Syncing TV watch history: ID=$tmdbId S${season ?: "?"}E${episode ?: "?"} position=${playbackPosition}s title=$title")
+                    
+                    // Save to local database with watch history and metadata
+                    DatabaseManager.addToWatchHistoryAsync(
+                        id = tmdbId,
+                        mediaType = "tv",
+                        title = title,
+                        overview = overview,
+                        posterPath = posterPath,
+                        backdropPath = backdropPath,
+                        voteAverage = voteAverage,
+                        releaseDate = releaseDate,
+                        seasonNumber = season,
+                        episodeNumber = episode,
+                        playbackPosition = playbackPosition
+                    )
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error processing TV: $tmdbIdStr", e)
