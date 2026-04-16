@@ -422,7 +422,7 @@ object FirebaseSyncManager {
     /**
      * Process TV watch history from Firebase.
      */
-    private fun processTvWatchHistory(tvHistory: Map<*, *>) {
+    private suspend fun processTvWatchHistory(tvHistory: Map<*, *>) {
         tvHistory.forEach { (tmdbIdStr, seasonsData) ->
             try {
                 val tmdbId = (tmdbIdStr as? String)?.toIntOrNull() ?: return@forEach
@@ -438,12 +438,19 @@ object FirebaseSyncManager {
                                             val playbackPosition = (episodeData["playbackPosition"] as? Number)?.toLong() ?: 0L
                                             val duration = (episodeData["duration"] as? Number)?.toLong() ?: 0L
                                             val progress = (episodeData["progress"] as? Number)?.toDouble() ?: 0.0
+                                            val title = (episodeData["title"] as? String) ?: "TV Show"
                                             
                                             Log.d(TAG, "Syncing TV watch history: ID=$tmdbId S${season}E${episode} position=${playbackPosition}s")
                                             
-                                            // Update local database with watch history
-                                            // Note: This would require a method in DatabaseManager to update watch history
-                                            // For now, we just log it
+                                            // Save to local database with watch history
+                                            DatabaseManager.addToWatchHistoryAsync(
+                                                id = tmdbId,
+                                                mediaType = "tv",
+                                                title = title,
+                                                seasonNumber = season,
+                                                episodeNumber = episode,
+                                                playbackPosition = playbackPosition
+                                            )
                                         }
                                     } catch (e: Exception) {
                                         Log.e(TAG, "Error processing episode: $episodeStr", e)
@@ -464,7 +471,7 @@ object FirebaseSyncManager {
     /**
      * Process movie watch history from Firebase.
      */
-    private fun processMovieWatchHistory(movieHistory: Map<*, *>) {
+    private suspend fun processMovieWatchHistory(movieHistory: Map<*, *>) {
         movieHistory.forEach { (tmdbIdStr, movieData) ->
             try {
                 val tmdbId = (tmdbIdStr as? String)?.toIntOrNull() ?: return@forEach
@@ -472,12 +479,17 @@ object FirebaseSyncManager {
                     val playbackPosition = (movieData["playbackPosition"] as? Number)?.toLong() ?: 0L
                     val duration = (movieData["duration"] as? Number)?.toLong() ?: 0L
                     val progress = (movieData["progress"] as? Number)?.toDouble() ?: 0.0
+                    val title = (movieData["title"] as? String) ?: "Movie"
                     
                     Log.d(TAG, "Syncing movie watch history: ID=$tmdbId position=${playbackPosition}s")
                     
-                    // Update local database with watch history
-                    // Note: This would require a method in DatabaseManager to update watch history
-                    // For now, we just log it
+                    // Save to local database with watch history
+                    DatabaseManager.addToWatchHistoryAsync(
+                        id = tmdbId,
+                        mediaType = "movie",
+                        title = title,
+                        playbackPosition = playbackPosition
+                    )
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error processing movie: $tmdbIdStr", e)

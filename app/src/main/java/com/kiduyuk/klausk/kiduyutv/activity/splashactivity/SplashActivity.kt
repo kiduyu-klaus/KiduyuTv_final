@@ -49,6 +49,7 @@ import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.activity.mainactivity.MainActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
 import com.kiduyuk.klausk.kiduyutv.util.ApkInfo
+import com.kiduyuk.klausk.kiduyutv.util.AuthManager
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseSyncManager
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import com.kiduyuk.klausk.kiduyutv.util.UpdateUtil
@@ -244,9 +245,17 @@ class SplashActivity : ComponentActivity() {
     /**
      * Start Firebase data synchronization in the background.
      * Updates the splash screen with sync progress.
+     * Only syncs if the user is logged in.
      */
     private fun startFirebaseSync() {
-        Log.i(TAG, "Starting Firebase data sync...")
+        // Check if user is logged in
+        if (!AuthManager.isSignedIn.value) {
+            Log.i(TAG, "User not logged in - skipping Firebase sync")
+            syncCompleted = true
+            return
+        }
+        
+        Log.i(TAG, "User logged in - starting Firebase data sync...")
         
         // Start sync and observe progress
         FirebaseSyncManager.startSync()

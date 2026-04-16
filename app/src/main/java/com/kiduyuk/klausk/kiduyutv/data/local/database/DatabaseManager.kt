@@ -146,6 +146,39 @@ object DatabaseManager {
     fun watchHistoryDao(): WatchHistoryDao = database.watchHistoryDao()
 
     /**
+     * Add or update a watch history item (suspend version for coroutines).
+     */
+    suspend fun addToWatchHistoryAsync(
+        id: Int,
+        mediaType: String,
+        title: String,
+        overview: String? = null,
+        posterPath: String? = null,
+        backdropPath: String? = null,
+        voteAverage: Double = 0.0,
+        releaseDate: String? = null,
+        seasonNumber: Int? = null,
+        episodeNumber: Int? = null,
+        playbackPosition: Long = 0L
+    ) = withContext(Dispatchers.IO) {
+        val entity = WatchHistoryEntity(
+            id = id,
+            mediaType = mediaType,
+            title = title,
+            overview = overview,
+            posterPath = posterPath,
+            backdropPath = backdropPath,
+            voteAverage = voteAverage,
+            releaseDate = releaseDate,
+            seasonNumber = seasonNumber,
+            episodeNumber = episodeNumber,
+            playbackPosition = playbackPosition,
+            lastWatchedTimestamp = System.currentTimeMillis()
+        )
+        watchHistoryDao().insertWatchHistory(entity)
+    }
+
+    /**
      * Add or update a watch history item.
      */
     fun addToWatchHistory(

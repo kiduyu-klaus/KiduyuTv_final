@@ -90,9 +90,18 @@ fun SettingsScreen(
     onBackClick: () -> Unit,
     viewModel: SettingsViewModel = viewModel()
 ) {
-    var selectedSection by remember { mutableStateOf(SettingsSection.APP_SETTINGS) }
+    // Set initial section to ACCOUNT for focus management
+    var selectedSection by remember { mutableStateOf(SettingsSection.ACCOUNT) }
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
+    
+    // Focus management for TV
+    val accountNavFocusRequester = remember { FocusRequester() }
+    
+    // Request focus on Account section when screen loads
+    LaunchedEffect(Unit) {
+        accountNavFocusRequester.requestFocus()
+    }
     
     // Auth state from AuthManager
     val isSignedIn by AuthManager.isSignedIn.collectAsState()
@@ -137,6 +146,7 @@ fun SettingsScreen(
             selectedSection = selectedSection,
             onSectionSelect = { selectedSection = it },
             onBackClick = onBackClick,
+            accountNavFocusRequester = accountNavFocusRequester,
             modifier = Modifier.width(280.dp)
         )
 
@@ -326,6 +336,7 @@ private fun SettingsSidebar(
     selectedSection: SettingsSection,
     onSectionSelect: (SettingsSection) -> Unit,
     onBackClick: () -> Unit,
+    accountNavFocusRequester: FocusRequester,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -378,12 +389,13 @@ private fun SettingsSidebar(
             modifier = Modifier.padding(vertical = 16.dp)
         )
 
-        // Nav items
-        SettingsSection.entries.forEach { section ->
+        // Nav items - Account is first and gets initial focus
+        SettingsSection.entries.forEachIndexed { index, section ->
             SettingsNavItem(
                 title = section.title,
                 isSelected = selectedSection == section,
-                onClick = { onSectionSelect(section) }
+                onClick = { onSectionSelect(section) },
+                focusRequester = if (index == 0) accountNavFocusRequester else null
             )
         }
     }
@@ -396,7 +408,8 @@ private fun SettingsSidebar(
 private fun SettingsNavItem(
     title: String,
     isSelected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    focusRequester: FocusRequester? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
@@ -415,6 +428,12 @@ private fun SettingsNavItem(
             .then(
                 if (isFocused && !isSelected)
                     Modifier.border(2.dp, DarkRed.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                else
+                    Modifier
+            )
+            .then(
+                if (focusRequester != null)
+                    Modifier.focusRequester(focusRequester)
                 else
                     Modifier
             )
@@ -2018,9 +2037,10 @@ private fun PreviewSettingsSidebar() {
                 .padding(24.dp)
         ) {
             SettingsSidebar(
-                selectedSection = SettingsSection.APP_SETTINGS,
+                selectedSection = SettingsSection.ACCOUNT,
                 onSectionSelect = {},
                 onBackClick = {},
+                accountNavFocusRequester = FocusRequester(),
                 modifier = Modifier.width(280.dp)
             )
         }
