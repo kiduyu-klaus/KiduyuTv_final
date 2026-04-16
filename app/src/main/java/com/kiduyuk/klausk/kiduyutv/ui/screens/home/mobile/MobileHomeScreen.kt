@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +47,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileTvShowCard
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.CardDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
+import com.kiduyuk.klausk.kiduyutv.viewmodel.MyListItem
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.NetworkItem
@@ -121,6 +124,26 @@ fun MobileHomeScreen(
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     // Hero Section
+                    val myList by MyListManager.myList.collectAsState()
+
+
+    val selectedItemId = uiState.selectedItem?.let {
+        when (it) {
+            is Movie -> it.id
+            is TvShow -> it.id
+            is WatchHistoryItem -> it.id
+            else -> null
+        }
+    } ?: 0
+    val selectedItemType = when (uiState.selectedItem) {
+        is Movie -> "movie"
+        is TvShow -> "tv"
+        is WatchHistoryItem -> if ((uiState.selectedItem as WatchHistoryItem).isTv) "tv" else "movie"
+        else -> ""
+    }
+    val isSelectedItemInMyList = myList.any { it.id == selectedItemId && it.type == selectedItemType }
+
+
                     item {
                         MobileHeroSection(
                             movie = selectedMovie,
@@ -268,7 +291,44 @@ fun MobileHomeScreen(
                                         else onMovieClick(selectedItem.id)
                                     }
                                 }
-                            }
+                            },
+                            onAddToListClick = {
+                                val selectedItem = uiState.selectedItem
+                                val contextRef = context
+                                when (selectedItem) {
+                                    is Movie -> {
+                                        val item = MyListItem(
+                                            id = selectedItem.id,
+                                            title = selectedItem.title ?: "",
+                                            posterPath = selectedItem.posterPath,
+                                            type = "movie",
+                                            voteAverage = selectedItem.voteAverage
+                                        )
+                                        MyListManager.toggleItem(item, contextRef)
+                                    }
+                                    is TvShow -> {
+                                        val item = MyListItem(
+                                            id = selectedItem.id,
+                                            title = selectedItem.name ?: "",
+                                            posterPath = selectedItem.posterPath,
+                                            type = "tv",
+                                            voteAverage = selectedItem.voteAverage
+                                        )
+                                        MyListManager.toggleItem(item, contextRef)
+                                    }
+                                    is WatchHistoryItem -> {
+                                        val item = MyListItem(
+                                            id = selectedItem.id,
+                                            title = selectedItem.title,
+                                            posterPath = selectedItem.posterPath,
+                                            type = if (selectedItem.isTv) "tv" else "movie",
+                                            voteAverage = selectedItem.voteAverage
+                                        )
+                                        MyListManager.toggleItem(item, contextRef)
+                                    }
+                                }
+                            },
+                            isInMyList = isSelectedItemInMyList
                         )
                     }
 
@@ -377,6 +437,8 @@ fun MobileHeroSection(
     tvShow: TvShow?,
     onPlayClick: () -> Unit,
     onInfoClick: () -> Unit,
+    onAddToListClick: () -> Unit,
+    isInMyList: Boolean,
     modifier: Modifier = Modifier
 ) {
     val configuration = LocalConfiguration.current
@@ -442,8 +504,25 @@ fun MobileHeroSection(
             Spacer(modifier = Modifier.height(8.dp))
 
             Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                // My List Button
+                OutlinedButton(
+                    onClick = onAddToListClick,
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = TextPrimary
+                    )
+                ) {
+                    Icon(
+                        imageVector = if (isInMyList) Icons.Default.Check else Icons.Default.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("My List", style = MaterialTheme.typography.labelMedium)
+                }
+                // Play Button
                 Button(
                     onClick = onPlayClick,
                     colors = ButtonDefaults.buttonColors(
@@ -452,19 +531,27 @@ fun MobileHeroSection(
                 ) {
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
-                        contentDescription = null
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Play")
+                    Text("Play", style = MaterialTheme.typography.labelMedium)
                 }
 
-                OutlinedButton(onClick = onInfoClick) {
+                // Info Button
+                OutlinedButton(
+                    onClick = onInfoClick,
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = TextPrimary
+                    )
+                ) {
                     Icon(
                         imageVector = Icons.Default.Info,
-                        contentDescription = null
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Info")
+                    Text("Info", style = MaterialTheme.typography.labelMedium)
                 }
             }
         }
