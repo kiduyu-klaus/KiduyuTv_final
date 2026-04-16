@@ -1,5 +1,7 @@
 package com.kiduyuk.klausk.kiduyutv.ui.player.youtube
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.widget.FrameLayout
@@ -88,6 +90,13 @@ class YouTubePlayerActivity : AppCompatActivity() {
                     finish()
                 }
             }
+
+            override fun onError(
+                youTubePlayer: YouTubePlayer,
+                error: PlayerConstants.PlayerError
+            ) {
+                openInYouTubeApp()
+            }
         }, iFramePlayerOptions)
 
         lifecycle.addObserver(youTubePlayerView)
@@ -113,5 +122,28 @@ class YouTubePlayerActivity : AppCompatActivity() {
             onNo = { /* dismiss */ },
             onYes = { finish() }
         ).show()
+    }
+
+    private fun openInYouTubeApp() {
+        try {
+            val intent = Intent(
+                Intent.ACTION_VIEW,
+                Uri.parse("https://www.youtube.com/watch?v=$videoId")
+            )
+            startActivity(intent)
+            finish() // close your player activity
+        } catch (e: Exception) {
+            // Optional fallback if no app/browser
+            QuitDialog(
+                context = this,
+                title = "Error",
+                message = "Unable to open YouTube.",
+                positiveButtonText = "Close",
+                negativeButtonText = "",
+                lottieAnimRes = R.raw.error,
+                onNo = {},
+                onYes = { finish() }
+            ).show()
+        }
     }
 }
