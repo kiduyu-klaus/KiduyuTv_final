@@ -148,7 +148,18 @@ object AuthManager {
                     val user = firebaseAuth?.currentUser
                     user?.let {
                         // Update FirebaseManager with user ID for data sync
+                        // CRITICAL: This ensures mobile and TV use the SAME Firebase path
                         FirebaseManager.init(it.uid)
+                        
+                        // Also update FirebaseSyncManager to restart sync with the correct user ID
+                        // This ensures listeners are set up for the correct user path
+                        try {
+                            FirebaseSyncManager.updateFirebaseManagerUserId(it.uid)
+                        } catch (e: Exception) {
+                            // FirebaseSyncManager might not be initialized yet
+                            Log.d(TAG, "FirebaseSyncManager not yet initialized, FirebaseManager updated with UID: ${it.uid}")
+                        }
+                        
                         onSuccess?.invoke(it)
                     }
                 } else {
@@ -284,7 +295,10 @@ object AuthManager {
      * The phone app sends the user's profile data (displayName, email, photoUrl)
      * along with the UID, so the TV can display the same account information.
      * 
-     * @param uid The Firebase UID received from phone authorization
+     * CRITICAL: This method ensures that both the TV and mobile app use the SAME
+     * Firebase path (users/{uid}/) for data operations, enabling data sharing.
+     * 
+     * @param uid The Firebase Auth UID received from phone authorization
      * @param displayName User's display name from phone's Google account
      * @param email User's email from phone's Google account
      * @param photoUrl User's profile photo URL from phone's Google account
@@ -295,8 +309,20 @@ object AuthManager {
         email: String? = null,
         photoUrl: String? = null
     ) {
-        // Update FirebaseManager with the authorized UID
+        // CRITICAL: Update FirebaseManager with the authorized UID
+        // This ensures TV and mobile save to the SAME Firebase path
+        // Both apps will now use: users/{uid}/myList, users/{uid}/savedCompanies, etc.
         FirebaseManager.init(uid)
+        
+        // Also update FirebaseSyncManager to restart sync with the correct user ID
+        // This ensures listeners are set up for the correct user path
+        // Note: We need to check if FirebaseSyncManager is initialized before calling this
+        try {
+            FirebaseSyncManager.updateFirebaseManagerUserId(uid)
+        } catch (e: Exception) {
+            // FirebaseSyncManager might not be initialized yet, FirebaseManager.init() is sufficient
+            Log.d(TAG, "FirebaseSyncManager not yet initialized, FirebaseManager updated with UID: $uid")
+        }
         
         // Update auth state to signed in
         // Note: We don't have a real FirebaseUser on TV since TV doesn't use Firebase Auth.
@@ -308,6 +334,7 @@ object AuthManager {
         _userPhotoUrl.value = photoUrl
         
         Log.i(TAG, "Phone authorization successful for UID: $uid, displayName: $displayName")
+        Log.i(TAG, "Both TV and mobile will now use Firebase path: users/$uid/")
     }
     
     /**

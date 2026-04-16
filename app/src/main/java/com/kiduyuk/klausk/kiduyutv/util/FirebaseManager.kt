@@ -20,6 +20,16 @@ import kotlinx.coroutines.tasks.await
  * - Watch History (optional sync)
  * - User Preferences
  * 
+ * CRITICAL: User identification strategy:
+ * - For Firebase Auth users (signed in via Google): Uses Firebase Auth UID
+ * - For TV phone-authorized users: Uses the UID received from phone authorization
+ * - For anonymous users: Falls back to device ID
+ * 
+ * The currentUserId is updated via init() whenever:
+ * 1. User signs in with Google (mobile app)
+ * 2. TV is authorized via phone
+ * 3. User signs out
+ * 
  * Usage:
  *   FirebaseManager.syncMyListItem(movie)
  *   FirebaseManager.removeFromMyList(tmdbId)
@@ -42,28 +52,64 @@ object FirebaseManager {
         const val MY_LIST = "myList"
         const val SAVED_COMPANIES = "savedCompanies"
         const val SAVED_NETWORKS = "savedNetworks"
+        const val SAVED_CASTS = "savedCasts"
         const val WATCH_HISTORY = "watchHistory"
         const val PREFERENCES = "preferences"
     }
     
     /**
      * Get the user-specific base path.
+     * For authenticated users (Google or phone-authorized), we use their Firebase Auth UID.
      * For anonymous users, we use a device ID.
-     * For authenticated users, we use their UID.
+     * 
+     * IMPORTANT: Both mobile and TV must use the SAME user identifier (Firebase Auth UID)
+     * to share data in Firebase Realtime Database. The TV app receives this UID during
+     * phone authorization from the mobile app.
      */
     private fun getUserPath(userId: String): String {
         return "$USERS_PATH/$userId"
     }
     
-    // Default user ID (device-based, can be replaced with Firebase Auth user ID)
+    // Current user ID - should be Firebase Auth UID when user is signed in
+    // This is set via init() from:
+    // - AuthManager.signInWithGoogle() on mobile
+    // - AuthManager.onPhoneAuthorized() on TV
+    // - AuthManager.signOut() / signOutFromPhone() to revert to device ID
     private var currentUserId: String = "anonymous_device"
     
     /**
      * Initialize FirebaseManager with a user ID.
      * Call this after getting or creating a user identifier.
+     * 
+     * @param userId The Firebase Auth UID (for signed-in users) or device ID (for anonymous)
+     * 
+     * Key scenarios:
+     * - Mobile app sign-in: Called with Firebase Auth UID from AuthManager.signInWithGoogle()
+     * - TV phone authorization: Called with UID from phone via AuthManager.onPhoneAuthorized()
+     * - Sign out: Called with device ID to switch back to anonymous storage
      */
     fun init(userId: String) {
+        val previousUserId = currentUserId
         currentUserId = userId
+        Log.i(TAG, "FirebaseManager initialized with user ID: $userId (previous: $previousUserId)")
+        Log.i(TAG, "Firebase path is now: ${getUserPath(userId)}")
+    }
+    
+    /**
+     * Get the current user ID being used for Firebase operations.
+     * Useful for debugging to verify which user path data is being saved to.
+     */
+    fun getCurrentUserId(): String = currentUserId
+    
+    /**
+     * Get the complete Firebase path for the current user.
+     * This is the base path where all user data is stored: users/{userId}/
+     * 
+     * Both mobile and TV apps should use the SAME path when the user is signed in,
+     * enabling data sharing across devices.
+     */
+    fun getCurrentUserPath(): String {
+        return getUserPath(currentUserId)
     }
     
     /**
@@ -227,6 +273,20 @@ object FirebaseManager {
         awaitClose { ref.removeEventListener(listener) }
     }
     
+    /**
+     * Get saved companies once (synchronous read for sync operations).
+     */
+    suspend fun getSavedCompaniesOnce(): Map<String, Any>? {
+        return try {
+            database.getReference("${getCurrentUserPath()}/${Nodes.SAVED_COMPANIES}")
+                .get()
+                .await()
+                .value as? Map<String, Any>
+        } catch (e: Exception) {
+            null
+        }
+    }
+    
     // ─────────────────────────────────────────────────────────────────────────────
     // SAVED NETWORKS OPERATIONS
     // ─────────────────────────────────────────────────────────────────────────────
@@ -278,6 +338,91 @@ object FirebaseManager {
         
         ref.addValueEventListener(listener)
         awaitClose { ref.removeEventListener(listener) }
+    }
+    
+    /**
+     * Get saved networks once (synchronous read for sync operations).
+     */
+    suspend fun getSavedNetworksOnce(): Map<String, Any>? {
+        return try {
+            database.getReference("${getCurrentUserPath()}/${Nodes.SAVED_NETWORKS}")
+                .get()
+                .await()
+                .value as? Map<String, Any>
+        } catch (e: Exception) {
+            null
+        }
+    }
+    
+    // ─────────────────────────────────────────────────────────────────────────────
+    // SAVED CASTS OPERATIONS
+    // ─────────────────────────────────────────────────────────────────────────────
+    
+    /**
+     * Add a cast member to saved casts list.
+     */
+    fun saveCast(
+        castId: Int,
+        name: String,
+        profilePath: String?,
+        character: String?,
+        knownForDepartment: String?
+    ) {
+        val ref = database.getReference("${getCurrentUserPath()}/${Nodes.SAVED_CASTS}/$castId")
+        
+        val cast = mapOf(
+            "castId" to castId,
+            "name" to name,
+            "profilePath" to profilePath,
+            "character" to character,
+            "knownForDepartment" to knownForDepartment,
+            "savedAt" to System.currentTimeMillis()
+        )
+        
+        ref.setValue(cast)
+    }
+    
+    /**
+     * Remove a cast member from saved casts list.
+     */
+    fun unsaveCast(castId: Int) {
+        database.getReference("${getCurrentUserPath()}/${Nodes.SAVED_CASTS}/$castId")
+            .removeValue()
+    }
+    
+    /**
+     * Get saved casts Flow.
+     */
+    fun getSavedCastsFlow(): Flow<Map<String, Any>?> = callbackFlow {
+        val ref = database.getReference("${getCurrentUserPath()}/${Nodes.SAVED_CASTS}")
+        
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val data = snapshot.value as? Map<String, Any>
+                trySend(data)
+            }
+            
+            override fun onCancelled(error: DatabaseError) {
+                close(error.toException())
+            }
+        }
+        
+        ref.addValueEventListener(listener)
+        awaitClose { ref.removeEventListener(listener) }
+    }
+    
+    /**
+     * Get saved casts once (synchronous read for sync operations).
+     */
+    suspend fun getSavedCastsOnce(): Map<String, Any>? {
+        return try {
+            database.getReference("${getCurrentUserPath()}/${Nodes.SAVED_CASTS}")
+                .get()
+                .await()
+                .value as? Map<String, Any>
+        } catch (e: Exception) {
+            null
+        }
     }
     
     // ─────────────────────────────────────────────────────────────────────────────

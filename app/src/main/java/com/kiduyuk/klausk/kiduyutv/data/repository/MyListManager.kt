@@ -1,9 +1,11 @@
 package com.kiduyuk.klausk.kiduyutv.data.repository
 
 import android.content.Context
+import android.util.Log
 import com.kiduyuk.klausk.kiduyutv.data.local.database.DatabaseManager
 import com.kiduyuk.klausk.kiduyutv.data.local.entity.SavedMediaEntity
 import com.kiduyuk.klausk.kiduyutv.viewmodel.MyListItem
+import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -29,6 +31,7 @@ import kotlinx.coroutines.launch
  */
 object MyListManager {
 
+    private const val TAG = "MyListManager"
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val _myList = MutableStateFlow<List<MyListItem>>(emptyList())
@@ -123,31 +126,69 @@ object MyListManager {
                 knownForDepartment = item.knownForDepartment
             )
 
-            // Sync to Firebase Realtime Database for mobile persistence
-            // Even if local data is cleared, Firebase will retain this item
-            com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.syncMyListItem(
-                tmdbId = item.id,
-                isTv = item.type == "tv",
-                title = item.title,
-                posterPath = item.posterPath,
-                backdropPath = null, // Detail screens can update this later if needed
-                voteAverage = item.voteAverage
-            )
-
-            // Special handling for companies and networks sync
-            if (item.type == "company") {
-                com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.saveCompany(
-                    companyId = item.id,
-                    name = item.title,
-                    logoPath = item.posterPath,
-                    originCountry = null
-                )
-            } else if (item.type == "network") {
-                com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.saveNetwork(
-                    networkId = item.id,
-                    name = item.title,
-                    logoPath = item.posterPath
-                )
+            // CRITICAL: Sync to Firebase Realtime Database
+            // Each item type goes to its OWN table in Firebase:
+            // - "movie" and "tv" -> users/{uid}/myList/
+            // - "company" -> users/{uid}/savedCompanies/
+            // - "network" -> users/{uid}/savedNetworks/
+            // - "cast" -> users/{uid}/savedCasts/
+            val currentUserPath = FirebaseManager.getCurrentUserPath()
+            
+            when (item.type) {
+                "movie", "tv" -> {
+                    // Save movies and TV shows to myList table
+                    Log.d(TAG, "Syncing ${item.type} to Firebase path: $currentUserPath/myList/${item.id}")
+                    FirebaseManager.syncMyListItem(
+                        tmdbId = item.id,
+                        isTv = item.type == "tv",
+                        title = item.title,
+                        posterPath = item.posterPath,
+                        backdropPath = null,
+                        voteAverage = item.voteAverage
+                    )
+                }
+                "company" -> {
+                    // Save companies to savedCompanies table ONLY (not myList)
+                    Log.d(TAG, "Syncing company to Firebase path: $currentUserPath/savedCompanies/${item.id}")
+                    FirebaseManager.saveCompany(
+                        companyId = item.id,
+                        name = item.title,
+                        logoPath = item.posterPath,
+                        originCountry = null
+                    )
+                }
+                "network" -> {
+                    // Save networks to savedNetworks table ONLY (not myList)
+                    Log.d(TAG, "Syncing network to Firebase path: $currentUserPath/savedNetworks/${item.id}")
+                    FirebaseManager.saveNetwork(
+                        networkId = item.id,
+                        name = item.title,
+                        logoPath = item.posterPath
+                    )
+                }
+                "cast" -> {
+                    // Save cast members to savedCasts table ONLY (not myList)
+                    Log.d(TAG, "Syncing cast to Firebase path: $currentUserPath/savedCasts/${item.id}")
+                    FirebaseManager.saveCast(
+                        castId = item.id,
+                        name = item.title,
+                        profilePath = item.posterPath,
+                        character = item.character,
+                        knownForDepartment = item.knownForDepartment
+                    )
+                }
+                else -> {
+                    // For unknown types, save to myList as fallback
+                    Log.w(TAG, "Unknown item type: ${item.type}, saving to myList")
+                    FirebaseManager.syncMyListItem(
+                        tmdbId = item.id,
+                        isTv = item.type == "tv",
+                        title = item.title,
+                        posterPath = item.posterPath,
+                        backdropPath = null,
+                        voteAverage = item.voteAverage
+                    )
+                }
             }
         }
     }
