@@ -52,6 +52,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "109926033937-64l66t61dnocgcavm77u97ri1gero1ec.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kiduyuk.klausk.kiduyutv.phone",
+            "certificate_hash": "ef27780a87d3a4313afea3221d618a1ce805a178"
+          }
+        },
+        {
           "client_id": "109926033937-dsl207opc1lsa3fnonim2sfmnc0o9hjk.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -80,6 +88,14 @@
         }
       },
       "oauth_client": [
+        {
+          "client_id": "109926033937-ann9f72gcb9p2gr0kdr8mkr490ktnif8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kiduyuk.klausk.kiduyutv.tv",
+            "certificate_hash": "ef27780a87d3a4313afea3221d618a1ce805a178"
+          }
+        },
         {
           "client_id": "109926033937-dsl207opc1lsa3fnonim2sfmnc0o9hjk.apps.googleusercontent.com",
           "client_type": 3

@@ -1628,7 +1628,7 @@ private fun PhoneLoginCodeDialog(
                                                 focusRequesters[index + 1].requestFocus()
                                             } else {
                                                 // Last digit entered, hide keyboard and focus validate button
-                                                keyboardController?.hide()
+                                                //keyboardController?.hide()
                                                 validateButtonFocusRequester.requestFocus()
                                             }
                                         }

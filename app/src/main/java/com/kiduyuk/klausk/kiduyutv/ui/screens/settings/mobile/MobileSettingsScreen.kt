@@ -85,7 +85,7 @@ fun MobileSettingsScreen(
                 )
             }
         } catch (e: com.google.android.gms.common.api.ApiException) {
-            showSignInError = e.message ?: "Sign-in failed"
+            showSignInError = "Sign-in failed (code ${e.statusCode}): ${e.localizedMessage}"
         }
     }
 
