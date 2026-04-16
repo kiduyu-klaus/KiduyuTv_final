@@ -140,7 +140,7 @@ class YouTubePlayerActivity : AppCompatActivity() {
                 message = "Unable to open YouTube.",
                 positiveButtonText = "Close",
                 negativeButtonText = "",
-                lottieAnimRes = R.raw.error,
+                lottieAnimRes = R.raw.exit,
                 onNo = {},
                 onYes = { finish() }
             ).show()
