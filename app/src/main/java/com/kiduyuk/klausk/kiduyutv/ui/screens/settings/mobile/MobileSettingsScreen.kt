@@ -252,7 +252,7 @@ fun MobileSettingsScreen(
                             placeholder = { Text("e.g. A7B29X") },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(
-                                capitalization = KeyboardOptions.Capitalization.Characters
+                                imeAction = ImeAction.Done
                             ),
                             keyboardActions = KeyboardActions(
                                 onDone = {
