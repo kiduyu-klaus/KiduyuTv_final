@@ -413,7 +413,7 @@ object FirebaseManager {
     }
     
     /**
-     * Get the root database reference.
+     * Get the Firebase Database instance.
      */
-    fun getDatabase(): FirebaseDatabase = database
+    fun getFirebaseDatabaseInstance(): FirebaseDatabase = database
 }
