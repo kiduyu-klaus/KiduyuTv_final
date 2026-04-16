@@ -57,11 +57,6 @@ import java.io.File
 @SuppressLint("CustomSplashScreen")
 class SplashActivity : ComponentActivity() {
 
-    companion object {
-        private const val TAG = "SplashActivity"
-        private const val SPLASH_DURATION_MS = 6000
-    }
-
     // Compose-observable flags
     private var updateAvailable by mutableStateOf(false)
     private var permissionHandled by mutableStateOf(false)
@@ -78,6 +73,9 @@ class SplashActivity : ComponentActivity() {
     // Version code of the APK being installed (used to detect successful update)
     private var pendingVersionCode: Int = -1
 
+    // Tracks if we just updated the app (used to show "What's New" dialog on mobile)
+    private var justUpdated = false
+
     // Activity result launcher for APK installation
     private val installLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -87,17 +85,23 @@ class SplashActivity : ComponentActivity() {
         pendingApkFile?.let {
             pendingApkFile = null
             pendingVersionCode = -1
-            
-            // On modern Android, self-updating kills the process. 
-            // If we are still here, the update either failed, was cancelled, 
+
+            // On modern Android, self-updating kills the process.
+            // If we are still here, the update either failed, was cancelled,
             // or we are running on a version that doesn't kill the app immediately.
             // UpdateReceiver.kt handles the successful restart via ACTION_MY_PACKAGE_REPLACED.
             Log.i(TAG, "Return from installation screen. If update was successful, app will restart via UpdateReceiver.")
-            
+
             // Optional: You can check if version actually changed here for non-killing updates,
             // but for most cases, finishing is safer to allow the receiver to take over.
             finish()
         }
+    }
+
+    // SharedPreferences key for storing previous version
+    companion object {
+        private const val PREFS_NAME = "kiduyutv_prefs"
+        private const val KEY_PREVIOUS_VERSION = "previous_version"
     }
 
     /**
@@ -208,6 +212,10 @@ class SplashActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Check if app was just updated and store current version
+        checkForAppUpdate()
+
         checkForUpdates()
         checkNotificationPermission()
         setContent {
@@ -216,6 +224,7 @@ class SplashActivity : ComponentActivity() {
                     updateAvailable = updateAvailable,
                     permissionHandled = permissionHandled,
                     remoteVersion = currentRemoteVersion,
+                    justUpdated = justUpdated,
                     onTimeout = {
                         startActivity(Intent(this@SplashActivity, MainActivity::class.java))
                         finish()
@@ -223,6 +232,28 @@ class SplashActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    /**
+     * Checks if the app was just updated and stores the current version.
+     * On TV devices, successful updates trigger ACTION_MY_PACKAGE_REPLACED which
+     * restarts the app and this method detects the version change.
+     * On mobile devices where the installer may kill the process, this check
+     * helps detect if the app was updated on the previous launch.
+     */
+    private fun checkForAppUpdate() {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val previousVersion = prefs.getString(KEY_PREVIOUS_VERSION, null)
+        val currentVersion = BuildConfig.VERSION_NAME
+
+        if (previousVersion != null && previousVersion != currentVersion) {
+            justUpdated = true
+            Log.i(TAG, "App was just updated from $previousVersion to $currentVersion")
+        }
+
+        // Always update the stored version
+        prefs.edit().putString(KEY_PREVIOUS_VERSION, currentVersion).apply()
+    }
     }
 
     // ── Update check ──────────────────────────────────────────────────────────
@@ -480,12 +511,14 @@ class SplashActivity : ComponentActivity() {
         updateAvailable: Boolean,
         permissionHandled: Boolean,
         remoteVersion: String?,
+        justUpdated: Boolean,
         onTimeout: () -> Unit
     ) {
         // Progress pauses when a dialog is open or permission hasn't been resolved yet.
         // LaunchedEffect key change cancels the running coroutine → animation stops.
         // When isPaused → false, a new effect fires and resumes from current progress.
-        val isPaused = updateAvailable || !permissionHandled
+        // Also pause when app was just updated (mobile may need additional handling)
+        val isPaused = updateAvailable || !permissionHandled || justUpdated
 
         val barProgress = remember { Animatable(0f) }
 
@@ -622,6 +655,8 @@ class SplashActivity : ComponentActivity() {
                 // Status chip — only visible while progress is paused
                 if (isPaused) {
                     val (chipLabel, chipColor) = when {
+                        justUpdated ->
+                            "App Updated! Please restart" to Color(0xFF4CAF50)
                         updateAvailable && remoteVersion != null ->
                             "Update available: v$remoteVersion" to Color(0xFFE50914)
                         updateAvailable ->
