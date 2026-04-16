@@ -25,6 +25,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardOptions
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -195,6 +198,67 @@ fun MobileSettingsScreen(
                             label = { Text("6-Digit Code") },
                             placeholder = { Text("e.g. A7B29X") },
                             singleLine = true,
+                            keyboardOptions = KeyboardOptions(
+                                capitalization = KeyboardCapitalization.Characters,
+                                imeAction = ImeAction.Done
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onDone = {
+                                    val code = tvCodeInput.trim()
+                                    if (code.length == 6) {
+                                        isAuthorizingTv = true
+                                        val database = com.google.firebase.database.FirebaseDatabase.getInstance()
+                                        val codeRef = database.getReference("tv_codes/$code")
+                                        
+                                        codeRef.get().addOnSuccessListener { snapshot ->
+                                            if (snapshot.exists()) {
+                                                val createdAt = snapshot.child("createdAt").getValue(Long::class.java) ?: 0L
+                                                val now = System.currentTimeMillis()
+                                                val fiveMinutes = 5 * 60 * 1000
+                                                
+                                                if (now - createdAt < fiveMinutes) {
+                                                    // Code is valid and not expired, write user data
+                                                    val uid = currentUid?.uid
+                                                    if (uid != null) {
+                                                        // Write complete user profile data for TV to fetch
+                                                        val authorizedUser = mapOf(
+                                                            "uid" to uid,
+                                                            "displayName" to (userDisplayName ?: ""),
+                                                            "email" to (userEmail ?: ""),
+                                                            "photoUrl" to (userPhotoUrl ?: "")
+                                                        )
+                                                        codeRef.child("authorizedUser").setValue(authorizedUser)
+                                                            .addOnSuccessListener {
+                                                                Toast.makeText(context, "TV Authorized Successfully!", Toast.LENGTH_SHORT).show()
+                                                                tvCodeInput = ""
+                                                                isAuthorizingTv = false
+                                                                
+                                                                // Clean up after a short delay
+                                                                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                                                    codeRef.removeValue()
+                                                                }, 2000)
+                                                            }
+                                                            .addOnFailureListener {
+                                                                Toast.makeText(context, "Failed to authorize TV", Toast.LENGTH_SHORT).show()
+                                                                isAuthorizingTv = false
+                                                            }
+                                                    }
+                                                } else {
+                                                    Toast.makeText(context, "Code has expired. Generate a new one on TV.", Toast.LENGTH_LONG).show()
+                                                    isAuthorizingTv = false
+                                                    codeRef.removeValue() // Cleanup expired code
+                                                }
+                                            } else {
+                                                Toast.makeText(context, "Invalid code. Please check and try again.", Toast.LENGTH_SHORT).show()
+                                                isAuthorizingTv = false
+                                            }
+                                        }.addOnFailureListener {
+                                            Toast.makeText(context, "Error connecting to Firebase", Toast.LENGTH_SHORT).show()
+                                            isAuthorizingTv = false
+                                        }
+                                    }
+                                }
+                            ),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = TextPrimary,
                                 unfocusedTextColor = TextPrimary,

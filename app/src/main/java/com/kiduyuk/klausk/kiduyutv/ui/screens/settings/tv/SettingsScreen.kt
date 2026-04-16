@@ -1558,17 +1558,37 @@ private fun PhoneLoginCodeDialog(
 ) {
     val context = LocalContext.current
     var generatedCode by remember { mutableStateOf("") }
-    var isWaitingForLogin by remember { mutableStateOf(false) }
+    var countdown by remember { mutableStateOf(60) }
+    var codeRef by remember { mutableStateOf<com.google.firebase.database.DatabaseReference?>(null) }
+    var currentListener by remember { mutableStateOf<com.google.firebase.database.ValueEventListener?>(null) }
     val cancelInteractionSource = remember { MutableInteractionSource() }
     val isCancelFocused by cancelInteractionSource.collectIsFocusedAsState()
     val cancelFocusRequester = remember { FocusRequester() }
+
+    // Cleanup function to remove listener and Firebase data
+    fun cleanup() {
+        currentListener?.let { listener ->
+            codeRef?.removeEventListener(listener)
+        }
+        codeRef?.removeValue()
+    }
+
+    // Countdown timer
+    LaunchedEffect(Unit) {
+        while (countdown > 0) {
+            kotlinx.coroutines.delay(1000)
+            countdown--
+        }
+        // Time expired - cleanup and dismiss
+        cleanup()
+        onDismiss()
+    }
 
     // Generate code and start listening to Firebase
     LaunchedEffect(Unit) {
         // 1. Generate a random 6-digit alphanumeric code
         val chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         generatedCode = (1..6).map { chars.random() }.joinToString("")
-        isWaitingForLogin = true
         
         // 2. Get device ID
         val settingsManager = SettingsManager(context)
@@ -1576,14 +1596,14 @@ private fun PhoneLoginCodeDialog(
         
         // 3. Store code in Firebase and listen for user data
         val database = com.google.firebase.database.FirebaseDatabase.getInstance()
-        val codeRef = database.getReference("tv_codes/$generatedCode")
+        codeRef = database.getReference("tv_codes/$generatedCode")
         
         // Save deviceId and timestamp
         val data = mapOf(
             "deviceId" to deviceId,
             "createdAt" to System.currentTimeMillis()
         )
-        codeRef.setValue(data)
+        codeRef?.setValue(data)
         
         // 4. Listen for authorizedUser (contains uid + profile info)
         val listener = object : com.google.firebase.database.ValueEventListener {
@@ -1597,20 +1617,21 @@ private fun PhoneLoginCodeDialog(
                     
                     if (uid != null) {
                         // Success! Login on TV with this user data
+                        // Stop countdown
+                        countdown = 0
+                        cleanup()
                         onLoginSuccess(uid, displayName, email, photoUrl)
-                        // Cleanup
-                        codeRef.removeValue()
-                        codeRef.removeEventListener(this)
                     }
                 }
             }
             
             override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
-                isWaitingForLogin = false
+                // Handle error
             }
         }
         
-        codeRef.addValueEventListener(listener)
+        currentListener = listener
+        codeRef?.addValueEventListener(listener)
         
         // Auto-focus cancel button for easy dismissal
         cancelFocusRequester.requestFocus()
@@ -1673,20 +1694,22 @@ private fun PhoneLoginCodeDialog(
                 
                 Spacer(modifier = Modifier.height(24.dp))
                 
-                if (isWaitingForLogin) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            color = PrimaryRed,
-                            strokeWidth = 2.dp
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Waiting for phone authorization...",
-                            color = TextSecondary,
-                            fontSize = 12.sp
-                        )
-                    }
+                // Countdown timer display
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(32.dp),
+                        color = PrimaryRed,
+                        strokeWidth = 3.dp,
+                        progress = { countdown / 60f }
+                    )
+                    Text(
+                        text = "Code will expire in $countdown seconds",
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
                 }
                 
                 Spacer(modifier = Modifier.height(32.dp))
@@ -1707,7 +1730,10 @@ private fun PhoneLoginCodeDialog(
                         .clickable(
                             interactionSource = cancelInteractionSource,
                             indication = null,
-                            onClick = { onDismiss() }
+                            onClick = {
+                                cleanup()
+                                onDismiss()
+                            }
                         )
                         .onKeyEvent { keyEvent ->
                             if (keyEvent.type == KeyEventType.KeyDown && 

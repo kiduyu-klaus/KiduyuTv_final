@@ -278,6 +278,8 @@ class SplashActivity : ComponentActivity() {
                 when (state) {
                     is FirebaseSyncManager.SyncState.Success -> {
                         Log.i(TAG, "Firebase sync completed with ${state.itemsSynced} items")
+                        // Enable real-time sync after initial sync completes
+                        FirebaseSyncManager.enableRealTimeSync()
                         syncCompleted = true
                     }
                     is FirebaseSyncManager.SyncState.Error -> {

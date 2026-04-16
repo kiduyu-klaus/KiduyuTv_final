@@ -207,8 +207,8 @@ object FirebaseSyncManager {
                 _syncMessage.value = "Sync complete!"
                 _syncState.value = SyncState.Success(totalItems)
                 
-                // Enable real-time sync after initial sync completes
-                enableRealTimeSync()
+                // Note: enableRealTimeSync() should be called separately from SplashActivity
+                // after confirming user is logged in, not automatically here
                 
                 Log.i(TAG, "Firebase sync completed. Items synced: $totalItems")
                 
@@ -583,6 +583,9 @@ object FirebaseSyncManager {
             return
         }
         
+        // First, disable any existing listeners to prevent conflicts
+        disableRealTimeSync()
+        
         Log.d(TAG, "Enabling real-time Firebase sync...")
         
         // Listen to My List changes
@@ -653,22 +656,49 @@ object FirebaseSyncManager {
         castsRef.addValueEventListener(castsListener)
         activeListeners.add(castsRef)
         
-        // Listen to Watch History changes
-        val watchHistoryRef = FirebaseManager.getNodeReference(FirebaseManager.Nodes.WATCH_HISTORY)
-        val watchHistoryListener = object : ValueEventListener {
+        // Listen to TV Watch History changes (separate listener for nested data)
+        val tvWatchHistoryRef = FirebaseManager.getNodeReference("${FirebaseManager.Nodes.WATCH_HISTORY}/tv")
+        val tvWatchHistoryListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                Log.d(TAG, "Watch History changed in Firebase - syncing to local")
+                Log.d(TAG, "TV Watch History changed in Firebase - syncing to local")
                 syncScope.launch {
-                    processFirebaseWatchHistorySnapshot(snapshot)
+                    if (snapshot.exists()) {
+                        val data = snapshot.value as? Map<*, *>
+                        if (data != null) {
+                            processTvWatchHistory(data)
+                        }
+                    }
                 }
             }
             
             override fun onCancelled(error: DatabaseError) {
-                Log.e(TAG, "Watch History listener cancelled", error.toException())
+                Log.e(TAG, "TV Watch History listener cancelled", error.toException())
             }
         }
-        watchHistoryRef.addValueEventListener(watchHistoryListener)
-        activeListeners.add(watchHistoryRef)
+        tvWatchHistoryRef.addValueEventListener(tvWatchHistoryListener)
+        activeListeners.add(tvWatchHistoryRef)
+        
+        // Listen to Movies Watch History changes (separate listener for nested data)
+        val moviesWatchHistoryRef = FirebaseManager.getNodeReference("${FirebaseManager.Nodes.WATCH_HISTORY}/movies")
+        val moviesWatchHistoryListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                Log.d(TAG, "Movies Watch History changed in Firebase - syncing to local")
+                syncScope.launch {
+                    if (snapshot.exists()) {
+                        val data = snapshot.value as? Map<*, *>
+                        if (data != null) {
+                            processMovieWatchHistory(data)
+                        }
+                    }
+                }
+            }
+            
+            override fun onCancelled(error: DatabaseError) {
+                Log.e(TAG, "Movies Watch History listener cancelled", error.toException())
+            }
+        }
+        moviesWatchHistoryRef.addValueEventListener(moviesWatchHistoryListener)
+        activeListeners.add(moviesWatchHistoryRef)
         
         Log.d(TAG, "Real-time sync enabled for all data types")
     }
