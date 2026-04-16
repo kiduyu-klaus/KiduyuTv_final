@@ -491,62 +491,6 @@ jobs:
         uses: actions/deploy-pages@v4
 
   # ══════════════════════════════════════════════════════════════════════
-  # SIGNING REPORT: run signingReport and write output to report.txt
-  # ══════════════════════════════════════════════════════════════════════
-  signing_report:
-    name: Get Signing Report
-    runs-on: ubuntu-latest
-    needs: [build_all]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Cache Gradle packages
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            gradle-${{ runner.os }}-
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      - name: Restore keystore
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > kiduyutv_final
-
-      - name: Run signingReport
-        run: ./gradlew signingReport 2>&1 | tee signing_report_raw.txt
-
-      - name: Append signing report to report.txt
-        run: |
-          TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
-          {
-            echo "=========================================="
-            echo "Signing Report — ${TIMESTAMP}"
-            echo "Commit: $(git rev-parse --short HEAD)"
-            echo "=========================================="
-            cat signing_report_raw.txt
-            echo ""
-          } >> report.txt
-          echo "✅ Appended signing report to report.txt"
-
-      - name: Upload report.txt artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: signing-report
-          path: report.txt
-
-  # ══════════════════════════════════════════════════════════════════════
   # CLEANUP: delete all failed workflow runs
   # ══════════════════════════════════════════════════════════════════════
   cleanup_failed_runs:
