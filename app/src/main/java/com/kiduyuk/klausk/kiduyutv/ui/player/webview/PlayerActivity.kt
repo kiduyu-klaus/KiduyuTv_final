@@ -207,20 +207,21 @@ class PlayerActivity : AppCompatActivity() {
 
                     // Sync watch history to Firebase Realtime Database
                     // This allows progress to be recovered even if local data is cleared
-                    val uiModeManager = getSystemService(Context.UI_MODE_SERVICE) as UiModeManager
-                    if (uiModeManager.currentModeType != Configuration.UI_MODE_TYPE_TELEVISION) {
-                        // Mobile-only sync for now
-                        com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.syncWatchHistory(
-                            tmdbId = tmdbId,
-                            isTv = mediaType == "tv" || mediaType == "anime" || isTv,
-                            seasonNumber = if (latestSeason > 0) latestSeason else currentSeason,
-                            episodeNumber = if (latestEpisode > 0) latestEpisode else currentEpisode,
-                            playbackPosition = playbackPosition,
-                            duration = latestDuration
-                        )
-                    } else {
-                        // TODO: Implement Firebase watch history sync for Android TV later
-                    }
+                    // Works for both mobile and TV devices
+                    val isTvContent = mediaType == "tv" || mediaType == "anime" || isTv
+                    val seasonToSync = if (isTvContent) (if (latestSeason > 0) latestSeason else currentSeason) else null
+                    val episodeToSync = if (isTvContent) (if (latestEpisode > 0) latestEpisode else currentEpisode) else null
+                    
+                    Log.d(TAG, "Syncing watch history to Firebase: tmdbId=$tmdbId, isTv=$isTvContent, season=$seasonToSync, episode=$episodeToSync, position=${playbackPosition}s")
+                    
+                    FirebaseManager.syncWatchHistory(
+                        tmdbId = tmdbId,
+                        isTv = isTvContent,
+                        seasonNumber = seasonToSync,
+                        episodeNumber = episodeToSync,
+                        playbackPosition = playbackPosition,
+                        duration = latestDuration
+                    )
 
                     // Determine season and episode - prefer message data if available
                     val seasonToSave =
@@ -873,9 +874,23 @@ class PlayerActivity : AppCompatActivity() {
                             )
                         }
 
+                        // Also sync final position to Firebase for cross-device continuity
+                        val mediaType = if (isTv) "tv" else "movie"
+                        val seasonToSync = if (isTv) currentSeason else null
+                        val episodeToSync = if (isTv) currentEpisode else null
+                        
+                        FirebaseManager.syncWatchHistory(
+                            tmdbId = tmdbId,
+                            isTv = isTv,
+                            seasonNumber = seasonToSync,
+                            episodeNumber = episodeToSync,
+                            playbackPosition = currentTime.toLong(),
+                            duration = latestDuration
+                        )
+
                         Log.i(
                             TAG,
-                            "Final playback position saved: ${currentTime}s (S$currentSeason E$currentEpisode)"
+                            "Final playback position saved: ${currentTime}s (S$currentSeason E$currentEpisode) to local and Firebase"
                         )
                     }
                 } catch (e: Exception) {

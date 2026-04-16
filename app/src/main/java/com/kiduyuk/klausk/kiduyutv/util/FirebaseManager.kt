@@ -55,6 +55,7 @@ object FirebaseManager {
         const val SAVED_CASTS = "savedCasts"
         const val WATCH_HISTORY = "watchHistory"
         const val PREFERENCES = "preferences"
+        const val DEFAULT_PROVIDER = "defaultProvider"
     }
     
     /**
@@ -483,6 +484,21 @@ object FirebaseManager {
         awaitClose { ref.removeEventListener(listener) }
     }
     
+    /**
+     * Get watch history once (synchronous read for sync operations).
+     */
+    suspend fun getWatchHistoryOnce(): Map<String, Any>? {
+        return try {
+            database.getReference("${getCurrentUserPath()}/${Nodes.WATCH_HISTORY}")
+                .get()
+                .await()
+                .value as? Map<String, Any>
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting watch history from Firebase", e)
+            null
+        }
+    }
+    
     // ─────────────────────────────────────────────────────────────────────────────
     // USER PREFERENCES SYNC
     // ─────────────────────────────────────────────────────────────────────────────
@@ -528,6 +544,35 @@ object FirebaseManager {
         
         ref.addValueEventListener(listener)
         awaitClose { ref.removeEventListener(listener) }
+    }
+    
+    // ─────────────────────────────────────────────────────────────────────────────
+    // DEFAULT PROVIDER SYNC
+    // ─────────────────────────────────────────────────────────────────────────────
+    
+    /**
+     * Save the default provider to Firebase.
+     * This allows the default provider preference to sync across devices.
+     */
+    fun saveDefaultProvider(provider: String) {
+        database.getReference("${getCurrentUserPath()}/${Nodes.DEFAULT_PROVIDER}")
+            .setValue(provider)
+        Log.d(TAG, "Saved default provider to Firebase: $provider")
+    }
+    
+    /**
+     * Get the default provider from Firebase (once).
+     */
+    suspend fun getDefaultProviderOnce(): String? {
+        return try {
+            database.getReference("${getCurrentUserPath()}/${Nodes.DEFAULT_PROVIDER}")
+                .get()
+                .await()
+                .value as? String
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting default provider from Firebase", e)
+            null
+        }
     }
     
     // ─────────────────────────────────────────────────────────────────────────────

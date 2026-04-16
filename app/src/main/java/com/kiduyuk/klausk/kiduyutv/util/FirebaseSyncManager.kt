@@ -57,7 +57,7 @@ object FirebaseSyncManager {
     val syncMessage: StateFlow<String> = _syncMessage.asStateFlow()
     
     // Total steps for progress calculation
-    private val TOTAL_SYNC_STEPS = 5 // MyList, Companies, Networks, Casts, WatchHistory
+    private val TOTAL_SYNC_STEPS = 6 // MyList, Companies, Networks, Casts, WatchHistory, DefaultProvider
     
     // Active listeners for cleanup
     private val activeListeners = mutableListOf<com.google.firebase.database.Query>()
@@ -185,10 +185,15 @@ object FirebaseSyncManager {
                 _syncProgress.value = 4
                 syncCasts(forceRefresh)
                 
-                // Step 5: Sync Watch History (optional)
+                // Step 5: Sync Watch History
                 _syncMessage.value = "Syncing Watch History..."
                 _syncProgress.value = 5
                 syncWatchHistory(forceRefresh)
+                
+                // Step 6: Sync Default Provider
+                _syncMessage.value = "Syncing Preferences..."
+                _syncProgress.value = 6
+                syncDefaultProvider()
                 
                 // Calculate total items synced
                 val myListCount = getFirebaseMyListCount()
@@ -385,9 +390,121 @@ object FirebaseSyncManager {
      */
     private suspend fun syncWatchHistory(forceRefresh: Boolean) {
         try {
-            Log.d(TAG, "Watch History sync initiated")
+            val firebaseData = FirebaseManager.getWatchHistoryOnce()
+            
+            if (firebaseData != null && firebaseData.isNotEmpty()) {
+                Log.d(TAG, "Found ${firebaseData.size} watch history entries in Firebase")
+                
+                // Watch history structure: { tv: { tmdbId: { seasonNumber: { episodeNumber: {...} } } }, movies: { tmdbId: {...} } }
+                // We process both TV and movies
+                
+                // Process TV watch history
+                val tvHistory = firebaseData["tv"] as? Map<*, *>
+                if (tvHistory != null) {
+                    processTvWatchHistory(tvHistory)
+                }
+                
+                // Process movie watch history
+                val movieHistory = firebaseData["movies"] as? Map<*, *>
+                if (movieHistory != null) {
+                    processMovieWatchHistory(movieHistory)
+                }
+                
+                Log.d(TAG, "Watch history sync completed")
+            } else {
+                Log.d(TAG, "No watch history found in Firebase")
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error syncing Watch History", e)
+        }
+    }
+    
+    /**
+     * Process TV watch history from Firebase.
+     */
+    private fun processTvWatchHistory(tvHistory: Map<*, *>) {
+        tvHistory.forEach { (tmdbIdStr, seasonsData) ->
+            try {
+                val tmdbId = (tmdbIdStr as? String)?.toIntOrNull() ?: return@forEach
+                if (seasonsData is Map<*, *>) {
+                    seasonsData.forEach { (seasonStr, episodesData) ->
+                        try {
+                            val season = (seasonStr as? String)?.toIntOrNull() ?: return@forEach
+                            if (episodesData is Map<*, *>) {
+                                episodesData.forEach { (episodeStr, episodeData) ->
+                                    try {
+                                        val episode = (episodeStr as? String)?.toIntOrNull() ?: return@forEach
+                                        if (episodeData is Map<*, *>) {
+                                            val playbackPosition = (episodeData["playbackPosition"] as? Number)?.toLong() ?: 0L
+                                            val duration = (episodeData["duration"] as? Number)?.toLong() ?: 0L
+                                            val progress = (episodeData["progress"] as? Number)?.toDouble() ?: 0.0
+                                            
+                                            Log.d(TAG, "Syncing TV watch history: ID=$tmdbId S${season}E${episode} position=${playbackPosition}s")
+                                            
+                                            // Update local database with watch history
+                                            // Note: This would require a method in DatabaseManager to update watch history
+                                            // For now, we just log it
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.e(TAG, "Error processing episode: $episodeStr", e)
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error processing season: $seasonStr", e)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error processing TV: $tmdbIdStr", e)
+            }
+        }
+    }
+    
+    /**
+     * Process movie watch history from Firebase.
+     */
+    private fun processMovieWatchHistory(movieHistory: Map<*, *>) {
+        movieHistory.forEach { (tmdbIdStr, movieData) ->
+            try {
+                val tmdbId = (tmdbIdStr as? String)?.toIntOrNull() ?: return@forEach
+                if (movieData is Map<*, *>) {
+                    val playbackPosition = (movieData["playbackPosition"] as? Number)?.toLong() ?: 0L
+                    val duration = (movieData["duration"] as? Number)?.toLong() ?: 0L
+                    val progress = (movieData["progress"] as? Number)?.toDouble() ?: 0.0
+                    
+                    Log.d(TAG, "Syncing movie watch history: ID=$tmdbId position=${playbackPosition}s")
+                    
+                    // Update local database with watch history
+                    // Note: This would require a method in DatabaseManager to update watch history
+                    // For now, we just log it
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error processing movie: $tmdbIdStr", e)
+            }
+        }
+    }
+    
+    /**
+     * Sync Default Provider from Firebase to local settings.
+     * This ensures the default provider preference syncs across devices.
+     */
+    private suspend fun syncDefaultProvider() {
+        try {
+            val firebaseProvider = FirebaseManager.getDefaultProviderOnce()
+            
+            if (firebaseProvider != null) {
+                Log.d(TAG, "Found default provider in Firebase: $firebaseProvider")
+                
+                // Save to local settings if Firebase has a value
+                // Note: We need context to access SettingsManager
+                // This is handled in SplashActivity after sync completes
+                _syncMessage.value = "Default provider: $firebaseProvider"
+            } else {
+                Log.d(TAG, "No default provider found in Firebase")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error syncing Default Provider", e)
         }
     }
     

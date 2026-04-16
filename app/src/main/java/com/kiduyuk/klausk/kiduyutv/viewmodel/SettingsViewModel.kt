@@ -65,9 +65,9 @@ class SettingsViewModel : ViewModel() {
     fun setDefaultProvider(context: Context, provider: String) {
         SettingsManager(context).saveDefaultProvider(provider)
         
-        // Sync preference to Firebase Realtime Database for mobile persistence
-        // This ensures the setting is saved in the cloud even if local data is cleared
-        com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.savePreference("default_provider", provider)
+        // Sync default provider to Firebase for cross-device sync
+        // This ensures the setting is saved in the cloud and synced to other devices
+        com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.saveDefaultProvider(provider)
         
         _uiState.update { it.copy(defaultProvider = provider) }
     }
