@@ -1629,79 +1629,79 @@ private fun PhoneLoginCodeDialog(
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
-                    .clip(RoundedCornerShape(24.dp))
+                    .clip(RoundedCornerShape(16.dp))
                     .background(SurfaceDark)
-                    .padding(48.dp)
-                    .width(400.dp)
+                    .padding(24.dp)
+                    .width(320.dp)
             ) {
                 Text(
                     text = "Login with Phone",
                     color = TextPrimary,
-                    fontSize = 28.sp,
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
                 )
                 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 
                 Text(
                     text = "Open the KiduyuTV app on your phone and enter this code to sync your account:",
                     color = TextSecondary,
-                    fontSize = 18.sp,
+                    fontSize = 14.sp,
                     textAlign = TextAlign.Center,
-                    lineHeight = 24.sp
+                    lineHeight = 20.sp
                 )
                 
-                Spacer(modifier = Modifier.height(40.dp))
+                Spacer(modifier = Modifier.height(24.dp))
                 
                 // Display the 6-digit code
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(12.dp))
                         .background(CardDark)
-                        .padding(horizontal = 32.dp, vertical = 16.dp)
-                        .border(2.dp, PrimaryRed, RoundedCornerShape(16.dp)),
+                        .padding(horizontal = 24.dp, vertical = 12.dp)
+                        .border(2.dp, PrimaryRed, RoundedCornerShape(12.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = generatedCode.chunked(3).joinToString(" "),
                         color = Color.White,
-                        fontSize = 48.sp,
+                        fontSize = 32.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 8.sp
+                        letterSpacing = 6.sp
                     )
                 }
                 
-                Spacer(modifier = Modifier.height(40.dp))
+                Spacer(modifier = Modifier.height(24.dp))
                 
                 if (isWaitingForLogin) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(16.dp),
                             color = PrimaryRed,
                             strokeWidth = 2.dp
                         )
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "Waiting for phone authorization...",
                             color = TextSecondary,
-                            fontSize = 14.sp
+                            fontSize = 12.sp
                         )
                     }
                 }
                 
-                Spacer(modifier = Modifier.height(48.dp))
+                Spacer(modifier = Modifier.height(32.dp))
                 
                 // Cancel Button
                 Box(
                     modifier = Modifier
-                        .width(200.dp)
-                        .height(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .width(160.dp)
+                        .height(40.dp)
+                        .clip(RoundedCornerShape(10.dp))
                         .background(if (isCancelFocused) PrimaryRed else CardDark)
                         .border(
                             width = 1.dp,
                             color = if (isCancelFocused) Color.White else TextTertiary.copy(alpha = 0.3f),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(10.dp)
                         )
                         .focusRequester(cancelFocusRequester)
                         .clickable(
@@ -1722,7 +1722,7 @@ private fun PhoneLoginCodeDialog(
                     Text(
                         text = "Cancel",
                         color = TextPrimary,
-                        fontSize = 16.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Medium
                     )
                 }
