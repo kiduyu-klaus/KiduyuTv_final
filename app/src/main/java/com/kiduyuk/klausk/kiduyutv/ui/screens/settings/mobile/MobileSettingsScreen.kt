@@ -188,6 +188,57 @@ fun MobileSettingsScreen(
                         
                         Spacer(modifier = Modifier.height(16.dp))
                         
+                        val onValidateCode = {
+                            val code = tvCodeInput.trim()
+                            if (code.length == 6) {
+                                isAuthorizingTv = true
+                                val database = com.google.firebase.database.FirebaseDatabase.getInstance()
+                                val codeRef = database.getReference("tv_codes/$code")
+                                
+                                codeRef.get().addOnSuccessListener { snapshot ->
+                                    if (snapshot.exists()) {
+                                        val createdAt = snapshot.child("createdAt").getValue(Long::class.java) ?: 0L
+                                        val now = System.currentTimeMillis()
+                                        val fiveMinutes = 5 * 60 * 1000
+                                        
+                                        if (now - createdAt < fiveMinutes) {
+                                            // Code is valid and not expired, write UID
+                                            val uid = currentUid?.uid
+                                            if (uid != null) {
+                                                codeRef.child("authorizedUid").setValue(uid)
+                                                    .addOnSuccessListener {
+                                                        Toast.makeText(context, "TV Authorized Successfully!", Toast.LENGTH_SHORT).show()
+                                                        tvCodeInput = ""
+                                                        isAuthorizingTv = false
+                                                        
+                                                        // Clean up after a short delay
+                                                        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                                            codeRef.removeValue()
+                                                        }, 2000)
+                                                    }
+                                                    .addOnFailureListener {
+                                                        Toast.makeText(context, "Failed to authorize TV", Toast.LENGTH_SHORT).show()
+                                                        isAuthorizingTv = false
+                                                    }
+                                            }
+                                        } else {
+                                            Toast.makeText(context, "Code has expired. Generate a new one on TV.", Toast.LENGTH_LONG).show()
+                                            isAuthorizingTv = false
+                                            codeRef.removeValue() // Cleanup expired code
+                                        }
+                                    } else {
+                                        Toast.makeText(context, "Invalid code. Please check and try again.", Toast.LENGTH_SHORT).show()
+                                        isAuthorizingTv = false
+                                    }
+                                }.addOnFailureListener {
+                                    Toast.makeText(context, "Error connecting to Firebase", Toast.LENGTH_SHORT).show()
+                                    isAuthorizingTv = false
+                                }
+                            } else {
+                                Toast.makeText(context, "Please enter a 6-digit code", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+
                         OutlinedTextField(
                             value = tvCodeInput,
                             onValueChange = { if (it.length <= 6) tvCodeInput = it.uppercase() },
@@ -205,59 +256,38 @@ fun MobileSettingsScreen(
                                 if (isAuthorizingTv) {
                                     CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                                 } else if (tvCodeInput.length == 6) {
-                                    IconButton(onClick = {
-                                        val code = tvCodeInput.trim()
-                                        if (code.length == 6) {
-                                            isAuthorizingTv = true
-                                            val database = com.google.firebase.database.FirebaseDatabase.getInstance()
-                                            val codeRef = database.getReference("tv_codes/$code")
-                                            
-                                            codeRef.get().addOnSuccessListener { snapshot ->
-                                                if (snapshot.exists()) {
-                                                    val createdAt = snapshot.child("createdAt").getValue(Long::class.java) ?: 0L
-                                                    val now = System.currentTimeMillis()
-                                                    val fiveMinutes = 5 * 60 * 1000
-                                                    
-                                                    if (now - createdAt < fiveMinutes) {
-                                                        // Code is valid and not expired, write UID
-                                                        val uid = currentUid?.uid
-                                                        if (uid != null) {
-                                                            codeRef.child("authorizedUid").setValue(uid)
-                                                                .addOnSuccessListener {
-                                                                    Toast.makeText(context, "TV Authorized Successfully!", Toast.LENGTH_SHORT).show()
-                                                                    tvCodeInput = ""
-                                                                    isAuthorizingTv = false
-                                                                    
-                                                                    // Clean up after a short delay
-                                                                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                                                                        codeRef.removeValue()
-                                                                    }, 2000)
-                                                                }
-                                                                .addOnFailureListener {
-                                                                    Toast.makeText(context, "Failed to authorize TV", Toast.LENGTH_SHORT).show()
-                                                                    isAuthorizingTv = false
-                                                                }
-                                                        }
-                                                    } else {
-                                                        Toast.makeText(context, "Code has expired. Generate a new one on TV.", Toast.LENGTH_LONG).show()
-                                                        isAuthorizingTv = false
-                                                        codeRef.removeValue() // Cleanup expired code
-                                                    }
-                                                } else {
-                                                    Toast.makeText(context, "Invalid code. Please check and try again.", Toast.LENGTH_SHORT).show()
-                                                    isAuthorizingTv = false
-                                                }
-                                            }.addOnFailureListener {
-                                                Toast.makeText(context, "Error connecting to Firebase", Toast.LENGTH_SHORT).show()
-                                                isAuthorizingTv = false
-                                            }
-                                        }
-                                    }) {
+                                    IconButton(onClick = onValidateCode) {
                                         Icon(Icons.Default.CheckCircle, contentDescription = "Authorize", tint = Color.Green)
                                     }
                                 }
                             }
                         )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Button(
+                            onClick = onValidateCode,
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !isAuthorizingTv && tvCodeInput.length == 6,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = PrimaryRed,
+                                contentColor = Color.White,
+                                disabledContainerColor = PrimaryRed.copy(alpha = 0.5f)
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            if (isAuthorizingTv) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Validating...")
+                            } else {
+                                Text("Validate Code", fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
                 }
             }
@@ -829,3 +859,4 @@ private fun SettingsItem(
         }
     }
 }
+
