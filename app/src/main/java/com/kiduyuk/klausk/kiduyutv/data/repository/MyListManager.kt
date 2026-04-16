@@ -112,7 +112,7 @@ object MyListManager {
             val newList = listOf(item) + currentList
             _myList.value = newList
 
-            // Persist to database
+            // Persist to local database
             DatabaseManager.addToMyList(
                 id = item.id,
                 mediaType = item.type,
@@ -122,6 +122,33 @@ object MyListManager {
                 character = item.character,
                 knownForDepartment = item.knownForDepartment
             )
+
+            // Sync to Firebase Realtime Database for mobile persistence
+            // Even if local data is cleared, Firebase will retain this item
+            com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.syncMyListItem(
+                tmdbId = item.id,
+                isTv = item.type == "tv",
+                title = item.title,
+                posterPath = item.posterPath,
+                backdropPath = null, // Detail screens can update this later if needed
+                voteAverage = item.voteAverage
+            )
+
+            // Special handling for companies and networks sync
+            if (item.type == "company") {
+                com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.saveCompany(
+                    companyId = item.id,
+                    name = item.title,
+                    logoPath = item.posterPath,
+                    originCountry = null
+                )
+            } else if (item.type == "network") {
+                com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.saveNetwork(
+                    networkId = item.id,
+                    name = item.title,
+                    logoPath = item.posterPath
+                )
+            }
         }
     }
 
@@ -142,7 +169,8 @@ object MyListManager {
         val newList = currentList.filter { !(it.id == itemId && it.type == type) }
         _myList.value = newList
 
-        // Remove from database
+        // Remove from local database only
+        // As per user requirement, Firebase data should not be deleted even if local data is cleared/removed
         DatabaseManager.removeFromMyList(itemId, type)
     }
 

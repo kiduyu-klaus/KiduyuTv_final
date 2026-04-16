@@ -106,8 +106,9 @@ fun SettingsScreen(
     if (showPhoneLoginDialog) {
         PhoneLoginCodeDialog(
             onDismiss = { showPhoneLoginDialog = false },
-            onCodeSubmit = { code ->
-                // TODO: Implement phone login logic with code
+            onLoginSuccess = { uid ->
+                // Success! Login on TV with this UID
+                com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.init(uid)
                 showPhoneLoginDialog = false
             }
         )
@@ -1527,17 +1528,61 @@ private fun AccountSignedInCard(
 @Composable
 private fun PhoneLoginCodeDialog(
     onDismiss: () -> Unit,
-    onCodeSubmit: (String) -> Unit
+    onLoginSuccess: (String) -> Unit
 ) {
-    var code by remember { mutableStateOf(List(6) { "" }) }
-    val focusRequesters = remember { List(6) { FocusRequester() } }
-    val validateButtonFocusRequester = remember { FocusRequester() }
-    val keyboardController = LocalSoftwareKeyboardController.current
-    val focusManager = LocalFocusManager.current
+    val context = LocalContext.current
+    var generatedCode by remember { mutableStateOf("") }
+    var isWaitingForLogin by remember { mutableStateOf(false) }
+    val cancelInteractionSource = remember { MutableInteractionSource() }
+    val isCancelFocused by cancelInteractionSource.collectIsFocusedAsState()
+    val cancelFocusRequester = remember { FocusRequester() }
 
-    // Auto-focus the first box when dialog opens
+    // Generate code and start listening to Firebase
     LaunchedEffect(Unit) {
-        focusRequesters[0].requestFocus()
+        // 1. Generate a random 6-digit alphanumeric code
+        val chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        generatedCode = (1..6).map { chars.random() }.joinToString("")
+        isWaitingForLogin = true
+        
+        // 2. Get device ID
+        val settingsManager = SettingsManager(context)
+        val deviceId = settingsManager.getDeviceId()
+        
+        // 3. Store code in Firebase and listen for UID
+        val database = com.google.firebase.database.FirebaseDatabase.getInstance()
+        val codeRef = database.getReference("tv_codes/$generatedCode")
+        
+        // Save deviceId and timestamp
+        val data = mapOf(
+            "deviceId" to deviceId,
+            "createdAt" to System.currentTimeMillis()
+        )
+        codeRef.setValue(data)
+        
+        // 4. Listen for authorizedUid
+        val listener = object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                if (snapshot.hasChild("authorizedUid")) {
+                    val uid = snapshot.child("authorizedUid").getValue(String::class.java)
+                    if (uid != null) {
+                        // Success! Login on TV with this UID
+                        onLoginSuccess(uid)
+                        // Cleanup
+                        codeRef.removeValue()
+                        codeRef.removeEventListener(this)
+                    }
+                }
+            }
+            
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                isWaitingForLogin = false
+            }
+        }
+        
+        codeRef.addValueEventListener(listener)
+        
+        // Auto-focus cancel button for easy dismissal
+        cancelFocusRequester.requestFocus()
     }
 
     Dialog(
@@ -1547,180 +1592,87 @@ private fun PhoneLoginCodeDialog(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Transparent), // Transparent background as requested
+                .background(Color.Black.copy(alpha = 0.8f)),
             contentAlignment = Alignment.Center
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .clip(RoundedCornerShape(24.dp))
-                    .background(SurfaceDark.copy(alpha = 0.95f))
+                    .background(SurfaceDark)
                     .padding(48.dp)
+                    .width(400.dp)
             ) {
                 Text(
-                    text = "Enter Code",
+                    text = "Login with Phone",
                     color = TextPrimary,
-                    fontSize = 24.sp,
+                    fontSize = 28.sp,
                     fontWeight = FontWeight.Bold
                 )
                 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(24.dp))
                 
                 Text(
-                    text = "Enter the 6-digit code displayed on your phone",
+                    text = "Open the KiduyuTV app on your phone and enter this code to sync your account:",
                     color = TextSecondary,
-                    fontSize = 16.sp,
-                    textAlign = TextAlign.Center
+                    fontSize = 18.sp,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 24.sp
                 )
                 
                 Spacer(modifier = Modifier.height(40.dp))
                 
-                // 6-digit code input boxes
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                // Display the 6-digit code
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(CardDark)
+                        .padding(horizontal = 32.dp, vertical = 16.dp)
+                        .border(2.dp, PrimaryRed, RoundedCornerShape(16.dp)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    repeat(6) { index ->
-                        val interactionSource = remember { MutableInteractionSource() }
-                        val isFocused by interactionSource.collectIsFocusedAsState()
-                        
-                        Box(
-                            modifier = Modifier
-                                .size(60.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(CardDark)
-                                .border(
-                                    width = if (isFocused) 2.dp else 1.dp,
-                                    color = if (isFocused) PrimaryRed else TextTertiary.copy(alpha = 0.3f),
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                                .focusRequester(focusRequesters[index])
-                                .focusable(interactionSource = interactionSource)
-                                .onKeyEvent { keyEvent ->
-                                    if (keyEvent.type == KeyEventType.KeyDown) {
-                                        when (keyEvent.key) {
-                                            Key.Backspace -> {
-                                                if (code[index].isEmpty() && index > 0) {
-                                                    focusRequesters[index - 1].requestFocus()
-                                                } else {
-                                                    val newCode = code.toMutableList()
-                                                    newCode[index] = ""
-                                                    code = newCode
-                                                }
-                                                true
-                                            }
-                                            else -> false
-                                        }
-                                    } else false
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            BasicTextField(
-                                value = code[index],
-                                onValueChange = { newValue ->
-                                    if (newValue.length <= 1 && newValue.all { it.isDigit() }) {
-                                        val newCode = code.toMutableList()
-                                        newCode[index] = newValue
-                                        code = newCode
-                                        
-                                        if (newValue.isNotEmpty()) {
-                                            if (index < 5) {
-                                                focusRequesters[index + 1].requestFocus()
-                                            } else {
-                                                // Last digit entered, hide keyboard and focus validate button
-                                                //keyboardController?.hide()
-                                                validateButtonFocusRequester.requestFocus()
-                                            }
-                                        }
-                                    }
-                                },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                textStyle = androidx.compose.ui.text.TextStyle(
-                                    color = TextPrimary,
-                                    fontSize = 28.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Center
-                                ),
-                                modifier = Modifier.fillMaxSize(),
-                                decorationBox = { innerTextField ->
-                                    Box(contentAlignment = Alignment.Center) {
-                                        innerTextField()
-                                    }
-                                }
-                            )
-                        }
+                    Text(
+                        text = generatedCode.chunked(3).joinToString(" "),
+                        color = Color.White,
+                        fontSize = 48.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 8.sp
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(40.dp))
+                
+                if (isWaitingForLogin) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = PrimaryRed,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "Waiting for phone authorization...",
+                            color = TextSecondary,
+                            fontSize = 14.sp
+                        )
                     }
                 }
                 
                 Spacer(modifier = Modifier.height(48.dp))
                 
-                // TODO: Implement phone login logic later
-                Text(
-                    text = "TODO: Implement phone login logic later",
-                    color = PrimaryRed.copy(alpha = 0.7f),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Light
-                )
-                
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Validate Code Button
-                val validateInteractionSource = remember { MutableInteractionSource() }
-                val isValidateFocused by validateInteractionSource.collectIsFocusedAsState()
-                val isCodeComplete = code.all { it.isNotEmpty() }
-
+                // Cancel Button
                 Box(
                     modifier = Modifier
                         .width(200.dp)
                         .height(48.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(if (isValidateFocused) PrimaryRed else if (isCodeComplete) SurfaceDark else SurfaceDark.copy(alpha = 0.5f))
-                        .border(
-                            width = if (isValidateFocused) 2.dp else 1.dp,
-                            color = if (isValidateFocused) Color.White else TextTertiary.copy(alpha = 0.3f),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        .focusRequester(validateButtonFocusRequester)
-                        .clickable(
-                            enabled = isCodeComplete,
-                            interactionSource = validateInteractionSource,
-                            indication = null,
-                            onClick = { onCodeSubmit(code.joinToString("")) }
-                        )
-                        .onKeyEvent { keyEvent ->
-                            if (isCodeComplete && keyEvent.type == KeyEventType.KeyDown && 
-                                (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)) {
-                                onCodeSubmit(code.joinToString(""))
-                                true
-                            } else false
-                        }
-                        .focusable(interactionSource = validateInteractionSource),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Validate Code",
-                        color = if (isCodeComplete) Color.White else TextSecondary,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                val cancelInteractionSource = remember { MutableInteractionSource() }
-                val isCancelFocused by cancelInteractionSource.collectIsFocusedAsState()
-                
-                Box(
-                    modifier = Modifier
-                        .width(200.dp)
-                        .height(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (isCancelFocused) CardDark else Color.Transparent)
+                        .background(if (isCancelFocused) PrimaryRed else CardDark)
                         .border(
                             width = 1.dp,
                             color = if (isCancelFocused) Color.White else TextTertiary.copy(alpha = 0.3f),
                             shape = RoundedCornerShape(12.dp)
                         )
+                        .focusRequester(cancelFocusRequester)
                         .clickable(
                             interactionSource = cancelInteractionSource,
                             indication = null,

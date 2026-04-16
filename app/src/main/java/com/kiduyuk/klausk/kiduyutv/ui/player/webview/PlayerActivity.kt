@@ -202,8 +202,25 @@ class PlayerActivity : AppCompatActivity() {
                         0L
                     }
 
-                    // Update playback position
+                    // Update local playback position
                     repository.updatePlaybackPosition(tmdbId, mediaType, playbackPosition)
+
+                    // Sync watch history to Firebase Realtime Database
+                    // This allows progress to be recovered even if local data is cleared
+                    val uiModeManager = getSystemService(Context.UI_MODE_SERVICE) as UiModeManager
+                    if (uiModeManager.currentModeType != Configuration.UI_MODE_TYPE_TELEVISION) {
+                        // Mobile-only sync for now
+                        com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.syncWatchHistory(
+                            tmdbId = tmdbId,
+                            isTv = mediaType == "tv" || mediaType == "anime" || isTv,
+                            seasonNumber = if (latestSeason > 0) latestSeason else currentSeason,
+                            episodeNumber = if (latestEpisode > 0) latestEpisode else currentEpisode,
+                            playbackPosition = playbackPosition,
+                            duration = latestDuration
+                        )
+                    } else {
+                        // TODO: Implement Firebase watch history sync for Android TV later
+                    }
 
                     // Determine season and episode - prefer message data if available
                     val seasonToSave =
