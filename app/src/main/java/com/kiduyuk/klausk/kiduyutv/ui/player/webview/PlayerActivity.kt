@@ -44,6 +44,14 @@ class PlayerActivity : AppCompatActivity() {
     private var isCursorDisabled = false
     private var currentProviderName: String = "VidLink"
 
+    // Track content metadata for Firebase sync
+    private var contentTitle: String = "Unknown"
+    private var contentOverview: String? = null
+    private var contentPosterPath: String? = null
+    private var contentBackdropPath: String? = null
+    private var contentVoteAverage: Double = 0.0
+    private var contentReleaseDate: String? = null
+
     // Track latest playback info from player messages
     private var latestTimestamp: Long = 0L
     private var latestDuration: Long = 0L
@@ -221,7 +229,13 @@ class PlayerActivity : AppCompatActivity() {
                         seasonNumber = seasonToSync,
                         episodeNumber = episodeToSync,
                         playbackPosition = playbackPosition,
-                        duration = latestDuration
+                        duration = latestDuration,
+                        title = contentTitle,
+                        overview = contentOverview,
+                        posterPath = contentPosterPath,
+                        backdropPath = contentBackdropPath,
+                        voteAverage = contentVoteAverage,
+                        releaseDate = contentReleaseDate
                     )
 
                     // Determine season and episode - prefer message data if available
@@ -283,7 +297,14 @@ class PlayerActivity : AppCompatActivity() {
         val isTv = intent.getBooleanExtra("IS_TV", false)
         currentSeason = intent.getIntExtra("SEASON_NUMBER", 1)
         currentEpisode = intent.getIntExtra("EPISODE_NUMBER", 1)
-        val title = intent.getStringExtra("TITLE") ?: "Unknown"
+        
+        // Store content metadata for Firebase sync
+        contentTitle = intent.getStringExtra("TITLE") ?: "Unknown"
+        contentOverview = intent.getStringExtra("OVERVIEW")
+        contentPosterPath = intent.getStringExtra("POSTER_PATH")
+        contentBackdropPath = intent.getStringExtra("BACKDROP_PATH")
+        contentVoteAverage = intent.getDoubleExtra("VOTE_AVERAGE", 0.0)
+        contentReleaseDate = intent.getStringExtra("RELEASE_DATE")
 
         if (tmdbId == -1) {
             finish()
@@ -315,12 +336,12 @@ class PlayerActivity : AppCompatActivity() {
                 this,
                 WatchHistoryItem(
                     id = tmdbId,
-                    title = title,
-                    overview = intent.getStringExtra("OVERVIEW"),
-                    posterPath = intent.getStringExtra("POSTER_PATH"),
-                    backdropPath = intent.getStringExtra("BACKDROP_PATH"),
-                    voteAverage = intent.getDoubleExtra("VOTE_AVERAGE", 0.0),
-                    releaseDate = intent.getStringExtra("RELEASE_DATE"),
+                    title = contentTitle,
+                    overview = contentOverview,
+                    posterPath = contentPosterPath,
+                    backdropPath = contentBackdropPath,
+                    voteAverage = contentVoteAverage,
+                    releaseDate = contentReleaseDate,
                     isTv = isTv,
                     seasonNumber = if (isTv) currentSeason else null,
                     episodeNumber = if (isTv) currentEpisode else null
@@ -886,7 +907,13 @@ class PlayerActivity : AppCompatActivity() {
                             seasonNumber = seasonToSync,
                             episodeNumber = episodeToSync,
                             playbackPosition = currentTime.toLong(),
-                            duration = latestDuration
+                            duration = latestDuration,
+                            title = contentTitle,
+                            overview = contentOverview,
+                            posterPath = contentPosterPath,
+                            backdropPath = contentBackdropPath,
+                            voteAverage = contentVoteAverage,
+                            releaseDate = contentReleaseDate
                         )
 
                         Log.i(

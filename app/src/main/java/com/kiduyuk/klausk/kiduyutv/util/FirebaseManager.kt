@@ -435,6 +435,12 @@ object FirebaseManager {
         episodeNumber: Int?,
         playbackPosition: Long,
         duration: Long,
+        title: String? = null,
+        overview: String? = null,
+        posterPath: String? = null,
+        backdropPath: String? = null,
+        voteAverage: Double? = null,
+        releaseDate: String? = null,
         updatedAt: Long = System.currentTimeMillis()
     ) {
         val path = if (isTv) {
@@ -443,7 +449,7 @@ object FirebaseManager {
             "${getCurrentUserPath()}/${Nodes.WATCH_HISTORY}/movies/$tmdbId"
         }
         
-        val item = mapOf(
+        val item = mutableMapOf<String, Any?>(
             "tmdbId" to tmdbId,
             "isTv" to isTv,
             "seasonNumber" to seasonNumber,
@@ -453,6 +459,14 @@ object FirebaseManager {
             "progress" to if (duration > 0) (playbackPosition.toDouble() / duration * 100) else 0.0,
             "updatedAt" to updatedAt
         )
+        
+        // Add optional metadata fields if provided
+        title?.let { item["title"] = it }
+        overview?.let { item["overview"] = it }
+        posterPath?.let { item["posterPath"] = it }
+        backdropPath?.let { item["backdropPath"] = it }
+        voteAverage?.let { item["voteAverage"] = it }
+        releaseDate?.let { item["releaseDate"] = it }
         
         database.getReference(path).setValue(item)
     }

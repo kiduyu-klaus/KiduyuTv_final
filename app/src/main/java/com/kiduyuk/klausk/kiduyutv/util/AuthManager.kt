@@ -3,6 +3,7 @@ package com.kiduyuk.klausk.kiduyutv.util
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.util.Log
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
@@ -23,6 +24,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * - Signing out
  * - Getting current user information
  * - Listening to auth state changes
+ * - Persisting login across cache clears via SharedPreferences
  * 
  * Usage:
  *   // Initialize once in Application
@@ -45,9 +47,19 @@ object AuthManager {
     // This is found in google-services.json or Google Cloud Console
     private const val DEFAULT_WEB_CLIENT_ID = "109926033937-dsl207opc1lsa3fnonim2sfmnc0o9hjk.apps.googleusercontent.com"
     
+    // SharedPreferences constants for persistent login
+    private const val PREFS_NAME = "auth_prefs"
+    private const val PREF_UID = "uid"
+    private const val PREF_DISPLAY_NAME = "display_name"
+    private const val PREF_EMAIL = "email"
+    private const val PREF_PHOTO_URL = "photo_url"
+    private const val PREF_IS_SIGNED_IN = "is_signed_in"
+    private const val PREF_AUTH_TYPE = "auth_type" // "google" or "phone"
+    
     private var firebaseAuth: FirebaseAuth? = null
     private var googleSignInClient: GoogleSignInClient? = null
     private var applicationContext: Context? = null
+    private var sharedPreferences: SharedPreferences? = null
     
     // Auth state as a StateFlow for reactive updates
     private val _authStateFlow = MutableStateFlow<FirebaseUser?>(null)
@@ -65,6 +77,10 @@ object AuthManager {
     private val _userPhotoUrl = MutableStateFlow<String?>(null)
     val userPhotoUrl: StateFlow<String?> = _userPhotoUrl.asStateFlow()
     
+    // User UID (for TV phone authorization)
+    private val _userUid = MutableStateFlow<String?>(null)
+    val userUid: StateFlow<String?> = _userUid.asStateFlow()
+    
     // Is user signed in
     private val _isSignedIn = MutableStateFlow(false)
     val isSignedIn: StateFlow<Boolean> = _isSignedIn.asStateFlow()
@@ -76,9 +92,13 @@ object AuthManager {
     /**
      * Initialize AuthManager.
      * Call this once in your Application class.
+     * Loads persisted login state from SharedPreferences if available.
      */
     fun init(context: Context, webClientId: String = DEFAULT_WEB_CLIENT_ID) {
         applicationContext = context.applicationContext
+        
+        // Initialize SharedPreferences for persistent login
+        sharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         
         // Initialize Firebase Auth
         firebaseAuth = FirebaseAuth.getInstance()
@@ -97,8 +117,111 @@ object AuthManager {
             updateAuthState(auth.currentUser)
         }
         
-        // Initialize with current user
-        updateAuthState(firebaseAuth?.currentUser)
+        // Initialize with current user (Firebase auth)
+        val firebaseUser = firebaseAuth?.currentUser
+        if (firebaseUser != null) {
+            // User is signed in via Google on mobile
+            updateAuthState(firebaseUser)
+        } else {
+            // Check for persisted TV phone authorization login
+            loadPersistedLogin()
+        }
+    }
+    
+    /**
+     * Load persisted login state from SharedPreferences.
+     * This restores TV phone authorization login after cache clear.
+     */
+    private fun loadPersistedLogin() {
+        val prefs = sharedPreferences ?: return
+        
+        val isSignedIn = prefs.getBoolean(PREF_IS_SIGNED_IN, false)
+        if (!isSignedIn) {
+            Log.d(TAG, "No persisted login found in SharedPreferences")
+            return
+        }
+        
+        val uid = prefs.getString(PREF_UID, null)
+        val displayName = prefs.getString(PREF_DISPLAY_NAME, null)
+        val email = prefs.getString(PREF_EMAIL, null)
+        val photoUrl = prefs.getString(PREF_PHOTO_URL, null)
+        val authType = prefs.getString(PREF_AUTH_TYPE, null)
+        
+        if (uid != null) {
+            Log.i(TAG, "Restoring persisted login from SharedPreferences: uid=$uid, authType=$authType")
+            
+            // Update FirebaseManager with the persisted UID
+            FirebaseManager.init(uid)
+            
+            // Try to update FirebaseSyncManager
+            try {
+                FirebaseSyncManager.updateFirebaseManagerUserId(uid)
+            } catch (e: Exception) {
+                Log.d(TAG, "FirebaseSyncManager not yet initialized, FirebaseManager updated with persisted UID: $uid")
+            }
+            
+            // Update auth state
+            _isSignedIn.value = true
+            _userDisplayName.value = displayName
+            _userEmail.value = email
+            _userPhotoUrl.value = photoUrl
+            _userUid.value = uid
+            
+            Log.i(TAG, "Persisted login restored successfully: displayName=$displayName")
+        } else {
+            Log.w(TAG, "Persisted login found but UID is null, clearing invalid state")
+            clearPersistedLogin()
+        }
+    }
+    
+    /**
+     * Save login state to SharedPreferences for persistence across cache clears.
+     */
+    private fun savePersistedLogin(
+        uid: String,
+        displayName: String?,
+        email: String?,
+        photoUrl: String?,
+        authType: String
+    ) {
+        val prefs = sharedPreferences ?: run {
+            Log.e(TAG, "SharedPreferences not initialized, cannot save login")
+            return
+        }
+        
+        prefs.edit().apply {
+            putString(PREF_UID, uid)
+            putString(PREF_DISPLAY_NAME, displayName)
+            putString(PREF_EMAIL, email)
+            putString(PREF_PHOTO_URL, photoUrl)
+            putBoolean(PREF_IS_SIGNED_IN, true)
+            putString(PREF_AUTH_TYPE, authType)
+            apply()
+        }
+        
+        Log.i(TAG, "Login saved to SharedPreferences: uid=$uid, authType=$authType")
+    }
+    
+    /**
+     * Clear persisted login state from SharedPreferences.
+     */
+    private fun clearPersistedLogin() {
+        val prefs = sharedPreferences ?: run {
+            Log.e(TAG, "SharedPreferences not initialized, cannot clear login")
+            return
+        }
+        
+        prefs.edit().apply {
+            remove(PREF_UID)
+            remove(PREF_DISPLAY_NAME)
+            remove(PREF_EMAIL)
+            remove(PREF_PHOTO_URL)
+            remove(PREF_IS_SIGNED_IN)
+            remove(PREF_AUTH_TYPE)
+            apply()
+        }
+        
+        Log.i(TAG, "Persisted login cleared from SharedPreferences")
     }
     
     /**
@@ -110,6 +233,18 @@ object AuthManager {
         _userDisplayName.value = user?.displayName
         _userEmail.value = user?.email
         _userPhotoUrl.value = user?.photoUrl?.toString()
+        _userUid.value = user?.uid
+        
+        // Also save to SharedPreferences for mobile Google sign-in persistence
+        if (user != null) {
+            savePersistedLogin(
+                uid = user.uid,
+                displayName = user.displayName,
+                email = user.email,
+                photoUrl = user.photoUrl?.toString(),
+                authType = "google"
+            )
+        }
     }
     
     /**
@@ -122,6 +257,12 @@ object AuthManager {
      */
     val currentUser: FirebaseUser?
         get() = firebaseAuth?.currentUser
+    
+    /**
+     * Get the persisted UID (for TV phone authorization).
+     */
+    val currentUid: String?
+        get() = _userUid.value
     
     /**
      * Sign in with Google ID token.
@@ -159,6 +300,15 @@ object AuthManager {
                             // FirebaseSyncManager might not be initialized yet
                             Log.d(TAG, "FirebaseSyncManager not yet initialized, FirebaseManager updated with UID: ${it.uid}")
                         }
+                        
+                        // Save to SharedPreferences for persistence
+                        savePersistedLogin(
+                            uid = it.uid,
+                            displayName = it.displayName,
+                            email = it.email,
+                            photoUrl = it.photoUrl?.toString(),
+                            authType = "google"
+                        )
                         
                         onSuccess?.invoke(it)
                     }
@@ -235,6 +385,9 @@ object AuthManager {
                 }
             }
         
+        // Clear persisted login
+        clearPersistedLogin()
+        
         // Revert to anonymous device ID for Firebase Manager
         val deviceId = SettingsManager(applicationContext!!).getDeviceId()
         FirebaseManager.init(deviceId)
@@ -261,6 +414,9 @@ object AuthManager {
                     // Sign out from Google as well
                     googleSignInClient?.revokeAccess()
                     
+                    // Clear persisted login
+                    clearPersistedLogin()
+                    
                     // Revert to anonymous
                     val deviceId = SettingsManager(applicationContext!!).getDeviceId()
                     FirebaseManager.init(deviceId)
@@ -279,11 +435,11 @@ object AuthManager {
      */
     fun getUserInfo(): Map<String, Any?> {
         return mapOf(
-            "uid" to currentUser?.uid,
-            "email" to currentUser?.email,
-            "displayName" to currentUser?.displayName,
-            "photoUrl" to currentUser?.photoUrl?.toString(),
-            "isSignedIn" to (currentUser != null)
+            "uid" to (currentUser?.uid ?: _userUid.value),
+            "email" to (currentUser?.email ?: _userEmail.value),
+            "displayName" to (currentUser?.displayName ?: _userDisplayName.value),
+            "photoUrl" to (currentUser?.photoUrl?.toString() ?: _userPhotoUrl.value),
+            "isSignedIn" to _isSignedIn.value
         )
     }
     
@@ -297,6 +453,8 @@ object AuthManager {
      * 
      * CRITICAL: This method ensures that both the TV and mobile app use the SAME
      * Firebase path (users/{uid}/) for data operations, enabling data sharing.
+     * 
+     * The login is persisted to SharedPreferences so it survives cache clears.
      * 
      * @param uid The Firebase Auth UID received from phone authorization
      * @param displayName User's display name from phone's Google account
@@ -332,14 +490,25 @@ object AuthManager {
         _userDisplayName.value = displayName ?: "TV User"
         _userEmail.value = email
         _userPhotoUrl.value = photoUrl
+        _userUid.value = uid
+        
+        // Save to SharedPreferences for persistence across cache clears
+        savePersistedLogin(
+            uid = uid,
+            displayName = displayName,
+            email = email,
+            photoUrl = photoUrl,
+            authType = "phone"
+        )
         
         Log.i(TAG, "Phone authorization successful for UID: $uid, displayName: $displayName")
         Log.i(TAG, "Both TV and mobile will now use Firebase path: users/$uid/")
+        Log.i(TAG, "Login persisted to SharedPreferences for cache clear survival")
     }
     
     /**
      * Sign out from phone authorization.
-     * Reverts to anonymous device ID.
+     * Reverts to anonymous device ID and clears persisted login.
      */
     fun signOutFromPhone(onComplete: (() -> Unit)? = null) {
         // Update auth state to signed out
@@ -347,7 +516,11 @@ object AuthManager {
         _userDisplayName.value = null
         _userEmail.value = null
         _userPhotoUrl.value = null
+        _userUid.value = null
         _authStateFlow.value = null
+        
+        // Clear persisted login from SharedPreferences
+        clearPersistedLogin()
         
         // Revert to anonymous device ID for Firebase Manager
         if (applicationContext != null) {
@@ -356,7 +529,6 @@ object AuthManager {
         }
         
         onComplete?.invoke()
-        Log.i(TAG, "Signed out from phone authorization")
+        Log.i(TAG, "Signed out from phone authorization and cleared persisted login")
     }
 }
-
