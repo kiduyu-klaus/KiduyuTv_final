@@ -1,14 +1,19 @@
 package com.kiduyuk.klausk.kiduyutv.ui.screens.settings.mobile
 
 import android.content.Intent
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,16 +22,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import coil.transform.CircleCropTransformation
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
+import com.kiduyuk.klausk.kiduyutv.util.AuthManager
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.SettingsViewModel
@@ -44,9 +54,51 @@ fun MobileSettingsScreen(
     val myList by MyListManager.myList.collectAsState()
     var showProviderPicker by remember { mutableStateOf(false) }
     var showWhatsNewDialog by remember { mutableStateOf(false) }
+    var showDeleteAccountDialog by remember { mutableStateOf(false) }
+    var showSignInError by remember { mutableStateOf<String?>(null) }
+
+    // Auth state from AuthManager
+    val isSignedIn by AuthManager.isSignedIn.collectAsState()
+    val userDisplayName by AuthManager.userDisplayName.collectAsState()
+    val userEmail by AuthManager.userEmail.collectAsState()
+    val userPhotoUrl by AuthManager.userPhotoUrl.collectAsState()
+    val isAuthLoading by AuthManager.isLoading.collectAsState()
+
+    // Google Sign-In launcher
+    val googleSignInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val data = result.data
+        val task = com.google.android.gms.auth.api.signin.GoogleSignIn.getSignedInAccountFromIntent(data)
+        
+        try {
+            val account = task.getResult(com.google.android.gms.common.api.ApiException::class.java)
+            account.idToken?.let { token ->
+                AuthManager.signInWithGoogle(
+                    idToken = token,
+                    onSuccess = { user ->
+                        Toast.makeText(context, "Signed in as ${user.displayName}", Toast.LENGTH_SHORT).show()
+                    },
+                    onFailure = { exception ->
+                        showSignInError = exception.message ?: "Sign-in failed"
+                    }
+                )
+            }
+        } catch (e: com.google.android.gms.common.api.ApiException) {
+            showSignInError = e.message ?: "Sign-in failed"
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.loadSettingsData(context)
+    }
+
+    // Show sign-in error toast
+    LaunchedEffect(showSignInError) {
+        showSignInError?.let { error ->
+            Toast.makeText(context, error, Toast.LENGTH_LONG).show()
+            showSignInError = null
+        }
     }
 
     Scaffold(
@@ -70,7 +122,51 @@ fun MobileSettingsScreen(
                 .verticalScroll(scrollState)
                 .padding(16.dp)
         ) {
-            // My List Section - Button to open My List screen
+            // ── Account Section ────────────────────────────────────────────────
+            SettingsGroup(title = "Account") {
+                if (isSignedIn) {
+                    // Signed in state - show user info
+                    AccountSignedInCard(
+                        displayName = userDisplayName ?: "User",
+                        email = userEmail ?: "",
+                        photoUrl = userPhotoUrl,
+                        onSignOutClick = {
+                            QuitDialog(
+                                context = context,
+                                title = "Sign Out?",
+                                message = "Are you sure you want to sign out of your account?",
+                                positiveButtonText = "Sign Out",
+                                negativeButtonText = "Cancel",
+                                lottieAnimRes = R.raw.exit,
+                                onNo = {},
+                                onYes = {
+                                    AuthManager.signOut {
+                                        Toast.makeText(context, "Signed out successfully", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            ).show()
+                        },
+                        onDeleteAccountClick = { showDeleteAccountDialog = true }
+                    )
+                } else {
+                    // Signed out state - show sign in button
+                    AccountSignInCard(
+                        onSignInClick = {
+                            val signInClient = AuthManager.getGoogleSignInClient()
+                            if (signInClient != null) {
+                                googleSignInLauncher.launch(signInClient.signInIntent)
+                            } else {
+                                Toast.makeText(context, "Unable to start sign-in", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        isLoading = isAuthLoading
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // ── My List Section ──────────────────────────────────────────────────
             SettingsGroup(title = "My List") {
                 SettingsItem(
                     icon = Icons.Default.Bookmark,
@@ -82,6 +178,7 @@ fun MobileSettingsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            // ── Playback Section ────────────────────────────────────────────────
             SettingsGroup(title = "Playback") {
                 SettingsItem(
                     icon = Icons.Default.PlayCircle,
@@ -96,6 +193,7 @@ fun MobileSettingsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            // ── App Settings Section ───────────────────────────────────────────
             SettingsGroup(title = "App Settings") {
                 SettingsItem(
                     icon = Icons.Default.Delete,
@@ -155,6 +253,7 @@ fun MobileSettingsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            // ── App Information Section ────────────────────────────────────────
             SettingsGroup(title = "App Information") {
                 SettingsItem(
                     icon = Icons.Default.Info,
@@ -175,6 +274,7 @@ fun MobileSettingsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            // ── Updates Section ────────────────────────────────────────────────
             SettingsGroup(title = "Updates") {
                 if (uiState.releaseTitle != null) {
                     SettingsItem(
@@ -331,6 +431,224 @@ fun MobileSettingsScreen(
                 }
             }
         )
+    }
+
+    // ── Delete Account Dialog ───────────────────────────────────────────────────
+    if (showDeleteAccountDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteAccountDialog = false },
+            containerColor = CardDark,
+            title = {
+                Text(
+                    "Delete Account?",
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    "This will permanently delete your account and all associated data. This action cannot be undone.",
+                    color = TextSecondary,
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteAccountDialog = false
+                        AuthManager.deleteAccount(
+                            onSuccess = {
+                                Toast.makeText(context, "Account deleted successfully", Toast.LENGTH_SHORT).show()
+                            },
+                            onFailure = { exception ->
+                                Toast.makeText(context, "Failed to delete account: ${exception.message}", Toast.LENGTH_LONG).show()
+                            }
+                        )
+                    }
+                ) {
+                    Text("Delete", color = Color.Red)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteAccountDialog = false }) {
+                    Text("Cancel", color = PrimaryRed)
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun AccountSignInCard(
+    onSignInClick: () -> Unit,
+    isLoading: Boolean
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Google Icon placeholder
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .clip(CircleShape)
+                .background(SurfaceDark),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Person,
+                contentDescription = null,
+                tint = TextSecondary,
+                modifier = Modifier.size(32.dp)
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        Text(
+            text = "Not signed in",
+            color = TextSecondary,
+            fontSize = 14.sp
+        )
+        
+        Spacer(modifier = Modifier.height(4.dp))
+        
+        Text(
+            text = "Sign in to sync your data across devices",
+            color = TextSecondary,
+            fontSize = 12.sp,
+            textAlign = TextAlign.Center
+        )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Sign in with Google button
+        Button(
+            onClick = onSignInClick,
+            enabled = !isLoading,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = PrimaryRed),
+            shape = RoundedCornerShape(8.dp)
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    color = Color.White,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Default.Login,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Sign in with Google")
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccountSignedInCard(
+    displayName: String,
+    email: String,
+    photoUrl: String?,
+    onSignOutClick: () -> Unit,
+    onDeleteAccountClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Profile photo or placeholder
+            if (photoUrl != null) {
+                AsyncImage(
+                    model = photoUrl,
+                    contentDescription = "Profile photo",
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(PrimaryRed),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = displayName.firstOrNull()?.uppercase() ?: "U",
+                        color = Color.White,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.width(16.dp))
+            
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = displayName,
+                    color = TextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = email,
+                    color = TextSecondary,
+                    fontSize = 12.sp
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // Sign out button
+        OutlinedButton(
+            onClick = onSignOutClick,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = TextPrimary
+            )
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.Logout,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Sign Out")
+        }
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        // Delete account button
+        TextButton(
+            onClick = onDeleteAccountClick,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.textButtonColors(
+                contentColor = Color.Red
+            )
+        ) {
+            Icon(
+                imageVector = Icons.Default.DeleteForever,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Delete Account")
+        }
     }
 }
 

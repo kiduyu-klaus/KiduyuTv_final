@@ -18,6 +18,7 @@ import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.database.FirebaseDatabase
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
+import com.kiduyuk.klausk.kiduyutv.util.AuthManager
 
 /**
  * Custom Application class for KiduyuTv.
@@ -54,6 +55,9 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
         // This enables syncing My List, Saved Companies, Networks, etc.
         val userId = SettingsManager(this).getDeviceId()
         FirebaseManager.init(userId)
+
+        // Initialize AuthManager for Firebase Authentication with Google Sign-In
+        AuthManager.init(this)
 
         // Initialize AndroidApp reference for singleton access
         AndroidApp.instance = this
