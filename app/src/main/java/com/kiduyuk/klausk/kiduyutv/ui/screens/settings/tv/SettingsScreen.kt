@@ -106,10 +106,15 @@ fun SettingsScreen(
     if (showPhoneLoginDialog) {
         PhoneLoginCodeDialog(
             onDismiss = { showPhoneLoginDialog = false },
-            onLoginSuccess = { uid ->
-                // Success! Login on TV with this UID
+            onLoginSuccess = { uid, displayName, email, photoUrl ->
+                // Success! Login on TV with full user profile data
                 // Update AuthManager state to reflect the signed-in status
-                AuthManager.onPhoneAuthorized(uid)
+                AuthManager.onPhoneAuthorized(
+                    uid = uid,
+                    displayName = displayName,
+                    email = email,
+                    photoUrl = photoUrl
+                )
                 showPhoneLoginDialog = false
             }
         )
@@ -1530,7 +1535,7 @@ private fun AccountSignedInCard(
 @Composable
 private fun PhoneLoginCodeDialog(
     onDismiss: () -> Unit,
-    onLoginSuccess: (String) -> Unit
+    onLoginSuccess: (uid: String, displayName: String?, email: String?, photoUrl: String?) -> Unit
 ) {
     val context = LocalContext.current
     var generatedCode by remember { mutableStateOf("") }
@@ -1550,7 +1555,7 @@ private fun PhoneLoginCodeDialog(
         val settingsManager = SettingsManager(context)
         val deviceId = settingsManager.getDeviceId()
         
-        // 3. Store code in Firebase and listen for UID
+        // 3. Store code in Firebase and listen for user data
         val database = com.google.firebase.database.FirebaseDatabase.getInstance()
         val codeRef = database.getReference("tv_codes/$generatedCode")
         
@@ -1561,14 +1566,19 @@ private fun PhoneLoginCodeDialog(
         )
         codeRef.setValue(data)
         
-        // 4. Listen for authorizedUid
+        // 4. Listen for authorizedUser (contains uid + profile info)
         val listener = object : com.google.firebase.database.ValueEventListener {
             override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
-                if (snapshot.hasChild("authorizedUid")) {
-                    val uid = snapshot.child("authorizedUid").getValue(String::class.java)
+                if (snapshot.hasChild("authorizedUser")) {
+                    val userSnapshot = snapshot.child("authorizedUser")
+                    val uid = userSnapshot.child("uid").getValue(String::class.java)
+                    val displayName = userSnapshot.child("displayName").getValue(String::class.java)?.takeIf { it.isNotEmpty() }
+                    val email = userSnapshot.child("email").getValue(String::class.java)?.takeIf { it.isNotEmpty() }
+                    val photoUrl = userSnapshot.child("photoUrl").getValue(String::class.java)?.takeIf { it.isNotEmpty() }
+                    
                     if (uid != null) {
-                        // Success! Login on TV with this UID
-                        onLoginSuccess(uid)
+                        // Success! Login on TV with this user data
+                        onLoginSuccess(uid, displayName, email, photoUrl)
                         // Cleanup
                         codeRef.removeValue()
                         codeRef.removeEventListener(this)

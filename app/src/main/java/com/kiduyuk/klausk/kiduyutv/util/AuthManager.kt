@@ -281,13 +281,13 @@ object AuthManager {
      * When a user authorizes the TV from their phone, this method is called
      * to update the AuthManager state to reflect the signed-in status.
      * 
-     * Since TV doesn't use Firebase Auth directly (it receives UID from phone),
-     * we create a mock user object to track the signed-in state.
+     * The phone app sends the user's profile data (displayName, email, photoUrl)
+     * along with the UID, so the TV can display the same account information.
      * 
      * @param uid The Firebase UID received from phone authorization
-     * @param displayName Optional display name (can be fetched from Firebase or passed from phone)
-     * @param email Optional email (can be fetched from Firebase or passed from phone)
-     * @param photoUrl Optional photo URL (can be fetched from Firebase or passed from phone)
+     * @param displayName User's display name from phone's Google account
+     * @param email User's email from phone's Google account
+     * @param photoUrl User's profile photo URL from phone's Google account
      */
     fun onPhoneAuthorized(
         uid: String,
@@ -299,18 +299,15 @@ object AuthManager {
         FirebaseManager.init(uid)
         
         // Update auth state to signed in
-        // Note: We don't have a real FirebaseUser on TV since TV doesn't use Firebase Auth
-        // Instead, we update the StateFlows directly to reflect the signed-in state
+        // Note: We don't have a real FirebaseUser on TV since TV doesn't use Firebase Auth.
+        // Instead, we update the StateFlows directly to reflect the signed-in state.
+        // The UI observes these StateFlows to display account information.
         _isSignedIn.value = true
         _userDisplayName.value = displayName ?: "TV User"
-        _userEmail.value = email ?: ""
+        _userEmail.value = email
         _userPhotoUrl.value = photoUrl
         
-        // Note: We don't set _authStateFlow with a mock user because the UI observes
-        // the individual StateFlows (_isSignedIn, _userDisplayName, etc.) instead.
-        // This simplifies the code and avoids Firebase SDK compatibility issues.
-        
-        Log.i(TAG, "Phone authorization successful for UID: $uid")
+        Log.i(TAG, "Phone authorization successful for UID: $uid, displayName: $displayName")
     }
     
     /**
