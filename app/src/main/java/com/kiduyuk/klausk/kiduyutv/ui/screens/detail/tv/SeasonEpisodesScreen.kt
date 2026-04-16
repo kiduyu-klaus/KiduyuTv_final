@@ -96,7 +96,7 @@ fun SeasonEpisodesScreen(
                 // Left Column: Show info and Seasons list (30% width)
                 Column(
                     modifier = Modifier
-                        .width(380.dp)
+                        .fillMaxWidth(0.30f)
                         .fillMaxHeight()
                 ) {
                     // Header: Show title (bold, uppercase)
@@ -113,9 +113,9 @@ fun SeasonEpisodesScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Year and seasons count
+                    // Year count
                     Text(
-                        text = if (tvShowYear.isNotEmpty()) "$tvShowYear • $totalSeasons seasons" else "$totalSeasons seasons",
+                        text = if (tvShowYear.isNotEmpty()) "$tvShowYear • $totalSeasons" else "$totalSeasons",
                         style = MaterialTheme.typography.bodyLarge,
                         color = TextSecondary
                     )
