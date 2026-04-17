@@ -44,6 +44,11 @@ class PlayerActivity : AppCompatActivity() {
     private var isCursorDisabled = false
     private var currentProviderName: String = "VidLink"
 
+    // HTML5 fullscreen support (player's native maximize button)
+    private var customView: View? = null
+    private var customViewCallback: WebChromeClient.CustomViewCallback? = null
+    private lateinit var rootLayout: FrameLayout
+
     // FIX: Single shared repository instance instead of creating new ones on every tick
     private val repository = TmdbRepository()
 
@@ -310,7 +315,7 @@ class PlayerActivity : AppCompatActivity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
-        window.setFormat(android.graphics.PixelFormat.TRANSLUCENT)
+        window.setFormat(android.graphics.PixelFormat.OPAQUE)
 
         super.onCreate(savedInstanceState)
 
@@ -385,25 +390,29 @@ class PlayerActivity : AppCompatActivity() {
         val isVidKingPlayer =
             url.startsWith("https://www.vidking.net") || url.startsWith("https://vidking.")
         val isVidLinkPlayer = url.startsWith("https://vidlink.pro")
-        val isTrackingEnabled = isVideasyPlayer || isVidKingPlayer || isVidLinkPlayer
+        val isSuperEmbedPlayer = url.contains("multiembed.mov", ignoreCase = true)
+        // Always enable tracking — JS interface must be present even on redirect targets
+        // like streamingnow.mov which multiembed.mov hands off to.
+        val isTrackingEnabled = isVideasyPlayer || isVidKingPlayer || isVidLinkPlayer || isSuperEmbedPlayer
 
         // FIX: Added SuperEmbed detection
         currentProviderName = when {
             isVidLinkPlayer -> "VidLink"
             isVidKingPlayer -> "VidKing"
             isVideasyPlayer -> "Videasy"
-            url.contains("vidfast", ignoreCase = true)        -> "VidFast"
-            url.contains("vidsrc", ignoreCase = true)         -> "VidSrc"
-            url.contains("mapple", ignoreCase = true)         -> "Mapple"
-            url.contains("flixer", ignoreCase = true)         -> "Flixer"
-            url.contains("multiembed.mov", ignoreCase = true) -> "SuperEmbed"
+            url.contains("vidfast", ignoreCase = true)           -> "VidFast"
+            url.contains("vidsrc", ignoreCase = true)            -> "VidSrc"
+            url.contains("mapple", ignoreCase = true)            -> "Mapple"
+            url.contains("flixer", ignoreCase = true)            -> "Flixer"
+            url.contains("multiembed.mov", ignoreCase = true)    -> "SuperEmbed"
+            url.contains("streamingnow.mov", ignoreCase = true)  -> "StreamingNow"
             else -> "VidLink"
         }
 
         Log.i(TAG, "[Provider] Selected: $currentProviderName")
 
         // ── Layout ────────────────────────────────────────────────────────────
-        val rootLayout = FrameLayout(this).apply {
+        rootLayout = FrameLayout(this).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
@@ -425,25 +434,42 @@ class PlayerActivity : AppCompatActivity() {
                 cacheMode = WebSettings.LOAD_DEFAULT
                 useWideViewPort = true
                 loadWithOverviewMode = true
+                // Desktop UA unlocks better stream sources on providers that
+                // serve degraded or blocked content to Android user agents.
+                userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     safeSetSafeBrowsingEnabled(this, false)
                 }
             }
 
-            setLayerType(View.LAYER_TYPE_NONE, null)
+            // FIX: HARDWARE layer required for HLS/DASH video frame rendering on some streams.
+            // LAYER_TYPE_NONE caused black screen (audio-only) on affected providers.
+            setLayerType(View.LAYER_TYPE_HARDWARE, null)
 
             if (isTrackingEnabled) {
                 addJavascriptInterface(VideasyJavaScriptInterface(), "VideasyInterface")
             }
 
             webViewClient = object : WebViewClient() {
+
+                // Additional ad/tracker domains to block at the network level.
+                // Complements AdvancedAdBlocker for domains commonly seen on streaming sites.
+                private val extraAdHosts = setOf(
+                    "doubleclick.net", "googlesyndication.com", "google-analytics.com",
+                    "adnxs.com", "popads.net", "popcash.net", "adsterra.com",
+                    "mc.yandex.ru", "onclickmedium.com", "propellerads.com",
+                    "ad-maven.com", "juicyads.com", "bebi.com", "histats.com"
+                )
+
                 override fun shouldInterceptRequest(
                     view: WebView?,
                     request: WebResourceRequest?
                 ): WebResourceResponse? {
                     val reqUrl = request?.url.toString()
-                    if (AdvancedAdBlocker.shouldBlock(reqUrl)) {
+                    val reqUrlLower = reqUrl.lowercase()
+                    if (AdvancedAdBlocker.shouldBlock(reqUrl) ||
+                        extraAdHosts.any { reqUrlLower.contains(it) }) {
                         return WebResourceResponse(
                             "text/plain",
                             "utf-8",
@@ -487,25 +513,62 @@ class PlayerActivity : AppCompatActivity() {
                     val advancedJs = """
                             (function() {
                                 function removeAdsAdvanced() {
-                                    const elements = document.querySelectorAll('*');
-                                    elements.forEach(el => {
-                                        const text = (el.innerText || '').toLowerCase();
-                                        const cls = (el.className || '').toString().toLowerCase();
-                                        if (
-                                            text.includes('advert') ||
-                                            text.includes('sponsored') ||
-                                            cls.includes('ad') ||
-                                            cls.includes('popup')
-                                        ) {
-                                            el.remove();
-                                        }
-                                    });
+                                    // Run immediately then every 500ms for 10s to catch
+                                    // ads that inject themselves after page load.
+                                    function killAds() {
+                                        // Remove by class/text heuristics
+                                        const elements = document.querySelectorAll('*');
+                                        elements.forEach(el => {
+                                            const text = (el.innerText || '').toLowerCase();
+                                            const cls = (el.className || '').toString().toLowerCase();
+                                            if (
+                                                text.includes('advert') ||
+                                                text.includes('sponsored') ||
+                                                cls.includes('ad') ||
+                                                cls.includes('popup')
+                                            ) {
+                                                el.remove();
+                                            }
+                                        });
+
+                                        // Remove skip-ad / betting overlays by text
+                                        document.querySelectorAll('div, span, a').forEach(el => {
+                                            if (el.innerText && (
+                                                el.innerText.includes('Skip after') ||
+                                                el.innerText.includes('Skip Ad') ||
+                                                el.innerText.toLowerCase().includes('1win') ||
+                                                el.innerText.toLowerCase().includes('bet365') ||
+                                                el.innerText.toLowerCase().includes('casino')
+                                            )) {
+                                                const container = el.closest('div[style*="position: absolute"]');
+                                                if (container) container.remove(); else el.remove();
+                                            }
+                                        });
+
+                                        // Remove ad iframes (betting/casino src)
+                                        document.querySelectorAll('iframe').forEach(iframe => {
+                                            try {
+                                                const src = iframe.src.toLowerCase();
+                                                if (src.includes('bet') || src.includes('win') || src.includes('casino')) {
+                                                    iframe.remove();
+                                                }
+                                            } catch(e) {}
+                                        });
+                                    }
+
+                                    killAds();
+                                    var _adCount = 0;
+                                    var _adInterval = setInterval(function() {
+                                        killAds();
+                                        if (++_adCount >= 20) clearInterval(_adInterval);
+                                    }, 500);
                                 }
                             
                                 function blockRedirects() {
+                                    // Block new popup windows only — do NOT override
+                                    // window.location.assign/replace as streamingnow.mov
+                                    // uses those internally to reach the actual video player.
                                     window.open = () => null;
-                                    window.location.assign = () => {};
-                                    window.location.replace = () => {};
                                 }
                             
                                 function setupMessageListener() {
@@ -679,6 +742,28 @@ class PlayerActivity : AppCompatActivity() {
                     isUserGesture: Boolean,
                     resultMsg: Message?
                 ): Boolean = false
+
+                // Handle player's native fullscreen button
+                override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
+                    super.onShowCustomView(view, callback)
+                    customView = view
+                    customViewCallback = callback
+                    rootLayout.addView(view, FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    ))
+                    webView.visibility = View.GONE
+                    Log.i(TAG, "[Fullscreen] Custom view shown")
+                }
+
+                override fun onHideCustomView() {
+                    super.onHideCustomView()
+                    customView?.let { rootLayout.removeView(it) }
+                    customView = null
+                    customViewCallback = null
+                    webView.visibility = View.VISIBLE
+                    Log.i(TAG, "[Fullscreen] Custom view hidden")
+                }
             }
 
             loadUrl(url)
@@ -729,9 +814,22 @@ class PlayerActivity : AppCompatActivity() {
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                showExitConfirmationDialog()
+                if (customView != null) {
+                    // Exit HTML5 fullscreen before doing anything else
+                    customViewCallback?.onCustomViewHidden()
+                    onHideCustomViewInternal()
+                } else {
+                    showExitConfirmationDialog()
+                }
             }
         })
+    }
+
+    private fun onHideCustomViewInternal() {
+        customView?.let { rootLayout.removeView(it) }
+        customView = null
+        customViewCallback = null
+        webView.visibility = View.VISIBLE
     }
 
     private fun showExitConfirmationDialog() {
@@ -974,3 +1072,4 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 }
+
