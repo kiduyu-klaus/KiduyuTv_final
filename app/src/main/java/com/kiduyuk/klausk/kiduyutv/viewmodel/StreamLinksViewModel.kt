@@ -164,7 +164,7 @@ class StreamLinksViewModel : ViewModel() {
         }
     }
 
-    private suspend fun checkUrlAvailability(client: OkHttpClient, urlString: String): Boolean {
+    /*private suspend fun checkUrlAvailability(client: OkHttpClient, urlString: String): Boolean {
         return withContext(Dispatchers.IO) {
             try {
                 Log.i(TAG, "Checking URL availability: $urlString")
@@ -184,7 +184,7 @@ class StreamLinksViewModel : ViewModel() {
                 false
             }
         }
-    }
+    }*/
 }
 
 data class StreamLinksUiState(
