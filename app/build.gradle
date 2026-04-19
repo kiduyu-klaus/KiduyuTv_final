@@ -192,7 +192,7 @@ dependencies {
     // ─────────────────────────────────────────────
     // Ads (disabled — uncomment to enable)
     // ─────────────────────────────────────────────
-    // implementation 'com.google.android.gms:play-services-ads:25.1.0'
+     implementation 'com.google.android.gms:play-services-ads:23.6.0'
 
     // ─────────────────────────────────────────────
     // media3
@@ -222,6 +222,18 @@ dependencies {
 
     implementation 'com.pierfrancescosoffritti.androidyoutubeplayer:core:13.0.0'
 
+    // ─────────────────────────────────────────────
+    // CuteDialog
+    // ─────────────────────────────────────────────
+
+    implementation 'com.github.CuteLibs:CuteDialog:2.1'
+
+    // ─────────────────────────────────────────────
+    // Dynamic Toasts
+    // ─────────────────────────────────────────────
+
+    // For AndroidX enabled projects.
+    implementation 'com.pranavpandey.android:dynamic-toasts:4.3.0'
 }
 
 configurations.all {
