@@ -69,7 +69,9 @@ fun MobileSeasonEpisodesScreen(
             .background(BackgroundDark)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
         ) {
             // Header
             Box(

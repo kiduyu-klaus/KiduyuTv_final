@@ -10,6 +10,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -65,6 +69,11 @@ fun MobileSettingsScreen(
     val userEmail by AuthManager.userEmail.collectAsState()
     val userPhotoUrl by AuthManager.userPhotoUrl.collectAsState()
     val isAuthLoading by AuthManager.isLoading.collectAsState()
+    val currentUid by AuthManager.authStateFlow.collectAsState()
+
+    // TV Login state
+    var tvCodeInput by remember { mutableStateOf("") }
+    var isAuthorizingTv by remember { mutableStateOf(false) }
 
     // Google Sign-In launcher
     val googleSignInLauncher = rememberLauncherForActivityResult(
@@ -100,6 +109,60 @@ fun MobileSettingsScreen(
         showSignInError?.let { error ->
             Toast.makeText(context, error, Toast.LENGTH_LONG).show()
             showSignInError = null
+        }
+    }
+
+    // Function to validate and authorize TV
+    fun validateAndAuthorizeTv(code: String) {
+        isAuthorizingTv = true
+        val database = com.google.firebase.database.FirebaseDatabase.getInstance()
+        val codeRef = database.getReference("tv_codes/$code")
+        
+        codeRef.get().addOnSuccessListener { snapshot ->
+            if (snapshot.exists()) {
+                val createdAt = snapshot.child("createdAt").getValue(Long::class.java) ?: 0L
+                val now = System.currentTimeMillis()
+                val fiveMinutes = 5 * 60 * 1000
+                
+                if (now - createdAt < fiveMinutes) {
+                    // Code is valid and not expired, write user data
+                    val uid = currentUid?.uid
+                    if (uid != null) {
+                        // Write complete user profile data for TV to fetch
+                        val authorizedUser = mapOf(
+                            "uid" to uid,
+                            "displayName" to (userDisplayName ?: ""),
+                            "email" to (userEmail ?: ""),
+                            "photoUrl" to (userPhotoUrl ?: "")
+                        )
+                        codeRef.child("authorizedUser").setValue(authorizedUser)
+                            .addOnSuccessListener {
+                                Toast.makeText(context, "TV Authorized Successfully!", Toast.LENGTH_SHORT).show()
+                                tvCodeInput = ""
+                                isAuthorizingTv = false
+                                
+                                // Clean up after a short delay
+                                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                    codeRef.removeValue()
+                                }, 2000)
+                            }
+                            .addOnFailureListener {
+                                Toast.makeText(context, "Failed to authorize TV", Toast.LENGTH_SHORT).show()
+                                isAuthorizingTv = false
+                            }
+                    }
+                } else {
+                    Toast.makeText(context, "Code has expired. Generate a new one on TV.", Toast.LENGTH_LONG).show()
+                    isAuthorizingTv = false
+                    codeRef.removeValue() // Cleanup expired code
+                }
+            } else {
+                Toast.makeText(context, "Invalid code. Please check and try again.", Toast.LENGTH_SHORT).show()
+                isAuthorizingTv = false
+            }
+        }.addOnFailureListener {
+            Toast.makeText(context, "Error connecting to Firebase", Toast.LENGTH_SHORT).show()
+            isAuthorizingTv = false
         }
     }
 
@@ -163,6 +226,68 @@ fun MobileSettingsScreen(
                         },
                         isLoading = isAuthLoading
                     )
+                }
+            }
+
+            // ── TV Login Section (Only if signed in) ───────────────────────────
+            if (isSignedIn) {
+                Spacer(modifier = Modifier.height(24.dp))
+                SettingsGroup(title = "TV Login") {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Authorize Android TV",
+                            color = TextPrimary,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = "Enter the 6-digit code shown on your TV to sync your account.",
+                            color = TextSecondary,
+                            fontSize = 12.sp
+                        )
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        OutlinedTextField(
+                            value = tvCodeInput,
+                            onValueChange = { if (it.length <= 6) tvCodeInput = it.uppercase() },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("6-Digit Code") },
+                            placeholder = { Text("e.g. A7B29X") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(
+                                imeAction = ImeAction.Done
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onDone = {
+                                    val code = tvCodeInput.trim()
+                                    if (code.length == 6 && !isAuthorizingTv) {
+                                        validateAndAuthorizeTv(code)
+                                    }
+                                }
+                            ),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = TextPrimary,
+                                unfocusedTextColor = TextPrimary,
+                                focusedBorderColor = PrimaryRed,
+                                unfocusedBorderColor = TextTertiary.copy(alpha = 0.3f)
+                            ),
+                            trailingIcon = {
+                                if (isAuthorizingTv) {
+                                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                                } else if (tvCodeInput.length == 6) {
+                                    IconButton(onClick = {
+                                        val code = tvCodeInput.trim()
+                                        if (code.length == 6) {
+                                            validateAndAuthorizeTv(code)
+                                        }
+                                    }) {
+                                        Icon(Icons.Default.CheckCircle, contentDescription = "Authorize", tint = Color.Green)
+                                    }
+                                }
+                            }
+                        )
+                    }
                 }
             }
 

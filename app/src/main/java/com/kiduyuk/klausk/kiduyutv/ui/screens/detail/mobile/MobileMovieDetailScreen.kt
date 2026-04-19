@@ -38,6 +38,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileCategoryRow
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
+import android.widget.Toast
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
 import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamLinksViewModel
 import com.kiduyuk.klausk.kiduyutv.util.AdManager
@@ -60,6 +61,11 @@ fun MobileMovieDetailScreen(
 
     LaunchedEffect(movieId) {
         viewModel.loadMovieDetail(context, movieId)
+        Toast.makeText(
+            context,
+            "You can create or select companies in My List to see curated movie collections",
+            Toast.LENGTH_LONG
+        ).show()
     }
 
     Box(

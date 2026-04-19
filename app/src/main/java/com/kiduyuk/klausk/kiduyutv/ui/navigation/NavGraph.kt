@@ -286,7 +286,6 @@ fun NavGraph(navController: NavHostController) {
                 tvShowId = tvId,
                 tvShowName = tvShowName,
                 totalSeasons = totalSeasons,
-                onBackClick = { navController.popBackStack() },
                 onPlayClick = { route ->
                     navController.navigate(route)
                 }

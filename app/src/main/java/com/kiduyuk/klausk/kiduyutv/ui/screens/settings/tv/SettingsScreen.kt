@@ -90,9 +90,18 @@ fun SettingsScreen(
     onBackClick: () -> Unit,
     viewModel: SettingsViewModel = viewModel()
 ) {
-    var selectedSection by remember { mutableStateOf(SettingsSection.APP_SETTINGS) }
+    // Set initial section to ACCOUNT for focus management
+    var selectedSection by remember { mutableStateOf(SettingsSection.ACCOUNT) }
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
+    
+    // Focus management for TV
+    val accountNavFocusRequester = remember { FocusRequester() }
+    
+    // Request focus on Account section when screen loads
+    LaunchedEffect(Unit) {
+        accountNavFocusRequester.requestFocus()
+    }
     
     // Auth state from AuthManager
     val isSignedIn by AuthManager.isSignedIn.collectAsState()
@@ -106,8 +115,15 @@ fun SettingsScreen(
     if (showPhoneLoginDialog) {
         PhoneLoginCodeDialog(
             onDismiss = { showPhoneLoginDialog = false },
-            onCodeSubmit = { code ->
-                // TODO: Implement phone login logic with code
+            onLoginSuccess = { uid, displayName, email, photoUrl ->
+                // Success! Login on TV with full user profile data
+                // Update AuthManager state to reflect the signed-in status
+                AuthManager.onPhoneAuthorized(
+                    uid = uid,
+                    displayName = displayName,
+                    email = email,
+                    photoUrl = photoUrl
+                )
                 showPhoneLoginDialog = false
             }
         )
@@ -130,6 +146,7 @@ fun SettingsScreen(
             selectedSection = selectedSection,
             onSectionSelect = { selectedSection = it },
             onBackClick = onBackClick,
+            accountNavFocusRequester = accountNavFocusRequester,
             modifier = Modifier.width(280.dp)
         )
 
@@ -161,8 +178,9 @@ fun SettingsScreen(
                                     lottieAnimRes = R.raw.exit,
                                     onNo = {},
                                     onYes = {
-                                        AuthManager.signOut {
-                                            // Handle sign out
+                                        // Use signOutFromPhone for TV since TV doesn't use Firebase Auth
+                                        AuthManager.signOutFromPhone {
+                                            // Handle sign out - UI will auto-update via StateFlow
                                         }
                                     }
                                 ).show()
@@ -318,6 +336,7 @@ private fun SettingsSidebar(
     selectedSection: SettingsSection,
     onSectionSelect: (SettingsSection) -> Unit,
     onBackClick: () -> Unit,
+    accountNavFocusRequester: FocusRequester,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -370,12 +389,13 @@ private fun SettingsSidebar(
             modifier = Modifier.padding(vertical = 16.dp)
         )
 
-        // Nav items
-        SettingsSection.entries.forEach { section ->
+        // Nav items - Account is first and gets initial focus
+        SettingsSection.entries.forEachIndexed { index, section ->
             SettingsNavItem(
                 title = section.title,
                 isSelected = selectedSection == section,
-                onClick = { onSectionSelect(section) }
+                onClick = { onSectionSelect(section) },
+                focusRequester = if (index == 0) accountNavFocusRequester else null
             )
         }
     }
@@ -388,7 +408,8 @@ private fun SettingsSidebar(
 private fun SettingsNavItem(
     title: String,
     isSelected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    focusRequester: FocusRequester? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
@@ -407,6 +428,12 @@ private fun SettingsNavItem(
             .then(
                 if (isFocused && !isSelected)
                     Modifier.border(2.dp, DarkRed.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                else
+                    Modifier
+            )
+            .then(
+                if (focusRequester != null)
+                    Modifier.focusRequester(focusRequester)
                 else
                     Modifier
             )
@@ -1527,17 +1554,87 @@ private fun AccountSignedInCard(
 @Composable
 private fun PhoneLoginCodeDialog(
     onDismiss: () -> Unit,
-    onCodeSubmit: (String) -> Unit
+    onLoginSuccess: (uid: String, displayName: String?, email: String?, photoUrl: String?) -> Unit
 ) {
-    var code by remember { mutableStateOf(List(6) { "" }) }
-    val focusRequesters = remember { List(6) { FocusRequester() } }
-    val validateButtonFocusRequester = remember { FocusRequester() }
-    val keyboardController = LocalSoftwareKeyboardController.current
-    val focusManager = LocalFocusManager.current
+    val context = LocalContext.current
+    var generatedCode by remember { mutableStateOf("") }
+    var countdown by remember { mutableStateOf(60) }
+    var codeRef by remember { mutableStateOf<com.google.firebase.database.DatabaseReference?>(null) }
+    var currentListener by remember { mutableStateOf<com.google.firebase.database.ValueEventListener?>(null) }
+    val cancelInteractionSource = remember { MutableInteractionSource() }
+    val isCancelFocused by cancelInteractionSource.collectIsFocusedAsState()
+    val cancelFocusRequester = remember { FocusRequester() }
 
-    // Auto-focus the first box when dialog opens
+    // Cleanup function to remove listener and Firebase data
+    fun cleanup() {
+        currentListener?.let { listener ->
+            codeRef?.removeEventListener(listener)
+        }
+        codeRef?.removeValue()
+    }
+
+    // Countdown timer
     LaunchedEffect(Unit) {
-        focusRequesters[0].requestFocus()
+        while (countdown > 0) {
+            kotlinx.coroutines.delay(1000)
+            countdown--
+        }
+        // Time expired - cleanup and dismiss
+        cleanup()
+        onDismiss()
+    }
+
+    // Generate code and start listening to Firebase
+    LaunchedEffect(Unit) {
+        // 1. Generate a random 6-digit alphanumeric code
+        val chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        generatedCode = (1..6).map { chars.random() }.joinToString("")
+        
+        // 2. Get device ID
+        val settingsManager = SettingsManager(context)
+        val deviceId = settingsManager.getDeviceId()
+        
+        // 3. Store code in Firebase and listen for user data
+        val database = com.google.firebase.database.FirebaseDatabase.getInstance()
+        codeRef = database.getReference("tv_codes/$generatedCode")
+        
+        // Save deviceId and timestamp
+        val data = mapOf(
+            "deviceId" to deviceId,
+            "createdAt" to System.currentTimeMillis()
+        )
+        codeRef?.setValue(data)
+        
+        // 4. Listen for authorizedUser (contains uid + profile info)
+        val listener = object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                if (snapshot.hasChild("authorizedUser")) {
+                    val userSnapshot = snapshot.child("authorizedUser")
+                    val uid = userSnapshot.child("uid").getValue(String::class.java)
+                    val displayName = userSnapshot.child("displayName").getValue(String::class.java)?.takeIf { it.isNotEmpty() }
+                    val email = userSnapshot.child("email").getValue(String::class.java)?.takeIf { it.isNotEmpty() }
+                    val photoUrl = userSnapshot.child("photoUrl").getValue(String::class.java)?.takeIf { it.isNotEmpty() }
+                    
+                    if (uid != null) {
+                        // Success! Login on TV with this user data
+                        // Stop countdown
+                        countdown = 0
+                        cleanup()
+                        onLoginSuccess(uid, displayName, email, photoUrl)
+                    }
+                }
+            }
+            
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
+                // Handle error
+            }
+        }
+        
+        currentListener = listener
+        codeRef?.addValueEventListener(listener)
+        
+        // Auto-focus cancel button for easy dismissal
+        cancelFocusRequester.requestFocus()
     }
 
     Dialog(
@@ -1547,184 +1644,96 @@ private fun PhoneLoginCodeDialog(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Transparent), // Transparent background as requested
+                .background(Color.Black.copy(alpha = 0.8f)),
             contentAlignment = Alignment.Center
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(SurfaceDark.copy(alpha = 0.95f))
-                    .padding(48.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(SurfaceDark)
+                    .padding(24.dp)
+                    .width(320.dp)
             ) {
                 Text(
-                    text = "Enter Code",
+                    text = "Login with Phone",
                     color = TextPrimary,
-                    fontSize = 24.sp,
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
                 )
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Text(
-                    text = "Enter the 6-digit code displayed on your phone",
+                    text = "Open the KiduyuTV app on your phone and enter this code to sync your account:",
                     color = TextSecondary,
-                    fontSize = 16.sp,
-                    textAlign = TextAlign.Center
-                )
-                
-                Spacer(modifier = Modifier.height(40.dp))
-                
-                // 6-digit code input boxes
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    repeat(6) { index ->
-                        val interactionSource = remember { MutableInteractionSource() }
-                        val isFocused by interactionSource.collectIsFocusedAsState()
-                        
-                        Box(
-                            modifier = Modifier
-                                .size(60.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(CardDark)
-                                .border(
-                                    width = if (isFocused) 2.dp else 1.dp,
-                                    color = if (isFocused) PrimaryRed else TextTertiary.copy(alpha = 0.3f),
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                                .focusRequester(focusRequesters[index])
-                                .focusable(interactionSource = interactionSource)
-                                .onKeyEvent { keyEvent ->
-                                    if (keyEvent.type == KeyEventType.KeyDown) {
-                                        when (keyEvent.key) {
-                                            Key.Backspace -> {
-                                                if (code[index].isEmpty() && index > 0) {
-                                                    focusRequesters[index - 1].requestFocus()
-                                                } else {
-                                                    val newCode = code.toMutableList()
-                                                    newCode[index] = ""
-                                                    code = newCode
-                                                }
-                                                true
-                                            }
-                                            else -> false
-                                        }
-                                    } else false
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            BasicTextField(
-                                value = code[index],
-                                onValueChange = { newValue ->
-                                    if (newValue.length <= 1 && newValue.all { it.isDigit() }) {
-                                        val newCode = code.toMutableList()
-                                        newCode[index] = newValue
-                                        code = newCode
-                                        
-                                        if (newValue.isNotEmpty()) {
-                                            if (index < 5) {
-                                                focusRequesters[index + 1].requestFocus()
-                                            } else {
-                                                // Last digit entered, hide keyboard and focus validate button
-                                                //keyboardController?.hide()
-                                                validateButtonFocusRequester.requestFocus()
-                                            }
-                                        }
-                                    }
-                                },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                textStyle = androidx.compose.ui.text.TextStyle(
-                                    color = TextPrimary,
-                                    fontSize = 28.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Center
-                                ),
-                                modifier = Modifier.fillMaxSize(),
-                                decorationBox = { innerTextField ->
-                                    Box(contentAlignment = Alignment.Center) {
-                                        innerTextField()
-                                    }
-                                }
-                            )
-                        }
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(48.dp))
-                
-                // TODO: Implement phone login logic later
-                Text(
-                    text = "TODO: Implement phone login logic later",
-                    color = PrimaryRed.copy(alpha = 0.7f),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Light
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 20.sp
                 )
                 
                 Spacer(modifier = Modifier.height(24.dp))
-
-                // Validate Code Button
-                val validateInteractionSource = remember { MutableInteractionSource() }
-                val isValidateFocused by validateInteractionSource.collectIsFocusedAsState()
-                val isCodeComplete = code.all { it.isNotEmpty() }
-
+                
+                // Display the 6-digit code
                 Box(
                     modifier = Modifier
-                        .width(200.dp)
-                        .height(48.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(if (isValidateFocused) PrimaryRed else if (isCodeComplete) SurfaceDark else SurfaceDark.copy(alpha = 0.5f))
-                        .border(
-                            width = if (isValidateFocused) 2.dp else 1.dp,
-                            color = if (isValidateFocused) Color.White else TextTertiary.copy(alpha = 0.3f),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        .focusRequester(validateButtonFocusRequester)
-                        .clickable(
-                            enabled = isCodeComplete,
-                            interactionSource = validateInteractionSource,
-                            indication = null,
-                            onClick = { onCodeSubmit(code.joinToString("")) }
-                        )
-                        .onKeyEvent { keyEvent ->
-                            if (isCodeComplete && keyEvent.type == KeyEventType.KeyDown && 
-                                (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)) {
-                                onCodeSubmit(code.joinToString(""))
-                                true
-                            } else false
-                        }
-                        .focusable(interactionSource = validateInteractionSource),
+                        .background(CardDark)
+                        .padding(horizontal = 24.dp, vertical = 12.dp)
+                        .border(2.dp, PrimaryRed, RoundedCornerShape(12.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "Validate Code",
-                        color = if (isCodeComplete) Color.White else TextSecondary,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
+                        text = generatedCode.chunked(3).joinToString(" "),
+                        color = Color.White,
+                        fontSize = 32.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 6.sp
                     )
                 }
-
-                Spacer(modifier = Modifier.height(12.dp))
                 
-                val cancelInteractionSource = remember { MutableInteractionSource() }
-                val isCancelFocused by cancelInteractionSource.collectIsFocusedAsState()
+                Spacer(modifier = Modifier.height(24.dp))
                 
+                // Countdown timer display
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(40.dp),
+                        color = PrimaryRed,
+                        strokeWidth = 3.dp,
+                        progress = { countdown / 60f }
+                    )
+                    Text(
+                        text = "Code will expire in $countdown seconds",
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(32.dp))
+                
+                // Cancel Button
                 Box(
                     modifier = Modifier
-                        .width(200.dp)
-                        .height(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (isCancelFocused) CardDark else Color.Transparent)
+                        .width(160.dp)
+                        .height(40.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(if (isCancelFocused) PrimaryRed else CardDark)
                         .border(
                             width = 1.dp,
                             color = if (isCancelFocused) Color.White else TextTertiary.copy(alpha = 0.3f),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(10.dp)
                         )
+                        .focusRequester(cancelFocusRequester)
                         .clickable(
                             interactionSource = cancelInteractionSource,
                             indication = null,
-                            onClick = { onDismiss() }
+                            onClick = {
+                                cleanup()
+                                onDismiss()
+                            }
                         )
                         .onKeyEvent { keyEvent ->
                             if (keyEvent.type == KeyEventType.KeyDown && 
@@ -1739,7 +1748,7 @@ private fun PhoneLoginCodeDialog(
                     Text(
                         text = "Cancel",
                         color = TextPrimary,
-                        fontSize = 16.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -2054,9 +2063,10 @@ private fun PreviewSettingsSidebar() {
                 .padding(24.dp)
         ) {
             SettingsSidebar(
-                selectedSection = SettingsSection.APP_SETTINGS,
+                selectedSection = SettingsSection.ACCOUNT,
                 onSectionSelect = {},
                 onBackClick = {},
+                accountNavFocusRequester = FocusRequester(),
                 modifier = Modifier.width(280.dp)
             )
         }

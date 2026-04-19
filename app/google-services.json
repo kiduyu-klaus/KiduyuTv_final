@@ -15,11 +15,11 @@
       },
       "oauth_client": [
         {
-          "client_id": "109926033937-skutfsifs6n3n73omka6ggf9to8jpp96.apps.googleusercontent.com",
+          "client_id": "109926033937-v8vseike2cbv1ec2ul742e38o6h32tab.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.kiduyuk.klausk.kiduyutv",
-            "certificate_hash": "ef27780a87d3a4313afea3221d618a1ce805a178"
+            "certificate_hash": "054a2d5fad15b11d6714c4633b6d561e9496ee02"
           }
         },
         {
@@ -52,11 +52,11 @@
       },
       "oauth_client": [
         {
-          "client_id": "109926033937-64l66t61dnocgcavm77u97ri1gero1ec.apps.googleusercontent.com",
+          "client_id": "109926033937-dnp6d1a1ef9ad2uvijaaqlg1t5blrc84.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.kiduyuk.klausk.kiduyutv.phone",
-            "certificate_hash": "ef27780a87d3a4313afea3221d618a1ce805a178"
+            "certificate_hash": "054a2d5fad15b11d6714c4633b6d561e9496ee02"
           }
         },
         {
@@ -89,11 +89,11 @@
       },
       "oauth_client": [
         {
-          "client_id": "109926033937-ann9f72gcb9p2gr0kdr8mkr490ktnif8.apps.googleusercontent.com",
+          "client_id": "109926033937-st1tuuihl0pp90h98nkdsfnq88p19ah9.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.kiduyuk.klausk.kiduyutv.tv",
-            "certificate_hash": "ef27780a87d3a4313afea3221d618a1ce805a178"
+            "certificate_hash": "054a2d5fad15b11d6714c4633b6d561e9496ee02"
           }
         },
         {

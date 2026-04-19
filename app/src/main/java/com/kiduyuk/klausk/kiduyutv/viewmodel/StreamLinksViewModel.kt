@@ -55,31 +55,58 @@ class StreamLinksViewModel : ViewModel() {
             season: Int?,
             episode: Int?
         ): List<StreamProvider> {
+            val type = if (isTv) "tv" else "movie"
             return listOf(
                 StreamProvider(
                     name = "Videasy",
                     urlTemplate = if (isTv) "https://player.videasy.net/tv/${tmdbId}/${season}/${episode}?nextEpisode=true&autoplayNextEpisode=true&episodeSelector=true&overlay=true&color=8B5CF6" else "https://player.videasy.net/movie/${tmdbId}?overlay=true",
-                    type = if (isTv) "tv" else "movie"
+                    type = type
                 ),
                 StreamProvider(
                     name = "VidLink",
                     urlTemplate = if (isTv) "https://vidlink.pro/tv/${tmdbId}/${season}/${episode}?autoPlay=true" else "https://vidlink.pro/movie/${tmdbId}?autoPlay=true",
-                    type = if (isTv) "tv" else "movie"
+                    type = type
                 ),
                 StreamProvider(
                     name = "VidFast",
                     urlTemplate = if (isTv) "https://vidfast.pro/tv/${tmdbId}/${season}/${episode}?autoPlay=true&nextButton=true&autoNext=true" else "https://vidfast.pro/movie/${tmdbId}?autoPlay=true",
-                    type = if (isTv) "tv" else "movie"
+                    type = type
                 ),
                 StreamProvider(
                     name = "VidKing",
                     urlTemplate = if (isTv) "https://www.vidking.net/embed/tv/${tmdbId}/${season}/${episode}?autoPlay=true&nextEpisode=true&episodeSelector=true" else "https://www.vidking.net/embed/movie/${tmdbId}?autoPlay=true",
-                    type = if (isTv) "tv" else "movie"
+                    type = type
                 ),
                 StreamProvider(
                     name = "Flixer",
                     urlTemplate = if (isTv) "https://flixer.su/watch/tv/${tmdbId}/${season}/${episode}" else "https://flixer.su/watch/movie/${tmdbId}",
-                    type = if (isTv) "tv" else "movie"
+                    type = type
+                ),
+                StreamProvider(
+                    name = "SuperEmbed",
+                    urlTemplate = if (isTv) "https://multiembed.mov/?video_id=${tmdbId}&tmdb=1&s=${season}&e=${episode}" else "https://multiembed.mov/?video_id=${tmdbId}&tmdb=1",
+                    type = type
+                ),
+                StreamProvider(
+                    name = "Autoembed",
+                    urlTemplate = if (isTv) "https://autoembed.co/tv/tmdb/${tmdbId}-${season}-${episode}" else "https://autoembed.co/movie/tmdb/${tmdbId}",
+                    type = type
+                ),
+                StreamProvider(
+                    name = "VidSrc (WTF) v4",
+                    urlTemplate = if (isTv)
+                        "https://vidsrc.wtf/api/4/tv/?id=$tmdbId&s=$season&e=$episode"
+                    else
+                        "https://www.vidsrc.wtf/api/4/movie/?id=$tmdbId",
+                    type = type
+                ),
+                StreamProvider(
+                    name = "MoviesAPI",
+                    urlTemplate = if (isTv)
+                        "https://moviesapi.club/tv/$tmdbId-$season-$episode"
+                    else
+                        "https://moviesapi.club/movie/$tmdbId",
+                    type = type
                 )
             )
         }
@@ -137,7 +164,7 @@ class StreamLinksViewModel : ViewModel() {
         }
     }
 
-    private suspend fun checkUrlAvailability(client: OkHttpClient, urlString: String): Boolean {
+    /*private suspend fun checkUrlAvailability(client: OkHttpClient, urlString: String): Boolean {
         return withContext(Dispatchers.IO) {
             try {
                 Log.i(TAG, "Checking URL availability: $urlString")
@@ -149,7 +176,7 @@ class StreamLinksViewModel : ViewModel() {
 
                 val response = client.newCall(request).execute()
                 val isAvailable = response.code in 200..399
-                Log.i(TAG, "URL $urlString availability: $isAvailable (code: ${response.code})")
+                Log.i(TAG, "URL $urlTemplate availability: $isAvailable (code: ${response.code})")
                 response.close()
                 isAvailable
             } catch (e: Exception) {
@@ -157,7 +184,7 @@ class StreamLinksViewModel : ViewModel() {
                 false
             }
         }
-    }
+    }*/
 }
 
 data class StreamLinksUiState(
