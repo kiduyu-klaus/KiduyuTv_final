@@ -35,3 +35,4 @@ app/release/baselineProfiles/0/app-release.dm
 *.dm
 /instructions.txt
 /keystore_b64.txt
+/ADS_IMPLEMENTATION.md

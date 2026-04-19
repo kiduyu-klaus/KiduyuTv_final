@@ -16,6 +16,7 @@ import com.kiduyuk.klausk.kiduyutv.network.NetworkConnectivityChecker
 import com.kiduyuk.klausk.kiduyutv.util.NotificationHelper
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.database.FirebaseDatabase
+import com.kiduyuk.klausk.kiduyutv.util.AdManager
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.util.AuthManager
@@ -61,6 +62,9 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
 
         // Initialize AndroidApp reference for singleton access
         AndroidApp.instance = this
+
+        // Initialize Mobile Ads SDK (AdMob for phone, GAM for tv)
+        AdManager.init(this)
 
         // Start network connectivity monitoring
         NetworkConnectivityChecker.startMonitoring(this)

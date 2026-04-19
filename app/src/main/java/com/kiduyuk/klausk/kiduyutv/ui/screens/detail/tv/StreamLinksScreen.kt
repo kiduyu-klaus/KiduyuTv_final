@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import android.app.Activity
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.util.UnstableApi
 import coil.compose.AsyncImage
@@ -35,6 +36,8 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextSecondary
 import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamLinksViewModel
+import com.kiduyuk.klausk.kiduyutv.util.TvInterstitialManager
+import com.kiduyuk.klausk.kiduyutv.BuildConfig
 
 data class StreamProvider(
     val name: String,
@@ -208,7 +211,14 @@ fun StreamLinksScreen(
                                 }
                             }
 
-                            context.startActivity(intent)
+                            // Show TV interstitial before launching player (TV flavour only)
+                            if (BuildConfig.FLAVOR == "tv") {
+                                TvInterstitialManager.showAndThenLaunch(context as android.app.Activity) {
+                                    context.startActivity(intent)
+                                }
+                            } else {
+                                context.startActivity(intent)
+                            }
                         }
                     }
                 }
@@ -304,3 +314,4 @@ fun Tag(text: String, bg: Color, fg: Color) {
         Text(text, color = fg, style = MaterialTheme.typography.labelSmall)
     }
 }
+

@@ -41,6 +41,8 @@ import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileBottomNavigation
+import com.kiduyuk.klausk.kiduyutv.ui.components.BannerAdView
+import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileMovieCard
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileNetworkCard
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileTvShowCard
@@ -617,3 +619,4 @@ private fun LoadingContent() {
         LottieLoadingView(size = 200.dp)
     }
 }
+

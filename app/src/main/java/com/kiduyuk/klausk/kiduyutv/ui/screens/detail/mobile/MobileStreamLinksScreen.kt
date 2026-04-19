@@ -31,7 +31,10 @@ import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamLinksViewModel
 import androidx.compose.material3.CircularProgressIndicator
+import android.app.Activity
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
+import com.kiduyuk.klausk.kiduyutv.util.AdManager
+import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.StreamProvider
 
 /**
@@ -379,3 +382,4 @@ private fun MobileStreamProviderCard(
         }
     }
 }
+

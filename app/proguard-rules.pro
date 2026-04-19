@@ -1,4 +1,19 @@
 ##############################################
+# 📢 GOOGLE ADS / ADMOB
+##############################################
+
+# Google Mobile Ads SDK
+-keep class com.google.android.gms.ads.** { *; }
+-keep class com.google.ads.** { *; }
+
+# User Messaging Platform (UMP / GDPR consent)
+-keep class com.google.android.ump.** { *; }
+
+# AdMob mediation adapters (if added later)
+-keep class com.google.android.gms.ads.mediation.** { *; }
+
+
+##############################################
 # 🔒 GENERAL SAFE RULES
 ##############################################
 

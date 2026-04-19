@@ -49,6 +49,7 @@ import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.activity.mainactivity.MainActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
 import com.kiduyuk.klausk.kiduyutv.util.ApkInfo
+import com.kiduyuk.klausk.kiduyutv.util.ConsentManager
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import com.kiduyuk.klausk.kiduyutv.util.UpdateUtil
 import kotlinx.coroutines.launch
@@ -208,6 +209,8 @@ class SplashActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+
         checkForUpdates()
         checkNotificationPermission()
         setContent {
@@ -669,3 +672,4 @@ class SplashActivity : ComponentActivity() {
         }
     }
 }
+

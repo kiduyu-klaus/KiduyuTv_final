@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -34,10 +35,13 @@ import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.player.youtube.YouTubePlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileCategoryRow
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
 import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamLinksViewModel
+import com.kiduyuk.klausk.kiduyutv.util.AdManager
+import com.kiduyuk.klausk.kiduyutv.BuildConfig
 
 @Composable
 fun MobileMovieDetailScreen(
@@ -320,3 +324,4 @@ fun MobileMovieDetailScreen(
         }
     }
 }
+

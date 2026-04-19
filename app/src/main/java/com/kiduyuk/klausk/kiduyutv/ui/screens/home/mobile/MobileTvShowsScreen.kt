@@ -17,6 +17,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
 import com.kiduyuk.klausk.kiduyutv.ui.components.*
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileBottomNavigation
+import com.kiduyuk.klausk.kiduyutv.ui.components.BannerAdView
+import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileTvShowCard
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeViewModel
@@ -204,3 +206,4 @@ private fun LoadingContent() {
         LottieLoadingView(size = 200.dp)
     }
 }
+

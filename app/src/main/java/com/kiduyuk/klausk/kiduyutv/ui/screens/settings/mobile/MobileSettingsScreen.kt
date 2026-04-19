@@ -38,6 +38,7 @@ import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.util.AuthManager
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
+import com.kiduyuk.klausk.kiduyutv.util.AdManager
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.SettingsViewModel
 
@@ -49,6 +50,7 @@ fun MobileSettingsScreen(
     viewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val activity = context as? Activity
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
     val myList by MyListManager.myList.collectAsState()
@@ -194,6 +196,28 @@ fun MobileSettingsScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             // ── App Settings Section ───────────────────────────────────────────
+            // Support section with rewarded ad (phone only)
+            if (BuildConfig.FLAVOR == "phone") {
+                SettingsGroup(title = "Support KiduyuTV") {
+                    SettingsItem(
+                        icon = Icons.Default.CardGiftcard,
+                        title = "Watch an Ad",
+                        subtitle = "Support us by watching a short ad",
+                        onClick = {
+                            if (activity != null) {
+                                AdManager.showRewarded(
+                                    activity = activity,
+                                    onRewarded = {
+                                        Toast.makeText(context, "Thank you for your support!", Toast.LENGTH_SHORT).show()
+                                    }
+                                )
+                            }
+                        }
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
             SettingsGroup(title = "App Settings") {
                 SettingsItem(
                     icon = Icons.Default.Delete,
@@ -731,3 +755,4 @@ private fun SettingsItem(
         }
     }
 }
+

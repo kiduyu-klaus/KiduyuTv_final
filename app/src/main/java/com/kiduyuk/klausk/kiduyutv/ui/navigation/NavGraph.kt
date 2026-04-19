@@ -6,7 +6,10 @@ import android.os.Build
 import androidx.annotation.OptIn
 import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavHostController
@@ -27,8 +30,11 @@ import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.HomeScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.MoviesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.MyListScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.TvShowsScreen
+import com.kiduyuk.klausk.kiduyutv.ui.components.TvBannerAdView
 import com.kiduyuk.klausk.kiduyutv.viewmodel.SearchViewModel
+import com.kiduyuk.klausk.kiduyutv.ui.components.TvBannerAdView
 import com.kiduyuk.klausk.kiduyutv.viewmodel.SearchViewModelFactory
+import com.kiduyuk.klausk.kiduyutv.BuildConfig
 
 /**
  * Main navigation graph for the application.

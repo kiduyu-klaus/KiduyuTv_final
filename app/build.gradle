@@ -190,9 +190,18 @@ dependencies {
     implementation 'com.airbnb.android:lottie-compose:6.6.2'          // JSON-based animations
 
     // ─────────────────────────────────────────────
-    // Ads (disabled — uncomment to enable)
+    // Ads
     // ─────────────────────────────────────────────
-     implementation 'com.google.android.gms:play-services-ads:23.6.0'
+     implementation 'com.google.android.gms:play-services-ads:23.3.0'
+    // ── Phone flavour only ────────────────────────────────────────────────
+    phoneImplementation 'com.google.android.gms:play-services-ads:23.3.0'
+    // ── TV flavour only ───────────────────────────────────────────────────
+    // Google Ad Manager supports leanback / Fire TV
+    tvImplementation 'com.google.android.gms:play-services-ads:23.3.0'
+
+    // ── Consent SDK (both flavours, required for EEA users) ───────────────
+    implementation 'com.google.android.ump:user-messaging-platform:3.0.0'
+
 
     // ─────────────────────────────────────────────
     // media3

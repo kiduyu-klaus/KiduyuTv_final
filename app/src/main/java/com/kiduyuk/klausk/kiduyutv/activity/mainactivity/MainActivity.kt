@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.OptIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -35,7 +36,9 @@ import com.kiduyuk.klausk.kiduyutv.network.NetworkConnectivityChecker
 import com.kiduyuk.klausk.kiduyutv.network.NetworkConnectivityObserver
 import com.kiduyuk.klausk.kiduyutv.network.NetworkState
 import com.kiduyuk.klausk.kiduyutv.network.NetworkStateDialog
+import com.kiduyuk.klausk.kiduyutv.ui.components.BannerAdView
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
+import com.kiduyuk.klausk.kiduyutv.BuildConfig
 
 class MainActivity : ComponentActivity() {
 
@@ -217,3 +220,4 @@ class MainActivity : ComponentActivity() {
         ).show()
     }
 }
+
