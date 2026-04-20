@@ -36,6 +36,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
     private lateinit var cursorView: MouseCursorView
+    private lateinit var rootLayout: FrameLayout
     private var cursorX = 0f
     private var cursorY = 0f
     private val moveSpeed = 50f
@@ -67,45 +68,28 @@ class PlayerActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "VideasyPlayer"
-        private const val PROGRESS_UPDATE_INTERVAL = 15_000L // 15 seconds
+        private const val PROGRESS_UPDATE_INTERVAL = 15_000L
     }
 
-    // JavaScript interface to receive messages from WebView (supports Videasy, VidKing, and VidLink)
-    // The player sends progress updates via window.postMessage with these fields:
-    // id, type (movie/tv/anime), progress, timestamp, duration, season, episode
     @Suppress("UNUSED")
     inner class VideasyJavaScriptInterface {
         @JavascriptInterface
         fun postMessage(message: String) {
             try {
-                //Log.i(TAG, "[JS Message] Received: $message")
-
                 val json = org.json.JSONObject(message)
-
-                // Handle different message formats
                 when {
-                    // Format 1: { type: "PLAYER_EVENT", data: { ... } }
                     json.has("type") && json.getString("type") == "PLAYER_EVENT" && json.has("data") -> {
                         val data = json.getJSONObject("data")
                         processPlayerProgressData(data)
                     }
-
-                    // Format 2: Direct progress object { id, type, progress, timestamp, duration, season, episode }
                     json.has("progress") && json.has("timestamp") -> {
                         processPlayerProgressData(json)
                     }
-
-                    // Format 3: Simple format { id, type, currentTime, duration }
                     json.has("currentTime") -> {
                         processPlayerProgressData(json)
                     }
-
                     else -> {
-                        Log.i(
-                            TAG,
-                            "[JS Message] Unrecognized message format, attempting generic parse"
-                        )
-                        // Try to extract any progress-like data
+                        Log.i(TAG, "[JS Message] Unrecognized message format, attempting generic parse")
                         if (json.has("progress") || json.has("timestamp") || json.has("currentTime")) {
                             processPlayerProgressData(json)
                         }
@@ -117,55 +101,29 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Process player progress data received from the JavaScript message listener.
-     * Extracts and stores the latest playback info for periodic saving to watch history.
-     */
     private fun processPlayerProgressData(data: org.json.JSONObject) {
         try {
-            // Extract content info
-            if (data.has("id")) {
-                latestContentId = data.getInt("id")
-            }
+            if (data.has("id")) latestContentId = data.getInt("id")
+            if (data.has("type")) latestContentType = data.getString("type")
 
-            if (data.has("type")) {
-                latestContentType = data.getString("type")
-            }
-
-            // Extract progress info
             latestProgress = if (data.has("progress")) {
                 data.getDouble("progress")
             } else if (data.has("currentTime") && data.has("duration")) {
                 val currentTime = data.getDouble("currentTime")
                 val duration = data.getDouble("duration")
                 if (duration > 0) (currentTime / duration) * 100 else 0.0
-            } else {
-                0.0
-            }
+            } else 0.0
 
-            // Extract timestamp (playback position in seconds)
             latestTimestamp = if (data.has("timestamp")) {
                 data.getLong("timestamp")
             } else if (data.has("currentTime")) {
                 data.getDouble("currentTime").toLong()
-            } else {
-                0L
-            }
+            } else 0L
 
-            // Extract duration
-            latestDuration = if (data.has("duration")) {
-                data.getLong("duration")
-            } else {
-                0L
-            }
+            latestDuration = if (data.has("duration")) data.getLong("duration") else 0L
 
-            // Extract season and episode (for TV/Anime content)
-            if (data.has("season")) {
-                latestSeason = data.getInt("season")
-            }
-            if (data.has("episode")) {
-                latestEpisode = data.getInt("episode")
-            }
+            if (data.has("season")) latestSeason = data.getInt("season")
+            if (data.has("episode")) latestEpisode = data.getInt("episode")
 
             Log.i(
                 TAG, String.format(
@@ -174,7 +132,6 @@ class PlayerActivity : AppCompatActivity() {
                     latestDuration, latestSeason, latestEpisode
                 )
             )
-
         } catch (e: Exception) {
             Log.e(TAG, "[Player Progress] Error processing data: ${e.message}")
         }
@@ -188,7 +145,7 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    // ── 15-second progress saver using data from setupMessageListener ─────────────────────────────────
+    // ── 15-second progress saver ───────────────────────────────────────────────
     private val progressHandler = Handler(Looper.getMainLooper())
     private val progressRunnable = object : Runnable {
         override fun run() {
@@ -199,34 +156,26 @@ class PlayerActivity : AppCompatActivity() {
                 try {
                     val repository = TmdbRepository()
 
-                    // Determine media type - prefer message data if available
                     val mediaType = when {
                         latestContentType.isNotEmpty() && latestContentType != "null" -> latestContentType
                         isTv -> "tv"
                         else -> "movie"
                     }
 
-                    // Use message timestamp if available, otherwise use duration-based calculation
                     val playbackPosition = if (latestTimestamp > 0) {
                         latestTimestamp
                     } else if (latestDuration > 0 && latestProgress > 0) {
                         ((latestProgress / 100.0) * latestDuration).toLong()
-                    } else {
-                        0L
-                    }
+                    } else 0L
 
-                    // Update local playback position
                     repository.updatePlaybackPosition(tmdbId, mediaType, playbackPosition)
 
-                    // Sync watch history to Firebase Realtime Database
-                    // This allows progress to be recovered even if local data is cleared
-                    // Works for both mobile and TV devices
                     val isTvContent = mediaType == "tv" || mediaType == "anime" || isTv
                     val seasonToSync = if (isTvContent) (if (latestSeason > 0) latestSeason else currentSeason) else null
                     val episodeToSync = if (isTvContent) (if (latestEpisode > 0) latestEpisode else currentEpisode) else null
-                    
+
                     Log.d(TAG, "Syncing watch history to Firebase: tmdbId=$tmdbId, isTv=$isTvContent, season=$seasonToSync, episode=$episodeToSync, position=${playbackPosition}s")
-                    
+
                     FirebaseManager.syncWatchHistory(
                         tmdbId = tmdbId,
                         isTv = isTvContent,
@@ -242,40 +191,16 @@ class PlayerActivity : AppCompatActivity() {
                         releaseDate = contentReleaseDate
                     )
 
-                    // Determine season and episode - prefer message data if available
-                    val seasonToSave =
-                        if (latestSeason > 0 && (mediaType == "tv" || mediaType == "anime")) {
-                            latestSeason
-                        } else {
-                            currentSeason
-                        }
+                    val seasonToSave = if (latestSeason > 0 && (mediaType == "tv" || mediaType == "anime")) latestSeason else currentSeason
+                    val episodeToSave = if (latestEpisode > 0 && (mediaType == "tv" || mediaType == "anime")) latestEpisode else currentEpisode
 
-                    val episodeToSave =
-                        if (latestEpisode > 0 && (mediaType == "tv" || mediaType == "anime")) {
-                            latestEpisode
-                        } else {
-                            currentEpisode
-                        }
-
-                    // Update episode info for TV/Anime content
                     if (mediaType == "tv" || mediaType == "anime" || isTv) {
                         repository.updateEpisodeInfo(tmdbId, mediaType, seasonToSave, episodeToSave)
-                        Log.i(
-                            TAG, String.format(
-                                "[Progress Save] position=%ds (%.1f%%), S%dE%d saved",
-                                playbackPosition, latestProgress, seasonToSave, episodeToSave
-                            )
-                        )
+                        Log.i(TAG, String.format("[Progress Save] position=%ds (%.1f%%), S%dE%d saved", playbackPosition, latestProgress, seasonToSave, episodeToSave))
                     } else {
-                        Log.i(
-                            TAG, String.format(
-                                "[Progress Save] position=%ds (%.1f%%) saved for movie",
-                                playbackPosition, latestProgress
-                            )
-                        )
+                        Log.i(TAG, String.format("[Progress Save] position=%ds (%.1f%%) saved for movie", playbackPosition, latestProgress))
                     }
 
-                    // Update local state with latest from message
                     if (seasonToSave > 0) currentSeason = seasonToSave
                     if (episodeToSave > 0) currentEpisode = episodeToSave
 
@@ -286,23 +211,47 @@ class PlayerActivity : AppCompatActivity() {
                 Log.i(TAG, "[Progress Save] No valid timestamp received yet from player")
             }
 
-            // Schedule next update
             progressHandler.postDelayed(this, PROGRESS_UPDATE_INTERVAL)
         }
     }
 
+    // ── Fullscreen helper ──────────────────────────────────────────────────────
+    private fun enableFullscreen() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.insetsController?.let {
+                it.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
+                it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = (
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                            or View.SYSTEM_UI_FLAG_FULLSCREEN
+                            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                            or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                            or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                            or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    )
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) enableFullscreen()
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
-
-
         super.onCreate(savedInstanceState)
+
+        // Apply fullscreen immediately, before any layout is set
+        enableFullscreen()
 
         val tmdbId = intent.getIntExtra("TMDB_ID", -1)
         val isTv = intent.getBooleanExtra("IS_TV", false)
         currentSeason = intent.getIntExtra("SEASON_NUMBER", 1)
         currentEpisode = intent.getIntExtra("EPISODE_NUMBER", 1)
-        
-        // Store content metadata for Firebase sync
+
         contentTitle = intent.getStringExtra("TITLE") ?: "Unknown"
         contentOverview = intent.getStringExtra("OVERVIEW")
         contentPosterPath = intent.getStringExtra("POSTER_PATH")
@@ -317,7 +266,7 @@ class PlayerActivity : AppCompatActivity() {
 
         val repository = TmdbRepository()
 
-        // Detect device type and disable cursor for mobile
+        // Detect device type — cursor disabled only on mobile/tablet
         val uiModeManager = getSystemService(Context.UI_MODE_SERVICE) as UiModeManager
         if (uiModeManager.currentModeType != Configuration.UI_MODE_TYPE_TELEVISION) {
             isCursorDisabled = true
@@ -329,10 +278,7 @@ class PlayerActivity : AppCompatActivity() {
         val existsInHistory = repository.isInWatchHistory(this, tmdbId, isTv)
 
         if (existsInHistory) {
-            Log.i(
-                TAG,
-                "[WatchHistory] Item exists, updating season $currentSeason episode $currentEpisode"
-            )
+            Log.i(TAG, "[WatchHistory] Item exists, updating season $currentSeason episode $currentEpisode")
             repository.updateEpisodeInfo(tmdbId, "tv", currentSeason, currentEpisode)
         } else {
             Log.i(TAG, "[WatchHistory] New item, saving to history")
@@ -360,8 +306,7 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         val isVideasyPlayer = url.startsWith("https://player.videasy.net")
-        val isVidKingPlayer =
-            url.startsWith("https://www.vidking.net") || url.startsWith("https://vidking.")
+        val isVidKingPlayer = url.startsWith("https://www.vidking.net") || url.startsWith("https://vidking.")
         val isVidLinkPlayer = url.startsWith("https://vidlink.pro")
         val isTrackingEnabled = isVideasyPlayer || isVidKingPlayer || isVidLinkPlayer
 
@@ -380,7 +325,7 @@ class PlayerActivity : AppCompatActivity() {
         warmUpDnsForUrl(url)
 
         // ── Layout ────────────────────────────────────────────────────────────
-        val rootLayout = FrameLayout(this).apply {
+        rootLayout = FrameLayout(this).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
@@ -407,14 +352,12 @@ class PlayerActivity : AppCompatActivity() {
                 databaseEnabled = true
                 allowFileAccess = true
                 userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     safeSetSafeBrowsingEnabled(this, false)
                 }
             }
 
             if (isCursorDisabled) {
-                // Mobile — hardware layer composites correctly
                 setLayerType(View.LAYER_TYPE_HARDWARE, null)
             } else {
                 // TV / FireTV — keep NONE so SurfaceView can punch through
@@ -426,28 +369,16 @@ class PlayerActivity : AppCompatActivity() {
             }
 
             webViewClient = object : WebViewClient() {
-                override fun shouldInterceptRequest(
-                    view: WebView?,
-                    request: WebResourceRequest?
-                ): WebResourceResponse? {
+                override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
                     val reqUrl = request?.url.toString()
                     request?.url?.host?.let { warmUpDnsHost(it) }
                     if (AdvancedAdBlocker.shouldBlock(reqUrl)) {
-                        return WebResourceResponse(
-                            "text/plain",
-                            "utf-8",
-                            ByteArrayInputStream(ByteArray(0))
-                        )
+                        return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
                     }
                     return super.shouldInterceptRequest(view, request)
                 }
 
-                override fun shouldOverrideUrlLoading(
-                    view: WebView?,
-                    request: WebResourceRequest?
-                ): Boolean {
-                    return true
-                }
+                override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean = true
 
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
@@ -460,188 +391,169 @@ class PlayerActivity : AppCompatActivity() {
                     }
 
                     val advancedJs = """
-                            (function() {
-                                function removeAdsAdvanced() {
-                                    const elements = document.querySelectorAll('*');
-                                    elements.forEach(el => {
-                                        const text = (el.innerText || '').toLowerCase();
-                                        const cls = (el.className || '').toString().toLowerCase();
-                                        if (
-                                            text.includes('advert') ||
-                                            text.includes('sponsored') ||
-                                            cls.includes('ad') ||
-                                            cls.includes('popup')
-                                        ) {
-                                            el.remove();
-                                        }
-                                    });
-                                }
-                            
-                                function blockRedirects() {
-                                    window.open = () => null;
-                                    window.location.assign = () => {};
-                                    window.location.replace = () => {};
-                                }
-                            
-                                function setupMessageListener() {
-                                    console.log('Player message listener initialized');
-                            
-                                    // Intercept postMessage
-                                    (function() {
-                                        var originalPostMessage = window.postMessage;
-                                        window.postMessage = function(message, targetOrigin, transfer) {
-                                            try {
-                                                if (window.VideasyInterface) {
-                                                    if (typeof message === 'string') {
-                                                        window.VideasyInterface.postMessage(message);
-                                                    } else {
-                                                        window.VideasyInterface.postMessage(JSON.stringify(message));
-                                                    }
-                                                }
-                                            } catch (e) {}
-                                            return originalPostMessage.apply(this, arguments);
-                                        };
-                                    })();
-                            
-                                    // Listen to iframe/player messages
-                                    window.addEventListener('message', function(event) {
+                        (function() {
+                            function removeAdsAdvanced() {
+                                const elements = document.querySelectorAll('*');
+                                elements.forEach(el => {
+                                    const text = (el.innerText || '').toLowerCase();
+                                    const cls = (el.className || '').toString().toLowerCase();
+                                    if (
+                                        text.includes('advert') ||
+                                        text.includes('sponsored') ||
+                                        cls.includes('ad') ||
+                                        cls.includes('popup')
+                                    ) {
+                                        el.remove();
+                                    }
+                                });
+                            }
+
+                            function blockRedirects() {
+                                window.open = () => null;
+                                window.location.assign = () => {};
+                                window.location.replace = () => {};
+                            }
+
+                            function setupMessageListener() {
+                                console.log('Player message listener initialized');
+
+                                (function() {
+                                    var originalPostMessage = window.postMessage;
+                                    window.postMessage = function(message, targetOrigin, transfer) {
                                         try {
                                             if (window.VideasyInterface) {
-                                                if (typeof event.data === 'string') {
-                                                    window.VideasyInterface.postMessage(event.data);
+                                                if (typeof message === 'string') {
+                                                    window.VideasyInterface.postMessage(message);
                                                 } else {
-                                                    window.VideasyInterface.postMessage(JSON.stringify(event.data));
+                                                    window.VideasyInterface.postMessage(JSON.stringify(message));
                                                 }
                                             }
                                         } catch (e) {}
-                                    });
-                            
-                                    function getContentInfo() {
-                                        var info = { type: 'movie', id: null, season: 1, episode: 1 };
-                                        try {
-                                            var url = window.location.href;
-                                            var match;
-                            
-                                            match = url.match(/\/tv\/(\d+)\/(\d+)\/(\d+)/);
-                                            if (match) {
-                                                info.type = 'tv';
-                                                info.id = parseInt(match[1]);
-                                                info.season = parseInt(match[2]);
-                                                info.episode = parseInt(match[3]);
-                                                return info;
-                                            }
-                            
-                                            match = url.match(/\/movie\/(\d+)/);
-                                            if (match) {
-                                                info.type = 'movie';
-                                                info.id = parseInt(match[1]);
-                                                return info;
-                                            }
-                            
-                                            match = url.match(/\/anime\/(\d+)\/(\d+)\/(\d+)/);
-                                            if (match) {
-                                                info.type = 'anime';
-                                                info.id = parseInt(match[1]);
-                                                info.season = parseInt(match[2]);
-                                                info.episode = parseInt(match[3]);
-                                                return info;
-                                            }
-                                        } catch (e) {}
-                                        return info;
-                                    }
-                            
-                                    function sendVideoProgress() {
-                                        var videos = document.getElementsByTagName('video');
-                                        for (var i = 0; i < videos.length; i++) {
-                                            var v = videos[i];
-                                            if (v.duration > 0 && !isNaN(v.duration)) {
-                            
-                                                var contentInfo = getContentInfo();
-                            
-                                                var progressData = {
-                                                    progress: (v.currentTime / v.duration) * 100,
-                                                    timestamp: Math.floor(v.currentTime),
-                                                    duration: Math.floor(v.duration),
-                                                    currentTime: v.currentTime,
-                                                    paused: v.paused,
-                                                    ended: v.ended
-                                                };
-                            
-                                                if (contentInfo) {
-                                                    progressData.id = contentInfo.id;
-                                                    progressData.type = contentInfo.type;
-                                                    progressData.season = contentInfo.season;
-                                                    progressData.episode = contentInfo.episode;
-                                                }
-                            
-                                                if (window.VideasyInterface) {
-                                                    window.VideasyInterface.postMessage(JSON.stringify(progressData));
-                                                }
-                                                break;
+                                        return originalPostMessage.apply(this, arguments);
+                                    };
+                                })();
+
+                                window.addEventListener('message', function(event) {
+                                    try {
+                                        if (window.VideasyInterface) {
+                                            if (typeof event.data === 'string') {
+                                                window.VideasyInterface.postMessage(event.data);
+                                            } else {
+                                                window.VideasyInterface.postMessage(JSON.stringify(event.data));
                                             }
                                         }
+                                    } catch (e) {}
+                                });
+
+                                function getContentInfo() {
+                                    var info = { type: 'movie', id: null, season: 1, episode: 1 };
+                                    try {
+                                        var url = window.location.href;
+                                        var match;
+
+                                        match = url.match(/\/tv\/(\d+)\/(\d+)\/(\d+)/);
+                                        if (match) {
+                                            info.type = 'tv';
+                                            info.id = parseInt(match[1]);
+                                            info.season = parseInt(match[2]);
+                                            info.episode = parseInt(match[3]);
+                                            return info;
+                                        }
+
+                                        match = url.match(/\/movie\/(\d+)/);
+                                        if (match) {
+                                            info.type = 'movie';
+                                            info.id = parseInt(match[1]);
+                                            return info;
+                                        }
+
+                                        match = url.match(/\/anime\/(\d+)\/(\d+)\/(\d+)/);
+                                        if (match) {
+                                            info.type = 'anime';
+                                            info.id = parseInt(match[1]);
+                                            info.season = parseInt(match[2]);
+                                            info.episode = parseInt(match[3]);
+                                            return info;
+                                        }
+                                    } catch (e) {}
+                                    return info;
+                                }
+
+                                function sendVideoProgress() {
+                                    var videos = document.getElementsByTagName('video');
+                                    for (var i = 0; i < videos.length; i++) {
+                                        var v = videos[i];
+                                        if (v.duration > 0 && !isNaN(v.duration)) {
+                                            var contentInfo = getContentInfo();
+                                            var progressData = {
+                                                progress: (v.currentTime / v.duration) * 100,
+                                                timestamp: Math.floor(v.currentTime),
+                                                duration: Math.floor(v.duration),
+                                                currentTime: v.currentTime,
+                                                paused: v.paused,
+                                                ended: v.ended
+                                            };
+                                            if (contentInfo) {
+                                                progressData.id = contentInfo.id;
+                                                progressData.type = contentInfo.type;
+                                                progressData.season = contentInfo.season;
+                                                progressData.episode = contentInfo.episode;
+                                            }
+                                            if (window.VideasyInterface) {
+                                                window.VideasyInterface.postMessage(JSON.stringify(progressData));
+                                            }
+                                            break;
+                                        }
                                     }
-                            
-                                    function enforceVolume(video) {
-                                        video.volume = 1.0;
-                                        video.muted = false;
-                            
-                                        video.addEventListener('volumechange', function() {
-                                            if (video.volume < 1.0 || video.muted) {
-                                                video.volume = 1.0;
-                                                video.muted = false;
+                                }
+
+                                function enforceVolume(video) {
+                                    video.volume = 1.0;
+                                    video.muted = false;
+                                    video.addEventListener('volumechange', function() {
+                                        if (video.volume < 1.0 || video.muted) {
+                                            video.volume = 1.0;
+                                            video.muted = false;
+                                        }
+                                    });
+                                }
+
+                                function monitorVideoEvents() {
+                                    const videos = document.querySelectorAll('video');
+                                    videos.forEach(video => {
+                                        if (video._monitored) return;
+                                        video._monitored = true;
+                                        video.addEventListener('loadedmetadata', () => sendVideoProgress());
+                                        video.addEventListener('ended', () => sendVideoProgress());
+                                        video.addEventListener('timeupdate', function() {
+                                            if (!video._lastProgressUpdate || Date.now() - video._lastProgressUpdate > 1000) {
+                                                sendVideoProgress();
+                                                video._lastProgressUpdate = Date.now();
                                             }
                                         });
-                                    }
-                            
-                                    function monitorVideoEvents() {
-                                        const videos = document.querySelectorAll('video');
-                            
-                                        videos.forEach(video => {
-                                            if (video._monitored) return;
-                                            video._monitored = true;
-                            
-                                            video.addEventListener('loadedmetadata', () => sendVideoProgress());
-                                            video.addEventListener('ended', () => sendVideoProgress());
-                            
-                                            video.addEventListener('timeupdate', function() {
-                                                if (!video._lastProgressUpdate || Date.now() - video._lastProgressUpdate > 1000) {
-                                                    sendVideoProgress();
-                                                    video._lastProgressUpdate = Date.now();
-                                                }
-                                            });
-                            
-                                            enforceVolume(video);
-                                        });
-                                    }
-                            
-                                    function observeVideoElements() {
-                                        const observer = new MutationObserver(() => {
-                                            monitorVideoEvents();
-                                        });
-                            
-                                        observer.observe(document.body, {
-                                            childList: true,
-                                            subtree: true
-                                        });
-                                    }
-                            
-                                    // Initial run
-                                    monitorVideoEvents();
-                                    observeVideoElements();
-                            
-                                    // Fallback (light)
-                                    setInterval(monitorVideoEvents, 10000);
-                            
-                                    // Backup progress reporting
-                                    setInterval(sendVideoProgress, 15000);
+                                        enforceVolume(video);
+                                    });
                                 }
-                            
-                                blockRedirects();
-                                removeAdsAdvanced();
-                                setupMessageListener();
-                            })();
-                            """.trimIndent()
+
+                                function observeVideoElements() {
+                                    const observer = new MutationObserver(() => {
+                                        monitorVideoEvents();
+                                    });
+                                    observer.observe(document.body, { childList: true, subtree: true });
+                                }
+
+                                monitorVideoEvents();
+                                observeVideoElements();
+                                setInterval(monitorVideoEvents, 10000);
+                                setInterval(sendVideoProgress, 15000);
+                            }
+
+                            blockRedirects();
+                            removeAdsAdvanced();
+                            setupMessageListener();
+                        })();
+                    """.trimIndent()
+
                     view?.evaluateJavascript(AdvancedAdBlocker.getCss(), null)
                     view?.evaluateJavascript(advancedJs, null)
                 }
@@ -658,11 +570,22 @@ class PlayerActivity : AppCompatActivity() {
                     }
                     customView = view
                     customViewCallback = callback
-                    rootLayout.addView(customView, FrameLayout.LayoutParams(
-                        FrameLayout.LayoutParams.MATCH_PARENT,
-                        FrameLayout.LayoutParams.MATCH_PARENT
-                    ))
+                    rootLayout.addView(
+                        customView,
+                        FrameLayout.LayoutParams(
+                            FrameLayout.LayoutParams.MATCH_PARENT,
+                            FrameLayout.LayoutParams.MATCH_PARENT
+                        )
+                    )
                     webView.visibility = View.GONE
+
+                    // Keep cursor visible and on top during fullscreen video
+                    if (!isCursorDisabled) {
+                        cursorView.bringToFront()
+                        cursorView.visibility = View.VISIBLE
+                    }
+
+                    enableFullscreen()
                 }
 
                 override fun onHideCustomView() {
@@ -671,14 +594,17 @@ class PlayerActivity : AppCompatActivity() {
                     customView = null
                     customViewCallback?.onCustomViewHidden()
                     webView.visibility = View.VISIBLE
+
+                    // Restore cursor on top after exiting fullscreen video
+                    if (!isCursorDisabled) {
+                        cursorView.bringToFront()
+                        cursorView.visibility = View.VISIBLE
+                    }
+
+                    enableFullscreen()
                 }
 
-                override fun onCreateWindow(
-                    view: WebView?,
-                    isDialog: Boolean,
-                    isUserGesture: Boolean,
-                    resultMsg: Message?
-                ): Boolean = false
+                override fun onCreateWindow(view: WebView?, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message?): Boolean = false
             }
 
             loadUrl(url)
@@ -695,20 +621,7 @@ class PlayerActivity : AppCompatActivity() {
         rootLayout.addView(webView)
         if (!isCursorDisabled) {
             rootLayout.addView(cursorView)
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            window.insetsController?.let {
-                it.hide(WindowInsets.Type.statusBars())
-                it.systemBarsBehavior =
-                    WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            }
-        } else {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = (
-                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                            or View.SYSTEM_UI_FLAG_FULLSCREEN
-                    )
+            cursorView.bringToFront() // Ensure cursor is always above video layer
         }
 
         setContentView(rootLayout)
@@ -750,10 +663,6 @@ class PlayerActivity : AppCompatActivity() {
         ).show()
     }
 
-    /**
-     * WebView doesn't expose a custom Dns hook.
-     * We pre-resolve hosts through SingletonDnsResolver (DoH) to warm resolution paths.
-     */
     private fun warmUpDnsForUrl(url: String) {
         val host = runCatching { Uri.parse(url).host }.getOrNull() ?: return
         warmUpDnsHost(host)
@@ -762,15 +671,10 @@ class PlayerActivity : AppCompatActivity() {
     private fun warmUpDnsHost(host: String) {
         if (host.isBlank()) return
         if (!dnsWarmedHosts.add(host)) return
-
         Thread {
             runCatching { SingletonDnsResolver.getDns().lookup(host) }
-                .onSuccess { addresses ->
-                    Log.i(TAG, "[DNS] DoH resolved $host -> ${addresses.joinToString()}")
-                }
-                .onFailure { error ->
-                    Log.w(TAG, "[DNS] DoH resolve failed for $host: ${error.message}")
-                }
+                .onSuccess { addresses -> Log.i(TAG, "[DNS] DoH resolved $host -> ${addresses.joinToString()}") }
+                .onFailure { error -> Log.w(TAG, "[DNS] DoH resolve failed for $host: ${error.message}") }
         }.start()
     }
 
@@ -807,14 +711,11 @@ class PlayerActivity : AppCompatActivity() {
         if (::webView.isInitialized) {
             try {
                 (webView.parent as? ViewGroup)?.removeView(webView)
-
                 webView.apply {
                     removeJavascriptInterface("VideasyInterface")
-
                     stopLoading()
                     webChromeClient = WebChromeClient()
                     webViewClient = WebViewClient()
-
                     clearHistory()
                     clearCache(true)
                     loadUrl("about:blank")
@@ -854,34 +755,29 @@ class PlayerActivity : AppCompatActivity() {
                 updateCursorPosition()
                 true
             }
-
             KeyEvent.KEYCODE_DPAD_DOWN -> {
                 showCursorAndResetTimer()
                 cursorY = (cursorY + moveSpeed).coerceAtMost(screenHeight.toFloat())
                 updateCursorPosition()
                 true
             }
-
             KeyEvent.KEYCODE_DPAD_LEFT -> {
                 showCursorAndResetTimer()
                 cursorX = (cursorX - moveSpeed).coerceAtLeast(0f)
                 updateCursorPosition()
                 true
             }
-
             KeyEvent.KEYCODE_DPAD_RIGHT -> {
                 showCursorAndResetTimer()
                 cursorX = (cursorX + moveSpeed).coerceAtMost(screenWidth.toFloat())
                 updateCursorPosition()
                 true
             }
-
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
                 showCursorAndResetTimer()
                 simulateClick(cursorX, cursorY)
                 true
             }
-
             else -> super.onKeyDown(keyCode, event)
         }
     }
@@ -892,6 +788,7 @@ class PlayerActivity : AppCompatActivity() {
         if (isCursorDisabled) return
         cursorView.x = cursorX
         cursorView.y = cursorY
+        cursorView.bringToFront() // Keep cursor above video layer on every move
         cursorView.invalidate()
     }
 
@@ -899,14 +796,8 @@ class PlayerActivity : AppCompatActivity() {
         val downTime = SystemClock.uptimeMillis()
         val eventTime = SystemClock.uptimeMillis()
 
-        val downEvent = MotionEvent.obtain(
-            downTime, eventTime,
-            MotionEvent.ACTION_DOWN, x, y, 0
-        )
-        val upEvent = MotionEvent.obtain(
-            downTime, eventTime + 100,
-            MotionEvent.ACTION_UP, x, y, 0
-        )
+        val downEvent = MotionEvent.obtain(downTime, eventTime, MotionEvent.ACTION_DOWN, x, y, 0)
+        val upEvent = MotionEvent.obtain(downTime, eventTime + 100, MotionEvent.ACTION_UP, x, y, 0)
 
         downEvent.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
         upEvent.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
@@ -920,7 +811,6 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun showCursorAndResetTimer() {
         if (isCursorDisabled) return
-
         cursorView.animate().cancel()
         cursorView.alpha = 1f
         cursorHideHandler.removeCallbacks(cursorHideRunnable)
@@ -937,7 +827,7 @@ class PlayerActivity : AppCompatActivity() {
                 }
                 return null;
             })();
-        """.trimIndent()
+            """.trimIndent()
         ) { result ->
             if (result != null && result != "null") {
                 try {
@@ -946,31 +836,15 @@ class PlayerActivity : AppCompatActivity() {
                     val isTv = intent.getBooleanExtra("IS_TV", false)
                     if (tmdbId != -1) {
                         val repository = TmdbRepository()
-                        repository.updatePlaybackPosition(
-                            tmdbId,
-                            if (isTv) "tv" else "movie",
-                            currentTime.toLong()
-                        )
-
+                        repository.updatePlaybackPosition(tmdbId, if (isTv) "tv" else "movie", currentTime.toLong())
                         if (isTv) {
-                            repository.updateEpisodeInfo(
-                                tmdbId,
-                                "tv",
-                                currentSeason,
-                                currentEpisode
-                            )
+                            repository.updateEpisodeInfo(tmdbId, "tv", currentSeason, currentEpisode)
                         }
-
-                        // Also sync final position to Firebase for cross-device continuity
-                        val mediaType = if (isTv) "tv" else "movie"
-                        val seasonToSync = if (isTv) currentSeason else null
-                        val episodeToSync = if (isTv) currentEpisode else null
-                        
                         FirebaseManager.syncWatchHistory(
                             tmdbId = tmdbId,
                             isTv = isTv,
-                            seasonNumber = seasonToSync,
-                            episodeNumber = episodeToSync,
+                            seasonNumber = if (isTv) currentSeason else null,
+                            episodeNumber = if (isTv) currentEpisode else null,
                             playbackPosition = currentTime.toLong(),
                             duration = latestDuration,
                             title = contentTitle,
@@ -980,11 +854,7 @@ class PlayerActivity : AppCompatActivity() {
                             voteAverage = contentVoteAverage,
                             releaseDate = contentReleaseDate
                         )
-
-                        Log.i(
-                            TAG,
-                            "Final playback position saved: ${currentTime}s (S$currentSeason E$currentEpisode) to local and Firebase"
-                        )
+                        Log.i(TAG, "Final playback position saved: ${currentTime}s (S$currentSeason E$currentEpisode) to local and Firebase")
                     }
                 } catch (e: Exception) {
                     Log.w(TAG, "Error saving final playback position: ${e.message}")
@@ -993,3 +863,4 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 }
+
