@@ -40,6 +40,10 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
 import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamLinksViewModel
+import com.kiduyuk.klausk.kiduyutv.util.AdManager
+import com.kiduyuk.klausk.kiduyutv.BuildConfig
+import androidx.activity.compose.BackHandler
+import android.app.Activity
 
 @Composable
 fun MobileTvShowDetailScreen(
@@ -59,6 +63,18 @@ fun MobileTvShowDetailScreen(
 
     LaunchedEffect(tvId) {
         viewModel.loadTvShowDetail(context, tvId)
+    }
+
+    // Override back navigation to show an interstitial (phone flavour only)
+    val activity = context as? Activity
+    BackHandler {
+        if (BuildConfig.FLAVOR == "phone" && activity != null) {
+            AdManager.showInterstitial(activity) {
+                onBackClick()
+            }
+        } else {
+            onBackClick()
+        }
     }
 
     Box(

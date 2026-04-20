@@ -74,7 +74,15 @@ fun MobileStreamLinksScreen(
     viewModel: StreamLinksViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val activity = context as? Activity
     val uiState by viewModel.uiState.collectAsState()
+
+    // Show interstitial ad once when the screen first opens (phone flavour only)
+    LaunchedEffect(tmdbId) {
+        if (BuildConfig.FLAVOR == "phone" && activity != null) {
+            AdManager.showInterstitial(activity)
+        }
+    }
 
     LaunchedEffect(tmdbId, isTv, season, episode) {
         viewModel.loadStreamProviders(tmdbId, isTv, season, episode, context)

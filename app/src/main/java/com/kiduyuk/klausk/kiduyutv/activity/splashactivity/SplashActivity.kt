@@ -53,6 +53,8 @@ import com.kiduyuk.klausk.kiduyutv.util.AuthManager
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseSyncManager
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import com.kiduyuk.klausk.kiduyutv.util.UpdateUtil
+import com.kiduyuk.klausk.kiduyutv.util.ConsentManager
+import com.kiduyuk.klausk.kiduyutv.util.AdManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
@@ -73,7 +75,7 @@ class SplashActivity : ComponentActivity() {
 
     // Remote version shown in the status chip
     private var currentRemoteVersion by mutableStateOf<String?>(null)
-    
+
     // Firebase sync state
     private var syncProgress by mutableStateOf(0)
     private var syncMessage by mutableStateOf("")
@@ -96,13 +98,13 @@ class SplashActivity : ComponentActivity() {
         pendingApkFile?.let {
             pendingApkFile = null
             pendingVersionCode = -1
-            
-            // On modern Android, self-updating kills the process. 
-            // If we are still here, the update either failed, was cancelled, 
+
+            // On modern Android, self-updating kills the process.
+            // If we are still here, the update either failed, was cancelled,
             // or we are running on a version that doesn't kill the app immediately.
             // UpdateReceiver.kt handles the successful restart via ACTION_MY_PACKAGE_REPLACED.
             Log.i(TAG, "Return from installation screen. If update was successful, app will restart via UpdateReceiver.")
-            
+
             // Optional: You can check if version actually changed here for non-killing updates,
             // but for most cases, finishing is safer to allow the receiver to take over.
             finish()
@@ -217,11 +219,18 @@ class SplashActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         // Initialize FirebaseSyncManager and start data sync
         FirebaseSyncManager.init(this)
         startFirebaseSync()
-        
+
+        // Request GDPR consent before initializing ads
+        // AdManager will be initialized after consent is resolved
+        ConsentManager.requestConsent(this) {
+            // Initialize Mobile Ads SDK (AdMob for phone, GAM for tv) after consent
+            AdManager.init(this@SplashActivity)
+        }
+
         checkForUpdates()
         checkNotificationPermission()
         setContent {
@@ -241,7 +250,7 @@ class SplashActivity : ComponentActivity() {
             }
         }
     }
-    
+
     /**
      * Start Firebase data synchronization in the background.
      * Updates the splash screen with sync progress.
@@ -254,25 +263,25 @@ class SplashActivity : ComponentActivity() {
             syncCompleted = true
             return
         }
-        
+
         Log.i(TAG, "User logged in - starting Firebase data sync...")
-        
+
         // Start sync and observe progress
         FirebaseSyncManager.startSync()
-        
+
         // Observe sync state changes
         lifecycleScope.launch {
             FirebaseSyncManager.syncProgress.collect { progress ->
                 syncProgress = progress
             }
         }
-        
+
         lifecycleScope.launch {
             FirebaseSyncManager.syncMessage.collect { message ->
                 syncMessage = message
             }
         }
-        
+
         lifecycleScope.launch {
             FirebaseSyncManager.syncState.collect { state ->
                 when (state) {
@@ -295,7 +304,7 @@ class SplashActivity : ComponentActivity() {
             }
         }
     }
-    
+
     /**
      * Navigate to MainActivity and finish this splash screen.
      */
