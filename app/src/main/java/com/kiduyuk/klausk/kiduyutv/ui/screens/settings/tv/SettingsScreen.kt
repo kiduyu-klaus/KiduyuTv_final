@@ -194,6 +194,7 @@ fun SettingsScreen(
                     SettingsSection.APP_SETTINGS -> {
                     AppSettingsContent(
                         context = context,
+                        isSignedIn = isSignedIn,
                         // Cache
                         isClearingCache = uiState.isClearingCache,
                         cacheClearSuccess = uiState.cacheClearSuccess,
@@ -278,7 +279,15 @@ fun SettingsScreen(
                                 lottieAnimRes = R.raw.exit,
                                 onYes = { viewModel.clearWatchHistory() }
                             ).show()
-                        }
+                        },
+                        // Firebase Sync
+                        isFirebaseSyncing = uiState.isFirebaseSyncing,
+                        firebaseSyncProgress = uiState.firebaseSyncProgress,
+                        firebaseSyncMessage = uiState.firebaseSyncMessage,
+                        firebaseSyncSuccess = uiState.firebaseSyncSuccess,
+                        firebaseSyncError = uiState.firebaseSyncError,
+                        firebaseItemsSynced = uiState.firebaseItemsSynced,
+                        onSyncWithFirebaseClick = { viewModel.syncDataWithFirebase(context) }
                     )
                 }
 
@@ -468,6 +477,7 @@ private fun SettingsNavItem(
 @Composable
 private fun AppSettingsContent(
     context: Context,
+    isSignedIn: Boolean = false,
     // Cache
     isClearingCache: Boolean,
     cacheClearSuccess: Boolean,
@@ -492,7 +502,15 @@ private fun AppSettingsContent(
     // Watch History
     isClearingWatchHistory: Boolean,
     watchHistoryClearSuccess: Boolean,
-    onClearWatchHistoryClick: () -> Unit
+    onClearWatchHistoryClick: () -> Unit,
+    // Firebase Sync
+    isFirebaseSyncing: Boolean = false,
+    firebaseSyncProgress: Int = 0,
+    firebaseSyncMessage: String = "",
+    firebaseSyncSuccess: Boolean = false,
+    firebaseSyncError: String? = null,
+    firebaseItemsSynced: Int? = null,
+    onSyncWithFirebaseClick: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -507,6 +525,43 @@ private fun AppSettingsContent(
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 24.dp)
         )
+
+        if (isSignedIn) {
+            SettingsSectionLabel(text = "Firebase Sync")
+
+            SettingsActionCard(
+                description = "Push your local data to Firebase first, then run a full cloud sync across My List, Companies, Networks, Casts, Watch History, and Preferences.",
+                buttonLabel = "Sync With Firebase",
+                isLoading = isFirebaseSyncing,
+                loadingLabel = if (firebaseSyncMessage.isNotBlank()) firebaseSyncMessage else "Syncing...",
+                successMessage = if (firebaseItemsSynced != null) "Synced! ($firebaseItemsSynced items)" else "Sync complete!",
+                showSuccess = firebaseSyncSuccess,
+                icon = Icons.Default.Refresh,
+                onClick = onSyncWithFirebaseClick
+            )
+
+            if (!firebaseSyncError.isNullOrBlank()) {
+                Text(
+                    text = firebaseSyncError,
+                    color = Color(0xFFFF6B6B),
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(top = 10.dp)
+                )
+            }
+
+            if (isFirebaseSyncing) {
+                LinearProgressIndicator(
+                    progress = { (firebaseSyncProgress.coerceIn(0, 6) / 6f) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp),
+                    color = PrimaryRed,
+                    trackColor = CardDark
+                )
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+        }
 
         // ── 1. Storage & Cache ────────────────────────────────────────
         SettingsSectionLabel(text = "Storage & Cache")

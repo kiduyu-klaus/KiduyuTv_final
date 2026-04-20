@@ -292,6 +292,31 @@ fun MobileSettingsScreen(
                 }
             }
 
+            if (isSignedIn) {
+                Spacer(modifier = Modifier.height(24.dp))
+                SettingsGroup(title = "Firebase Sync") {
+                    SettingsItem(
+                        icon = Icons.Default.Sync,
+                        title = "Sync with Firebase",
+                        subtitle = when {
+                            uiState.isFirebaseSyncing && uiState.firebaseSyncMessage.isNotBlank() -> uiState.firebaseSyncMessage
+                            uiState.firebaseSyncSuccess && uiState.firebaseItemsSynced != null -> "Sync complete (${uiState.firebaseItemsSynced} items)"
+                            uiState.firebaseSyncSuccess -> "Sync complete"
+                            !uiState.firebaseSyncError.isNullOrBlank() -> uiState.firebaseSyncError ?: "Sync failed"
+                            else -> "Push local data to Firebase, then run a full sync"
+                        },
+                        onClick = { viewModel.syncDataWithFirebase(context) },
+                        isLoading = uiState.isFirebaseSyncing,
+                        isSuccess = uiState.firebaseSyncSuccess,
+                        progress = if (uiState.isFirebaseSyncing) {
+                            (uiState.firebaseSyncProgress.coerceIn(0, 6) / 6f)
+                        } else {
+                            null
+                        }
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
 
             // ── My List Section ──────────────────────────────────────────────────

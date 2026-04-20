@@ -8,7 +8,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.data.local.database.DatabaseManager
+import com.kiduyuk.klausk.kiduyutv.data.local.entity.SavedMediaEntity
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
+import com.kiduyuk.klausk.kiduyutv.util.AuthManager
+import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
+import com.kiduyuk.klausk.kiduyutv.util.FirebaseSyncManager
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.util.UpdateUtil
@@ -16,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -27,6 +32,68 @@ class SettingsViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState
+
+    init {
+        observeFirebaseSyncState()
+    }
+
+    private fun observeFirebaseSyncState() {
+        viewModelScope.launch {
+            FirebaseSyncManager.syncProgress.collect { progress ->
+                _uiState.update { it.copy(firebaseSyncProgress = progress) }
+            }
+        }
+
+        viewModelScope.launch {
+            FirebaseSyncManager.syncMessage.collect { message ->
+                _uiState.update { it.copy(firebaseSyncMessage = message) }
+            }
+        }
+
+        viewModelScope.launch {
+            FirebaseSyncManager.syncState.collect { state ->
+                when (state) {
+                    is FirebaseSyncManager.SyncState.Idle -> {
+                        _uiState.update {
+                            it.copy(
+                                isFirebaseSyncing = false
+                            )
+                        }
+                    }
+                    is FirebaseSyncManager.SyncState.Syncing -> {
+                        _uiState.update {
+                            it.copy(
+                                isFirebaseSyncing = true,
+                                firebaseSyncSuccess = false,
+                                firebaseSyncError = null,
+                                firebaseItemsSynced = null
+                            )
+                        }
+                    }
+                    is FirebaseSyncManager.SyncState.Success -> {
+                        _uiState.update {
+                            it.copy(
+                                isFirebaseSyncing = false,
+                                firebaseSyncSuccess = true,
+                                firebaseSyncError = null,
+                                firebaseItemsSynced = state.itemsSynced
+                            )
+                        }
+                    }
+                    is FirebaseSyncManager.SyncState.Error -> {
+                        _uiState.update {
+                            it.copy(
+                                isFirebaseSyncing = false,
+                                firebaseSyncSuccess = false,
+                                firebaseSyncError = state.message,
+                                firebaseItemsSynced = null
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     /**
      * Load settings data including cache size and latest release title.
@@ -70,6 +137,127 @@ class SettingsViewModel : ViewModel() {
         com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.saveDefaultProvider(provider)
         
         _uiState.update { it.copy(defaultProvider = provider) }
+    }
+
+    /**
+     * Push all local data to Firebase and then run a full Firebase -> local sync.
+     * This is intended for manually reconciling data across devices.
+     */
+    fun syncDataWithFirebase(context: Context) {
+        if (_uiState.value.isFirebaseSyncing) return
+
+        if (!AuthManager.isSignedIn.value) {
+            _uiState.update {
+                it.copy(
+                    firebaseSyncSuccess = false,
+                    firebaseSyncError = "Sign in required before syncing."
+                )
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                _uiState.update {
+                    it.copy(
+                        isFirebaseSyncing = true,
+                        firebaseSyncSuccess = false,
+                        firebaseSyncError = null,
+                        firebaseItemsSynced = null,
+                        firebaseSyncMessage = "Pushing local data to Firebase...",
+                        firebaseSyncProgress = 0
+                    )
+                }
+
+                FirebaseSyncManager.init(context)
+                pushLocalDataToFirebase(context)
+
+                _uiState.update {
+                    it.copy(firebaseSyncMessage = "Running full Firebase sync...")
+                }
+
+                FirebaseSyncManager.startSync(forceRefresh = true)
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isFirebaseSyncing = false,
+                        firebaseSyncSuccess = false,
+                        firebaseSyncError = e.message ?: "Failed to sync with Firebase."
+                    )
+                }
+            }
+        }
+    }
+
+    private suspend fun pushLocalDataToFirebase(context: Context) = withContext(Dispatchers.IO) {
+        DatabaseManager.init(context)
+
+        val savedItems = DatabaseManager.getMyList().first()
+        savedItems.forEach { item ->
+            pushSavedMediaItemToFirebase(item)
+        }
+
+        val watchHistoryItems = DatabaseManager.getAllWatchHistoryItems()
+        watchHistoryItems.forEach { item ->
+            FirebaseManager.syncWatchHistory(
+                tmdbId = item.id,
+                isTv = item.mediaType == "tv",
+                seasonNumber = item.seasonNumber,
+                episodeNumber = item.episodeNumber,
+                playbackPosition = item.playbackPosition,
+                duration = 0L,
+                title = item.title,
+                overview = item.overview,
+                posterPath = item.posterPath,
+                backdropPath = item.backdropPath,
+                voteAverage = item.voteAverage,
+                releaseDate = item.releaseDate,
+                updatedAt = item.lastWatchedTimestamp
+            )
+        }
+
+        FirebaseManager.saveDefaultProvider(SettingsManager(context).getDefaultProvider())
+    }
+
+    private fun pushSavedMediaItemToFirebase(item: SavedMediaEntity) {
+        when (item.mediaType) {
+            "movie", "tv" -> FirebaseManager.syncMyListItem(
+                tmdbId = item.id,
+                isTv = item.mediaType == "tv",
+                title = item.title ?: "",
+                posterPath = item.posterPath,
+                backdropPath = null,
+                voteAverage = item.voteAverage,
+                addedAt = item.savedTimestamp
+            )
+            "company" -> FirebaseManager.saveCompany(
+                companyId = item.id,
+                name = item.title ?: "",
+                logoPath = item.posterPath,
+                originCountry = null
+            )
+            "network" -> FirebaseManager.saveNetwork(
+                networkId = item.id,
+                name = item.title ?: "",
+                logoPath = item.posterPath
+            )
+            "cast" -> FirebaseManager.saveCast(
+                castId = item.id,
+                name = item.title ?: "",
+                profilePath = item.posterPath,
+                character = item.character,
+                knownForDepartment = item.knownForDepartment
+            )
+            else -> FirebaseManager.syncMyListItem(
+                tmdbId = item.id,
+                isTv = false,
+                title = item.title ?: "",
+                posterPath = item.posterPath,
+                backdropPath = null,
+                voteAverage = item.voteAverage,
+                addedAt = item.savedTimestamp
+            )
+        }
     }
 
     /**
@@ -433,5 +621,12 @@ data class SettingsUiState(
     val isDownloadingUpdate: Boolean = false,
     val downloadProgress: Int = 0,
     val releaseTitle: String? = null,
-    val releaseNotes: AnnotatedString? = null
+    val releaseNotes: AnnotatedString? = null,
+    // Firebase manual sync states
+    val isFirebaseSyncing: Boolean = false,
+    val firebaseSyncProgress: Int = 0,
+    val firebaseSyncMessage: String = "",
+    val firebaseSyncSuccess: Boolean = false,
+    val firebaseSyncError: String? = null,
+    val firebaseItemsSynced: Int? = null
 )
