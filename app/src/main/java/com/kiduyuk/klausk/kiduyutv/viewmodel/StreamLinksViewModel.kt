@@ -82,16 +82,19 @@ class StreamLinksViewModel : ViewModel() {
                     urlTemplate = if (isTv) "https://flixer.su/watch/tv/${tmdbId}/${season}/${episode}" else "https://flixer.su/watch/movie/${tmdbId}",
                     type = type
                 ),
+/*
                 StreamProvider(
                     name = "SuperEmbed",
                     urlTemplate = if (isTv) "https://multiembed.mov/?video_id=${tmdbId}&tmdb=1&s=${season}&e=${episode}" else "https://multiembed.mov/?video_id=${tmdbId}&tmdb=1",
                     type = type
                 ),
+*/
                 StreamProvider(
                     name = "Autoembed",
                     urlTemplate = if (isTv) "https://autoembed.co/tv/tmdb/${tmdbId}-${season}-${episode}" else "https://autoembed.co/movie/tmdb/${tmdbId}",
                     type = type
                 ),
+/*
                 StreamProvider(
                     name = "VidSrc (WTF) v4",
                     urlTemplate = if (isTv)
@@ -106,6 +109,17 @@ class StreamLinksViewModel : ViewModel() {
                         "https://moviesapi.club/tv/$tmdbId-$season-$episode"
                     else
                         "https://moviesapi.club/movie/$tmdbId",
+                    type = type
+                ),
+*/
+                StreamProvider(
+                    name = "VidSrc (WTF) v1",
+                    urlTemplate = if (isTv) "https://vidsrc.wtf/api/1/tv/?id=$tmdbId&s=$season&e=$episode" else "https://www.vidsrc.wtf/api/1/movie/?id=$tmdbId",
+                    type = type
+                ),
+                StreamProvider(
+                    name = "VidSrc (WTF) v3 - Multi Providers",
+                    urlTemplate = if (isTv) "https://vidsrc.wtf/api/3/tv/?id=$tmdbId&s=$season&e=$episode" else "https://www.vidsrc.wtf/api/3/movie/?id=$tmdbId",
                     type = type
                 )
             )
