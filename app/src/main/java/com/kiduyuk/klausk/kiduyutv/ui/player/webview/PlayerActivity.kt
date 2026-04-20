@@ -44,14 +44,6 @@ class PlayerActivity : AppCompatActivity() {
     private var isCursorDisabled = false
     private var currentProviderName: String = "VidLink"
 
-    // HTML5 fullscreen support (player's native maximize button)
-    private var customView: View? = null
-    private var customViewCallback: WebChromeClient.CustomViewCallback? = null
-    private lateinit var rootLayout: FrameLayout
-
-    // FIX: Single shared repository instance instead of creating new ones on every tick
-    private val repository = TmdbRepository()
-
     // Track content metadata for Firebase sync
     private var contentTitle: String = "Unknown"
     private var contentOverview: String? = null
@@ -69,28 +61,9 @@ class PlayerActivity : AppCompatActivity() {
     private var latestContentType: String = "movie"
     private var latestContentId: Int = -1
 
-    // Cache intent extras so we don't re-read them on every progress tick
-    private var intentTmdbId: Int = -1
-    private var intentIsTv: Boolean = false
-
     companion object {
         private const val TAG = "VideasyPlayer"
         private const val PROGRESS_UPDATE_INTERVAL = 15_000L // 15 seconds
-
-        // Domains the WebView is allowed to navigate to (redirects permitted).
-        // Covers core providers + SuperEmbed's redirect chain.
-        private val ALLOWED_NAVIGATION_HOSTS = setOf(
-            // Core providers
-            
-        
-            
-            
-            
-            
-            // SuperEmbed + its CDN redirect target
-            "multiembed.mov",
-            "streamingnow.mov"
-        )
     }
 
     // JavaScript interface to receive messages from WebView (supports Videasy, VidKing, and VidLink)
@@ -215,12 +188,13 @@ class PlayerActivity : AppCompatActivity() {
     private val progressHandler = Handler(Looper.getMainLooper())
     private val progressRunnable = object : Runnable {
         override fun run() {
-            // FIX: Use cached intent values instead of re-reading on every tick
-            val tmdbId = intentTmdbId
-            val isTv = intentIsTv
+            val tmdbId = intent.getIntExtra("TMDB_ID", -1)
+            val isTv = intent.getBooleanExtra("IS_TV", false)
 
             if (tmdbId != -1 && latestTimestamp > 0) {
                 try {
+                    val repository = TmdbRepository()
+
                     // Determine media type - prefer message data if available
                     val mediaType = when {
                         latestContentType.isNotEmpty() && latestContentType != "null" -> latestContentType
@@ -246,9 +220,9 @@ class PlayerActivity : AppCompatActivity() {
                     val isTvContent = mediaType == "tv" || mediaType == "anime" || isTv
                     val seasonToSync = if (isTvContent) (if (latestSeason > 0) latestSeason else currentSeason) else null
                     val episodeToSync = if (isTvContent) (if (latestEpisode > 0) latestEpisode else currentEpisode) else null
-
-                    Log.i(TAG, "Syncing watch history to Firebase: tmdbId=$tmdbId, isTv=$isTvContent, season=$seasonToSync, episode=$episodeToSync, position=${playbackPosition}s")
-
+                    
+                    Log.d(TAG, "Syncing watch history to Firebase: tmdbId=$tmdbId, isTv=$isTvContent, season=$seasonToSync, episode=$episodeToSync, position=${playbackPosition}s")
+                    
                     FirebaseManager.syncWatchHistory(
                         tmdbId = tmdbId,
                         isTv = isTvContent,
@@ -315,19 +289,15 @@ class PlayerActivity : AppCompatActivity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
-        window.setFormat(android.graphics.PixelFormat.OPAQUE)
+        window.setFormat(android.graphics.PixelFormat.TRANSLUCENT)
 
         super.onCreate(savedInstanceState)
 
-        // FIX: Cache intent extras once so progressRunnable doesn't re-read them every tick
-        intentTmdbId = intent.getIntExtra("TMDB_ID", -1)
-        intentIsTv = intent.getBooleanExtra("IS_TV", false)
-
-        val tmdbId = intentTmdbId
-        val isTv = intentIsTv
+        val tmdbId = intent.getIntExtra("TMDB_ID", -1)
+        val isTv = intent.getBooleanExtra("IS_TV", false)
         currentSeason = intent.getIntExtra("SEASON_NUMBER", 1)
         currentEpisode = intent.getIntExtra("EPISODE_NUMBER", 1)
-
+        
         // Store content metadata for Firebase sync
         contentTitle = intent.getStringExtra("TITLE") ?: "Unknown"
         contentOverview = intent.getStringExtra("OVERVIEW")
@@ -340,6 +310,8 @@ class PlayerActivity : AppCompatActivity() {
             finish()
             return
         }
+
+        val repository = TmdbRepository()
 
         // Detect device type and disable cursor for mobile
         val uiModeManager = getSystemService(Context.UI_MODE_SERVICE) as UiModeManager
@@ -357,10 +329,7 @@ class PlayerActivity : AppCompatActivity() {
                 TAG,
                 "[WatchHistory] Item exists, updating season $currentSeason episode $currentEpisode"
             )
-            // FIX: Only update episode info for TV content, not movies
-            if (isTv) {
-                repository.updateEpisodeInfo(tmdbId, "tv", currentSeason, currentEpisode)
-            }
+            repository.updateEpisodeInfo(tmdbId, "tv", currentSeason, currentEpisode)
         } else {
             Log.i(TAG, "[WatchHistory] New item, saving to history")
             repository.saveToWatchHistory(
@@ -390,29 +359,23 @@ class PlayerActivity : AppCompatActivity() {
         val isVidKingPlayer =
             url.startsWith("https://www.vidking.net") || url.startsWith("https://vidking.")
         val isVidLinkPlayer = url.startsWith("https://vidlink.pro")
-        val isSuperEmbedPlayer = url.contains("multiembed.mov", ignoreCase = true)
-        // Always enable tracking — JS interface must be present even on redirect targets
-        // like streamingnow.mov which multiembed.mov hands off to.
-        val isTrackingEnabled = isVideasyPlayer || isVidKingPlayer || isVidLinkPlayer || isSuperEmbedPlayer
+        val isTrackingEnabled = isVideasyPlayer || isVidKingPlayer || isVidLinkPlayer
 
-        // FIX: Added SuperEmbed detection
         currentProviderName = when {
             isVidLinkPlayer -> "VidLink"
             isVidKingPlayer -> "VidKing"
             isVideasyPlayer -> "Videasy"
-            url.contains("vidfast", ignoreCase = true)           -> "VidFast"
-            url.contains("vidsrc", ignoreCase = true)            -> "VidSrc"
-            url.contains("mapple", ignoreCase = true)            -> "Mapple"
-            url.contains("flixer", ignoreCase = true)            -> "Flixer"
-            url.contains("multiembed.mov", ignoreCase = true)    -> "SuperEmbed"
-            url.contains("streamingnow.mov", ignoreCase = true)  -> "StreamingNow"
+            url.contains("vidfast", ignoreCase = true) -> "VidFast"
+            url.contains("vidsrc", ignoreCase = true) -> "VidSrc"
+            url.contains("mapple", ignoreCase = true) -> "Mapple"
+            url.contains("flixer", ignoreCase = true) -> "Flixer"
             else -> "VidLink"
         }
 
         Log.i(TAG, "[Provider] Selected: $currentProviderName")
 
         // ── Layout ────────────────────────────────────────────────────────────
-        rootLayout = FrameLayout(this).apply {
+        val rootLayout = FrameLayout(this).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
@@ -432,44 +395,28 @@ class PlayerActivity : AppCompatActivity() {
                 javaScriptCanOpenWindowsAutomatically = false
                 setSupportMultipleWindows(false)
                 cacheMode = WebSettings.LOAD_DEFAULT
+                setRenderPriority(WebSettings.RenderPriority.HIGH)
                 useWideViewPort = true
                 loadWithOverviewMode = true
-                // Desktop UA unlocks better stream sources on providers that
-                // serve degraded or blocked content to Android user agents.
-                userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     safeSetSafeBrowsingEnabled(this, false)
                 }
             }
 
-            // FIX: HARDWARE layer required for HLS/DASH video frame rendering on some streams.
-            // LAYER_TYPE_NONE caused black screen (audio-only) on affected providers.
-            setLayerType(View.LAYER_TYPE_HARDWARE, null)
+            setLayerType(View.LAYER_TYPE_NONE, null)
 
             if (isTrackingEnabled) {
                 addJavascriptInterface(VideasyJavaScriptInterface(), "VideasyInterface")
             }
 
             webViewClient = object : WebViewClient() {
-
-                // Additional ad/tracker domains to block at the network level.
-                // Complements AdvancedAdBlocker for domains commonly seen on streaming sites.
-                private val extraAdHosts = setOf(
-                    "doubleclick.net", "googlesyndication.com", "google-analytics.com",
-                    "adnxs.com", "popads.net", "popcash.net", "adsterra.com",
-                    "mc.yandex.ru", "onclickmedium.com", "propellerads.com",
-                    "ad-maven.com", "juicyads.com", "bebi.com", "histats.com"
-                )
-
                 override fun shouldInterceptRequest(
                     view: WebView?,
                     request: WebResourceRequest?
                 ): WebResourceResponse? {
                     val reqUrl = request?.url.toString()
-                    val reqUrlLower = reqUrl.lowercase()
-                    if (AdvancedAdBlocker.shouldBlock(reqUrl) ||
-                        extraAdHosts.any { reqUrlLower.contains(it) }) {
+                    if (AdvancedAdBlocker.shouldBlock(reqUrl)) {
                         return WebResourceResponse(
                             "text/plain",
                             "utf-8",
@@ -483,21 +430,7 @@ class PlayerActivity : AppCompatActivity() {
                     view: WebView?,
                     request: WebResourceRequest?
                 ): Boolean {
-                    val host = request?.url?.host ?: return true
-
-                    // Allow navigation within trusted streaming domains.
-                    // endsWith(".$it") handles subdomains (e.g. cdn.streamingnow.mov).
-                    val isAllowed = ALLOWED_NAVIGATION_HOSTS.any { allowed ->
-                        host == allowed || host.endsWith(".$allowed")
-                    }
-
-                    return if (isAllowed) {
-                        Log.i(TAG, "[Navigation] Allowing redirect: ${request?.url}")
-                        false // Let WebView follow the URL
-                    } else {
-                        Log.i(TAG, "[Navigation] Blocking navigation: ${request?.url}")
-                        true  // Block everything else
-                    }
+                    return true
                 }
 
                 override fun onPageFinished(view: WebView?, url: String?) {
@@ -513,62 +446,25 @@ class PlayerActivity : AppCompatActivity() {
                     val advancedJs = """
                             (function() {
                                 function removeAdsAdvanced() {
-                                    // Run immediately then every 500ms for 10s to catch
-                                    // ads that inject themselves after page load.
-                                    function killAds() {
-                                        // Remove by class/text heuristics
-                                        const elements = document.querySelectorAll('*');
-                                        elements.forEach(el => {
-                                            const text = (el.innerText || '').toLowerCase();
-                                            const cls = (el.className || '').toString().toLowerCase();
-                                            if (
-                                                text.includes('advert') ||
-                                                text.includes('sponsored') ||
-                                                cls.includes('ad') ||
-                                                cls.includes('popup')
-                                            ) {
-                                                el.remove();
-                                            }
-                                        });
-
-                                        // Remove skip-ad / betting overlays by text
-                                        document.querySelectorAll('div, span, a').forEach(el => {
-                                            if (el.innerText && (
-                                                el.innerText.includes('Skip after') ||
-                                                el.innerText.includes('Skip Ad') ||
-                                                el.innerText.toLowerCase().includes('1win') ||
-                                                el.innerText.toLowerCase().includes('bet365') ||
-                                                el.innerText.toLowerCase().includes('casino')
-                                            )) {
-                                                const container = el.closest('div[style*="position: absolute"]');
-                                                if (container) container.remove(); else el.remove();
-                                            }
-                                        });
-
-                                        // Remove ad iframes (betting/casino src)
-                                        document.querySelectorAll('iframe').forEach(iframe => {
-                                            try {
-                                                const src = iframe.src.toLowerCase();
-                                                if (src.includes('bet') || src.includes('win') || src.includes('casino')) {
-                                                    iframe.remove();
-                                                }
-                                            } catch(e) {}
-                                        });
-                                    }
-
-                                    killAds();
-                                    var _adCount = 0;
-                                    var _adInterval = setInterval(function() {
-                                        killAds();
-                                        if (++_adCount >= 20) clearInterval(_adInterval);
-                                    }, 500);
+                                    const elements = document.querySelectorAll('*');
+                                    elements.forEach(el => {
+                                        const text = (el.innerText || '').toLowerCase();
+                                        const cls = (el.className || '').toString().toLowerCase();
+                                        if (
+                                            text.includes('advert') ||
+                                            text.includes('sponsored') ||
+                                            cls.includes('ad') ||
+                                            cls.includes('popup')
+                                        ) {
+                                            el.remove();
+                                        }
+                                    });
                                 }
                             
                                 function blockRedirects() {
-                                    // Block new popup windows only — do NOT override
-                                    // window.location.assign/replace as streamingnow.mov
-                                    // uses those internally to reach the actual video player.
                                     window.open = () => null;
+                                    window.location.assign = () => {};
+                                    window.location.replace = () => {};
                                 }
                             
                                 function setupMessageListener() {
@@ -742,28 +638,6 @@ class PlayerActivity : AppCompatActivity() {
                     isUserGesture: Boolean,
                     resultMsg: Message?
                 ): Boolean = false
-
-                // Handle player's native fullscreen button
-                override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
-                    super.onShowCustomView(view, callback)
-                    customView = view
-                    customViewCallback = callback
-                    rootLayout.addView(view, FrameLayout.LayoutParams(
-                        FrameLayout.LayoutParams.MATCH_PARENT,
-                        FrameLayout.LayoutParams.MATCH_PARENT
-                    ))
-                    webView.visibility = View.GONE
-                    Log.i(TAG, "[Fullscreen] Custom view shown")
-                }
-
-                override fun onHideCustomView() {
-                    super.onHideCustomView()
-                    customView?.let { rootLayout.removeView(it) }
-                    customView = null
-                    customViewCallback = null
-                    webView.visibility = View.VISIBLE
-                    Log.i(TAG, "[Fullscreen] Custom view hidden")
-                }
             }
 
             loadUrl(url)
@@ -814,22 +688,9 @@ class PlayerActivity : AppCompatActivity() {
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (customView != null) {
-                    // Exit HTML5 fullscreen before doing anything else
-                    customViewCallback?.onCustomViewHidden()
-                    onHideCustomViewInternal()
-                } else {
-                    showExitConfirmationDialog()
-                }
+                showExitConfirmationDialog()
             }
         })
-    }
-
-    private fun onHideCustomViewInternal() {
-        customView?.let { rootLayout.removeView(it) }
-        customView = null
-        customViewCallback = null
-        webView.visibility = View.VISIBLE
     }
 
     private fun showExitConfirmationDialog() {
@@ -1016,35 +877,30 @@ class PlayerActivity : AppCompatActivity() {
             if (result != null && result != "null") {
                 try {
                     val currentTime = result.toDouble()
-                    val tmdbId = intentTmdbId
-                    val isTv = intentIsTv
-
+                    val tmdbId = intent.getIntExtra("TMDB_ID", -1)
+                    val isTv = intent.getBooleanExtra("IS_TV", false)
                     if (tmdbId != -1) {
+                        val repository = TmdbRepository()
                         repository.updatePlaybackPosition(
                             tmdbId,
                             if (isTv) "tv" else "movie",
                             currentTime.toLong()
                         )
 
-                        // FIX: Prefer latestSeason/latestEpisode from JS messages over
-                        // currentSeason/currentEpisode which may be stale from the original intent
-                        val seasonToSave = if (latestSeason > 0) latestSeason else currentSeason
-                        val episodeToSave = if (latestEpisode > 0) latestEpisode else currentEpisode
-
                         if (isTv) {
                             repository.updateEpisodeInfo(
                                 tmdbId,
                                 "tv",
-                                seasonToSave,
-                                episodeToSave
+                                currentSeason,
+                                currentEpisode
                             )
                         }
 
                         // Also sync final position to Firebase for cross-device continuity
                         val mediaType = if (isTv) "tv" else "movie"
-                        val seasonToSync = if (isTv) seasonToSave else null
-                        val episodeToSync = if (isTv) episodeToSave else null
-
+                        val seasonToSync = if (isTv) currentSeason else null
+                        val episodeToSync = if (isTv) currentEpisode else null
+                        
                         FirebaseManager.syncWatchHistory(
                             tmdbId = tmdbId,
                             isTv = isTv,
@@ -1062,7 +918,7 @@ class PlayerActivity : AppCompatActivity() {
 
                         Log.i(
                             TAG,
-                            "Final playback position saved: ${currentTime}s (S$seasonToSave E$episodeToSave) to local and Firebase"
+                            "Final playback position saved: ${currentTime}s (S$currentSeason E$currentEpisode) to local and Firebase"
                         )
                     }
                 } catch (e: Exception) {
@@ -1072,4 +928,3 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 }
-
