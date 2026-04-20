@@ -27,12 +27,12 @@ object AdUnitIds {
     // ── TV (Google Ad Manager) ────────────────────────────────────────────
 
     val TV_BANNER: String get() = if (useTestIds)
-        "ca-app-pub-3940256099942544/6300978111"                     // GAM test banner
+        "/6499/example/banner"                     // GAM test banner
     else
         "/YOUR_NETWORK_CODE/kiduyutv/tv_banner"    // Your GAM banner unit
 
     val TV_INTERSTITIAL: String get() = if (useTestIds)
-        "ca-app-pub-3940256099942544/1033173712"               // GAM test interstitial
+        "/6499/example/interstitial"               // GAM test interstitial
     else
         "/YOUR_NETWORK_CODE/kiduyutv/tv_interstitial"
 }
