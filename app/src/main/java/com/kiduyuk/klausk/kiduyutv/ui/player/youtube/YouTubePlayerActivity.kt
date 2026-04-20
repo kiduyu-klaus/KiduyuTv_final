@@ -49,8 +49,8 @@ class YouTubePlayerActivity : AppCompatActivity() {
         val iFramePlayerOptions = IFramePlayerOptions.Builder(applicationContext)
             .controls(1)
             .fullscreen(1)
-            .langPref("en")      // prefer English captions
-            .ccLoadPolicy(1)     // show captions by default
+            //.langPref("en")      // prefer English captions
+            //.ccLoadPolicy(1)     // show captions by default
             .build()
 
         // we need to initialize manually in order to pass IFramePlayerOptions to the player
