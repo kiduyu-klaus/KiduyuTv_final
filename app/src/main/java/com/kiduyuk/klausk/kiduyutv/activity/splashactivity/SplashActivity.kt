@@ -12,6 +12,7 @@ import android.util.Log
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.activity.ComponentActivity
@@ -178,34 +179,7 @@ class SplashActivity : ComponentActivity() {
         show()
     }
 
-    private fun showCuteDialog(
-        title: String,
-        desc: String,
-        headerImage: Int = R.mipmap.ic_launcher11,
-        positiveButtonText: String = "Try Again",
-        negativeButtonText: String = "Cancel",
-        accentColor: Int = android.graphics.Color.parseColor("#673AB7"),
-        onPositive: () -> Unit,
-        onNegative: () -> Unit = {},
-        onClose: () -> Unit = {}
-    ) {
-        CuteDialog(this)
-            .setDialogStyle(io.github.cutelibs.cutedialog.R.color.white, 10, CuteDialog.POSITION_CENTER, 10)
-            .isCancelable(true)
-            .setCloseIconStyle(0, 30, com.google.android.material.R.color.material_dynamic_primary10)
-            .setHeader(CuteDialog.HEADER_IMAGE)
-            .setHeaderImage(headerImage)
-            .setTitle(title, 0, accentColor, 0)
-            .setDesc(desc, 0, 0, 0)
-            .setPositiveButtonText(positiveButtonText, accentColor, 0)
-            .setNegativeButtonText(negativeButtonText, accentColor, 0)
-            .setPositiveButtonStyle(0, accentColor, 0, 0, 0)
-            .setNegativeButtonStyle(0, 0, accentColor, 0, 0)
-            .setPositiveButtonListener { onPositive() }
-            .setNegativeButtonListener { onNegative() }
-            .setCloseListener { onClose() }
-            .show()
-    }
+
 
     override fun onDestroy() {
         super.onDestroy()
@@ -250,13 +224,6 @@ class SplashActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-//        showCuteDialog(
-//            title = "Something is Wrong",
-//            desc = "I don't know what went wrong, but there is a problem.",
-//            onPositive = { /* retry */ },
-//            onNegative = { /* cancel */ },
-//            onClose = { /* closed */ }
-//        )
         // Initialize FirebaseSyncManager and start data sync
         FirebaseSyncManager.init(this)
         startFirebaseSync()
@@ -301,8 +268,9 @@ class SplashActivity : ComponentActivity() {
             return
         }
 
-        Log.i(TAG, "User logged in - starting Firebase data sync...")
-
+         Log.i(TAG, "User logged in - starting Firebase data sync...")
+        val displayName = AuthManager.userDisplayName.value ?: "User"
+        Toast.makeText(this, "Welcome back, $displayName!", Toast.LENGTH_SHORT).show()
         // Start sync and observe progress
         FirebaseSyncManager.startSync()
 
