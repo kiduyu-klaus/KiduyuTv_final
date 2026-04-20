@@ -196,7 +196,7 @@ object UpdateUtil {
         // Primary check: UiModeManager is the official Android API for this
         val uiModeManager = context.getSystemService(Context.UI_MODE_SERVICE) as? UiModeManager
         if (uiModeManager?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION) {
-            Log.d(TAG, "TV detected via UiModeManager")
+            Log.i(TAG, "TV detected via UiModeManager")
             return true
         }
 
@@ -204,14 +204,14 @@ object UpdateUtil {
 
         // Secondary: system feature flags
         if (packageManager.hasSystemFeature("amazon.hardware.fire_tv")) {
-            Log.d(TAG, "TV detected via Fire TV feature")
+            Log.i(TAG, "TV detected via Fire TV feature")
             return true
         }
         if (packageManager.hasSystemFeature("android.software.leanback") ||
             packageManager.hasSystemFeature("android.software.leanback_only") ||
             packageManager.hasSystemFeature("android.hardware.type.tv")
         ) {
-            Log.d(TAG, "TV detected via leanback/tv feature")
+            Log.i(TAG, "TV detected via leanback/tv feature")
             return true
         }
 
@@ -221,7 +221,7 @@ object UpdateUtil {
                         model.contains("AFT", ignoreCase = true) ||
                         model.contains("Chromecast", ignoreCase = true)
 
-        Log.d(TAG, "TV model heuristic for '$model': $isTvBuild")
+        Log.i(TAG, "TV model heuristic for '$model': $isTvBuild")
         return isTvBuild
     }
 
@@ -332,7 +332,7 @@ object UpdateUtil {
 
                         // Check if APK matches the current device type by prefix
                         if (!matchesDeviceType(name, deviceType)) {
-                            Log.d(TAG, "Skipping APK (device type mismatch): $name for device type: $deviceType")
+                            Log.i(TAG, "Skipping APK (device type mismatch): $name for device type: $deviceType")
                             continue
                         }
 
@@ -340,7 +340,7 @@ object UpdateUtil {
                         val version = extractVersionFromApkName(name)
                         val buildNumber = extractBuildNumber(name)
 
-                        Log.d(TAG, "Found matching APK: $name, version: $version, build: $buildNumber")
+                        Log.i(TAG, "Found matching APK: $name, version: $version, build: $buildNumber")
 
                         // Select the APK with the highest build number
                         if (buildNumber > bestBuildNumber) {

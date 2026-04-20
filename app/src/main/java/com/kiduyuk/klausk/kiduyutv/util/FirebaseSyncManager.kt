@@ -99,7 +99,7 @@ object FirebaseSyncManager {
         // - Mobile app: Firebase Auth (Google Sign-In)
         // - TV app: Phone authorization (receives UID from mobile app)
         val userId = if (AuthManager.isSignedIn.value && AuthManager.currentUser != null) {
-            Log.d(TAG, "Initializing FirebaseManager with authenticated user UID: ${AuthManager.currentUser?.uid}")
+            Log.i(TAG, "Initializing FirebaseManager with authenticated user UID: ${AuthManager.currentUser?.uid}")
             AuthManager.currentUser?.uid ?: SettingsManager(context).getDeviceId()
         } else {
             // For TV app after phone authorization, we need to check if there's a phone-authorized user
@@ -113,7 +113,7 @@ object FirebaseSyncManager {
             
             // For now, fall back to device ID
             // The fix: onPhoneAuthorized() calls updateFirebaseManagerUserId() which is called below
-            Log.d(TAG, "Initializing FirebaseManager with device ID (user not signed in)")
+            Log.i(TAG, "Initializing FirebaseManager with device ID (user not signed in)")
             SettingsManager(context).getDeviceId()
         }
         FirebaseManager.init(userId)
@@ -133,13 +133,13 @@ object FirebaseSyncManager {
      * @param userId The Firebase Auth UID (from phone authorization or Google sign-in)
      */
     fun updateFirebaseManagerUserId(userId: String) {
-        Log.d(TAG, "Updating FirebaseManager user ID to: $userId")
+        Log.i(TAG, "Updating FirebaseManager user ID to: $userId")
         FirebaseManager.init(userId)
         
         // Restart sync with the new user ID
         // This ensures listeners are set up for the correct user path
         if (isInitialized) {
-            Log.d(TAG, "Restarting sync with new user ID: $userId")
+            Log.i(TAG, "Restarting sync with new user ID: $userId")
             startSync(forceRefresh = true)
         }
     }
@@ -224,7 +224,7 @@ object FirebaseSyncManager {
             val firebaseData = FirebaseManager.getMyListOnce()
             
             if (firebaseData != null && firebaseData.isNotEmpty()) {
-                Log.d(TAG, "Found ${firebaseData.size} items in Firebase My List")
+                Log.i(TAG, "Found ${firebaseData.size} items in Firebase My List")
                 
                 // Process each item from Firebase
                 firebaseData.forEach { (tmdbIdStr, itemData) ->
@@ -246,7 +246,7 @@ object FirebaseSyncManager {
                                     posterPath = posterPath,
                                     voteAverage = voteAverage
                                 )
-                                Log.d(TAG, "Synced My List item: $title (ID: $tmdbId)")
+                                Log.i(TAG, "Synced My List item: $title (ID: $tmdbId)")
                             }
                         }
                     } catch (e: Exception) {
@@ -254,7 +254,7 @@ object FirebaseSyncManager {
                     }
                 }
             } else {
-                Log.d(TAG, "No My List items found in Firebase")
+                Log.i(TAG, "No My List items found in Firebase")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching My List from Firebase", e)
@@ -269,7 +269,7 @@ object FirebaseSyncManager {
             val firebaseData = FirebaseManager.getSavedCompaniesOnce()
             
             if (firebaseData != null && firebaseData.isNotEmpty()) {
-                Log.d(TAG, "Found ${firebaseData.size} companies in Firebase")
+                Log.i(TAG, "Found ${firebaseData.size} companies in Firebase")
                 
                 firebaseData.forEach { (companyIdStr, itemData) ->
                     try {
@@ -286,7 +286,7 @@ object FirebaseSyncManager {
                                     title = name,
                                     posterPath = logoPath
                                 )
-                                Log.d(TAG, "Synced company: $name (ID: $companyId)")
+                                Log.i(TAG, "Synced company: $name (ID: $companyId)")
                             }
                         }
                     } catch (e: Exception) {
@@ -294,7 +294,7 @@ object FirebaseSyncManager {
                     }
                 }
             } else {
-                Log.d(TAG, "No saved companies found in Firebase")
+                Log.i(TAG, "No saved companies found in Firebase")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error syncing Companies", e)
@@ -309,7 +309,7 @@ object FirebaseSyncManager {
             val firebaseData = FirebaseManager.getSavedNetworksOnce()
             
             if (firebaseData != null && firebaseData.isNotEmpty()) {
-                Log.d(TAG, "Found ${firebaseData.size} networks in Firebase")
+                Log.i(TAG, "Found ${firebaseData.size} networks in Firebase")
                 
                 firebaseData.forEach { (networkIdStr, itemData) ->
                     try {
@@ -326,7 +326,7 @@ object FirebaseSyncManager {
                                     title = name,
                                     posterPath = logoPath
                                 )
-                                Log.d(TAG, "Synced network: $name (ID: $networkId)")
+                                Log.i(TAG, "Synced network: $name (ID: $networkId)")
                             }
                         }
                     } catch (e: Exception) {
@@ -334,7 +334,7 @@ object FirebaseSyncManager {
                     }
                 }
             } else {
-                Log.d(TAG, "No saved networks found in Firebase")
+                Log.i(TAG, "No saved networks found in Firebase")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error syncing Networks", e)
@@ -349,7 +349,7 @@ object FirebaseSyncManager {
             val firebaseData = FirebaseManager.getSavedCastsOnce()
             
             if (firebaseData != null && firebaseData.isNotEmpty()) {
-                Log.d(TAG, "Found ${firebaseData.size} cast members in Firebase")
+                Log.i(TAG, "Found ${firebaseData.size} cast members in Firebase")
                 
                 firebaseData.forEach { (castIdStr, itemData) ->
                     try {
@@ -370,7 +370,7 @@ object FirebaseSyncManager {
                                     character = character,
                                     knownForDepartment = knownForDepartment
                                 )
-                                Log.d(TAG, "Synced cast: $name (ID: $castId)")
+                                Log.i(TAG, "Synced cast: $name (ID: $castId)")
                             }
                         }
                     } catch (e: Exception) {
@@ -378,7 +378,7 @@ object FirebaseSyncManager {
                     }
                 }
             } else {
-                Log.d(TAG, "No saved casts found in Firebase")
+                Log.i(TAG, "No saved casts found in Firebase")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error syncing Casts", e)
@@ -393,7 +393,7 @@ object FirebaseSyncManager {
             val firebaseData = FirebaseManager.getWatchHistoryOnce()
             
             if (firebaseData != null && firebaseData.isNotEmpty()) {
-                Log.d(TAG, "Found ${firebaseData.size} watch history entries in Firebase")
+                Log.i(TAG, "Found ${firebaseData.size} watch history entries in Firebase")
                 
                 // Watch history structure: { tv: { tmdbId: { seasonNumber: { episodeNumber: {...} } } }, movies: { tmdbId: {...} } }
                 // We process both TV and movies
@@ -410,9 +410,9 @@ object FirebaseSyncManager {
                     processMovieWatchHistory(movieHistory)
                 }
                 
-                Log.d(TAG, "Watch history sync completed")
+                Log.i(TAG, "Watch history sync completed")
             } else {
-                Log.d(TAG, "No watch history found in Firebase")
+                Log.i(TAG, "No watch history found in Firebase")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error syncing Watch History", e)
@@ -440,7 +440,7 @@ object FirebaseSyncManager {
                     val voteAverage = (tvData["voteAverage"] as? Number)?.toDouble() ?: 0.0
                     val releaseDate = tvData["releaseDate"] as? String
                     
-                    Log.d(TAG, "Syncing TV watch history: ID=$tmdbId S${season ?: "?"}E${episode ?: "?"} position=${playbackPosition}s title=$title")
+                    Log.i(TAG, "Syncing TV watch history: ID=$tmdbId S${season ?: "?"}E${episode ?: "?"} position=${playbackPosition}s title=$title")
                     
                     // Save to local database with watch history and metadata
                     DatabaseManager.addToWatchHistoryAsync(
@@ -481,7 +481,7 @@ object FirebaseSyncManager {
                     val voteAverage = (movieData["voteAverage"] as? Number)?.toDouble() ?: 0.0
                     val releaseDate = movieData["releaseDate"] as? String
                     
-                    Log.d(TAG, "Syncing movie watch history: ID=$tmdbId position=${playbackPosition}s title=$title")
+                    Log.i(TAG, "Syncing movie watch history: ID=$tmdbId position=${playbackPosition}s title=$title")
                     
                     // Save to local database with watch history and metadata
                     DatabaseManager.addToWatchHistoryAsync(
@@ -511,14 +511,14 @@ object FirebaseSyncManager {
             val firebaseProvider = FirebaseManager.getDefaultProviderOnce()
             
             if (firebaseProvider != null) {
-                Log.d(TAG, "Found default provider in Firebase: $firebaseProvider")
+                Log.i(TAG, "Found default provider in Firebase: $firebaseProvider")
                 
                 // Save to local settings if Firebase has a value
                 // Note: We need context to access SettingsManager
                 // This is handled in SplashActivity after sync completes
                 _syncMessage.value = "Default provider: $firebaseProvider"
             } else {
-                Log.d(TAG, "No default provider found in Firebase")
+                Log.i(TAG, "No default provider found in Firebase")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error syncing Default Provider", e)
@@ -583,14 +583,14 @@ object FirebaseSyncManager {
             return
         }
         
-        Log.d(TAG, "Enabling real-time Firebase sync...")
+        Log.i(TAG, "Enabling real-time Firebase sync...")
         
         // Listen to My List changes
         val myListRef = FirebaseManager.getNodeReference(FirebaseManager.Nodes.MY_LIST)
         val myListListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 // Handle real-time My List updates
-                Log.d(TAG, "My List updated in Firebase")
+                Log.i(TAG, "My List updated in Firebase")
             }
             
             override fun onCancelled(error: DatabaseError) {
@@ -605,7 +605,7 @@ object FirebaseSyncManager {
      * Disable real-time sync and clean up listeners.
      */
     fun disableRealTimeSync() {
-        Log.d(TAG, "Disabling real-time Firebase sync...")
+        Log.i(TAG, "Disabling real-time Firebase sync...")
         activeListeners.forEach { listener ->
             try {
                 listener.removeEventListener(object : ValueEventListener {

@@ -295,10 +295,10 @@ class SplashActivity : ComponentActivity() {
                         syncCompleted = true
                     }
                     is FirebaseSyncManager.SyncState.Syncing -> {
-                        Log.d(TAG, "Firebase sync in progress...")
+                        Log.i(TAG, "Firebase sync in progress...")
                     }
                     is FirebaseSyncManager.SyncState.Idle -> {
-                        Log.d(TAG, "Firebase sync idle")
+                        Log.i(TAG, "Firebase sync idle")
                     }
                 }
             }

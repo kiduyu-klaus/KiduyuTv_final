@@ -569,7 +569,7 @@ object FirebaseManager {
     fun saveDefaultProvider(provider: String) {
         database.getReference("${getCurrentUserPath()}/${Nodes.DEFAULT_PROVIDER}")
             .setValue(provider)
-        Log.d(TAG, "Saved default provider to Firebase: $provider")
+        Log.i(TAG, "Saved default provider to Firebase: $provider")
     }
     
     /**

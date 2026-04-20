@@ -137,7 +137,7 @@ object AuthManager {
         
         val isSignedIn = prefs.getBoolean(PREF_IS_SIGNED_IN, false)
         if (!isSignedIn) {
-            Log.d(TAG, "No persisted login found in SharedPreferences")
+            Log.i(TAG, "No persisted login found in SharedPreferences")
             return
         }
         
@@ -157,7 +157,7 @@ object AuthManager {
             try {
                 FirebaseSyncManager.updateFirebaseManagerUserId(uid)
             } catch (e: Exception) {
-                Log.d(TAG, "FirebaseSyncManager not yet initialized, FirebaseManager updated with persisted UID: $uid")
+                Log.i(TAG, "FirebaseSyncManager not yet initialized, FirebaseManager updated with persisted UID: $uid")
             }
             
             // Update auth state
@@ -298,7 +298,7 @@ object AuthManager {
                             FirebaseSyncManager.updateFirebaseManagerUserId(it.uid)
                         } catch (e: Exception) {
                             // FirebaseSyncManager might not be initialized yet
-                            Log.d(TAG, "FirebaseSyncManager not yet initialized, FirebaseManager updated with UID: ${it.uid}")
+                            Log.i(TAG, "FirebaseSyncManager not yet initialized, FirebaseManager updated with UID: ${it.uid}")
                         }
                         
                         // Save to SharedPreferences for persistence
@@ -479,7 +479,7 @@ object AuthManager {
             FirebaseSyncManager.updateFirebaseManagerUserId(uid)
         } catch (e: Exception) {
             // FirebaseSyncManager might not be initialized yet, FirebaseManager.init() is sufficient
-            Log.d(TAG, "FirebaseSyncManager not yet initialized, FirebaseManager updated with UID: $uid")
+            Log.i(TAG, "FirebaseSyncManager not yet initialized, FirebaseManager updated with UID: $uid")
         }
         
         // Update auth state to signed in

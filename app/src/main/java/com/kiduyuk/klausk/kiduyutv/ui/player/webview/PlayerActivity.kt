@@ -247,7 +247,7 @@ class PlayerActivity : AppCompatActivity() {
                     val seasonToSync = if (isTvContent) (if (latestSeason > 0) latestSeason else currentSeason) else null
                     val episodeToSync = if (isTvContent) (if (latestEpisode > 0) latestEpisode else currentEpisode) else null
 
-                    Log.d(TAG, "Syncing watch history to Firebase: tmdbId=$tmdbId, isTv=$isTvContent, season=$seasonToSync, episode=$episodeToSync, position=${playbackPosition}s")
+                    Log.i(TAG, "Syncing watch history to Firebase: tmdbId=$tmdbId, isTv=$isTvContent, season=$seasonToSync, episode=$episodeToSync, position=${playbackPosition}s")
 
                     FirebaseManager.syncWatchHistory(
                         tmdbId = tmdbId,

@@ -137,7 +137,7 @@ object MyListManager {
             when (item.type) {
                 "movie", "tv" -> {
                     // Save movies and TV shows to myList table
-                    Log.d(TAG, "Syncing ${item.type} to Firebase path: $currentUserPath/myList/${item.id}")
+                    Log.i(TAG, "Syncing ${item.type} to Firebase path: $currentUserPath/myList/${item.id}")
                     FirebaseManager.syncMyListItem(
                         tmdbId = item.id,
                         isTv = item.type == "tv",
@@ -149,7 +149,7 @@ object MyListManager {
                 }
                 "company" -> {
                     // Save companies to savedCompanies table ONLY (not myList)
-                    Log.d(TAG, "Syncing company to Firebase path: $currentUserPath/savedCompanies/${item.id}")
+                    Log.i(TAG, "Syncing company to Firebase path: $currentUserPath/savedCompanies/${item.id}")
                     FirebaseManager.saveCompany(
                         companyId = item.id,
                         name = item.title,
@@ -159,7 +159,7 @@ object MyListManager {
                 }
                 "network" -> {
                     // Save networks to savedNetworks table ONLY (not myList)
-                    Log.d(TAG, "Syncing network to Firebase path: $currentUserPath/savedNetworks/${item.id}")
+                    Log.i(TAG, "Syncing network to Firebase path: $currentUserPath/savedNetworks/${item.id}")
                     FirebaseManager.saveNetwork(
                         networkId = item.id,
                         name = item.title,
@@ -168,7 +168,7 @@ object MyListManager {
                 }
                 "cast" -> {
                     // Save cast members to savedCasts table ONLY (not myList)
-                    Log.d(TAG, "Syncing cast to Firebase path: $currentUserPath/savedCasts/${item.id}")
+                    Log.i(TAG, "Syncing cast to Firebase path: $currentUserPath/savedCasts/${item.id}")
                     FirebaseManager.saveCast(
                         castId = item.id,
                         name = item.title,
