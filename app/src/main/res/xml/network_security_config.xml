@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- AdGuard DNS-over-HTTPS servers -->
+    <dns-over-https>
+        <server address="https://dns.adguard-dns.com/dns-query">
+            <include-subdomains>true</include-subdomains>
+        </server>
+        <server address="https://adguard-dns.com/dns-query">
+            <include-subdomains>true</include-subdomains>
+        </server>
+    </dns-over-https>
+    
+    <!-- Base configuration for all network traffic -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

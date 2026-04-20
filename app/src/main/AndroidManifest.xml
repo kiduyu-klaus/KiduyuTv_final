@@ -30,6 +30,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.KiduyuTv"
         android:usesCleartextTraffic="true"
+        android:networkSecurityConfig="@xml/network_security_config"
         tools:targetApi="28">
         <!-- Add the AdMob app ID -->
         <meta-data
