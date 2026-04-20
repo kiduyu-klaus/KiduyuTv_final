@@ -250,13 +250,13 @@ class SplashActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        showCuteDialog(
-            title = "Something is Wrong",
-            desc = "I don't know what went wrong, but there is a problem.",
-            onPositive = { /* retry */ },
-            onNegative = { /* cancel */ },
-            onClose = { /* closed */ }
-        )
+//        showCuteDialog(
+//            title = "Something is Wrong",
+//            desc = "I don't know what went wrong, but there is a problem.",
+//            onPositive = { /* retry */ },
+//            onNegative = { /* cancel */ },
+//            onClose = { /* closed */ }
+//        )
         // Initialize FirebaseSyncManager and start data sync
         FirebaseSyncManager.init(this)
         startFirebaseSync()

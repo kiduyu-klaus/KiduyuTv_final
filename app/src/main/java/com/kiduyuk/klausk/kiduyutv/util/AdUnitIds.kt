@@ -5,7 +5,7 @@ import com.kiduyuk.klausk.kiduyutv.BuildConfig
 object AdUnitIds {
 
     // Set to true during development to use Google test ad units
-    private val useTestIds = true
+    private const val useTestIds = true
 
     // ── Phone (AdMob) ─────────────────────────────────────────────────────
 
