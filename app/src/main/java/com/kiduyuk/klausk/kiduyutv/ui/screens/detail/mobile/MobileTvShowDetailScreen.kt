@@ -143,6 +143,10 @@ fun MobileTvShowDetailScreen(
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(text = "${tvShow.numberOfSeasons} Seasons", color = TextSecondary, fontSize = 14.sp)
                         }
+                        if (tvShow.status != null) {
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(text = tvShow.status, color = TextSecondary, fontSize = 14.sp)
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))

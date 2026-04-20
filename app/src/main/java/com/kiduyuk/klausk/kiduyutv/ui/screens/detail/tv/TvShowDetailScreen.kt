@@ -234,6 +234,14 @@ fun TvShowDetailScreen(
                                     fontSize = 12.sp
                                 )
                             }
+                            if (tvShow.status != null) {
+                                Text("·", color = TextSecondary, fontSize = 12.sp)
+                                Text(
+                                    text = tvShow.status,
+                                    color = TextSecondary,
+                                    fontSize = 12.sp
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(6.dp))
