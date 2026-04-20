@@ -41,9 +41,9 @@ import com.kiduyuk.klausk.kiduyutv.ui.player.youtube.YouTubePlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
+import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamLinksViewModel
 import com.kiduyuk.klausk.kiduyutv.util.TvInterstitialManager
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
-import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamLinksViewModel
 
 /**
  * Composable function for displaying the detailed information of a TV show.
@@ -92,28 +92,10 @@ fun TvShowDetailScreen(
         viewModel.loadTvShowDetail(context, tvId)
     }
 
-    // Override back navigation to show TV interstitial before navigating back
-    val activity = context as? android.app.Activity
-    IconButton(
-        onClick = {
-            if (BuildConfig.FLAVOR == "tv" && activity != null) {
-                TvInterstitialManager.showAndThen(activity) {
-                    onBackClick()
-                }
-            } else {
-                onBackClick()
-            }
-        },
-        modifier = Modifier
-            .align(Alignment.TopStart)
-            .padding(8.dp)
-    ) {
-        Icon(
-            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-            contentDescription = "Back",
-            tint = TextPrimary,
-            modifier = Modifier.size(24.dp)
-        )
+    LaunchedEffect(uiState.isLoading) {
+        if (!uiState.isLoading && uiState.tvShowDetail != null) {
+            playFocusRequester.requestFocus()
+        }
     }
 
     Box(
@@ -167,8 +149,17 @@ fun TvShowDetailScreen(
                     )
 
                     // Back button
+                    val activity = context as? android.app.Activity
                     IconButton(
-                        onClick = onBackClick,
+                        onClick = {
+                            if (BuildConfig.FLAVOR == "tv" && activity != null) {
+                                TvInterstitialManager.showAndThen(activity) {
+                                    onBackClick()
+                                }
+                            } else {
+                                onBackClick()
+                            }
+                        },
                         modifier = Modifier
                             .align(Alignment.TopStart)
                             .padding(8.dp)

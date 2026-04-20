@@ -48,7 +48,9 @@ class YouTubePlayerActivity : AppCompatActivity() {
 
         val iFramePlayerOptions = IFramePlayerOptions.Builder(applicationContext)
             .controls(1)
-            .fullscreen(1) // enable full screen button
+            .fullscreen(1)
+            .langPref("en")      // prefer English captions
+            .ccLoadPolicy(1)     // show captions by default
             .build()
 
         // we need to initialize manually in order to pass IFramePlayerOptions to the player
@@ -77,6 +79,7 @@ class YouTubePlayerActivity : AppCompatActivity() {
         youTubePlayerView.initialize(object : AbstractYouTubePlayerListener() {
             override fun onReady(youTubePlayer: YouTubePlayer) {
                 this@YouTubePlayerActivity.youTubePlayer = youTubePlayer
+                //youTubePlayer.setPlaybackQuality(PlayerConstants.PlaybackQuality.HIGH)
                 youTubePlayer.loadVideo(videoId, 0f)
                 youTubePlayer.play()
             }
@@ -147,3 +150,4 @@ class YouTubePlayerActivity : AppCompatActivity() {
         }
     }
 }
+
