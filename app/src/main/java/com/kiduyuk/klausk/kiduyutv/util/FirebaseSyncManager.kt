@@ -98,21 +98,18 @@ object FirebaseSyncManager {
         // This covers both:
         // - Mobile app: Firebase Auth (Google Sign-In)
         // - TV app: Phone authorization (receives UID from mobile app)
-        val userId = if (AuthManager.isSignedIn.value && AuthManager.currentUser != null) {
-            Log.i(TAG, "Initializing FirebaseManager with authenticated user UID: ${AuthManager.currentUser?.uid}")
-            AuthManager.currentUser?.uid ?: SettingsManager(context).getDeviceId()
+        val userId = if (AuthManager.isSignedIn.value) {
+            // Priority 1: Firebase Auth user (Mobile)
+            // Priority 2: Phone-authorized user UID (TV)
+            val uid = AuthManager.currentUser?.uid ?: AuthManager.currentUid
+            if (uid != null) {
+                Log.i(TAG, "Initializing FirebaseManager with authenticated user UID: $uid")
+                uid
+            } else {
+                Log.i(TAG, "Initializing FirebaseManager with device ID (signed in but UID null)")
+                SettingsManager(context).getDeviceId()
+            }
         } else {
-            // For TV app after phone authorization, we need to check if there's a phone-authorized user
-            // The _isSignedIn StateFlow in AuthManager is updated by onPhoneAuthorized()
-            // But AuthManager.currentUser might be null on TV since TV doesn't use Firebase Auth
-            // So we need to check the user data that's set during phone authorization
-            
-            // Check if AuthManager has phone-authorized user data
-            // The phone authorization sets _isSignedIn to true and stores user info in StateFlows
-            // But since we don't store the UID separately, we need another way to detect this
-            
-            // For now, fall back to device ID
-            // The fix: onPhoneAuthorized() calls updateFirebaseManagerUserId() which is called below
             Log.i(TAG, "Initializing FirebaseManager with device ID (user not signed in)")
             SettingsManager(context).getDeviceId()
         }
@@ -656,3 +653,4 @@ object FirebaseSyncManager {
         return _syncState.value is SyncState.Syncing
     }
 }
+

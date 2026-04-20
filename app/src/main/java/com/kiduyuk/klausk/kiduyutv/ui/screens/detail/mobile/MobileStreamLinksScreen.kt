@@ -91,28 +91,32 @@ fun MobileStreamLinksScreen(
     // Auto-launch if a default provider is set and providers have loaded
     val defaultProvider = remember { SettingsManager(context).getDefaultProvider() }
     LaunchedEffect(uiState.streamProviders) {
-        if (defaultProvider != SettingsManager.AUTO && uiState.streamProviders.isNotEmpty()) {
-            val match = uiState.streamProviders.find { it.name == defaultProvider }
-            if (match != null) {
-                val url = when (match.name) {
-                    "VidLink" -> "${match.urlTemplate}&startAt=$timestamp"
-                    "VidKing" -> "${match.urlTemplate}&progress=$timestamp"
-                    "Videasy" -> "${match.urlTemplate}&progress=$timestamp"
-                    "VidFast" -> "${match.urlTemplate}&startAt=$timestamp"
-                    else -> match.urlTemplate
+                if (defaultProvider != SettingsManager.AUTO && uiState.streamProviders.isNotEmpty()) {
+                    val match = uiState.streamProviders.find { it.name == defaultProvider }
+                    if (match != null) {
+                        val url = when (match.name) {
+                            "VidLink" -> "${match.urlTemplate}&startAt=$timestamp"
+                            "VidKing" -> "${match.urlTemplate}&progress=$timestamp"
+                            "Videasy" -> "${match.urlTemplate}&progress=$timestamp"
+                            "VidFast" -> "${match.urlTemplate}&startAt=$timestamp"
+                            else -> match.urlTemplate
+                        }
+                        val intent = Intent(context, PlayerActivity::class.java).apply {
+                            putExtra("STREAM_URL", url)
+                            putExtra("TITLE", title)
+                            putExtra("TMDB_ID", tmdbId)
+                            putExtra("IS_TV", isTv)
+                            putExtra("SEASON_NUMBER", season ?: 0)
+                            putExtra("EPISODE_NUMBER", episode ?: 0)
+                            putExtra("OVERVIEW", overview)
+                            putExtra("POSTER_PATH", posterPath)
+                            putExtra("BACKDROP_PATH", backdropPath)
+                            putExtra("VOTE_AVERAGE", voteAverage)
+                            putExtra("RELEASE_DATE", releaseDate)
+                        }
+                        context.startActivity(intent)
+                    }
                 }
-                val intent = Intent(context, PlayerActivity::class.java).apply {
-                    putExtra("url", url)
-                    putExtra("title", title)
-                    putExtra("tmdbId", tmdbId)
-                    putExtra("isTv", isTv)
-                    putExtra("season", season ?: 0)
-                    putExtra("episode", episode ?: 0)
-                    putExtra("timestamp", timestamp)
-                }
-                context.startActivity(intent)
-            }
-        }
     }
 
     Box(
@@ -259,7 +263,6 @@ fun MobileStreamLinksScreen(
                                     putExtra("STREAM_URL", finalUrl)
                                 }
                                 context.startActivity(intent)
-                                onProviderClick(provider.urlTemplate)
                             }
                         )
                         Spacer(modifier = Modifier.height(12.dp))
@@ -390,4 +393,5 @@ private fun MobileStreamProviderCard(
         }
     }
 }
+
 
