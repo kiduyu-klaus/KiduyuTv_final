@@ -82,16 +82,43 @@ class StreamLinksViewModel : ViewModel() {
                     urlTemplate = if (isTv) "https://flixer.su/watch/tv/${tmdbId}/${season}/${episode}" else "https://flixer.su/watch/movie/${tmdbId}",
                     type = type
                 ),
-/*
+
                 StreamProvider(
                     name = "SuperEmbed",
                     urlTemplate = if (isTv) "https://multiembed.mov/?video_id=${tmdbId}&tmdb=1&s=${season}&e=${episode}" else "https://multiembed.mov/?video_id=${tmdbId}&tmdb=1",
                     type = type
                 ),
-*/
+
                 StreamProvider(
                     name = "Autoembed",
                     urlTemplate = if (isTv) "https://autoembed.co/tv/tmdb/${tmdbId}-${season}-${episode}" else "https://autoembed.co/movie/tmdb/${tmdbId}",
+                    type = type
+                ),
+                // New provider: Cinetaro
+                StreamProvider(
+                    name = "Cinetaro",
+                    urlTemplate = if (isTv)
+                        "https://api.cinetaro.buzz/tv/$tmdbId/$season/$episode/english"
+                    else
+                        "https://api.cinetaro.buzz/movie/$tmdbId/english",
+                    type = type
+                ),
+                // New provider: 2Embed Stream
+                StreamProvider(
+                    name = "2Embed Stream",
+                    urlTemplate = if (isTv)
+                        "https://www.2embed.stream/embed/tv/$tmdbId/$season/$episode"
+                    else
+                        "https://www.2embed.stream/embed/movie/$tmdbId",
+                    type = type
+                ),
+                // Re-enabled: MoviesAPI
+                StreamProvider(
+                    name = "MoviesAPI",
+                    urlTemplate = if (isTv)
+                        "https://moviesapi.club/tv/$tmdbId-$season-$episode"
+                    else
+                        "https://moviesapi.club/movie/$tmdbId",
                     type = type
                 ),
 /*
@@ -143,6 +170,7 @@ class StreamLinksViewModel : ViewModel() {
                     "VidKing" -> "${provider.urlTemplate}&progress=$timestamp"
                     "Videasy" -> "${provider.urlTemplate}&progress=$timestamp"
                     "VidFast" -> "${provider.urlTemplate}&startAt=$timestamp"
+                    // Add timestamp support for new providers here if needed
                     else -> provider.urlTemplate
                 }
             } else {
