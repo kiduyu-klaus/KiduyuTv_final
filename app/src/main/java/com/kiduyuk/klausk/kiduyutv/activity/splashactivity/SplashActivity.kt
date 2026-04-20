@@ -38,6 +38,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Color.Companion.White
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -55,6 +56,7 @@ import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import com.kiduyuk.klausk.kiduyutv.util.UpdateUtil
 import com.kiduyuk.klausk.kiduyutv.util.ConsentManager
 import com.kiduyuk.klausk.kiduyutv.util.AdManager
+import io.github.cutelibs.cutedialog.CuteDialog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
@@ -176,6 +178,35 @@ class SplashActivity : ComponentActivity() {
         show()
     }
 
+    private fun showCuteDialog(
+        title: String,
+        desc: String,
+        headerImage: Int = R.mipmap.ic_launcher11,
+        positiveButtonText: String = "Try Again",
+        negativeButtonText: String = "Cancel",
+        accentColor: Int = android.graphics.Color.parseColor("#673AB7"),
+        onPositive: () -> Unit,
+        onNegative: () -> Unit = {},
+        onClose: () -> Unit = {}
+    ) {
+        CuteDialog(this)
+            .setDialogStyle(io.github.cutelibs.cutedialog.R.color.white, 10, CuteDialog.POSITION_CENTER, 10)
+            .isCancelable(true)
+            .setCloseIconStyle(0, 30, com.google.android.material.R.color.material_dynamic_primary10)
+            .setHeader(CuteDialog.HEADER_IMAGE)
+            .setHeaderImage(headerImage)
+            .setTitle(title, 0, accentColor, 0)
+            .setDesc(desc, 0, 0, 0)
+            .setPositiveButtonText(positiveButtonText, accentColor, 0)
+            .setNegativeButtonText(negativeButtonText, accentColor, 0)
+            .setPositiveButtonStyle(0, accentColor, 0, 0, 0)
+            .setNegativeButtonStyle(0, 0, accentColor, 0, 0)
+            .setPositiveButtonListener { onPositive() }
+            .setNegativeButtonListener { onNegative() }
+            .setCloseListener { onClose() }
+            .show()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         activeDialogs.forEach { if (it.isShowing) it.dismiss() }
@@ -219,7 +250,13 @@ class SplashActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
+        showCuteDialog(
+            title = "Something is Wrong",
+            desc = "I don't know what went wrong, but there is a problem.",
+            onPositive = { /* retry */ },
+            onNegative = { /* cancel */ },
+            onClose = { /* closed */ }
+        )
         // Initialize FirebaseSyncManager and start data sync
         FirebaseSyncManager.init(this)
         startFirebaseSync()
@@ -671,7 +708,7 @@ class SplashActivity : ComponentActivity() {
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
                         text = "Kiduyu",
-                        color = Color.White,
+                        color = White,
                         fontSize = 42.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = (-1.5).sp
