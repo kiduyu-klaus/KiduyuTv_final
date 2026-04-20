@@ -81,12 +81,12 @@ class PlayerActivity : AppCompatActivity() {
         // Covers core providers + SuperEmbed's redirect chain.
         private val ALLOWED_NAVIGATION_HOSTS = setOf(
             // Core providers
-            "vidlink.pro",
-            "player.videasy.net",
-            "vidking.net",
-            "www.vidking.net",
-            "vidfast.pro",
-            "flixer.su",
+            
+        
+            
+            
+            
+            
             // SuperEmbed + its CDN redirect target
             "multiembed.mov",
             "streamingnow.mov"
