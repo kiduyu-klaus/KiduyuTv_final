@@ -150,24 +150,28 @@ object AuthManager {
         if (uid != null) {
             Log.i(TAG, "Restoring persisted login from SharedPreferences: uid=$uid, authType=$authType")
             
-            // Update FirebaseManager with the persisted UID
-            FirebaseManager.init(uid)
-            
-            // Try to update FirebaseSyncManager
-            try {
-                FirebaseSyncManager.updateFirebaseManagerUserId(uid)
-            } catch (e: Exception) {
-                Log.i(TAG, "FirebaseSyncManager not yet initialized, FirebaseManager updated with persisted UID: $uid")
-            }
-            
-            // Update auth state
+            // CRITICAL: Update auth state FIRST, then Firebase components
+            // This ensures the StateFlow emits the new value before FirebaseSyncManager's collector runs
             _isSignedIn.value = true
             _userDisplayName.value = displayName
             _userEmail.value = email
             _userPhotoUrl.value = photoUrl
             _userUid.value = uid
             
-            Log.i(TAG, "Persisted login restored successfully: displayName=$displayName")
+            // Update FirebaseManager with the persisted UID
+            // This MUST be called after updating StateFlows to ensure consistency
+            FirebaseManager.init(uid)
+            Log.i(TAG, "FirebaseManager updated with persisted UID: $uid")
+            
+            // Try to update FirebaseSyncManager to restart sync with the correct UID
+            // Note: This is a best-effort update since FirebaseSyncManager may not be initialized yet
+            try {
+                FirebaseSyncManager.updateFirebaseManagerUserId(uid)
+            } catch (e: Exception) {
+                Log.i(TAG, "FirebaseSyncManager not yet initialized, FirebaseManager already updated with UID: $uid")
+            }
+            
+            Log.i(TAG, "Persisted login restored successfully: displayName=$displayName, isSignedIn=$_isSignedIn.value")
         } else {
             Log.w(TAG, "Persisted login found but UID is null, clearing invalid state")
             clearPersistedLogin()

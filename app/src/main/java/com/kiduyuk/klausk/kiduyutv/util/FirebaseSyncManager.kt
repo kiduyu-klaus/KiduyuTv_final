@@ -84,14 +84,41 @@ object FirebaseSyncManager {
         // This ensures that if the user signs in/out after app start,
         // FirebaseManager is updated and sync is restarted with the correct path.
         syncScope.launch {
+            // Use flow that emits current value first, then changes
+            // This ensures we handle both:
+            // 1. App start: AuthManager may have already restored persisted login
+            // 2. Runtime changes: User signs in/out via phone authorization
             AuthManager.isSignedIn.collect { isSignedIn ->
+                // Read current UID after the StateFlow value has been updated
+                // This ensures we get the latest value, not a stale one
                 val currentUid = AuthManager.currentUser?.uid ?: AuthManager.currentUid
                 val deviceId = SettingsManager(context).getDeviceId()
-                val targetUid = if (isSignedIn && currentUid != null) currentUid else deviceId
                 
-                Log.i(TAG, "Auth state changed: isSignedIn=$isSignedIn, targetUid=$targetUid")
+                // Determine target UID based on sign-in state
+                val targetUid = if (isSignedIn && currentUid != null) {
+                    Log.i(TAG, "Auth state: Signed in, using UID: $currentUid")
+                    currentUid
+                } else {
+                    Log.i(TAG, "Auth state: Not signed in, using device ID: $deviceId")
+                    deviceId
+                }
+                
+                Log.i(TAG, "Auth state collection triggered: isSignedIn=$isSignedIn, targetUid=$targetUid")
                 updateFirebaseManagerUserId(targetUid)
             }
+        }
+        
+        // Immediately check and apply current auth state
+        // This handles the case where AuthManager has already restored persisted login
+        // before FirebaseSyncManager.init() is called
+        val immediateUid = if (AuthManager.isSignedIn.value) {
+            AuthManager.currentUser?.uid ?: AuthManager.currentUid
+        } else {
+            null
+        }
+        if (immediateUid != null) {
+            Log.i(TAG, "Applying restored login immediately: UID=$immediateUid")
+            FirebaseManager.init(immediateUid)
         }
         
         isInitialized = true

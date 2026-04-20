@@ -236,11 +236,18 @@ fun TvShowDetailScreen(
                             }
                             if (tvShow.status != null) {
                                 Text("·", color = TextSecondary, fontSize = 12.sp)
-                                Text(
-                                    text = tvShow.status,
-                                    color = TextSecondary,
-                                    fontSize = 12.sp
-                                )
+                                Surface(
+                                    color = PrimaryRed.copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text(
+                                        text = tvShow.status,
+                                        color = PrimaryRed,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
                             }
                         }
 

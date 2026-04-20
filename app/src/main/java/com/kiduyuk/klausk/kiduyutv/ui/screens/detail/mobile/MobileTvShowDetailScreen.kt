@@ -145,7 +145,18 @@ fun MobileTvShowDetailScreen(
                         }
                         if (tvShow.status != null) {
                             Spacer(modifier = Modifier.width(12.dp))
-                            Text(text = tvShow.status, color = TextSecondary, fontSize = 14.sp)
+                            Surface(
+                                color = PrimaryRed.copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(4.dp)
+                            ) {
+                                Text(
+                                    text = tvShow.status,
+                                    color = PrimaryRed,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
                         }
                     }
 

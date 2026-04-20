@@ -58,12 +58,14 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
         AuthManager.init(this, webClientId = "109926033937-dsl207opc1lsa3fnonim2sfmnc0o9hjk.apps.googleusercontent.com")
 
         // 2. Determine the correct user ID (authenticated UID or device ID)
+        // CRITICAL: AuthManager.init() has already restored persisted login and updated StateFlows
+        // We can now safely read isSignedIn.value which should reflect the persisted state
         val isSignedIn = AuthManager.isSignedIn.value
         val currentUid = AuthManager.currentUser?.uid ?: AuthManager.currentUid
         val deviceId = SettingsManager(this).getDeviceId()
         
         val userId = if (isSignedIn && currentUid != null) {
-            android.util.Log.i("KiduyuTvApp", "User is signed in. Using UID: $currentUid")
+            android.util.Log.i("KiduyuTvApp", "User is signed in (persisted login restored). Using UID: $currentUid")
             currentUid
         } else {
             android.util.Log.i("KiduyuTvApp", "User not signed in. Using device ID: $deviceId")
@@ -72,6 +74,7 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
 
         // 3. Initialize FirebaseManager with the correct user ID
         FirebaseManager.init(userId)
+        android.util.Log.i("KiduyuTvApp", "FirebaseManager initialized with userId: $userId")
 
         // Initialize AndroidApp reference for singleton access
         AndroidApp.instance = this
