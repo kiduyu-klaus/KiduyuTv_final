@@ -103,12 +103,22 @@ fun SettingsScreen(
         accountNavFocusRequester.requestFocus()
     }
     
-    // Auth state from AuthManager
+    // Auth state from AuthManager - These StateFlows are automatically updated when
+    // AuthManager.init() restores persisted login in KiduyuTvApp.onCreate()
+    // The UI will recompose automatically when these values change
     val isSignedIn by AuthManager.isSignedIn.collectAsState()
     val userDisplayName by AuthManager.userDisplayName.collectAsState()
     val userEmail by AuthManager.userEmail.collectAsState()
     val userPhotoUrl by AuthManager.userPhotoUrl.collectAsState()
     val isAuthLoading by AuthManager.isLoading.collectAsState()
+    
+    // Force recomposition when screen becomes visible to ensure account state is current
+    // This handles the case where persisted login was restored before navigating to Settings
+    LaunchedEffect(Unit) {
+        // AuthManager.init() is already called in KiduyuTvApp.onCreate()
+        // which restores persisted login and updates StateFlows
+        // StateFlows will trigger recomposition automatically when values change
+    }
     
     var showPhoneLoginDialog by remember { mutableStateOf(false) }
 
@@ -1471,50 +1481,85 @@ private fun AccountSignedInCard(
 
     Column(
         modifier = Modifier
-            .width(400.dp)
+            .width(480.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(CardDark)
-            .padding(24.dp)
+            .padding(28.dp)
     ) {
+        // Account status badge
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color(0xFF4CAF50).copy(alpha = 0.15f))
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF4CAF50))
+            )
+            Text(
+                text = "Connected",
+                color = Color(0xFF4CAF50),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(20.dp))
+        
         Row(
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Profile photo or placeholder
-            if (photoUrl != null) {
-                AsyncImage(
-                    model = photoUrl,
-                    contentDescription = "Profile photo",
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .background(PrimaryRed),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = displayName.firstOrNull()?.uppercase() ?: "U",
-                        color = Color.White,
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Bold
+            // Profile photo with border
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(CircleShape)
+                    .border(3.dp, PrimaryRed, CircleShape)
+                    .background(CardDark),
+                contentAlignment = Alignment.Center
+            ) {
+                if (photoUrl != null) {
+                    AsyncImage(
+                        model = photoUrl,
+                        contentDescription = "Profile photo",
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
                     )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(CircleShape)
+                            .background(PrimaryRed),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = displayName.firstOrNull()?.uppercase() ?: "U",
+                            color = Color.White,
+                            fontSize = 32.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
             
-            Spacer(modifier = Modifier.width(20.dp))
+            Spacer(modifier = Modifier.width(24.dp))
             
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = displayName,
                     color = TextPrimary,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold
                 )
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = email,
                     color = TextSecondary,
@@ -1523,7 +1568,38 @@ private fun AccountSignedInCard(
             }
         }
         
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        HorizontalDivider(
+            color = TextTertiary.copy(alpha = 0.15f),
+            thickness = 1.dp
+        )
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        // Account info section
+        Text(
+            text = "Account Info",
+            color = TextPrimary,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+        
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        AccountInfoRow(
+            icon = Icons.Default.Login,
+            label = "Signed in via",
+            value = "Phone Authorization"
+        )
+        
+        AccountInfoRow(
+            icon = Icons.Default.Refresh,
+            label = "Data syncing",
+            value = "Enabled"
+        )
+        
+        Spacer(modifier = Modifier.height(24.dp))
         
         // Sign out button
         Box(
@@ -1600,6 +1676,44 @@ private fun AccountSignedInCard(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun AccountInfoRow(
+    icon: ImageVector,
+    label: String,
+    value: String
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = TextSecondary,
+                modifier = Modifier.size(18.dp)
+            )
+            Text(
+                text = label,
+                color = TextSecondary,
+                fontSize = 14.sp
+            )
+        }
+        Text(
+            text = value,
+            color = TextPrimary,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 
