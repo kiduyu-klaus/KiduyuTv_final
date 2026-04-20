@@ -208,7 +208,7 @@ class PlayerActivity : AppCompatActivity() {
                     Log.e(TAG, "[Progress Save] Error saving progress: ${e.message}")
                 }
             } else {
-                Log.i(TAG, "[Progress Save] No valid timestamp received yet from player")
+                Log.i(TAG, "[Progress Save] No valid timestamp received yet ")
             }
 
             progressHandler.postDelayed(this, PROGRESS_UPDATE_INTERVAL)
@@ -368,17 +368,44 @@ class PlayerActivity : AppCompatActivity() {
                 addJavascriptInterface(VideasyJavaScriptInterface(), "VideasyInterface")
             }
 
+            // ================= REPLACED WebViewClient BLOCK START =================
             webViewClient = object : WebViewClient() {
-                override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
+
+                override fun shouldInterceptRequest(
+                    view: WebView?,
+                    request: WebResourceRequest?
+                ): WebResourceResponse? {
+
                     val reqUrl = request?.url.toString()
+
                     request?.url?.host?.let { warmUpDnsHost(it) }
-                    if (AdvancedAdBlocker.shouldBlock(reqUrl)) {
-                        return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
+
+                    return if (AdvancedAdBlocker.shouldBlock(reqUrl)) {
+                        Log.d("AdBlocker", "Blocked request: $reqUrl")
+                        WebResourceResponse(
+                            "text/plain",
+                            "utf-8",
+                            ByteArrayInputStream(ByteArray(0))
+                        )
+                    } else {
+                        super.shouldInterceptRequest(view, request)
                     }
-                    return super.shouldInterceptRequest(view, request)
                 }
 
-                override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean = true
+                override fun shouldOverrideUrlLoading(
+                    view: WebView?,
+                    request: WebResourceRequest?
+                ): Boolean {
+
+                    val url = request?.url?.toString() ?: return false
+
+                    // 🚀 Allow navigation unless blocked
+                    return AdvancedAdBlocker.shouldBlock(url).also { blocked ->
+                        if (blocked) {
+                            Log.d("AdBlocker", "Blocked navigation: $url")
+                        }
+                    }
+                }
 
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
@@ -386,10 +413,15 @@ class PlayerActivity : AppCompatActivity() {
                     if (url != null) {
                         val cookieManager = CookieManager.getInstance()
                         val cookies = cookieManager.getCookie(url)
+
                         Log.i(TAG, "[Cookies] URL: $url")
                         Log.i(TAG, "[Cookies] Content: ${cookies ?: "No cookies found"}")
                     }
 
+                    // ✅ Inject CSS FIRST (important timing fix)
+                    view?.evaluateJavascript(AdvancedAdBlocker.getCss(), null)
+
+                    // Your existing JS stays unchanged
                     val advancedJs = """
                         (function() {
                             function removeAdsAdvanced() {
@@ -554,10 +586,10 @@ class PlayerActivity : AppCompatActivity() {
                         })();
                     """.trimIndent()
 
-                    view?.evaluateJavascript(AdvancedAdBlocker.getCss(), null)
                     view?.evaluateJavascript(advancedJs, null)
                 }
             }
+            // ================= REPLACED WebViewClient BLOCK END =================
 
             webChromeClient = object : WebChromeClient() {
                 private var customView: View? = null
@@ -863,4 +895,3 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 }
-
