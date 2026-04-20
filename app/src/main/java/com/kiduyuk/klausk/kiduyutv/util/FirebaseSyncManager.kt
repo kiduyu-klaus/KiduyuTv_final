@@ -78,9 +78,21 @@ object FirebaseSyncManager {
         DatabaseManager.init(context)
         
         // Initialize FirebaseManager with appropriate user ID
-        // Note: If the user is already signed in (e.g., from a previous session),
-        // this will use the Firebase Auth UID. Otherwise, it uses device ID.
         initializeFirebaseManager(context)
+        
+        // Set up reactive auth state collection
+        // This ensures that if the user signs in/out after app start,
+        // FirebaseManager is updated and sync is restarted with the correct path.
+        syncScope.launch {
+            AuthManager.isSignedIn.collect { isSignedIn ->
+                val currentUid = AuthManager.currentUser?.uid ?: AuthManager.currentUid
+                val deviceId = SettingsManager(context).getDeviceId()
+                val targetUid = if (isSignedIn && currentUid != null) currentUid else deviceId
+                
+                Log.i(TAG, "Auth state changed: isSignedIn=$isSignedIn, targetUid=$targetUid")
+                updateFirebaseManagerUserId(targetUid)
+            }
+        }
         
         isInitialized = true
     }

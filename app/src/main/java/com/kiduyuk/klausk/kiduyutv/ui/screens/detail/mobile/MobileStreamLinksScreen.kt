@@ -1,6 +1,7 @@
 package com.kiduyuk.klausk.kiduyutv.ui.screens.detail.mobile
 
 import android.content.Intent
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -32,6 +33,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamLinksViewModel
 import androidx.compose.material3.CircularProgressIndicator
 import android.app.Activity
+import android.widget.Toast
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.util.AdManager
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
@@ -91,32 +93,43 @@ fun MobileStreamLinksScreen(
     // Auto-launch if a default provider is set and providers have loaded
     val defaultProvider = remember { SettingsManager(context).getDefaultProvider() }
     LaunchedEffect(uiState.streamProviders) {
-                if (defaultProvider != SettingsManager.AUTO && uiState.streamProviders.isNotEmpty()) {
-                    val match = uiState.streamProviders.find { it.name == defaultProvider }
-                    if (match != null) {
-                        val url = when (match.name) {
-                            "VidLink" -> "${match.urlTemplate}&startAt=$timestamp"
-                            "VidKing" -> "${match.urlTemplate}&progress=$timestamp"
-                            "Videasy" -> "${match.urlTemplate}&progress=$timestamp"
-                            "VidFast" -> "${match.urlTemplate}&startAt=$timestamp"
-                            else -> match.urlTemplate
-                        }
-                        val intent = Intent(context, PlayerActivity::class.java).apply {
-                            putExtra("STREAM_URL", url)
-                            putExtra("TITLE", title)
-                            putExtra("TMDB_ID", tmdbId)
-                            putExtra("IS_TV", isTv)
-                            putExtra("SEASON_NUMBER", season ?: 0)
-                            putExtra("EPISODE_NUMBER", episode ?: 0)
-                            putExtra("OVERVIEW", overview)
-                            putExtra("POSTER_PATH", posterPath)
-                            putExtra("BACKDROP_PATH", backdropPath)
-                            putExtra("VOTE_AVERAGE", voteAverage)
-                            putExtra("RELEASE_DATE", releaseDate)
-                        }
-                        context.startActivity(intent)
+        if (defaultProvider != SettingsManager.AUTO && uiState.streamProviders.isNotEmpty()) {
+            val match = uiState.streamProviders.find { it.name == defaultProvider }
+            if (match != null) {
+                try {
+                    val url = StreamLinksViewModel.resolveProviderUrl(
+                        providerName = match.name,
+                        tmdbId = tmdbId,
+                        isTv = isTv,
+                        season = season,
+                        episode = episode,
+                        timestamp = timestamp
+                    )
+                    
+                    if (url.isNullOrBlank()) {
+                        Log.e("MobileStreamLinks", "Auto-launch: Resolved URL is null or blank for ${match.name}")
+                        return@LaunchedEffect
                     }
+                    
+                    val intent = Intent(context, PlayerActivity::class.java).apply {
+                        putExtra("STREAM_URL", url)
+                        putExtra("TITLE", title)
+                        putExtra("TMDB_ID", tmdbId)
+                        putExtra("IS_TV", isTv)
+                        putExtra("SEASON_NUMBER", season ?: 0)
+                        putExtra("EPISODE_NUMBER", episode ?: 0)
+                        putExtra("OVERVIEW", overview)
+                        putExtra("POSTER_PATH", posterPath)
+                        putExtra("BACKDROP_PATH", backdropPath)
+                        putExtra("VOTE_AVERAGE", voteAverage)
+                        putExtra("RELEASE_DATE", releaseDate)
+                    }
+                    context.startActivity(intent)
+                } catch (e: Exception) {
+                    Log.e("MobileStreamLinks", "Auto-launch failed", e)
                 }
+            }
+        }
     }
 
     Box(
@@ -236,33 +249,21 @@ fun MobileStreamLinksScreen(
                         MobileStreamProviderCard(
                             provider = provider,
                             onProviderClick = {
-                                // Launch PlayerActivity for webview links
-                                val intent = Intent(context, PlayerActivity::class.java).apply {
-                                    putExtra("TMDB_ID", tmdbId)
-                                    putExtra("IS_TV", isTv)
-                                    putExtra("SEASON_NUMBER", season ?: 0)
-                                    putExtra("EPISODE_NUMBER", episode ?: 0)
-                                    putExtra("TITLE", title)
-                                    putExtra("OVERVIEW", overview)
-                                    putExtra("POSTER_PATH", posterPath)
-                                    putExtra("BACKDROP_PATH", backdropPath)
-                                    putExtra("VOTE_AVERAGE", voteAverage)
-                                    putExtra("RELEASE_DATE", releaseDate)
-
-                                    val finalUrl = if (timestamp > 0) {
-                                        when (provider.name) {
-                                            "VidLink" -> "${provider.urlTemplate}&startAt=$timestamp"
-                                            "VidKing" -> "${provider.urlTemplate}&progress=$timestamp"
-                                            "Videasy" -> "${provider.urlTemplate}&progress=$timestamp"
-                                            "VidFast" -> "${provider.urlTemplate}&startAt=$timestamp"
-                                            else -> provider.urlTemplate
-                                        }
-                                    } else {
-                                        provider.urlTemplate
-                                    }
-                                    putExtra("STREAM_URL", finalUrl)
-                                }
-                                context.startActivity(intent)
+                                launchPlayerWithProvider(
+                                    context = context,
+                                    provider = provider,
+                                    tmdbId = tmdbId,
+                                    isTv = isTv,
+                                    title = title,
+                                    overview = overview,
+                                    posterPath = posterPath,
+                                    backdropPath = backdropPath,
+                                    voteAverage = voteAverage,
+                                    releaseDate = releaseDate,
+                                    season = season,
+                                    episode = episode,
+                                    timestamp = timestamp
+                                )
                             }
                         )
                         Spacer(modifier = Modifier.height(12.dp))
@@ -274,6 +275,76 @@ fun MobileStreamLinksScreen(
                 }
             }
         }
+    }
+}
+
+/**
+ * Safely launch PlayerActivity with the selected provider.
+ * Uses the same safe URL resolution method as the TV version.
+ */
+private fun launchPlayerWithProvider(
+    context: android.content.Context,
+    provider: StreamProvider,
+    tmdbId: Int,
+    isTv: Boolean,
+    title: String,
+    overview: String?,
+    posterPath: String?,
+    backdropPath: String?,
+    voteAverage: Double,
+    releaseDate: String?,
+    season: Int?,
+    episode: Int?,
+    timestamp: Long
+) {
+    try {
+        // Use the safe URL resolver from ViewModel (same as TV version)
+        val finalUrl = StreamLinksViewModel.resolveProviderUrl(
+            providerName = provider.name,
+            tmdbId = tmdbId,
+            isTv = isTv,
+            season = season,
+            episode = episode,
+            timestamp = timestamp
+        )
+
+        // Validate the resolved URL
+        if (finalUrl.isNullOrBlank()) {
+            android.util.Log.e("MobileStreamLinks", "Resolved URL is null or blank for provider: ${provider.name}")
+            Toast.makeText(
+                context,
+                "${provider.name} is currently unavailable",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+
+        android.util.Log.i("MobileStreamLinks", "Launching PlayerActivity with provider: ${provider.name}, URL: $finalUrl")
+
+        // Launch PlayerActivity with the validated URL
+        val intent = Intent(context, PlayerActivity::class.java).apply {
+            putExtra("TMDB_ID", tmdbId)
+            putExtra("IS_TV", isTv)
+            putExtra("SEASON_NUMBER", season ?: 0)
+            putExtra("EPISODE_NUMBER", episode ?: 0)
+            putExtra("TITLE", title)
+            putExtra("OVERVIEW", overview)
+            putExtra("POSTER_PATH", posterPath)
+            putExtra("BACKDROP_PATH", backdropPath)
+            putExtra("VOTE_AVERAGE", voteAverage)
+            putExtra("RELEASE_DATE", releaseDate)
+            putExtra("STREAM_URL", finalUrl)
+        }
+        
+        context.startActivity(intent)
+        
+    } catch (e: Exception) {
+        android.util.Log.e("MobileStreamLinks", "Failed to launch player for provider: ${provider.name}", e)
+        Toast.makeText(
+            context,
+            "Failed to open ${provider.name}",
+            Toast.LENGTH_SHORT
+        ).show()
     }
 }
 
@@ -393,5 +464,3 @@ private fun MobileStreamProviderCard(
         }
     }
 }
-
-

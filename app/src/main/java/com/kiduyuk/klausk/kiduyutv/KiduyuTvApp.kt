@@ -52,13 +52,26 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
         // Initialize Firebase Realtime Database with persistence
         FirebaseDatabase.getInstance().setPersistenceEnabled(true)
 
-        // Initialize FirebaseManager with device-based user ID
-        // This enables syncing My List, Saved Companies, Networks, etc.
-        val userId = SettingsManager(this).getDeviceId()
-        FirebaseManager.init(userId)
-
-        // Initialize AuthManager for Firebase Authentication with Google Sign-In
+        // 1. Initialize AuthManager FIRST to restore persisted login from SharedPreferences
+        // This ensures isSignedIn and currentUid are populated before Firebase services start
+        android.util.Log.i("KiduyuTvApp", "Initializing AuthManager...")
         AuthManager.init(this, webClientId = "109926033937-dsl207opc1lsa3fnonim2sfmnc0o9hjk.apps.googleusercontent.com")
+
+        // 2. Determine the correct user ID (authenticated UID or device ID)
+        val isSignedIn = AuthManager.isSignedIn.value
+        val currentUid = AuthManager.currentUser?.uid ?: AuthManager.currentUid
+        val deviceId = SettingsManager(this).getDeviceId()
+        
+        val userId = if (isSignedIn && currentUid != null) {
+            android.util.Log.i("KiduyuTvApp", "User is signed in. Using UID: $currentUid")
+            currentUid
+        } else {
+            android.util.Log.i("KiduyuTvApp", "User not signed in. Using device ID: $deviceId")
+            deviceId
+        }
+
+        // 3. Initialize FirebaseManager with the correct user ID
+        FirebaseManager.init(userId)
 
         // Initialize AndroidApp reference for singleton access
         AndroidApp.instance = this
@@ -119,3 +132,4 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
             .build()
     }
 }
+
