@@ -293,7 +293,7 @@ class PlayerActivity : AppCompatActivity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
-        window.setFormat(android.graphics.PixelFormat.TRANSLUCENT)
+
 
         super.onCreate(savedInstanceState)
 
@@ -403,13 +403,23 @@ class PlayerActivity : AppCompatActivity() {
                 setRenderPriority(WebSettings.RenderPriority.HIGH)
                 useWideViewPort = true
                 loadWithOverviewMode = true
+                allowContentAccess = true
+                databaseEnabled = true
+                allowFileAccess = true
+                userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     safeSetSafeBrowsingEnabled(this, false)
                 }
             }
 
-            setLayerType(View.LAYER_TYPE_NONE, null)
+            if (isCursorDisabled) {
+                // Mobile — hardware layer composites correctly
+                setLayerType(View.LAYER_TYPE_HARDWARE, null)
+            } else {
+                // TV / FireTV — keep NONE so SurfaceView can punch through
+                setLayerType(View.LAYER_TYPE_NONE, null)
+            }
 
             if (isTrackingEnabled) {
                 addJavascriptInterface(VideasyJavaScriptInterface(), "VideasyInterface")
@@ -638,6 +648,31 @@ class PlayerActivity : AppCompatActivity() {
             }
 
             webChromeClient = object : WebChromeClient() {
+                private var customView: View? = null
+                private var customViewCallback: CustomViewCallback? = null
+
+                override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
+                    if (customView != null) {
+                        onHideCustomView()
+                        return
+                    }
+                    customView = view
+                    customViewCallback = callback
+                    rootLayout.addView(customView, FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    ))
+                    webView.visibility = View.GONE
+                }
+
+                override fun onHideCustomView() {
+                    if (customView == null) return
+                    rootLayout.removeView(customView)
+                    customView = null
+                    customViewCallback?.onCustomViewHidden()
+                    webView.visibility = View.VISIBLE
+                }
+
                 override fun onCreateWindow(
                     view: WebView?,
                     isDialog: Boolean,
