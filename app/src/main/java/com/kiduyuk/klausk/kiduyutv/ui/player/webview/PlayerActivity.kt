@@ -1,6 +1,7 @@
 package com.kiduyuk.klausk.kiduyutv.ui.player.webview
 
 import android.annotation.SuppressLint
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -27,7 +28,9 @@ import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
 import com.kiduyuk.klausk.kiduyutv.util.AdvancedAdBlocker
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
+import com.kiduyuk.klausk.kiduyutv.util.SingletonDnsResolver
 import java.io.ByteArrayInputStream
+import java.util.Collections
 
 class PlayerActivity : AppCompatActivity() {
 
@@ -60,6 +63,7 @@ class PlayerActivity : AppCompatActivity() {
     private var latestEpisode: Int = 1
     private var latestContentType: String = "movie"
     private var latestContentId: Int = -1
+    private val dnsWarmedHosts = Collections.synchronizedSet(mutableSetOf<String>())
 
     companion object {
         private const val TAG = "VideasyPlayer"
@@ -373,6 +377,7 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         Log.i(TAG, "[Provider] Selected: $currentProviderName")
+        warmUpDnsForUrl(url)
 
         // ── Layout ────────────────────────────────────────────────────────────
         val rootLayout = FrameLayout(this).apply {
@@ -416,6 +421,7 @@ class PlayerActivity : AppCompatActivity() {
                     request: WebResourceRequest?
                 ): WebResourceResponse? {
                     val reqUrl = request?.url.toString()
+                    request?.url?.host?.let { warmUpDnsHost(it) }
                     if (AdvancedAdBlocker.shouldBlock(reqUrl)) {
                         return WebResourceResponse(
                             "text/plain",
@@ -707,6 +713,30 @@ class PlayerActivity : AppCompatActivity() {
                 finish()
             }
         ).show()
+    }
+
+    /**
+     * WebView doesn't expose a custom Dns hook.
+     * We pre-resolve hosts through SingletonDnsResolver (DoH) to warm resolution paths.
+     */
+    private fun warmUpDnsForUrl(url: String) {
+        val host = runCatching { Uri.parse(url).host }.getOrNull() ?: return
+        warmUpDnsHost(host)
+    }
+
+    private fun warmUpDnsHost(host: String) {
+        if (host.isBlank()) return
+        if (!dnsWarmedHosts.add(host)) return
+
+        Thread {
+            runCatching { SingletonDnsResolver.getDns().lookup(host) }
+                .onSuccess { addresses ->
+                    Log.i(TAG, "[DNS] DoH resolved $host -> ${addresses.joinToString()}")
+                }
+                .onFailure { error ->
+                    Log.w(TAG, "[DNS] DoH resolve failed for $host: ${error.message}")
+                }
+        }.start()
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
