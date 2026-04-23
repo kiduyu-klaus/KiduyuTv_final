@@ -45,6 +45,77 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      # ═══════════════════════════════════════════════════════════════
+      # OPTIMIZE GRADLE FOR CI (12GB Runner)
+      # Overrides local 6GB settings with 12GB-optimized values
+      # only during CI execution. Local file is restored after build.
+      # ═══════════════════════════════════════════════════════════════
+      - name: Optimize Gradle for CI (12GB)
+        run: |
+          # Backup the local properties (don't touch the file in repo)
+          if [ -f gradle.properties ]; then
+            cp gradle.properties gradle.properties.local-backup
+          fi
+
+          # Write CI-optimized gradle.properties
+          cat > gradle.properties << 'EOF'
+          # --------------------------------------------------
+          # CI-OPTIMIZED — GitHub Actions 12GB Runner
+          # Auto-generated, DO NOT COMMIT
+          # --------------------------------------------------
+
+          # JVM MEMORY (Tuned for 12GB RAM runner)
+          org.gradle.jvmargs=-Xmx8g -Xms2g -XX:MaxMetaspaceSize=1g \
+            -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Dfile.encoding=UTF-8 \
+            -XX:+HeapDumpOnOutOfMemoryError -XX:MaxRAMPercentage=75
+
+          # GRADLE PERFORMANCE
+          org.gradle.daemon=true
+          org.gradle.daemon.idletimeout=3600000
+          org.gradle.parallel=true
+          org.gradle.configureondemand=true
+          org.gradle.workers.max=4
+          org.gradle.caching=true
+          org.gradle.configuration-cache=true
+
+          # KOTLIN OPTIMIZATION
+          kotlin.daemon.jvm.options=-Xmx4g -Xms1g
+          kotlin.incremental=true
+          kotlin.incremental.android=true
+          kotlin.incremental.useClasspathSnapshot=true
+          kotlin.compiler.execution.strategy=daemon
+
+          # ANDROID SETTINGS
+          android.useAndroidX=true
+          android.enableJetifier=false
+          android.nonTransitiveRClass=true
+          android.enableR8.fullMode=true
+          android.enableDexingArtifactTransform=false
+
+          # JAVA TOOLCHAIN
+          org.gradle.java.installations.auto-detect=true
+          org.gradle.java.installations.auto-download=true
+          EOF
+
+          echo "=== CI-Optimized gradle.properties ==="
+          cat gradle.properties
+          echo "======================================="
+
+      # ═══════════════════════════════════════════════════════════════
+      # RESTORE LOCAL GRADLE PROPERTIES
+      # Runs even if the build fails, ensuring local settings are preserved
+      # ═══════════════════════════════════════════════════════════════
+      - name: Restore local gradle.properties
+        if: always()
+        run: |
+          if [ -f gradle.properties.local-backup ]; then
+            cp gradle.properties.local-backup gradle.properties
+            rm gradle.properties.local-backup
+            echo "✓ Restored local gradle.properties"
+          else
+            echo "ℹ No local gradle.properties to restore"
+          fi
+
       - name: Get commit info
         id: commit_info
         run: |
