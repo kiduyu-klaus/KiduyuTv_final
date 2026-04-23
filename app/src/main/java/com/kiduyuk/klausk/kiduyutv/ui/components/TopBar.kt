@@ -251,6 +251,7 @@ private fun NotificationDialog(
                                         color = if (isFocused) Color.White else Color.Transparent,
                                         shape = RoundedCornerShape(12.dp)
                                     )
+                                    .focusable(interactionSource = interactionSource)
                                     .clickable(
                                         interactionSource = interactionSource,
                                         indication = null,
