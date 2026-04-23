@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.focus.onFocusChanged
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.CardDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.DarkRed
@@ -192,6 +193,10 @@ private fun NotificationDialog(
     onDismiss: () -> Unit,
     onNotificationClick: (Int, String) -> Unit
 ) {
+    var selectedNotificationId by remember(notifications) {
+        mutableStateOf(notifications.firstOrNull()?.id)
+    }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -240,22 +245,32 @@ private fun NotificationDialog(
                         items(notifications) { notification ->
                             val interactionSource = remember { MutableInteractionSource() }
                             val isFocused by interactionSource.collectIsFocusedAsState()
+                            val isSelected = selectedNotificationId == notification.id
+                            val isHighlighted = isFocused || isSelected
                             
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(if (isFocused) DarkRed else CardDark)
+                                    .background(if (isHighlighted) DarkRed else CardDark)
                                     .border(
                                         width = 1.dp,
-                                        color = if (isFocused) Color.White else Color.Transparent,
+                                        color = if (isHighlighted) Color.White else Color.Transparent,
                                         shape = RoundedCornerShape(12.dp)
                                     )
+                                    .onFocusChanged { focusState ->
+                                        if (focusState.isFocused) {
+                                            selectedNotificationId = notification.id
+                                        }
+                                    }
                                     .focusable(interactionSource = interactionSource)
                                     .clickable(
                                         interactionSource = interactionSource,
                                         indication = null,
-                                        onClick = { onNotificationClick(notification.id, notification.type) }
+                                        onClick = {
+                                            selectedNotificationId = notification.id
+                                            onNotificationClick(notification.id, notification.type)
+                                        }
                                     )
                                     .padding(12.dp)
                             ) {
