@@ -57,7 +57,7 @@ jobs:
             cp gradle.properties gradle.properties.local-backup
           fi
 
-          # Write CI-optimized gradle.properties
+          # Write CI-optimized gradle.properties (only modifying existing settings)
           cat > gradle.properties << 'EOF'
           # --------------------------------------------------
           # CI-OPTIMIZED — GitHub Actions 12GB Runner
@@ -65,21 +65,17 @@ jobs:
           # --------------------------------------------------
 
           # JVM MEMORY (Tuned for 12GB RAM runner)
-          org.gradle.jvmargs=-Xmx8g -Xms2g -XX:MaxMetaspaceSize=1g \
-            -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Dfile.encoding=UTF-8 \
-            -XX:+HeapDumpOnOutOfMemoryError -XX:MaxRAMPercentage=75
+          org.gradle.jvmargs=-Xmx8g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Dfile.encoding=UTF-8
 
           # GRADLE PERFORMANCE
           org.gradle.daemon=true
-          org.gradle.daemon.idletimeout=3600000
           org.gradle.parallel=true
-          org.gradle.configureondemand=true
           org.gradle.workers.max=4
           org.gradle.caching=true
           org.gradle.configuration-cache=true
 
           # KOTLIN OPTIMIZATION
-          kotlin.daemon.jvm.options=-Xmx4g -Xms1g
+          kotlin.daemon.jvm.options=-Xmx4g
           kotlin.incremental=true
           kotlin.incremental.android=true
           kotlin.incremental.useClasspathSnapshot=true
@@ -89,8 +85,6 @@ jobs:
           android.useAndroidX=true
           android.enableJetifier=false
           android.nonTransitiveRClass=true
-          android.enableR8.fullMode=true
-          android.enableDexingArtifactTransform=false
 
           # JAVA TOOLCHAIN
           org.gradle.java.installations.auto-detect=true
