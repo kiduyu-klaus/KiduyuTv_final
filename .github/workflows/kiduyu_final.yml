@@ -101,21 +101,6 @@ jobs:
           cat gradle.properties
           echo "======================================="
 
-      # ═══════════════════════════════════════════════════════════════
-      # RESTORE LOCAL GRADLE PROPERTIES
-      # Runs even if the build fails, ensuring local settings are preserved
-      # ═══════════════════════════════════════════════════════════════
-      - name: Restore local gradle.properties
-        if: always()
-        run: |
-          if [ -f gradle.properties.local-backup ]; then
-            cp gradle.properties.local-backup gradle.properties
-            rm gradle.properties.local-backup
-            echo "✓ Restored local gradle.properties"
-          else
-            echo "ℹ No local gradle.properties to restore"
-          fi
-
       - name: Get commit info
         id: commit_info
         run: |
@@ -202,6 +187,21 @@ jobs:
         with:
           name: tv-release
           path: ${{ steps.rename_tv_release.outputs.apk_path }}
+
+      # ═══════════════════════════════════════════════════════════════
+      # RESTORE LOCAL GRADLE PROPERTIES (after builds complete)
+      # Runs even if the build fails, ensuring local settings are preserved
+      # ═══════════════════════════════════════════════════════════════
+      - name: Restore local gradle.properties
+        if: always()
+        run: |
+          if [ -f gradle.properties.local-backup ]; then
+            cp gradle.properties.local-backup gradle.properties
+            rm gradle.properties.local-backup
+            echo "✓ Restored local gradle.properties"
+          else
+            echo "ℹ No local gradle.properties to restore"
+          fi
 
       # ── Single GitHub Release with all 2 APKs ────────────────
       - name: Create GitHub Release
