@@ -10,12 +10,15 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.border
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,13 +26,22 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
+import com.kiduyuk.klausk.kiduyutv.ui.theme.CardDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.DarkRed
+import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
+import com.kiduyuk.klausk.kiduyutv.ui.theme.SurfaceDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
+import com.kiduyuk.klausk.kiduyutv.ui.theme.TextSecondary
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
+import com.kiduyuk.klausk.kiduyutv.util.NotificationHelper
 import com.kiduyuk.klausk.kiduyutv.R
 
 @Composable
@@ -38,9 +50,23 @@ fun TopBar(
     onNavItemClick: (String) -> Unit,
     onSearchClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onNotificationClick: (id: Int, type: String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     val navItems = listOf("Movies", "TV Shows", "My List")
+    var showNotificationDialog by remember { mutableStateOf(false) }
+    val notifications by NotificationHelper.notifications.collectAsState()
+
+    if (showNotificationDialog) {
+        NotificationDialog(
+            notifications = notifications,
+            onDismiss = { showNotificationDialog = false },
+            onNotificationClick = { id, type ->
+                showNotificationDialog = false
+                onNotificationClick(id, type)
+            }
+        )
+    }
 
     Row(
         modifier = modifier
@@ -123,11 +149,28 @@ fun TopBar(
             }
         }
 
-        // Right: Search + Settings
+        // Right: Notifications + Search + Settings
         Row(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            Box {
+                FocusableIconButton(
+                    icon = Icons.Default.Notifications,
+                    contentDescription = "Notifications",
+                    onClick = { showNotificationDialog = true }
+                )
+                if (notifications.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(PrimaryRed)
+                            .align(Alignment.TopEnd)
+                            .offset(x = (-2).dp, y = 2.dp)
+                    )
+                }
+            }
             FocusableIconButton(
                 icon = Icons.Default.Search,
                 contentDescription = "Search",
@@ -138,6 +181,113 @@ fun TopBar(
                 contentDescription = "Settings",
                 onClick = onSettingsClick
             )
+        }
+    }
+}
+
+@Composable
+private fun NotificationDialog(
+    notifications: List<com.kiduyuk.klausk.kiduyutv.util.AppNotification>,
+    onDismiss: () -> Unit,
+    onNotificationClick: (Int, String) -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.7f))
+                .clickable { onDismiss() },
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+                    .width(400.dp)
+                    .heightIn(max = 500.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(SurfaceDark)
+                    .clickable(enabled = false) {} // Prevent clicks from closing dialog
+                    .padding(20.dp)
+            ) {
+                Text(
+                    text = "Notifications",
+                    color = Color.White,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                if (notifications.isEmpty()) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No new notifications",
+                            color = TextSecondary,
+                            fontSize = 16.sp
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(notifications) { notification ->
+                            val interactionSource = remember { MutableInteractionSource() }
+                            val isFocused by interactionSource.collectIsFocusedAsState()
+                            
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (isFocused) DarkRed else CardDark)
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (isFocused) Color.White else Color.Transparent,
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .clickable(
+                                        interactionSource = interactionSource,
+                                        indication = null,
+                                        onClick = { onNotificationClick(notification.id, notification.type) }
+                                    )
+                                    .padding(12.dp)
+                            ) {
+                                Text(
+                                    text = notification.title,
+                                    color = Color.White,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = notification.overview,
+                                    color = TextSecondary,
+                                    fontSize = 14.sp,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.align(Alignment.End),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryRed)
+                ) {
+                    Text("Close")
+                }
+            }
         }
     }
 }

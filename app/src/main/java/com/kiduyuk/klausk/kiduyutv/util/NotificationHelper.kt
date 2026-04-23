@@ -10,6 +10,20 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.activity.mainactivity.MainActivity
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
+/**
+ * Data class representing a notification in the app.
+ */
+data class AppNotification(
+    val id: Int,
+    val title: String,
+    val type: String,
+    val overview: String,
+    val timestamp: Long = System.currentTimeMillis()
+)
 
 /**
  * Helper class to manage notification channels and post notifications.
@@ -20,6 +34,26 @@ object NotificationHelper {
     private const val CHANNEL_NAME = "Recommendations"
     private const val CHANNEL_DESCRIPTION = "Daily movie and TV show recommendations"
     private const val NOTIFICATION_ID = 1001
+
+    private val _notifications = MutableStateFlow<List<AppNotification>>(emptyList())
+    val notifications: StateFlow<List<AppNotification>> = _notifications.asStateFlow()
+
+    fun addNotification(notification: AppNotification) {
+        val currentList = _notifications.value.toMutableList()
+        // Avoid duplicates by ID
+        if (currentList.none { it.id == notification.id }) {
+            currentList.add(0, notification) // Add to top
+            // Keep only last 20 notifications
+            if (currentList.size > 20) {
+                currentList.removeAt(currentList.size - 1)
+            }
+            _notifications.value = currentList
+        }
+    }
+
+    fun clearNotifications() {
+        _notifications.value = emptyList()
+    }
 
     /**
      * Creates the notification channel for media recommendations.
@@ -80,6 +114,8 @@ object NotificationHelper {
             // Check for permission is handled by the system on API 33+
             try {
                 notify(NOTIFICATION_ID, builder.build())
+                // Also add to our internal list for the UI
+                addNotification(AppNotification(id, title, type, overview))
             } catch (e: SecurityException) {
                 // Handle case where permission might have been revoked
             }

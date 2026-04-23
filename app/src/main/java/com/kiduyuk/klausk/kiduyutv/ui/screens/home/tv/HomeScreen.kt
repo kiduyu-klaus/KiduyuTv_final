@@ -664,7 +664,14 @@ private fun HomeContent(
             selectedRoute = selectedRoute,
             onNavItemClick = onNavItemClick,
             onSearchClick = onSearchClick,
-            onSettingsClick = onSettingsClick
+            onSettingsClick = onSettingsClick,
+            onNotificationClick = { id, type ->
+                if (type == "movie") {
+                    onMovieClick(id)
+                } else {
+                    onTvShowClick(id)
+                }
+            }
         )
     }
 }
