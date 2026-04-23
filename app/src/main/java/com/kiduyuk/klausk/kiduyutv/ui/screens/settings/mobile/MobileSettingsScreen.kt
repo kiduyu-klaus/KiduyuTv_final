@@ -46,6 +46,11 @@ import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import com.kiduyuk.klausk.kiduyutv.util.AdManager
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.SettingsViewModel
+import com.android.volley.Request
+import com.android.volley.toolbox.JsonObjectRequest
+import com.android.volley.toolbox.Volley
+import com.google.firebase.auth.FirebaseAuth
+import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,8 +75,6 @@ fun MobileSettingsScreen(
     val userEmail by AuthManager.userEmail.collectAsState()
     val userPhotoUrl by AuthManager.userPhotoUrl.collectAsState()
     val isAuthLoading by AuthManager.isLoading.collectAsState()
-    val currentUid by AuthManager.authStateFlow.collectAsState()
-
     // TV Login state
     var tvCodeInput by remember { mutableStateOf("") }
     var isAuthorizingTv by remember { mutableStateOf(false) }
@@ -113,58 +116,61 @@ fun MobileSettingsScreen(
         }
     }
 
-    // Function to validate and authorize TV
-    fun validateAndAuthorizeTv(code: String) {
+    // Authorize TV via cPanel API using Firebase ID token.
+    fun authorizeTvWithToken(code: String) {
         isAuthorizingTv = true
-        val database = com.google.firebase.database.FirebaseDatabase.getInstance()
-        val codeRef = database.getReference("tv_codes/$code")
-        
-        codeRef.get().addOnSuccessListener { snapshot ->
-            if (snapshot.exists()) {
-                val createdAt = snapshot.child("createdAt").getValue(Long::class.java) ?: 0L
-                val now = System.currentTimeMillis()
-                val fiveMinutes = 5 * 60 * 1000
-                
-                if (now - createdAt < fiveMinutes) {
-                    // Code is valid and not expired, write user data
-                    val uid = currentUid?.uid
-                    if (uid != null) {
-                        // Write complete user profile data for TV to fetch
-                        val authorizedUser = mapOf(
-                            "uid" to uid,
-                            "displayName" to (userDisplayName ?: ""),
-                            "email" to (userEmail ?: ""),
-                            "photoUrl" to (userPhotoUrl ?: "")
-                        )
-                        codeRef.child("authorizedUser").setValue(authorizedUser)
-                            .addOnSuccessListener {
-                                Toast.makeText(context, "TV Authorized Successfully!", Toast.LENGTH_SHORT).show()
-                                tvCodeInput = ""
-                                isAuthorizingTv = false
-                                
-                                // Clean up after a short delay
-                                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                                    codeRef.removeValue()
-                                }, 2000)
-                            }
-                            .addOnFailureListener {
-                                Toast.makeText(context, "Failed to authorize TV", Toast.LENGTH_SHORT).show()
-                                isAuthorizingTv = false
-                            }
-                    }
-                } else {
-                    Toast.makeText(context, "Code has expired. Generate a new one on TV.", Toast.LENGTH_LONG).show()
+
+        val user = FirebaseAuth.getInstance().currentUser
+        if (user == null) {
+            Toast.makeText(context, "You must be signed in first.", Toast.LENGTH_SHORT).show()
+            isAuthorizingTv = false
+            return
+        }
+
+        user.getIdToken(true)
+            .addOnSuccessListener { result ->
+                val idToken = result.token
+                if (idToken == null) {
+                    Toast.makeText(context, "Failed to get ID token.", Toast.LENGTH_SHORT).show()
                     isAuthorizingTv = false
-                    codeRef.removeValue() // Cleanup expired code
+                    return@addOnSuccessListener
                 }
-            } else {
-                Toast.makeText(context, "Invalid code. Please check and try again.", Toast.LENGTH_SHORT).show()
+
+                val jsonBody = JSONObject().apply {
+                    put("code", code)
+                    put("idToken", idToken)
+                }
+
+                val url = "https://sflatransport.com/api/connectTv"
+                val requestQueue = Volley.newRequestQueue(context)
+
+                val jsonObjectRequest = JsonObjectRequest(
+                    Request.Method.POST,
+                    url,
+                    jsonBody,
+                    {
+                        Toast.makeText(context, "TV Authorized Successfully!", Toast.LENGTH_SHORT).show()
+                        tvCodeInput = ""
+                        isAuthorizingTv = false
+                    },
+                    { error ->
+                        val message = try {
+                            val responseBody = String(error.networkResponse.data, Charsets.UTF_8)
+                            JSONObject(responseBody).optString("error", "Unknown error")
+                        } catch (_: Exception) {
+                            error.message ?: "Connection failed"
+                        }
+                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                        isAuthorizingTv = false
+                    }
+                )
+
+                requestQueue.add(jsonObjectRequest)
+            }
+            .addOnFailureListener { exception ->
+                Toast.makeText(context, "ID token error: ${exception.message}", Toast.LENGTH_LONG).show()
                 isAuthorizingTv = false
             }
-        }.addOnFailureListener {
-            Toast.makeText(context, "Error connecting to Firebase", Toast.LENGTH_SHORT).show()
-            isAuthorizingTv = false
-        }
     }
 
     Scaffold(
@@ -263,7 +269,7 @@ fun MobileSettingsScreen(
                                 onDone = {
                                     val code = tvCodeInput.trim()
                                     if (code.length == 6 && !isAuthorizingTv) {
-                                        validateAndAuthorizeTv(code)
+                                        authorizeTvWithToken(code)
                                     }
                                 }
                             ),
@@ -279,8 +285,8 @@ fun MobileSettingsScreen(
                                 } else if (tvCodeInput.length == 6) {
                                     IconButton(onClick = {
                                         val code = tvCodeInput.trim()
-                                        if (code.length == 6) {
-                                            validateAndAuthorizeTv(code)
+                                        if (code.length == 6 && !isAuthorizingTv) {
+                                            authorizeTvWithToken(code)
                                         }
                                     }) {
                                         Icon(Icons.Default.CheckCircle, contentDescription = "Authorize", tint = Color.Green)

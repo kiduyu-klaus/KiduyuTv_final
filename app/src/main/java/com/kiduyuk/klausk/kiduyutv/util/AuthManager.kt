@@ -54,7 +54,7 @@ object AuthManager {
     private const val PREF_EMAIL = "email"
     private const val PREF_PHOTO_URL = "photo_url"
     private const val PREF_IS_SIGNED_IN = "is_signed_in"
-    private const val PREF_AUTH_TYPE = "auth_type" // "google" or "phone"
+    private const val PREF_AUTH_TYPE = "auth_type" // "google", "custom", or legacy "phone"
     
     private var firebaseAuth: FirebaseAuth? = null
     private var googleSignInClient: GoogleSignInClient? = null
@@ -232,23 +232,40 @@ object AuthManager {
      * Update authentication state from Firebase user.
      */
     private fun updateAuthState(user: FirebaseUser?) {
-        _authStateFlow.value = user
-        _isSignedIn.value = user != null
-        _userDisplayName.value = user?.displayName
-        _userEmail.value = user?.email
-        _userPhotoUrl.value = user?.photoUrl?.toString()
-        _userUid.value = user?.uid
-        
-        // Also save to SharedPreferences for mobile Google sign-in persistence
-        if (user != null) {
-            savePersistedLogin(
-                uid = user.uid,
-                displayName = user.displayName,
-                email = user.email,
-                photoUrl = user.photoUrl?.toString(),
-                authType = "google"
-            )
+        // Ignore anonymous users for UI signed-in state.
+        // TV uses anonymous auth only as a temporary step before custom-token sign-in.
+        if (user == null || user.isAnonymous) {
+            _authStateFlow.value = null
+            _isSignedIn.value = false
+            _userDisplayName.value = null
+            _userEmail.value = null
+            _userPhotoUrl.value = null
+            _userUid.value = null
+            return
         }
+
+        _authStateFlow.value = user
+        _isSignedIn.value = true
+        _userDisplayName.value = user.displayName
+        _userEmail.value = user.email
+        _userPhotoUrl.value = user.photoUrl?.toString()
+        _userUid.value = user.uid
+
+        // Keep all authenticated sessions (Google + custom token) on the same UID path.
+        FirebaseManager.init(user.uid)
+        try {
+            FirebaseSyncManager.updateFirebaseManagerUserId(user.uid)
+        } catch (e: Exception) {
+            Log.i(TAG, "FirebaseSyncManager not yet initialized, FirebaseManager updated with UID: ${user.uid}")
+        }
+
+        savePersistedLogin(
+            uid = user.uid,
+            displayName = user.displayName,
+            email = user.email,
+            photoUrl = user.photoUrl?.toString(),
+            authType = "custom"
+        )
     }
     
     /**
@@ -292,28 +309,6 @@ object AuthManager {
                 if (task.isSuccessful) {
                     val user = firebaseAuth?.currentUser
                     user?.let {
-                        // Update FirebaseManager with user ID for data sync
-                        // CRITICAL: This ensures mobile and TV use the SAME Firebase path
-                        FirebaseManager.init(it.uid)
-                        
-                        // Also update FirebaseSyncManager to restart sync with the correct user ID
-                        // This ensures listeners are set up for the correct user path
-                        try {
-                            FirebaseSyncManager.updateFirebaseManagerUserId(it.uid)
-                        } catch (e: Exception) {
-                            // FirebaseSyncManager might not be initialized yet
-                            Log.i(TAG, "FirebaseSyncManager not yet initialized, FirebaseManager updated with UID: ${it.uid}")
-                        }
-                        
-                        // Save to SharedPreferences for persistence
-                        savePersistedLogin(
-                            uid = it.uid,
-                            displayName = it.displayName,
-                            email = it.email,
-                            photoUrl = it.photoUrl?.toString(),
-                            authType = "google"
-                        )
-                        
                         onSuccess?.invoke(it)
                     }
                 } else {
@@ -374,27 +369,18 @@ object AuthManager {
      */
     fun signOut(onComplete: (() -> Unit)? = null) {
         _isLoading.value = true
-        
-        // Sign out from Firebase
+
         firebaseAuth?.signOut()
-        
-        // Sign out from Google
         googleSignInClient?.signOut()
-            ?.addOnCompleteListener { task ->
-                _isLoading.value = false
-                onComplete?.invoke()
-                
-                if (!task.isSuccessful) {
-                    // Log error if needed
-                }
-            }
-        
-        // Clear persisted login
         clearPersistedLogin()
-        
-        // Revert to anonymous device ID for Firebase Manager
-        val deviceId = SettingsManager(applicationContext!!).getDeviceId()
-        FirebaseManager.init(deviceId)
+
+        if (applicationContext != null) {
+            val deviceId = SettingsManager(applicationContext!!).getDeviceId()
+            FirebaseManager.init(deviceId)
+        }
+
+        _isLoading.value = false
+        onComplete?.invoke()
     }
     
     /**
@@ -515,24 +501,6 @@ object AuthManager {
      * Reverts to anonymous device ID and clears persisted login.
      */
     fun signOutFromPhone(onComplete: (() -> Unit)? = null) {
-        // Update auth state to signed out
-        _isSignedIn.value = false
-        _userDisplayName.value = null
-        _userEmail.value = null
-        _userPhotoUrl.value = null
-        _userUid.value = null
-        _authStateFlow.value = null
-        
-        // Clear persisted login from SharedPreferences
-        clearPersistedLogin()
-        
-        // Revert to anonymous device ID for Firebase Manager
-        if (applicationContext != null) {
-            val deviceId = SettingsManager(applicationContext!!).getDeviceId()
-            FirebaseManager.init(deviceId)
-        }
-        
-        onComplete?.invoke()
-        Log.i(TAG, "Signed out from phone authorization and cleared persisted login")
+        signOut(onComplete)
     }
 }

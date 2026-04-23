@@ -74,6 +74,11 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.window.DialogProperties
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
+import kotlinx.coroutines.tasks.await
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Root Screen
@@ -125,15 +130,7 @@ fun SettingsScreen(
     if (showPhoneLoginDialog) {
         PhoneLoginCodeDialog(
             onDismiss = { showPhoneLoginDialog = false },
-            onLoginSuccess = { uid, displayName, email, photoUrl ->
-                // Success! Login on TV with full user profile data
-                // Update AuthManager state to reflect the signed-in status
-                AuthManager.onPhoneAuthorized(
-                    uid = uid,
-                    displayName = displayName,
-                    email = email,
-                    photoUrl = photoUrl
-                )
+            onLoginSuccess = { _, _, _, _ ->
                 showPhoneLoginDialog = false
             }
         )
@@ -188,8 +185,7 @@ fun SettingsScreen(
                                     lottieAnimRes = R.raw.exit,
                                     onNo = {},
                                     onYes = {
-                                        // Use signOutFromPhone for TV since TV doesn't use Firebase Auth
-                                        AuthManager.signOutFromPhone {
+                                        AuthManager.signOut {
                                             // Handle sign out - UI will auto-update via StateFlow
                                         }
                                     }
@@ -1725,21 +1721,24 @@ private fun PhoneLoginCodeDialog(
     onDismiss: () -> Unit,
     onLoginSuccess: (uid: String, displayName: String?, email: String?, photoUrl: String?) -> Unit
 ) {
-    val context = LocalContext.current
     var generatedCode by remember { mutableStateOf("") }
     var countdown by remember { mutableStateOf(60) }
-    var codeRef by remember { mutableStateOf<com.google.firebase.database.DatabaseReference?>(null) }
-    var currentListener by remember { mutableStateOf<com.google.firebase.database.ValueEventListener?>(null) }
+    var listenerRegistration by remember { mutableStateOf<ListenerRegistration?>(null) }
+    var isCompleting by remember { mutableStateOf(false) }
     val cancelInteractionSource = remember { MutableInteractionSource() }
     val isCancelFocused by cancelInteractionSource.collectIsFocusedAsState()
     val cancelFocusRequester = remember { FocusRequester() }
 
-    // Cleanup function to remove listener and Firebase data
+    // Cleanup function to remove Firestore listener and generated code doc.
     fun cleanup() {
-        currentListener?.let { listener ->
-            codeRef?.removeEventListener(listener)
+        listenerRegistration?.remove()
+        listenerRegistration = null
+        if (generatedCode.isNotBlank()) {
+            FirebaseFirestore.getInstance()
+                .collection("tvCodes")
+                .document(generatedCode)
+                .delete()
         }
-        codeRef?.removeValue()
     }
 
     // Countdown timer
@@ -1748,66 +1747,90 @@ private fun PhoneLoginCodeDialog(
             kotlinx.coroutines.delay(1000)
             countdown--
         }
-        // Time expired - cleanup and dismiss
-        cleanup()
-        onDismiss()
+        if (!isCompleting) {
+            cleanup()
+            onDismiss()
+        }
     }
 
-    // Generate code and start listening to Firebase
+    // Generate code and start listening for linked custom token.
     LaunchedEffect(Unit) {
-        // 1. Generate a random 6-digit alphanumeric code
-        val chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        generatedCode = (1..6).map { chars.random() }.joinToString("")
-        
-        // 2. Get device ID
-        val settingsManager = SettingsManager(context)
-        val deviceId = settingsManager.getDeviceId()
-        
-        // 3. Store code in Firebase and listen for user data
-        val database = com.google.firebase.database.FirebaseDatabase.getInstance()
-        codeRef = database.getReference("tv_codes/$generatedCode")
-        
-        // Save deviceId and timestamp
-        val data = mapOf(
-            "deviceId" to deviceId,
-            "createdAt" to System.currentTimeMillis()
-        )
-        codeRef?.setValue(data)
-        
-        // 4. Listen for authorizedUser (contains uid + profile info)
-        val listener = object : com.google.firebase.database.ValueEventListener {
-            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
-                if (snapshot.hasChild("authorizedUser")) {
-                    val userSnapshot = snapshot.child("authorizedUser")
-                    val uid = userSnapshot.child("uid").getValue(String::class.java)
-                    val displayName = userSnapshot.child("displayName").getValue(String::class.java)?.takeIf { it.isNotEmpty() }
-                    val email = userSnapshot.child("email").getValue(String::class.java)?.takeIf { it.isNotEmpty() }
-                    val photoUrl = userSnapshot.child("photoUrl").getValue(String::class.java)?.takeIf { it.isNotEmpty() }
-                    
-                    if (uid != null) {
-                        // Success! Login on TV with this user data
-                        // Stop countdown
-                        countdown = 0
-                        cleanup()
-                        onLoginSuccess(uid, displayName, email, photoUrl)
-                    }
-                }
-            }
-            
-            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {
-                // Handle error
+        val auth = FirebaseAuth.getInstance()
+        if (auth.currentUser == null) {
+            try {
+                auth.signInAnonymously().await()
+            } catch (_: Exception) {
+                cleanup()
+                onDismiss()
+                return@LaunchedEffect
             }
         }
-        
-        currentListener = listener
-        codeRef?.addValueEventListener(listener)
-        
-        // Auto-focus cancel button for easy dismissal
+
+        val tvUid = auth.currentUser?.uid ?: run {
+            cleanup()
+            onDismiss()
+            return@LaunchedEffect
+        }
+
+        // 1. Generate a random 6-digit alphanumeric code.
+        val chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        generatedCode = (1..6).map { chars.random() }.joinToString("")
+
+        // 2. Create tvCodes/{code} in Firestore.
+        val firestore = FirebaseFirestore.getInstance()
+        val docRef = firestore.collection("tvCodes").document(generatedCode)
+        val data = hashMapOf(
+            "tvUid" to tvUid,
+            "createdAt" to FieldValue.serverTimestamp(),
+            "status" to "pending"
+        )
+
+        try {
+            docRef.set(data).await()
+        } catch (_: Exception) {
+            cleanup()
+            onDismiss()
+            return@LaunchedEffect
+        }
+
+        // 3. Listen for function output: status=linked + customToken.
+        listenerRegistration = docRef.addSnapshotListener { snapshot, error ->
+            if (error != null || snapshot == null || isCompleting) return@addSnapshotListener
+
+            val status = snapshot.getString("status")
+            if (status == "linked") {
+                val customToken = snapshot.getString("customToken")
+                if (!customToken.isNullOrBlank()) {
+                    isCompleting = true
+                    FirebaseAuth.getInstance()
+                        .signInWithCustomToken(customToken)
+                        .addOnSuccessListener { authResult ->
+                            countdown = 0
+                            cleanup()
+                            val user = authResult.user
+                            onLoginSuccess(
+                                user?.uid.orEmpty(),
+                                user?.displayName,
+                                user?.email,
+                                user?.photoUrl?.toString()
+                            )
+                        }
+                        .addOnFailureListener {
+                            isCompleting = false
+                        }
+                }
+            }
+        }
+
+        // Auto-focus cancel button for easy dismissal.
         cancelFocusRequester.requestFocus()
     }
 
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            cleanup()
+            onDismiss()
+        },
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Box(
@@ -1830,9 +1853,9 @@ private fun PhoneLoginCodeDialog(
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
                 )
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 Text(
                     text = "Open the KiduyuTV app on your phone and enter this code to sync your account:",
                     color = TextSecondary,
@@ -1840,9 +1863,9 @@ private fun PhoneLoginCodeDialog(
                     textAlign = TextAlign.Center,
                     lineHeight = 20.sp
                 )
-                
+
                 Spacer(modifier = Modifier.height(24.dp))
-                
+
                 // Display the 6-digit code
                 Box(
                     modifier = Modifier
@@ -1860,9 +1883,10 @@ private fun PhoneLoginCodeDialog(
                         letterSpacing = 6.sp
                     )
                 }
-                
+            
+
                 Spacer(modifier = Modifier.height(24.dp))
-                
+
                 // Countdown timer display
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -1880,9 +1904,9 @@ private fun PhoneLoginCodeDialog(
                         fontSize = 12.sp
                     )
                 }
-                
+
                 Spacer(modifier = Modifier.height(32.dp))
-                
+
                 // Cancel Button
                 Box(
                     modifier = Modifier
@@ -1905,8 +1929,9 @@ private fun PhoneLoginCodeDialog(
                             }
                         )
                         .onKeyEvent { keyEvent ->
-                            if (keyEvent.type == KeyEventType.KeyDown && 
+                            if (keyEvent.type == KeyEventType.KeyDown &&
                                 (keyEvent.key == Key.Enter || keyEvent.key == Key.DirectionCenter)) {
+                                cleanup()
                                 onDismiss()
                                 true
                             } else false
@@ -1925,6 +1950,7 @@ private fun PhoneLoginCodeDialog(
         }
     }
 }
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Compose Previews
@@ -2235,7 +2261,7 @@ private fun PreviewSettingsSidebar() {
                 selectedSection = SettingsSection.ACCOUNT,
                 onSectionSelect = {},
                 onBackClick = {},
-                accountNavFocusRequester = FocusRequester(),
+                accountNavFocusRequester = remember { FocusRequester() },
                 modifier = Modifier.width(280.dp)
             )
         }
