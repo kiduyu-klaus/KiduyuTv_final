@@ -1,26 +1,28 @@
 package com.kiduyuk.klausk.kiduyutv.ui.components
 
-import androidx.compose.foundation.*
-import androidx.compose.foundation.border
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.remember
+import androidx.compose.foundation.border
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.focus.*
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
@@ -28,13 +30,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.kiduyuk.klausk.kiduyutv.R
-import com.kiduyuk.klausk.kiduyutv.ui.theme.*
+import androidx.compose.ui.focus.onFocusChanged
+import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
+import com.kiduyuk.klausk.kiduyutv.ui.theme.CardDark
+import com.kiduyuk.klausk.kiduyutv.ui.theme.DarkRed
+import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
+import com.kiduyuk.klausk.kiduyutv.ui.theme.SurfaceDark
+import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
+import com.kiduyuk.klausk.kiduyutv.ui.theme.TextSecondary
+import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
 import com.kiduyuk.klausk.kiduyutv.util.NotificationHelper
-
-// ---------------- TOP BAR ----------------
+import com.kiduyuk.klausk.kiduyutv.R
 
 @Composable
 fun TopBar(
@@ -43,76 +52,147 @@ fun TopBar(
     onSearchClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onNotificationClick: (id: Int, type: String) -> Unit = { _, _ -> },
+    modifier: Modifier = Modifier
 ) {
     val navItems = listOf("Movies", "TV Shows", "My List")
-    var showDialog by remember { mutableStateOf(false) }
+    var showNotificationDialog by remember { mutableStateOf(false) }
     val notifications by NotificationHelper.notifications.collectAsState()
 
-    if (showDialog) {
+    if (showNotificationDialog) {
         NotificationDialog(
             notifications = notifications,
-            onDismiss = { showDialog = false },
-            onNotificationClick = {
-                showDialog = false
-                onNotificationClick(it.first, it.second)
+            onDismiss = { showNotificationDialog = false },
+            onNotificationClick = { id, type ->
+                showNotificationDialog = false
+                onNotificationClick(id, type)
             }
         )
     }
 
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+            .background(Color.Transparent)
+            .padding(horizontal = 15.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Left: Logo + Nav items
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.weight(1f)
+        ) {
+            // Logo — focused state gives dark red ring
+            val logoInteraction = remember { MutableInteractionSource() }
+            val logoFocused by logoInteraction.collectIsFocusedAsState()
 
-            navItems.forEach { title ->
-                Text(
-                    text = title,
-                    modifier = Modifier
-                        .focusable()
-                        .clickable { onNavItemClick(title) }
-                        .padding(8.dp),
-                    color = Color.White
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(
+                        color = if (logoFocused) DarkRed.copy(alpha = 0.7f) else Color.Transparent
+                    )
+                    .noRippleClickable(interactionSource = logoInteraction) { onNavItemClick("home") },
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(id = R.mipmap.ic_launcher11),
+                    contentDescription = "KiduyuTV Logo",
+                    modifier = Modifier.size(32.dp)
                 )
+            }
+
+            // Nav items
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                navItems.forEachIndexed { index, title ->
+                    val route = when (index) {
+                        0 -> "movies"
+                        1 -> "tv_shows"
+                        2 -> "my_list"
+                        else -> ""
+                    }
+                    val isSelected = selectedRoute == route
+                    val interactionSource = remember { MutableInteractionSource() }
+                    val isFocused by interactionSource.collectIsFocusedAsState()
+                    val isHighlighted = isSelected || isFocused
+
+                    Text(
+                        text = title,
+                        color = if (isHighlighted) Color.White else TextPrimary,
+                        fontSize = 15.sp,
+                        modifier = Modifier
+                            .background(
+                                color = if (isFocused) DarkRed else Color.Transparent,
+                                shape = RoundedCornerShape(4.dp)
+                            )
+                            .padding(horizontal = 5.dp, vertical = 4.dp)
+                            .drawBehind {
+                                if (isSelected) { // underline only for selected, not focused
+                                    val strokeWidth = 2.dp.toPx()
+                                    val y = size.height - strokeWidth / 2
+                                    drawLine(
+                                        color = DarkRed,
+                                        start = Offset(0f, y),
+                                        end = Offset(size.width, y),
+                                        strokeWidth = strokeWidth
+                                    )
+                                }
+                            }
+                            .noRippleClickable(interactionSource = interactionSource) { onNavItemClick(route) }
+                    )
+                }
             }
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-
-            IconButton(onClick = { showDialog = true }) {
-                Icon(Icons.Default.Notifications, contentDescription = "Notifications")
+        // Right: Notifications + Search + Settings
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box {
+                FocusableIconButton(
+                    icon = Icons.Default.Notifications,
+                    contentDescription = "Notifications",
+                    onClick = { showNotificationDialog = true }
+                )
+                if (notifications.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(PrimaryRed)
+                            .align(Alignment.TopEnd)
+                            .offset(x = (-2).dp, y = 2.dp)
+                    )
+                }
             }
-
-            IconButton(onClick = onSearchClick) {
-                Icon(Icons.Default.Search, contentDescription = "Search")
-            }
-
-            IconButton(onClick = onSettingsClick) {
-                Icon(Icons.Default.Settings, contentDescription = "Settings")
-            }
+            FocusableIconButton(
+                icon = Icons.Default.Search,
+                contentDescription = "Search",
+                onClick = onSearchClick
+            )
+            FocusableIconButton(
+                icon = Icons.Default.Settings,
+                contentDescription = "Settings",
+                onClick = onSettingsClick
+            )
         }
     }
 }
-
-// ---------------- FIXED DIALOG ----------------
 
 @Composable
 private fun NotificationDialog(
     notifications: List<com.kiduyuk.klausk.kiduyutv.util.AppNotification>,
     onDismiss: () -> Unit,
-    onNotificationClick: (Pair<Int, String>) -> Unit
+    onNotificationClick: (Int, String) -> Unit
 ) {
-    var selectedId by remember { mutableStateOf(notifications.firstOrNull()?.id) }
-
-    val firstItemFocusRequester = remember { FocusRequester() }
-
-    // 🔑 Move focus when dialog opens
-    LaunchedEffect(Unit) {
-        if (notifications.isNotEmpty()) {
-            firstItemFocusRequester.requestFocus()
-        }
+    var selectedNotificationId by remember(notifications) {
+        mutableStateOf(notifications.firstOrNull()?.id)
     }
 
     Dialog(
@@ -123,97 +203,88 @@ private fun NotificationDialog(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.7f))
-                .clickable(
-                    indication = null,
-                    interactionSource = remember { MutableInteractionSource() }
-                ) { onDismiss() },
+                .clickable { onDismiss() },
             contentAlignment = Alignment.Center
         ) {
-
             Column(
                 modifier = Modifier
                     .width(400.dp)
                     .heightIn(max = 500.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .background(SurfaceDark)
-                    .clickable(enabled = false) {}
+                    .clickable(enabled = false) {} // Prevent clicks from closing dialog
                     .padding(20.dp)
             ) {
-
                 Text(
-                    "Notifications",
+                    text = "Notifications",
                     color = Color.White,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
                 )
-
+                
                 Spacer(modifier = Modifier.height(16.dp))
-
+                
                 if (notifications.isEmpty()) {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
+                        modifier = Modifier.fillMaxWidth().weight(1f),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("No notifications", color = TextSecondary)
+                        Text(
+                            text = "No new notifications",
+                            color = TextSecondary,
+                            fontSize = 16.sp
+                        )
                     }
                 } else {
                     LazyColumn(
-                        modifier = Modifier
-                            .weight(1f)
-                            .focusable(),
+                        modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        itemsIndexed(notifications) { index, item ->
-
-                            val interaction = remember { MutableInteractionSource() }
-                            val focused by interaction.collectIsFocusedAsState()
-
-                            val isSelected = selectedId == item.id
-                            val highlight = focused || isSelected
-
-                            val modifier = if (index == 0) {
-                                Modifier.focusRequester(firstItemFocusRequester)
-                            } else Modifier
-
+                        items(notifications) { notification ->
+                            val interactionSource = remember { MutableInteractionSource() }
+                            val isFocused by interactionSource.collectIsFocusedAsState()
+                            val isSelected = selectedNotificationId == notification.id
+                            val isHighlighted = isFocused || isSelected
+                            
                             Column(
-                                modifier = modifier
+                                modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(if (highlight) DarkRed else CardDark)
+                                    .background(if (isHighlighted) DarkRed else CardDark)
                                     .border(
-                                        1.dp,
-                                        if (highlight) Color.White else Color.Transparent,
-                                        RoundedCornerShape(12.dp)
+                                        width = 1.dp,
+                                        color = if (isHighlighted) Color.White else Color.Transparent,
+                                        shape = RoundedCornerShape(12.dp)
                                     )
-                                    .onFocusChanged {
-                                        if (it.isFocused) selectedId = item.id
+                                    .onFocusChanged { focusState ->
+                                        if (focusState.isFocused) {
+                                            selectedNotificationId = notification.id
+                                        }
                                     }
-                                    .focusable(interactionSource = interaction)
+                                    .focusable(interactionSource = interactionSource)
                                     .clickable(
-                                        interactionSource = interaction,
-                                        indication = null
-                                    ) {
-                                        selectedId = item.id
-                                        onNotificationClick(item.id to item.type)
-                                    }
+                                        interactionSource = interactionSource,
+                                        indication = null,
+                                        onClick = {
+                                            selectedNotificationId = notification.id
+                                            onNotificationClick(notification.id, notification.type)
+                                        }
+                                    )
                                     .padding(12.dp)
                             ) {
-
                                 Text(
-                                    item.title,
+                                    text = notification.title,
                                     color = Color.White,
+                                    fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-
                                 Spacer(modifier = Modifier.height(4.dp))
-
                                 Text(
-                                    item.overview,
+                                    text = notification.overview,
                                     color = TextSecondary,
+                                    fontSize = 14.sp,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -221,16 +292,86 @@ private fun NotificationDialog(
                         }
                     }
                 }
-
+                
                 Spacer(modifier = Modifier.height(16.dp))
-
+                
                 Button(
                     onClick = onDismiss,
-                    modifier = Modifier.align(Alignment.End)
+                    modifier = Modifier.align(Alignment.End),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryRed)
                 ) {
                     Text("Close")
                 }
             }
+        }
+    }
+}
+
+/** Icon button that tints dark red and shows text when focused. */
+@Composable
+private fun FocusableIconButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
+    Row(
+        modifier = Modifier
+            .height(48.dp)
+            .wrapContentWidth()
+            .background(
+                color = if (isFocused) DarkRed else Color.Transparent,
+                shape = RoundedCornerShape(8.dp)
+            )
+            .padding(horizontal = if (isFocused) 12.dp else 0.dp)
+            .noRippleClickable(interactionSource = interactionSource) { onClick() },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = TextPrimary,
+            modifier = Modifier.size(24.dp)
+        )
+        if (isFocused) {
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = contentDescription,
+                color = TextPrimary,
+                fontSize = 16.sp,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
+            )
+        }
+    }
+}
+
+/**
+ * Extension function to create a clickable modifier without ripple effect.
+ */
+@Composable
+fun Modifier.noRippleClickable(
+    interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
+    onClick: () -> Unit
+): Modifier = this.clickable(
+    interactionSource = interactionSource,
+    indication = null,
+    onClick = onClick
+)
+
+@Preview(showBackground = true, backgroundColor = 0xFF141414)
+@Composable
+fun TopBarPreview() {
+    KiduyuTvTheme {
+        Surface(color = BackgroundDark) {
+            TopBar(
+                selectedRoute = "movies",
+                onNavItemClick = {},
+                onSearchClick = {},
+                onSettingsClick = {}
+            )
         }
     }
 }
