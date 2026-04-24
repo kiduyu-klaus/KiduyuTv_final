@@ -138,9 +138,8 @@ class StreamLinksViewModel : ViewModel() {
             return if (timestamp > 0) {
                 when (provider.name) {
                     "VidLink" -> "${provider.urlTemplate}&startAt=$timestamp"
-                    "VidKing" -> "${provider.urlTemplate}&progress=$timestamp"
-                    "Videasy" -> "${provider.urlTemplate}&progress=$timestamp"
                     "VidFast" -> "${provider.urlTemplate}&startAt=$timestamp"
+                    "Videasy" -> "${provider.urlTemplate}&progress=$timestamp"
                     else -> provider.urlTemplate
                 }
             } else {
