@@ -17,8 +17,6 @@ import android.view.ViewGroup
 import android.app.UiModeManager
 import android.content.Context
 import android.content.res.Configuration
-import android.view.WindowInsets
-import android.view.WindowInsetsController
 import android.webkit.*
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
@@ -333,33 +331,6 @@ class PlayerActivity : AppCompatActivity() {
 
             progressHandler.postDelayed(this, PROGRESS_UPDATE_INTERVAL)
         }
-    }
-
-    // ── Fullscreen helper ──────────────────────────────────────────────────────
-    private fun enableFullscreen() {
-        val decorView = window.decorView ?: return
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            decorView.windowInsetsController?.let {
-                it.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
-                it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            }
-        } else {
-            @Suppress("DEPRECATION")
-            decorView.systemUiVisibility = (
-                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                            or View.SYSTEM_UI_FLAG_FULLSCREEN
-                            or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                            or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                            or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                            or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                    )
-        }
-    }
-
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) enableFullscreen()
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -746,50 +717,6 @@ class PlayerActivity : AppCompatActivity() {
             }
 
             webChromeClient = object : WebChromeClient() {
-                private var customView: View? = null
-                private var customViewCallback: CustomViewCallback? = null
-
-                override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
-                    if (customView != null) {
-                        onHideCustomView()
-                        return
-                    }
-                    customView = view
-                    customViewCallback = callback
-                    rootLayout.addView(
-                        customView,
-                        FrameLayout.LayoutParams(
-                            FrameLayout.LayoutParams.MATCH_PARENT,
-                            FrameLayout.LayoutParams.MATCH_PARENT
-                        )
-                    )
-                    webView.visibility = View.GONE
-
-                    // Keep cursor visible and on top during fullscreen video
-                    if (!isCursorDisabled) {
-                        cursorView.bringToFront()
-                        cursorView.visibility = View.VISIBLE
-                    }
-
-                    enableFullscreen()
-                }
-
-                override fun onHideCustomView() {
-                    if (customView == null) return
-                    rootLayout.removeView(customView)
-                    customView = null
-                    customViewCallback?.onCustomViewHidden()
-                    webView.visibility = View.VISIBLE
-
-                    // Restore cursor on top after exiting fullscreen video
-                    if (!isCursorDisabled) {
-                        cursorView.bringToFront()
-                        cursorView.visibility = View.VISIBLE
-                    }
-
-                    enableFullscreen()
-                }
-
                 override fun onCreateWindow(view: WebView?, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message?): Boolean = false
             }
 
@@ -811,7 +738,6 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         setContentView(rootLayout)
-        enableFullscreen()
         rootLayout.isFocusable = true
         rootLayout.isFocusableInTouchMode = true
         rootLayout.requestFocus()
@@ -1052,5 +978,3 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 }
-
-
