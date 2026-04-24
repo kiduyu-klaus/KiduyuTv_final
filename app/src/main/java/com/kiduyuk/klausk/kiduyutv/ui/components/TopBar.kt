@@ -35,6 +35,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
@@ -197,11 +198,18 @@ private fun NotificationDialog(
     var selectedNotificationId by remember(notifications) {
         mutableStateOf(notifications.firstOrNull()?.id)
     }
-    val focusRequester = remember { FocusRequester() }
+    val firstItemFocusRequester = remember { FocusRequester() }
+    // Used to route D-pad DOWN out of the LazyColumn into the Close button
+    val closeFocusRequester = remember { FocusRequester() }
+    val closeInteractionSource = remember { MutableInteractionSource() }
+    val isCloseFocused by closeInteractionSource.collectIsFocusedAsState()
 
     LaunchedEffect(Unit) {
         if (notifications.isNotEmpty()) {
-            focusRequester.requestFocus()
+            firstItemFocusRequester.requestFocus()
+        } else {
+            // Nothing in the list — put focus straight on Close
+            closeFocusRequester.requestFocus()
         }
     }
 
@@ -222,7 +230,7 @@ private fun NotificationDialog(
                     .heightIn(max = 500.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .background(SurfaceDark)
-                    .clickable(enabled = false) {} // Prevent clicks from closing dialog
+                    .clickable(enabled = false) {} // Prevent backdrop clicks from closing dialog
                     .padding(20.dp)
             ) {
                 Text(
@@ -231,12 +239,14 @@ private fun NotificationDialog(
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold
                 )
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 if (notifications.isEmpty()) {
                     Box(
-                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -247,7 +257,10 @@ private fun NotificationDialog(
                     }
                 } else {
                     LazyColumn(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            // Allow D-pad DOWN to escape the list and land on the Close button
+                            .focusProperties { down = closeFocusRequester },
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         itemsIndexed(notifications) { index, notification ->
@@ -255,7 +268,7 @@ private fun NotificationDialog(
                             val isFocused by interactionSource.collectIsFocusedAsState()
                             val isSelected = selectedNotificationId == notification.id
                             val isHighlighted = isFocused || isSelected
-                            
+
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -271,8 +284,13 @@ private fun NotificationDialog(
                                             selectedNotificationId = notification.id
                                         }
                                     }
-                                    .then(if (index == 0) Modifier.focusRequester(focusRequester) else Modifier)
-                                    .focusable(interactionSource = interactionSource)
+                                    .then(
+                                        if (index == 0) Modifier.focusRequester(firstItemFocusRequester)
+                                        else Modifier
+                                    )
+                                    // clickable already makes the item focusable on TV (D-pad center
+                                    // fires onClick). A separate .focusable() with the same
+                                    // interactionSource would duplicate focus handling and break clicks.
                                     .clickable(
                                         interactionSource = interactionSource,
                                         indication = null,
@@ -303,15 +321,38 @@ private fun NotificationDialog(
                         }
                     }
                 }
-                
+
                 Spacer(modifier = Modifier.height(16.dp))
-                
-                Button(
-                    onClick = onDismiss,
-                    modifier = Modifier.align(Alignment.End),
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryRed)
+
+                // Custom Close button — tracks focus so we can show a distinct focused style
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(
+                            // Brighter/lighter red when focused so the TV user can see selection
+                            color = if (isCloseFocused) PrimaryRed else DarkRed
+                        )
+                        .border(
+                            width = if (isCloseFocused) 2.dp else 0.dp,
+                            color = Color.White,
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .focusRequester(closeFocusRequester)
+                        .clickable(
+                            interactionSource = closeInteractionSource,
+                            indication = null,
+                            onClick = onDismiss
+                        )
+                        .padding(horizontal = 20.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text("Close")
+                    Text(
+                        text = "Close",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
             }
         }
@@ -386,3 +427,4 @@ fun TopBarPreview() {
         }
     }
 }
+
