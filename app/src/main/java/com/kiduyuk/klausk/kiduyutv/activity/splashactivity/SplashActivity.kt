@@ -224,19 +224,14 @@ class SplashActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Initialize FirebaseSyncManager and start data sync
-        FirebaseSyncManager.init(this)
-        startFirebaseSync()
 
-        // Request GDPR consent before initializing ads
-        // AdManager will be initialized after consent is resolved
-        ConsentManager.requestConsent(this) {
-            // Initialize Mobile Ads SDK (AdMob for phone, GAM for tv) after consent
-            AdManager.init(this@SplashActivity)
-        }
-
-        checkForUpdates()
-        checkNotificationPermission()
+        // Set up the Compose UI first so Compose owns android.R.id.content before
+        // any third-party SDK (UMP/ConsentManager, AdManager, Firebase) has a chance
+        // to touch the window hierarchy.  Those SDKs can call through to the window
+        // manager synchronously on some API levels, which leaves the content ViewGroup
+        // in an unexpected state and causes ComponentActivityKt.setContent to NPE on
+        // getChildAt(0).  All subsequent init is async / coroutine-based so moving it
+        // after setContent has no behavioural effect.
         setContent {
             KiduyuTvTheme {
                 SplashScreen(
@@ -253,6 +248,20 @@ class SplashActivity : ComponentActivity() {
                 )
             }
         }
+
+        // Initialize FirebaseSyncManager and start data sync
+        FirebaseSyncManager.init(this)
+        startFirebaseSync()
+
+        // Request GDPR consent before initializing ads
+        // AdManager will be initialized after consent is resolved
+        ConsentManager.requestConsent(this) {
+            // Initialize Mobile Ads SDK (AdMob for phone, GAM for tv) after consent
+            AdManager.init(this@SplashActivity)
+        }
+
+        checkForUpdates()
+        checkNotificationPermission()
     }
 
     /**
@@ -792,3 +801,4 @@ class SplashActivity : ComponentActivity() {
         }
     }
 }
+
