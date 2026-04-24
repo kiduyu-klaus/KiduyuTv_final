@@ -14,8 +14,6 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.WindowInsets
-import android.view.WindowInsetsController
 import android.app.UiModeManager
 import android.content.Context
 import android.content.res.Configuration
@@ -71,7 +69,6 @@ class PlayerActivity : AppCompatActivity() {
     private var isVideoLoaded = false
     private var isPageLoaded = false
     private var hasShownError = false
-    private val videoLoadTimeout = 15000L // 15 seconds timeout for video to start
     private var videoLoadCheckHandler: Handler? = null
     private var videoLoadCheckRunnable: Runnable? = null
 
@@ -150,13 +147,10 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun startVideoLoadTimeoutCheck() {
         cancelVideoLoadTimeoutCheck()
-
         videoLoadCheckHandler = Handler(Looper.getMainLooper())
         videoLoadCheckRunnable = Runnable {
             checkVideoLoadStatus()
         }
-
-        // Start checking after page has loaded
         videoLoadCheckHandler?.postDelayed(videoLoadCheckRunnable!!, 3000)
     }
 
@@ -193,7 +187,6 @@ class PlayerActivity : AppCompatActivity() {
                 Log.i(TAG, "[Video Check] hasVideo=$hasVideo, isPlaying=$isPlaying, hasError=$hasError, message=$message")
 
                 if (hasVideo && isPlaying) {
-                    // Video is playing successfully
                     isVideoLoaded = true
                     cancelVideoLoadTimeoutCheck()
                     Log.i(TAG, "[Video Check] Video loaded and playing successfully")
@@ -201,7 +194,6 @@ class PlayerActivity : AppCompatActivity() {
                 }
 
                 if (hasError) {
-                    // Video element has an error
                     if (!hasShownError) {
                         hasShownError = true
                         runOnUiThread {
@@ -212,14 +204,12 @@ class PlayerActivity : AppCompatActivity() {
                 }
 
                 if (!isVideoLoaded) {
-                    // Video hasn't started playing yet, check again or show error
                     if (videoLoadCheckHandler != null && videoLoadCheckRunnable != null) {
                         videoLoadCheckHandler?.postDelayed(videoLoadCheckRunnable!!, 3000)
                     }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "[Video Check] Error parsing video status: ${e.message}")
-                // If we can't check, assume it's a white screen and show error after timeout
                 if (!hasShownError && videoLoadCheckHandler != null && videoLoadCheckRunnable != null) {
                     videoLoadCheckHandler?.postDelayed(videoLoadCheckRunnable!!, 5000)
                 }
@@ -241,7 +231,6 @@ class PlayerActivity : AppCompatActivity() {
             negativeButtonText = "Exit",
             lottieAnimRes = R.raw.loading,
             onNo = {
-                // Try reloading the page
                 Log.i(TAG, "[Error Dialog] User chose to try again, reloading...")
                 hasShownError = false
                 isVideoLoaded = false
@@ -467,7 +456,6 @@ class PlayerActivity : AppCompatActivity() {
             if (isCursorDisabled) {
                 setLayerType(View.LAYER_TYPE_HARDWARE, null)
             } else {
-                // TV / FireTV — keep NONE so SurfaceView can punch through
                 setLayerType(View.LAYER_TYPE_NONE, null)
             }
 
@@ -511,7 +499,6 @@ class PlayerActivity : AppCompatActivity() {
                     if (request?.isForMainFrame == true) {
                         val statusCode = errorResponse?.statusCode ?: 0
                         Log.e(TAG, "[WebView] HTTP Error on main frame: $statusCode")
-                        // Only show error for actual failures (4xx/5xx)
                         if (statusCode >= 400 && !hasShownError) {
                             runOnUiThread {
                                 showVideoErrorDialog("HTTP Error", "Server returned error code: $statusCode")
@@ -525,17 +512,8 @@ class PlayerActivity : AppCompatActivity() {
                     isPageLoaded = true
                     Log.i(TAG, "[WebView] Page finished loading: $url")
 
-                    if (url != null) {
-                        val cookieManager = CookieManager.getInstance()
-                        val cookies = cookieManager.getCookie(url)
-                        Log.i(TAG, "[Cookies] URL: $url")
-                        Log.i(TAG, "[Cookies] Content: ${cookies ?: "No cookies found"}")
-                    }
-
-                    // Start video load timeout check
                     startVideoLoadTimeoutCheck()
 
-                    // Inject video detection script
                     val videoDetectionJs = """
                         (function() {
                             function checkVideoStatus() {
@@ -751,7 +729,7 @@ class PlayerActivity : AppCompatActivity() {
         rootLayout.addView(webView)
         if (!isCursorDisabled) {
             rootLayout.addView(cursorView)
-            cursorView.bringToFront() // Ensure cursor is always above video layer
+            cursorView.bringToFront()
         }
 
         setContentView(rootLayout)
@@ -785,7 +763,7 @@ class PlayerActivity : AppCompatActivity() {
             positiveButtonText = "Stop",
             negativeButtonText = "Continue",
             lottieAnimRes = R.raw.exit,
-            onNo = { /* dismiss — dialog closes itself */ },
+            onNo = { },
             onYes = {
                 savePlaybackPosition()
                 finish()
@@ -935,8 +913,78 @@ class PlayerActivity : AppCompatActivity() {
         if (isCursorDisabled) return
         cursorView.x = cursorX
         cursorView.y = cursorY
-        cursorView.bringToFront() // Keep cursor above video layer on every move
+        cursorView.bringToFront()
         cursorView.invalidate()
     }
 
-    private fun simulateClick
+    private fun simulateClick(x: Float, y: Float) {
+        val downTime = SystemClock.uptimeMillis()
+        val eventTime = SystemClock.uptimeMillis()
+
+        val downEvent = MotionEvent.obtain(downTime, eventTime, MotionEvent.ACTION_DOWN, x, y, 0)
+        val upEvent = MotionEvent.obtain(downTime, eventTime + 100, MotionEvent.ACTION_UP, x, y, 0)
+
+        downEvent.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
+        upEvent.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
+
+        window.decorView.dispatchTouchEvent(downEvent)
+        window.decorView.dispatchTouchEvent(upEvent)
+
+        downEvent.recycle()
+        upEvent.recycle()
+    }
+
+    private fun showCursorAndResetTimer() {
+        if (isCursorDisabled) return
+        cursorView.animate().cancel()
+        cursorView.alpha = 1f
+        cursorHideHandler.removeCallbacks(cursorHideRunnable)
+        cursorHideHandler.postDelayed(cursorHideRunnable, 5000)
+    }
+
+    private fun savePlaybackPosition() {
+        webView.evaluateJavascript(
+            """
+            (function() {
+                var v = document.querySelector('video');
+                if (v && v.duration > 0 && !isNaN(v.duration)) {
+                    return v.currentTime;
+                }
+                return null;
+            })();
+            """.trimIndent()
+        ) { result ->
+            if (result != null && result != "null") {
+                try {
+                    val currentTime = result.toDouble()
+                    val tmdbId = intent.getIntExtra("TMDB_ID", -1)
+                    val isTv = intent.getBooleanExtra("IS_TV", false)
+                    if (tmdbId != -1) {
+                        val repository = TmdbRepository()
+                        repository.updatePlaybackPosition(tmdbId, if (isTv) "tv" else "movie", currentTime.toLong())
+                        if (isTv) {
+                            repository.updateEpisodeInfo(tmdbId, "tv", currentSeason, currentEpisode)
+                        }
+                        FirebaseManager.syncWatchHistory(
+                            tmdbId = tmdbId,
+                            isTv = isTv,
+                            seasonNumber = if (isTv) currentSeason else null,
+                            episodeNumber = if (isTv) currentEpisode else null,
+                            playbackPosition = currentTime.toLong(),
+                            duration = latestDuration,
+                            title = contentTitle,
+                            overview = contentOverview,
+                            posterPath = contentPosterPath,
+                            backdropPath = contentBackdropPath,
+                            voteAverage = contentVoteAverage,
+                            releaseDate = contentReleaseDate
+                        )
+                        Log.i(TAG, "Final playback position saved: ${currentTime}s (S$currentSeason E$currentEpisode) to local and Firebase")
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "Error saving final playback position: ${e.message}")
+                }
+            }
+        }
+    }
+}
