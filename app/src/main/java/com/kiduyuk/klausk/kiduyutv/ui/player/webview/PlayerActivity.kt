@@ -14,6 +14,8 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.app.UiModeManager
 import android.content.Context
 import android.content.res.Configuration
@@ -336,6 +338,21 @@ class PlayerActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // ── Full-screen immersive mode ────────────────────────────────────────
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.insetsController?.let {
+                it.hide(WindowInsets.Type.statusBars())
+                it.systemBarsBehavior =
+                    WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = (
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                            or View.SYSTEM_UI_FLAG_FULLSCREEN
+                    )
+        }
 
         val tmdbId = intent.getIntExtra("TMDB_ID", -1)
         val isTv = intent.getBooleanExtra("IS_TV", false)
@@ -798,6 +815,21 @@ class PlayerActivity : AppCompatActivity() {
         webView.onResume()
         webView.resumeTimers()
         progressHandler.postDelayed(progressRunnable, 15_000L)
+        
+        // Re-apply immersive mode when resuming
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.insetsController?.let {
+                it.hide(WindowInsets.Type.statusBars())
+                it.systemBarsBehavior =
+                    WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = (
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                            or View.SYSTEM_UI_FLAG_FULLSCREEN
+                    )
+        }
     }
 
     override fun onPause() {
@@ -907,74 +939,4 @@ class PlayerActivity : AppCompatActivity() {
         cursorView.invalidate()
     }
 
-    private fun simulateClick(x: Float, y: Float) {
-        val downTime = SystemClock.uptimeMillis()
-        val eventTime = SystemClock.uptimeMillis()
-
-        val downEvent = MotionEvent.obtain(downTime, eventTime, MotionEvent.ACTION_DOWN, x, y, 0)
-        val upEvent = MotionEvent.obtain(downTime, eventTime + 100, MotionEvent.ACTION_UP, x, y, 0)
-
-        downEvent.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
-        upEvent.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
-
-        window.decorView.dispatchTouchEvent(downEvent)
-        window.decorView.dispatchTouchEvent(upEvent)
-
-        downEvent.recycle()
-        upEvent.recycle()
-    }
-
-    private fun showCursorAndResetTimer() {
-        if (isCursorDisabled) return
-        cursorView.animate().cancel()
-        cursorView.alpha = 1f
-        cursorHideHandler.removeCallbacks(cursorHideRunnable)
-        cursorHideHandler.postDelayed(cursorHideRunnable, 5000)
-    }
-
-    private fun savePlaybackPosition() {
-        webView.evaluateJavascript(
-            """
-            (function() {
-                var v = document.querySelector('video');
-                if (v && v.duration > 0 && !isNaN(v.duration)) {
-                    return v.currentTime;
-                }
-                return null;
-            })();
-            """.trimIndent()
-        ) { result ->
-            if (result != null && result != "null") {
-                try {
-                    val currentTime = result.toDouble()
-                    val tmdbId = intent.getIntExtra("TMDB_ID", -1)
-                    val isTv = intent.getBooleanExtra("IS_TV", false)
-                    if (tmdbId != -1) {
-                        val repository = TmdbRepository()
-                        repository.updatePlaybackPosition(tmdbId, if (isTv) "tv" else "movie", currentTime.toLong())
-                        if (isTv) {
-                            repository.updateEpisodeInfo(tmdbId, "tv", currentSeason, currentEpisode)
-                        }
-                        FirebaseManager.syncWatchHistory(
-                            tmdbId = tmdbId,
-                            isTv = isTv,
-                            seasonNumber = if (isTv) currentSeason else null,
-                            episodeNumber = if (isTv) currentEpisode else null,
-                            playbackPosition = currentTime.toLong(),
-                            duration = latestDuration,
-                            title = contentTitle,
-                            overview = contentOverview,
-                            posterPath = contentPosterPath,
-                            backdropPath = contentBackdropPath,
-                            voteAverage = contentVoteAverage,
-                            releaseDate = contentReleaseDate
-                        )
-                        Log.i(TAG, "Final playback position saved: ${currentTime}s (S$currentSeason E$currentEpisode) to local and Firebase")
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "Error saving final playback position: ${e.message}")
-                }
-            }
-        }
-    }
-}
+    private fun simulateClick
