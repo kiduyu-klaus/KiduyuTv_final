@@ -37,6 +37,7 @@ import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeViewModel
  */
 @Composable
 fun TvShowsScreen(
+    onMovieClick: (Int) -> Unit = { _ -> },
     onTvShowClick: (Int) -> Unit,
     onNavigate: (String) -> Unit = {},
     onSearchClick: () -> Unit = {},
@@ -240,7 +241,13 @@ fun TvShowsScreen(
             onNavItemClick = { route -> onNavigate(route) },
             onSearchClick = onSearchClick,
             onSettingsClick = onSettingsClick,
-            onNotificationClick = onNotificationClick
+            onNotificationClick = { id, type ->
+                if (type == "movie") {
+                    onMovieClick(id)
+                } else {
+                    onTvShowClick(id)
+                }
+            }
         )
     }
 }

@@ -99,7 +99,13 @@ fun MyListScreen(
             onNavItemClick = { route -> onNavigate(route) },
             onSearchClick = onSearchClick,
             onSettingsClick = onSettingsClick,
-            onNotificationClick = onNotificationClick
+            onNotificationClick = { id, type ->
+                if (type == "movie") {
+                    onMovieClick(id)
+                } else {
+                    onTvShowClick(id)
+                }
+            }
         )
 
         Column(
