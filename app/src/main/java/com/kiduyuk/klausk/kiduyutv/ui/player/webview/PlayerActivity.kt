@@ -505,17 +505,14 @@ class PlayerActivity : AppCompatActivity() {
                     Log.i(TAG, "[WebView] Page started loading: $url")
                 }
 
-                override fun onReceivedError(view: WebView?, error: WebResourceError?) {
-                    super.onReceivedError(view, error)
-                    val errorDescription = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        error?.description?.toString() ?: "Unknown error"
-                    } else {
-                        "Unknown error"
-                    }
-                    Log.e(TAG, "[WebView] Error received: $errorDescription")
+                @Suppress("DEPRECATION")
+                override fun onReceivedError(view: WebView?, errorCode: Int, description: String?, failingUrl: String?) {
+                    super.onReceivedError(view, errorCode, description, failingUrl)
+                    val errorDescription = description ?: "Unknown error"
+                    Log.e(TAG, "[WebView] Error received: $errorDescription (code: $errorCode)")
                     if (!hasShownError) {
                         runOnUiThread {
-                            showVideoErrorDialog("Failed to load video", "Error: $errorDescription")
+                            showVideoErrorDialog("Failed to load video", "Error: $errorDescription (Code: $errorCode)")
                         }
                     }
                 }
