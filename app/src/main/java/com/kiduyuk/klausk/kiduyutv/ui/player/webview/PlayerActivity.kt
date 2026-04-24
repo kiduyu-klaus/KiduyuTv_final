@@ -66,6 +66,14 @@ class PlayerActivity : AppCompatActivity() {
     private var latestContentId: Int = -1
     private val dnsWarmedHosts = Collections.synchronizedSet(mutableSetOf<String>())
 
+    // Error detection state
+    private var isVideoLoaded = false
+    private var isPageLoaded = false
+    private var hasShownError = false
+    private val videoLoadTimeout = 15000L // 15 seconds timeout for video to start
+    private var videoLoadCheckHandler: Handler? = null
+    private var videoLoadCheckRunnable: Runnable? = null
+
     companion object {
         private const val TAG = "VideasyPlayer"
         private const val PROGRESS_UPDATE_INTERVAL = 15_000L
@@ -135,6 +143,117 @@ class PlayerActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Log.e(TAG, "[Player Progress] Error processing data: ${e.message}")
         }
+    }
+
+    // ── Video Load Timeout Check ──────────────────────────────────────────────
+
+    private fun startVideoLoadTimeoutCheck() {
+        cancelVideoLoadTimeoutCheck()
+
+        videoLoadCheckHandler = Handler(Looper.getMainLooper())
+        videoLoadCheckRunnable = Runnable {
+            checkVideoLoadStatus()
+        }
+
+        // Start checking after page has loaded
+        videoLoadCheckHandler?.postDelayed(videoLoadCheckRunnable!!, 3000)
+    }
+
+    private fun cancelVideoLoadTimeoutCheck() {
+        videoLoadCheckRunnable?.let { runnable ->
+            videoLoadCheckHandler?.removeCallbacks(runnable)
+        }
+        videoLoadCheckHandler = null
+        videoLoadCheckRunnable = null
+    }
+
+    private fun checkVideoLoadStatus() {
+        if (hasShownError) return
+
+        webView.evaluateJavascript(
+            """
+            (function() {
+                if (window.getVideoStatus) {
+                    return window.getVideoStatus();
+                }
+                return JSON.stringify({ hasVideo: false, isPlaying: false, error: true, message: 'Check script not loaded' });
+            })();
+            """.trimIndent()
+        ) { result ->
+            if (hasShownError) return@evaluateJavascript
+
+            try {
+                val json = org.json.JSONObject(result)
+                val hasVideo = json.optBoolean("hasVideo", false)
+                val isPlaying = json.optBoolean("isPlaying", false)
+                val hasError = json.optBoolean("hasError", false)
+                val message = json.optString("message", "")
+
+                Log.i(TAG, "[Video Check] hasVideo=$hasVideo, isPlaying=$isPlaying, hasError=$hasError, message=$message")
+
+                if (hasVideo && isPlaying) {
+                    // Video is playing successfully
+                    isVideoLoaded = true
+                    cancelVideoLoadTimeoutCheck()
+                    Log.i(TAG, "[Video Check] Video loaded and playing successfully")
+                    return@evaluateJavascript
+                }
+
+                if (hasError) {
+                    // Video element has an error
+                    if (!hasShownError) {
+                        hasShownError = true
+                        runOnUiThread {
+                            showVideoErrorDialog("Video Error", message)
+                        }
+                    }
+                    return@evaluateJavascript
+                }
+
+                if (!isVideoLoaded) {
+                    // Video hasn't started playing yet, check again or show error
+                    if (videoLoadCheckHandler != null && videoLoadCheckRunnable != null) {
+                        videoLoadCheckHandler?.postDelayed(videoLoadCheckRunnable!!, 3000)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "[Video Check] Error parsing video status: ${e.message}")
+                // If we can't check, assume it's a white screen and show error after timeout
+                if (!hasShownError && videoLoadCheckHandler != null && videoLoadCheckRunnable != null) {
+                    videoLoadCheckHandler?.postDelayed(videoLoadCheckRunnable!!, 5000)
+                }
+            }
+        }
+    }
+
+    private fun showVideoErrorDialog(title: String, message: String) {
+        if (isFinishing || hasShownError) return
+        hasShownError = true
+
+        Log.e(TAG, "[Error Dialog] Showing error: $title - $message")
+
+        QuitDialog(
+            context = this,
+            title = title,
+            message = "$message\n\nThe video link may be broken or unavailable. Please try another source.",
+            positiveButtonText = "Try Again",
+            negativeButtonText = "Exit",
+            lottieAnimRes = R.raw.loading,
+            onNo = {
+                // Try reloading the page
+                Log.i(TAG, "[Error Dialog] User chose to try again, reloading...")
+                hasShownError = false
+                isVideoLoaded = false
+                isPageLoaded = false
+                cancelVideoLoadTimeoutCheck()
+                webView.reload()
+            },
+            onYes = {
+                Log.i(TAG, "[Error Dialog] User chose to exit")
+                savePlaybackPosition()
+                finish()
+            }
+        ).show()
     }
 
     // ── Cursor hide timer ──────────────────────────────────────────────────────
@@ -379,8 +498,46 @@ class PlayerActivity : AppCompatActivity() {
 
                 override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean = true
 
+                override fun onPageStarted(view: WebView?, url: String?) {
+                    super.onPageStarted(view, url)
+                    isPageLoaded = false
+                    isVideoLoaded = false
+                    Log.i(TAG, "[WebView] Page started loading: $url")
+                }
+
+                override fun onReceivedError(view: WebView?, error: WebResourceError?) {
+                    super.onReceivedError(view, error)
+                    val errorDescription = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        error?.description?.toString() ?: "Unknown error"
+                    } else {
+                        "Unknown error"
+                    }
+                    Log.e(TAG, "[WebView] Error received: $errorDescription")
+                    if (!hasShownError) {
+                        runOnUiThread {
+                            showVideoErrorDialog("Failed to load video", "Error: $errorDescription")
+                        }
+                    }
+                }
+
+                override fun onReceivedHttpError(view: WebView?, request: WebResourceRequest?, errorResponse: WebResourceResponse?) {
+                    super.onReceivedHttpError(view, request, errorResponse)
+                    if (request?.isForMainFrame == true) {
+                        val statusCode = errorResponse?.statusCode ?: 0
+                        Log.e(TAG, "[WebView] HTTP Error on main frame: $statusCode")
+                        // Only show error for actual failures (4xx/5xx)
+                        if (statusCode >= 400 && !hasShownError) {
+                            runOnUiThread {
+                                showVideoErrorDialog("HTTP Error", "Server returned error code: $statusCode")
+                            }
+                        }
+                    }
+                }
+
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
+                    isPageLoaded = true
+                    Log.i(TAG, "[WebView] Page finished loading: $url")
 
                     if (url != null) {
                         val cookieManager = CookieManager.getInstance()
@@ -388,6 +545,38 @@ class PlayerActivity : AppCompatActivity() {
                         Log.i(TAG, "[Cookies] URL: $url")
                         Log.i(TAG, "[Cookies] Content: ${cookies ?: "No cookies found"}")
                     }
+
+                    // Start video load timeout check
+                    startVideoLoadTimeoutCheck()
+
+                    // Inject video detection script
+                    val videoDetectionJs = """
+                        (function() {
+                            function checkVideoStatus() {
+                                var videos = document.getElementsByTagName('video');
+                                if (videos.length === 0) {
+                                    return JSON.stringify({ hasVideo: false, isPlaying: false, error: true, message: 'No video element found' });
+                                }
+                                var v = videos[0];
+                                var hasError = v.error !== null && v.error !== undefined;
+                                var isPlaying = !v.paused && !v.ended && v.readyState >= 3;
+                                var hasSource = v.readyState >= 1;
+                                return JSON.stringify({
+                                    hasVideo: true,
+                                    isPlaying: isPlaying,
+                                    hasError: hasError,
+                                    hasSource: hasSource,
+                                    readyState: v.readyState,
+                                    networkState: v.networkState,
+                                    errorCode: v.error ? v.error.code : 0,
+                                    message: hasError ? 'Video error: ' + (v.error ? v.error.message : 'Unknown') : (isPlaying ? 'Video is playing' : 'Video not playing')
+                                });
+                            }
+                            window.getVideoStatus = checkVideoStatus;
+                        })();
+                    """.trimIndent()
+
+                    view?.evaluateJavascript(videoDetectionJs, null)
 
                     val advancedJs = """
                         (function() {
@@ -692,6 +881,7 @@ class PlayerActivity : AppCompatActivity() {
         webView.onPause()
         webView.pauseTimers()
         progressHandler.removeCallbacks(progressRunnable)
+        cancelVideoLoadTimeoutCheck()
     }
 
     private fun safeSetSafeBrowsingEnabled(settings: WebSettings, enabled: Boolean) {
@@ -707,6 +897,7 @@ class PlayerActivity : AppCompatActivity() {
     override fun onDestroy() {
         progressHandler.removeCallbacks(progressRunnable)
         cursorHideHandler.removeCallbacks(cursorHideRunnable)
+        cancelVideoLoadTimeoutCheck()
 
         if (::webView.isInitialized) {
             try {
@@ -863,4 +1054,5 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 }
+
 
