@@ -1,6 +1,7 @@
 package com.kiduyuk.klausk.kiduyutv.ui.player.webview
 
 import android.annotation.SuppressLint
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -498,8 +499,8 @@ class PlayerActivity : AppCompatActivity() {
 
                 override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean = true
 
-                override fun onPageStarted(view: WebView?, url: String?) {
-                    super.onPageStarted(view, url)
+                override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                    super.onPageStarted(view, url, favicon)
                     isPageLoaded = false
                     isVideoLoaded = false
                     Log.i(TAG, "[WebView] Page started loading: $url")
@@ -531,8 +532,8 @@ class PlayerActivity : AppCompatActivity() {
                     }
                 }
 
-                override fun onPageFinished(view: WebView?, url: String?) {
-                    super.onPageFinished(view, url)
+                override fun onPageFinished(view: WebView?, url: String?, favicon: Bitmap?) {
+                    super.onPageFinished(view, url, favicon)
                     isPageLoaded = true
                     Log.i(TAG, "[WebView] Page finished loading: $url")
 
