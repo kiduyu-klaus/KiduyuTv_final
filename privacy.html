@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Privacy Policy for KiduyuTV - Learn how we handle your data and ensure your privacy.">
+    <title>Privacy Policy - KiduyuTV</title>
+    <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/app/src/main/res/mipmap-xxxhdpi/ic_launcher1.png">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #E50914;
+            --primary-dark: #B20710;
+            --dark-bg: #0a0a0a;
+            --card-bg: #141414;
+            --card-hover: #1f1f1f;
+            --text-primary: #ffffff;
+            --text-secondary: #a3a3a3;
+            --text-muted: #666666;
+            --gradient-primary: linear-gradient(135deg, #E50914 0%, #831010 100%);
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--dark-bg);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Navigation */
+        .nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(10,10,10,0.98);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--gradient-primary);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s ease;
+            font-size: 0.95rem;
+        }
+
+        .nav-links a:hover {
+            color: var(--text-primary);
+        }
+
+        /* Privacy Content */
+        .privacy-container {
+            max-width: 900px;
+            margin: 8rem auto 4rem;
+            padding: 0 2rem;
+        }
+
+        .privacy-header {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
+        .privacy-title {
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            font-weight: 800;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #ffffff 0%, #cccccc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .privacy-last-updated {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .privacy-section {
+            background: var(--card-bg);
+            border-radius: 24px;
+            padding: 3rem;
+            margin-bottom: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .section-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .section-content {
+            color: var(--text-secondary);
+            font-size: 1.05rem;
+            line-height: 1.8;
+        }
+
+        .section-content p {
+            margin-bottom: 1.5rem;
+        }
+
+        .section-content ul {
+            list-style: none;
+            margin-bottom: 1.5rem;
+        }
+
+        .section-content li {
+            position: relative;
+            padding-left: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .section-content li::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 12px;
+            width: 6px;
+            height: 6px;
+            background: var(--primary);
+            border-radius: 50%;
+        }
+
+        /* Footer */
+        .footer {
+            padding: 4rem 2rem;
+            background: #050505;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            text-align: center;
+        }
+
+        .footer-logo {
+            margin-bottom: 1.5rem;
+            justify-content: center;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-bottom: 2rem;
+            list-style: none;
+        }
+
+        .footer-links a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.3s ease;
+        }
+
+        .footer-links a:hover {
+            color: var(--text-primary);
+        }
+
+        .copyright {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+            .privacy-section {
+                padding: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <a href="index.html" class="logo">
+            <div class="logo-icon">
+                <svg viewBox="0 0 24 24" fill="white" width="24" height="24">
+                    <path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12zm-5-6l-7 4V7l7 4z"/>
+                </svg>
+            </div>
+            KiduyuTV
+        </a>
+        <ul class="nav-links">
+            <li><a href="index.html#features">Features</a></li>
+            <li><a href="index.html#download">Download</a></li>
+            <li><a href="index.html#support">Support</a></li>
+        </ul>
+    </nav>
+
+    <main class="privacy-container">
+        <header class="privacy-header">
+            <h1 class="privacy-title">Privacy Policy</h1>
+            <p class="privacy-last-updated">Last Updated: April 24, 2026</p>
+        </header>
+
+        <section class="privacy-section">
+            <h2 class="section-title">1. Introduction</h2>
+            <div class="section-content">
+                <p>Welcome to KiduyuTV. We are committed to protecting your personal information and your right to privacy. This Privacy Policy explains how we collect, use, and safeguard your data when you use our application.</p>
+                <p>By using KiduyuTV, you agree to the collection and use of information in accordance with this policy.</p>
+            </div>
+        </section>
+
+        <section class="privacy-section">
+            <h2 class="section-title">2. Information We Collect</h2>
+            <div class="section-content">
+                <p>We collect limited information to provide and improve our streaming service:</p>
+                <ul>
+                    <li><strong>Account Information:</strong> If you sign in via Google or phone authorization, we collect your basic profile information (UID, display name, and email) to sync your data across devices.</li>
+                    <li><strong>Usage Data:</strong> We may collect information about how you interact with the app, such as watch history and "My List" selections, to personalize your experience.</li>
+                    <li><strong>Device Information:</strong> We collect a unique device ID to manage anonymous sessions and ensure secure TV authorization.</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="privacy-section">
+            <h2 class="section-title">3. How We Use Your Information</h2>
+            <div class="section-content">
+                <p>Your information is used for the following purposes:</p>
+                <ul>
+                    <li>To provide and maintain our service.</li>
+                    <li>To synchronize your watch history and preferences across devices.</li>
+                    <li>To provide customer support and respond to inquiries.</li>
+                    <li>To monitor and analyze usage patterns to improve app performance.</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="privacy-section">
+            <h2 class="section-title">4. Data Security</h2>
+            <div class="section-content">
+                <p>We implement a variety of security measures to maintain the safety of your personal information. All data is stored securely using Firebase and industry-standard encryption protocols.</p>
+                <p>However, please remember that no method of transmission over the internet or method of electronic storage is 100% secure.</p>
+            </div>
+        </section>
+
+        <section class="privacy-section">
+            <h2 class="section-title">5. Third-Party Services</h2>
+            <div class="section-content">
+                <p>KiduyuTV uses third-party services that may collect information used to identify you:</p>
+                <ul>
+                    <li>Google Play Services</li>
+                    <li>Firebase Analytics</li>
+                    <li>TMDB (The Movie Database) for content metadata</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="privacy-section">
+            <h2 class="section-title">6. Contact Us</h2>
+            <div class="section-content">
+                <p>If you have any questions or suggestions about our Privacy Policy, do not hesitate to contact us at support@kiduyutv.com.</p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <a href="index.html" class="logo footer-logo">
+            <div class="logo-icon">
+                <svg viewBox="0 0 24 24" fill="white" width="24" height="24">
+                    <path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12zm-5-6l-7 4V7l7 4z"/>
+                </svg>
+            </div>
+            KiduyuTV
+        </a>
+        <ul class="footer-links">
+            <li><a href="index.html">Home</a></li>
+            <li><a href="privacy.html">Privacy Policy</a></li>
+            <li><a href="index.html#support">Terms of Service</a></li>
+        </ul>
+        <p class="copyright">&copy; 2026 KiduyuTV. All rights reserved.</p>
+    </footer>
+</body>
+</html>
