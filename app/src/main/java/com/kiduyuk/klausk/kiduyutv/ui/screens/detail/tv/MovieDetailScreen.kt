@@ -4,15 +4,15 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import androidx.annotation.RequiresApi
-import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -50,6 +50,7 @@ import com.kiduyuk.klausk.kiduyutv.BuildConfig
 /**
  * Composable function for displaying the detailed information of a movie.
  * It fetches movie details and similar movies using [DetailViewModel].
+ * Uses LazyColumn for better TV focus navigation and to prevent autoscroll on focus.
  *
  * @param movieId The ID of the movie to display.
  * @param onBackClick Lambda to be invoked when the back button is clicked.
@@ -69,7 +70,7 @@ fun MovieDetailScreen(
     viewModel: DetailViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val scrollState = rememberScrollState()
+    val lazyListState = rememberLazyListState()
     val context = LocalContext.current
 
     // Button interaction sources for focus tracking
@@ -87,16 +88,13 @@ fun MovieDetailScreen(
         viewModel.loadMovieDetail(context, movieId)
     }
 
+    // Request focus on the play button after content loads
+    // LazyColumn handles focus-scroll interaction better than verticalScroll
     LaunchedEffect(uiState.isLoading) {
         if (!uiState.isLoading && uiState.movieDetail != null) {
-            // Hold the scroll mutex at PreventUserInput priority while requesting
-            // focus. The focus system launches a BringIntoView coroutine that tries
-            // to acquire the same mutex at Default priority — because we're already
-            // holding it at a higher priority, that coroutine is cancelled, so the
-            // play button receives focus without the screen scrolling at all.
-            scrollState.scroll(MutatePriority.PreventUserInput) {
-                playFocusRequester.requestFocus()
-            }
+            // Small delay to allow LazyColumn to settle before requesting focus
+            kotlinx.coroutines.delay(50)
+            playFocusRequester.requestFocus()
         }
     }
 
@@ -112,329 +110,337 @@ fun MovieDetailScreen(
         } else if (uiState.movieDetail != null) {
             val movie = uiState.movieDetail!!
 
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scrollState)
+            LazyColumn(
+                state = lazyListState,
+                modifier = Modifier.fillMaxSize()
             ) {
                 // ── Hero Section ─────────────────────────────────────────────
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(300.dp)
-                ) {
-                    // Backdrop image
-                    if (movie.backdropPath != null) {
-                        AsyncImage(
-                            model = "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.BACKDROP_SIZE}${movie.backdropPath}",
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .blur(10.dp)
-                        )
-                    }
-
-                    // Gradient overlay
+                item {
                     Box(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        BackgroundDark.copy(alpha = 0.7f),
-                                        BackgroundDark
+                            .fillMaxWidth()
+                            .height(300.dp)
+                    ) {
+                        // Backdrop image
+                        if (movie.backdropPath != null) {
+                            AsyncImage(
+                                model = "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.BACKDROP_SIZE}${movie.backdropPath}",
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .blur(10.dp)
+                            )
+                        }
+
+                        // Gradient overlay
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color.Transparent,
+                                            BackgroundDark.copy(alpha = 0.7f),
+                                            BackgroundDark
+                                        )
                                     )
                                 )
-                            )
-                    )
+                        )
 
-                    // Back button
-                    val activity = context as? android.app.Activity
-                    IconButton(
-                        onClick = {
-                            if (BuildConfig.FLAVOR == "tv" && activity != null) {
-                                TvInterstitialManager.showAndThen(activity) {
+                        // Back button
+                        val activity = context as? android.app.Activity
+                        IconButton(
+                            onClick = {
+                                if (BuildConfig.FLAVOR == "tv" && activity != null) {
+                                    TvInterstitialManager.showAndThen(activity) {
+                                        onBackClick()
+                                    }
+                                } else {
                                     onBackClick()
                                 }
-                            } else {
-                                onBackClick()
-                            }
-                        },
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = TextPrimary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-
-                    // Hero content pinned to bottom
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 24.dp)
-                            .padding(top = 15.dp, bottom = 12.dp),
-                        verticalArrangement = Arrangement.Bottom
-                    ) {
-                        // Title
-                        Text(
-                            text = movie.title ?: "",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = TextPrimary,
-                            maxLines = 1,
-                            fontSize = 22.sp
-                        )
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        // Metadata row: rating · year · runtime
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            },
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(8.dp)
                         ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = TextPrimary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+
+                        // Hero content pinned to bottom
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 24.dp)
+                                .padding(top = 15.dp, bottom = 12.dp),
+                            verticalArrangement = Arrangement.Bottom
+                        ) {
+                            // Title
+                            Text(
+                                text = movie.title ?: "",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = TextPrimary,
+                                maxLines = 1,
+                                fontSize = 22.sp
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            // Metadata row: rating · year · runtime
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Star,
-                                    contentDescription = null,
-                                    tint = PrimaryRed,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Text(
-                                    text = String.format("%.1f", movie.voteAverage),
-                                    color = TextPrimary,
-                                    fontSize = 12.sp
-                                )
-                            }
-                            Text("·", color = TextSecondary, fontSize = 12.sp)
-                            Text(
-                                text = movie.releaseDate?.take(4) ?: "",
-                                color = TextSecondary,
-                                fontSize = 12.sp
-                            )
-                            if (movie.runtime != null) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Star,
+                                        contentDescription = null,
+                                        tint = PrimaryRed,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = String.format("%.1f", movie.voteAverage),
+                                        color = TextPrimary,
+                                        fontSize = 12.sp
+                                    )
+                                }
                                 Text("·", color = TextSecondary, fontSize = 12.sp)
                                 Text(
-                                    text = "${movie.runtime}m",
+                                    text = movie.releaseDate?.take(4) ?: "",
                                     color = TextSecondary,
                                     fontSize = 12.sp
                                 )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        // Genres + Production Companies on same row
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            movie.genres?.take(5)?.forEach { genre ->
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = GenrePill
-                                ) {
+                                if (movie.runtime != null) {
+                                    Text("·", color = TextSecondary, fontSize = 12.sp)
                                     Text(
-                                        text = genre.name,
-                                        color = TextPrimary,
-                                        fontSize = 10.sp,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                        text = "${movie.runtime}m",
+                                        color = TextSecondary,
+                                        fontSize = 12.sp
                                     )
                                 }
                             }
 
-                            movie.productionCompanies?.take(5)?.forEach { company ->
-                                val companyInteraction = remember { MutableInteractionSource() }
-                                val companyFocused by companyInteraction.collectIsFocusedAsState()
+                            Spacer(modifier = Modifier.height(6.dp))
 
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = if (companyFocused) DarkRed else Color.DarkGray,
-                                    modifier = Modifier.clickable(
-                                        interactionSource = companyInteraction,
-                                        indication = null
-                                    ) { onCompanyClick(company.id, company.name) }
-                                ) {
-                                    Text(
-                                        text = company.name,
-                                        color = TextPrimary,
-                                        fontSize = 10.sp,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        // Overview — 2 lines max
-                        Text(
-                            text = movie.overview ?: "",
-                            color = TextSecondary,
-                            //maxLines = 2,
-                            fontSize = 12.sp
-                        )
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        // Action buttons
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Play Now
-                            Button(
-                                onClick = {
-                                    val timestamp = uiState.watchHistoryItem?.playbackPosition ?: 0L
-                                    val defaultProvider = SettingsManager(context).getDefaultProvider()
-                                    val directUrl = if (defaultProvider != SettingsManager.AUTO) {
-                                        StreamLinksViewModel.resolveProviderUrl(
-                                            providerName = defaultProvider,
-                                            tmdbId = movie.id,
-                                            isTv = false,
-                                            season = null,
-                                            episode = null,
-                                            timestamp = timestamp
-                                        )
-                                    } else null
-
-                                    if (directUrl != null) {
-                                        val intent = Intent(context, PlayerActivity::class.java).apply {
-                                            putExtra("STREAM_URL", directUrl)
-                                            putExtra("TMDB_ID", movie.id)
-                                            putExtra("IS_TV", false)
-                                            putExtra("TITLE", movie.title ?: "")
-                                            putExtra("OVERVIEW", movie.overview)
-                                            putExtra("POSTER_PATH", movie.posterPath)
-                                            putExtra("BACKDROP_PATH", movie.backdropPath)
-                                            putExtra("VOTE_AVERAGE", movie.voteAverage)
-                                            putExtra("RELEASE_DATE", movie.releaseDate)
-                                        }
-                                        context.startActivity(intent)
-                                    } else {
-                                        onPlayClick(
-                                            Screen.StreamLinks.createRoute(
-                                                tmdbId = movie.id,
-                                                isTv = false,
-                                                title = movie.title ?: "",
-                                                overview = movie.overview,
-                                                posterPath = movie.posterPath,
-                                                backdropPath = movie.backdropPath,
-                                                voteAverage = movie.voteAverage,
-                                                releaseDate = movie.releaseDate,
-                                                timestamp = timestamp
-                                            )
+                            // Genres + Production Companies on same row
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                movie.genres?.take(5)?.forEach { genre ->
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = GenrePill
+                                    ) {
+                                        Text(
+                                            text = genre.name,
+                                            color = TextPrimary,
+                                            fontSize = 10.sp,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                         )
                                     }
-                                },
-                                modifier = Modifier.focusRequester(playFocusRequester),
-                                interactionSource = playInteraction,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (playFocused) DarkRed else PrimaryRed
-                                ),
-                                shape = RoundedCornerShape(4.dp),
-                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
-                            ) {
-                                Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(if (uiState.watchHistoryItem != null) "Continue" else "Play", fontSize = 12.sp)
+                                }
+
+                                movie.productionCompanies?.take(5)?.forEach { company ->
+                                    val companyInteraction = remember { MutableInteractionSource() }
+                                    val companyFocused by companyInteraction.collectIsFocusedAsState()
+
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = if (companyFocused) DarkRed else Color.DarkGray,
+                                        modifier = Modifier.clickable(
+                                            interactionSource = companyInteraction,
+                                            indication = null
+                                        ) { onCompanyClick(company.id, company.name) }
+                                    ) {
+                                        Text(
+                                            text = company.name,
+                                            color = TextPrimary,
+                                            fontSize = 10.sp,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                        )
+                                    }
+                                }
                             }
 
-                            // Watch Trailer
-                            if (uiState.trailerKey != null) {
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            // Overview — 2 lines max
+                            Text(
+                                text = movie.overview ?: "",
+                                color = TextSecondary,
+                                fontSize = 12.sp
+                            )
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Action buttons
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Play Now
                                 Button(
                                     onClick = {
-                                        val intent = Intent(context, YouTubePlayerActivity::class.java).apply {
-                                            putExtra("VIDEO_ID", uiState.trailerKey)
-                                            putExtra("TITLE", movie.title ?: "")
+                                        val timestamp = uiState.watchHistoryItem?.playbackPosition ?: 0L
+                                        val defaultProvider = SettingsManager(context).getDefaultProvider()
+                                        val directUrl = if (defaultProvider != SettingsManager.AUTO) {
+                                            StreamLinksViewModel.resolveProviderUrl(
+                                                providerName = defaultProvider,
+                                                tmdbId = movie.id,
+                                                isTv = false,
+                                                season = null,
+                                                episode = null,
+                                                timestamp = timestamp
+                                            )
+                                        } else null
+
+                                        if (directUrl != null) {
+                                            val intent = Intent(context, PlayerActivity::class.java).apply {
+                                                putExtra("STREAM_URL", directUrl)
+                                                putExtra("TMDB_ID", movie.id)
+                                                putExtra("IS_TV", false)
+                                                putExtra("TITLE", movie.title ?: "")
+                                                putExtra("OVERVIEW", movie.overview)
+                                                putExtra("POSTER_PATH", movie.posterPath)
+                                                putExtra("BACKDROP_PATH", movie.backdropPath)
+                                                putExtra("VOTE_AVERAGE", movie.voteAverage)
+                                                putExtra("RELEASE_DATE", movie.releaseDate)
+                                            }
+                                            context.startActivity(intent)
+                                        } else {
+                                            onPlayClick(
+                                                Screen.StreamLinks.createRoute(
+                                                    tmdbId = movie.id,
+                                                    isTv = false,
+                                                    title = movie.title ?: "",
+                                                    overview = movie.overview,
+                                                    posterPath = movie.posterPath,
+                                                    backdropPath = movie.backdropPath,
+                                                    voteAverage = movie.voteAverage,
+                                                    releaseDate = movie.releaseDate,
+                                                    timestamp = timestamp
+                                                )
+                                            )
                                         }
-                                        context.startActivity(intent)
                                     },
-                                    interactionSource = trailerInteraction,
+                                    modifier = Modifier.focusRequester(playFocusRequester),
+                                    interactionSource = playInteraction,
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (trailerFocused) DarkRed else Color.DarkGray
+                                        containerColor = if (playFocused) DarkRed else PrimaryRed
                                     ),
                                     shape = RoundedCornerShape(4.dp),
                                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
                                 ) {
-                                    Icon(Icons.Default.Movie, null, modifier = Modifier.size(16.dp))
+                                    Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Trailer", fontSize = 12.sp)
+                                    Text(if (uiState.watchHistoryItem != null) "Continue" else "Play", fontSize = 12.sp)
                                 }
-                            }
 
-                            // My List toggle
-                            OutlinedButton(
-                                onClick = { viewModel.toggleMyList(context) },
-                                interactionSource = myListInteraction,
-                                shape = RoundedCornerShape(4.dp),
-                                contentPadding = PaddingValues(8.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    containerColor = if (myListFocused) DarkRed else Color.Transparent,
-                                    contentColor = TextPrimary
-                                )
-                            ) {
-                                Icon(
-                                    imageVector = if (uiState.isInMyList) Icons.Default.Check else Icons.Default.Add,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
+                                // Watch Trailer
+                                if (uiState.trailerKey != null) {
+                                    Button(
+                                        onClick = {
+                                            val intent = Intent(context, YouTubePlayerActivity::class.java).apply {
+                                                putExtra("VIDEO_ID", uiState.trailerKey)
+                                                putExtra("TITLE", movie.title ?: "")
+                                            }
+                                            context.startActivity(intent)
+                                        },
+                                        interactionSource = trailerInteraction,
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = if (trailerFocused) DarkRed else Color.DarkGray
+                                        ),
+                                        shape = RoundedCornerShape(4.dp),
+                                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                                    ) {
+                                        Icon(Icons.Default.Movie, null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Trailer", fontSize = 12.sp)
+                                    }
+                                }
+
+                                // My List toggle
+                                OutlinedButton(
+                                    onClick = { viewModel.toggleMyList(context) },
+                                    interactionSource = myListInteraction,
+                                    shape = RoundedCornerShape(4.dp),
+                                    contentPadding = PaddingValues(8.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        containerColor = if (myListFocused) DarkRed else Color.Transparent,
+                                        contentColor = TextPrimary
+                                    )
+                                ) {
+                                    Icon(
+                                        imageVector = if (uiState.isInMyList) Icons.Default.Check else Icons.Default.Add,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
                             }
                         }
                     }
                 }
                 // ── End Hero Section ─────────────────────────────────────────
+
                 // Collection Movies
                 if (uiState.collectionDetail != null) {
-                    val collection = uiState.collectionDetail!!
-                    ContentRow(
-                        title = collection.name.uppercase(),
-                        items = collection.parts,
-                        onItemClick = { movie -> onMovieClick(movie.id) }
-                    ) { movie, isSelected, onClick ->
-                        MovieCard(movie = movie, isSelected = isSelected, onClick = onClick)
+                    item {
+                        val collection = uiState.collectionDetail!!
+                        ContentRow(
+                            title = collection.name.uppercase(),
+                            items = collection.parts,
+                            onItemClick = { movie -> onMovieClick(movie.id) }
+                        ) { movie, isSelected, onClick ->
+                            MovieCard(movie = movie, isSelected = isSelected, onClick = onClick)
+                        }
                     }
                 }
+
                 // Cast Row
                 if (uiState.cast.isNotEmpty()) {
-                    CastRow(
-                        title = "Cast",
-                        cast = uiState.cast,
-                        onCastClick = { castMember ->
-                            onCastClick(
-                                castMember.id,
-                                castMember.name,
-                                castMember.character,
-                                castMember.profilePath,
-                                castMember.knownForDepartment
-                            )
-                        }
-                    )
+                    item {
+                        CastRow(
+                            title = "Cast",
+                            cast = uiState.cast,
+                            onCastClick = { castMember ->
+                                onCastClick(
+                                    castMember.id,
+                                    castMember.name,
+                                    castMember.character,
+                                    castMember.profilePath,
+                                    castMember.knownForDepartment
+                                )
+                            }
+                        )
+                    }
                 }
-
-
 
                 // Similar Movies
                 if (uiState.similarMovies.isNotEmpty()) {
-                    ContentRow(
-                        title = "Others Also Watched",
-                        items = uiState.similarMovies,
-                        onItemClick = { movie -> onMovieClick(movie.id) }
-                    ) { movie, isSelected, onClick ->
-                        MovieCard(movie = movie, isSelected = isSelected, onClick = onClick)
+                    item {
+                        ContentRow(
+                            title = "Others Also Watched",
+                            items = uiState.similarMovies,
+                            onItemClick = { movie -> onMovieClick(movie.id) }
+                        ) { movie, isSelected, onClick ->
+                            MovieCard(movie = movie, isSelected = isSelected, onClick = onClick)
+                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(32.dp))
+                // Bottom spacing
+                item {
+                    Spacer(modifier = Modifier.height(32.dp))
+                }
             }
         } else if (uiState.error != null) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
