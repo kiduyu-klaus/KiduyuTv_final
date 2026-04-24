@@ -34,6 +34,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.CardDark
@@ -197,112 +199,162 @@ private fun NotificationDialog(
         mutableStateOf(notifications.firstOrNull()?.id)
     }
 
+    // Focus requester for the first notification item (TV D-pad navigation)
+    val firstItemFocusRequester = remember { FocusRequester() }
+
+    // Request focus on the first notification when dialog opens
+    LaunchedEffect(notifications) {
+        if (notifications.isNotEmpty()) {
+            // Small delay to ensure composable is laid out
+            kotlinx.coroutines.delay(100)
+            try {
+                firstItemFocusRequester.requestFocus()
+            } catch (_: Exception) {
+                // Focus might fail if composable isn't ready yet
+            }
+        }
+    }
+
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true
+        )
     ) {
+        // Outer Box – dimmed background that dismisses on click
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.7f))
-                .clickable { onDismiss() },
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onDismiss
+                ),
             contentAlignment = Alignment.Center
         ) {
-            Column(
+            // Card – its own clickable stops propagation so background clicks work correctly
+            Card(
                 modifier = Modifier
                     .width(400.dp)
                     .heightIn(max = 500.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(SurfaceDark)
-                    .clickable(enabled = false) {} // Prevent clicks from closing dialog
-                    .padding(20.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = { /* Consume click – don't propagate to dismiss background */ }
+                    ),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceDark)
             ) {
-                Text(
-                    text = "Notifications",
-                    color = Color.White,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                if (notifications.isEmpty()) {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().weight(1f),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "No new notifications",
-                            color = TextSecondary,
-                            fontSize = 16.sp
-                        )
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        items(notifications) { notification ->
-                            val interactionSource = remember { MutableInteractionSource() }
-                            val isFocused by interactionSource.collectIsFocusedAsState()
-                            val isSelected = selectedNotificationId == notification.id
-                            val isHighlighted = isFocused || isSelected
-                            
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(if (isHighlighted) DarkRed else CardDark)
-                                    .border(
-                                        width = 1.dp,
-                                        color = if (isHighlighted) Color.White else Color.Transparent,
-                                        shape = RoundedCornerShape(12.dp)
-                                    )
-                                    .onFocusChanged { focusState ->
-                                        if (focusState.isFocused) {
-                                            selectedNotificationId = notification.id
+                Column(
+                    modifier = Modifier.padding(20.dp)
+                ) {
+                    Text(
+                        text = "Notifications",
+                        color = Color.White,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    if (notifications.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "No new notifications",
+                                color = TextSecondary,
+                                fontSize = 16.sp
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier
+                                .weight(1f, fill = false)
+                                .heightIn(max = 380.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            items(notifications) { notification ->
+                                val interactionSource = remember { MutableInteractionSource() }
+                                val isFocused by interactionSource.collectIsFocusedAsState()
+                                val isSelected = selectedNotificationId == notification.id
+                                val isHighlighted = isFocused || isSelected
+                                val isFirst = notifications.firstOrNull()?.id == notification.id
+
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(if (isHighlighted) DarkRed else CardDark)
+                                        .border(
+                                            width = 1.dp,
+                                            color = if (isHighlighted) Color.White else Color.Transparent,
+                                            shape = RoundedCornerShape(12.dp)
+                                        )
+                                        .onFocusChanged { focusState ->
+                                            if (focusState.isFocused) {
+                                                selectedNotificationId = notification.id
+                                            }
                                         }
-                                    }
-                                    .focusable(interactionSource = interactionSource)
-                                    .clickable(
-                                        interactionSource = interactionSource,
-                                        indication = null,
-                                        onClick = {
-                                            selectedNotificationId = notification.id
-                                            onNotificationClick(notification.id, notification.type)
-                                        }
+                                        .then(
+                                            if (isFirst) Modifier.focusRequester(firstItemFocusRequester)
+                                            else Modifier
+                                        )
+                                        .focusable(interactionSource = interactionSource)
+                                        .clickable(
+                                            interactionSource = interactionSource,
+                                            indication = null,
+                                            onClick = {
+                                                selectedNotificationId = notification.id
+                                                onNotificationClick(notification.id, notification.type)
+                                            }
+                                        )
+                                        .padding(12.dp)
+                                ) {
+                                    Text(
+                                        text = notification.title,
+                                        color = Color.White,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
-                                    .padding(12.dp)
-                            ) {
-                                Text(
-                                    text = notification.title,
-                                    color = Color.White,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = notification.overview,
-                                    color = TextSecondary,
-                                    fontSize = 14.sp,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = notification.overview,
+                                        color = TextSecondary,
+                                        fontSize = 14.sp,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                         }
                     }
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Button(
-                    onClick = onDismiss,
-                    modifier = Modifier.align(Alignment.End),
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryRed)
-                ) {
-                    Text("Close")
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Close button with its own focus management
+                    val closeInteractionSource = remember { MutableInteractionSource() }
+                    val isCloseFocused by closeInteractionSource.collectIsFocusedAsState()
+
+                    Button(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .align(Alignment.End)
+                            .focusable(interactionSource = closeInteractionSource),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isCloseFocused) DarkRed else PrimaryRed
+                        )
+                    ) {
+                        Text("Close")
+                    }
                 }
             }
         }
