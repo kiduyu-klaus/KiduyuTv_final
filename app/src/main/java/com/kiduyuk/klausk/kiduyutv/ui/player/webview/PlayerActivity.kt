@@ -532,8 +532,8 @@ class PlayerActivity : AppCompatActivity() {
                     }
                 }
 
-                override fun onPageFinished(view: WebView?, url: String?, favicon: Bitmap?) {
-                    super.onPageFinished(view, url, favicon)
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
                     isPageLoaded = true
                     Log.i(TAG, "[WebView] Page finished loading: $url")
 
