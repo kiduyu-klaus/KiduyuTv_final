@@ -92,12 +92,12 @@ fun TvShowDetailScreen(
         viewModel.loadTvShowDetail(context, tvId)
     }
 
-    // Request focus on the play button after content loads
-    // LazyColumn handles focus-scroll interaction better than verticalScroll
     LaunchedEffect(uiState.isLoading) {
         if (!uiState.isLoading && uiState.tvShowDetail != null) {
-            // Small delay to allow LazyColumn to settle before requesting focus
-            kotlinx.coroutines.delay(50)
+            // Explicitly scroll to top first to prevent focus-triggered autoscroll
+            lazyListState.scrollToItem(0)
+            // Longer delay to ensure LazyColumn fully settles before requesting focus
+            kotlinx.coroutines.delay(100)
             playFocusRequester.requestFocus()
         }
     }

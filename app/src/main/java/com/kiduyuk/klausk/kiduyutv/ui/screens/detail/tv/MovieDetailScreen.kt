@@ -88,12 +88,12 @@ fun MovieDetailScreen(
         viewModel.loadMovieDetail(context, movieId)
     }
 
-    // Request focus on the play button after content loads
-    // LazyColumn handles focus-scroll interaction better than verticalScroll
     LaunchedEffect(uiState.isLoading) {
         if (!uiState.isLoading && uiState.movieDetail != null) {
-            // Small delay to allow LazyColumn to settle before requesting focus
-            kotlinx.coroutines.delay(50)
+            // Explicitly scroll to top first to prevent focus-triggered autoscroll
+            lazyListState.scrollToItem(0)
+            // Small delay to ensure scroll completes before requesting focus
+            kotlinx.coroutines.delay(16)
             playFocusRequester.requestFocus()
         }
     }
