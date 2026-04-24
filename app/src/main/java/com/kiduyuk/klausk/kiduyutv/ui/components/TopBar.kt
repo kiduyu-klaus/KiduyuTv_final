@@ -13,6 +13,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.foundation.border
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
@@ -33,6 +34,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.CardDark
@@ -194,6 +197,13 @@ private fun NotificationDialog(
     var selectedNotificationId by remember(notifications) {
         mutableStateOf(notifications.firstOrNull()?.id)
     }
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        if (notifications.isNotEmpty()) {
+            focusRequester.requestFocus()
+        }
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -240,7 +250,7 @@ private fun NotificationDialog(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        items(notifications) { notification ->
+                        itemsIndexed(notifications) { index, notification ->
                             val interactionSource = remember { MutableInteractionSource() }
                             val isFocused by interactionSource.collectIsFocusedAsState()
                             val isSelected = selectedNotificationId == notification.id
@@ -261,6 +271,7 @@ private fun NotificationDialog(
                                             selectedNotificationId = notification.id
                                         }
                                     }
+                                    .then(if (index == 0) Modifier.focusRequester(focusRequester) else Modifier)
                                     .focusable(interactionSource = interactionSource)
                                     .clickable(
                                         interactionSource = interactionSource,
