@@ -56,6 +56,7 @@ fun MyListScreen(
     onNavigate: (String) -> Unit = {},
     onSearchClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onNotificationClick: (id: Int, type: String) -> Unit = { _, _ -> },
     onCompanyClick: (Int, String) -> Unit = { _, _ -> },
     onNetworkClick: (Int, String) -> Unit = { _, _ -> },
     onCastClick: (CastMember) -> Unit = { _ -> },
@@ -95,9 +96,10 @@ fun MyListScreen(
         // Top navigation bar for the My List screen.
         TopBar(
             selectedRoute = "my_list",
-            onNavItemClick = { route -> onNavigate(route) }, // Handle navigation clicks.
+            onNavItemClick = { route -> onNavigate(route) },
             onSearchClick = onSearchClick,
-            onSettingsClick = onSettingsClick
+            onSettingsClick = onSettingsClick,
+            onNotificationClick = onNotificationClick
         )
 
         Column(

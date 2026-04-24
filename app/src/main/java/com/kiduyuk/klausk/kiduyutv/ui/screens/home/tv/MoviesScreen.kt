@@ -41,6 +41,7 @@ fun MoviesScreen(
     onNavigate: (String) -> Unit = {},
     onSearchClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onNotificationClick: (id: Int, type: String) -> Unit = { _, _ -> },
     viewModel: HomeViewModel = viewModel()
 ) {
     // Collect UI state from the ViewModel.
@@ -381,9 +382,10 @@ fun MoviesScreen(
         // Top navigation bar for the Movies screen.
         TopBar(
             selectedRoute = "movies",
-            onNavItemClick = { route -> onNavigate(route) }, // Handle navigation clicks.
+            onNavItemClick = { route -> onNavigate(route) },
             onSearchClick = onSearchClick,
-            onSettingsClick = onSettingsClick
+            onSettingsClick = onSettingsClick,
+            onNotificationClick = onNotificationClick
         )
     }
 }

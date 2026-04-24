@@ -41,6 +41,7 @@ fun TvShowsScreen(
     onNavigate: (String) -> Unit = {},
     onSearchClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    onNotificationClick: (id: Int, type: String) -> Unit = { _, _ -> },
     viewModel: HomeViewModel = viewModel()
 ) {
     // Collect UI state from the ViewModel.
@@ -236,9 +237,10 @@ fun TvShowsScreen(
         // Top navigation bar for the TV Shows screen.
         TopBar(
             selectedRoute = "tv_shows",
-            onNavItemClick = { route -> onNavigate(route) }, // Handle navigation clicks.
+            onNavItemClick = { route -> onNavigate(route) },
             onSearchClick = onSearchClick,
-            onSettingsClick = onSettingsClick
+            onSettingsClick = onSettingsClick,
+            onNotificationClick = onNotificationClick
         )
     }
 }

@@ -2,6 +2,7 @@ package com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -95,7 +96,14 @@ fun TvShowDetailScreen(
 
     LaunchedEffect(uiState.isLoading) {
         if (!uiState.isLoading && uiState.tvShowDetail != null) {
-            playFocusRequester.requestFocus()
+            // Hold the scroll mutex at PreventUserInput priority while requesting
+            // focus. The focus system launches a BringIntoView coroutine that tries
+            // to acquire the same mutex at Default priority — because we're already
+            // holding it at a higher priority, that coroutine is cancelled, so the
+            // play button receives focus without the screen scrolling at all.
+            scrollState.scroll(MutatePriority.PreventUserInput) {
+                playFocusRequester.requestFocus()
+            }
         }
     }
 
