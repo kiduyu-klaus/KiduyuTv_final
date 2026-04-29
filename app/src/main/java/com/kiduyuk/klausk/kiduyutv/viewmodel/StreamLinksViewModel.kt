@@ -78,6 +78,21 @@ class StreamLinksViewModel : ViewModel() {
                     type = type
                 ),
                 StreamProvider(
+                    name = "VidNest",
+                    urlTemplate = if (isTv) "https://vidnest.fun/tv/${tmdbId}/${season}/${episode}" else "https://vidnest.fun/movie/${tmdbId}",
+                    type = type
+                ),
+                StreamProvider(
+                    name = "Vidsync",
+                    urlTemplate = if (isTv) "https://vidsync.xyz/embed/tv/${tmdbId}/${season}/${episode}?autoPlay=true&autoNext=true" else "https://vidsync.xyz/embed/movie/${tmdbId}?autoPlay=true",
+                    type = type
+                ),
+                StreamProvider(
+                    name = "Vidrock",
+                    urlTemplate = if (isTv) "https://vidrock.net/tv/${tmdbId}/${season}/${episode}?autoplay=true&autonext=true" else "https://vidrock.net/movie/${tmdbId}?autoplay=true",
+                    type = type
+                ),
+                StreamProvider(
                     name = "Flixer",
                     urlTemplate = if (isTv) "https://flixer.su/watch/tv/${tmdbId}/${season}/${episode}" else "https://flixer.su/watch/movie/${tmdbId}",
                     type = type
