@@ -97,13 +97,11 @@ class StreamLinksViewModel : ViewModel() {
                     urlTemplate = if (isTv) "https://flixer.su/watch/tv/${tmdbId}/${season}/${episode}" else "https://flixer.su/watch/movie/${tmdbId}",
                     type = type
                 ),
-/*
                 StreamProvider(
-                    name = "SuperEmbed",
-                    urlTemplate = if (isTv) "https://multiembed.mov/?video_id=${tmdbId}&tmdb=1&s=${season}&e=${episode}" else "https://multiembed.mov/?video_id=${tmdbId}&tmdb=1",
+                    name = "StreamingNow",
+                    urlTemplate = if (isTv) "https://streamingnow.mov/tv/${tmdbId}/${season}/${episode}" else "https://streamingnow.mov/movie/${tmdbId}",
                     type = type
                 ),
-*/
                 StreamProvider(
                     name = "Autoembed",
                     urlTemplate = if (isTv) "https://autoembed.co/tv/tmdb/${tmdbId}-${season}-${episode}" else "https://autoembed.co/movie/tmdb/${tmdbId}",

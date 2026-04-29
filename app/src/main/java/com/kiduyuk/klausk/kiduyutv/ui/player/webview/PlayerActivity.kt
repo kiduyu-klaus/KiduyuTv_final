@@ -426,12 +426,14 @@ class PlayerActivity : AppCompatActivity() {
         val isVideasyPlayer = url.startsWith("https://player.videasy.net")
         val isVidKingPlayer = url.startsWith("https://www.vidking.net") || url.startsWith("https://vidking.")
         val isVidLinkPlayer = url.startsWith("https://vidlink.pro")
-        val isTrackingEnabled = isVideasyPlayer || isVidKingPlayer || isVidLinkPlayer
+        val isStreamingNowPlayer = url.contains("streamingnow.mov", ignoreCase = true) || url.contains("multiembed.mov", ignoreCase = true)
+        val isTrackingEnabled = isVideasyPlayer || isVidKingPlayer || isVidLinkPlayer || isStreamingNowPlayer
 
         currentProviderName = when {
             isVidLinkPlayer -> "VidLink"
             isVidKingPlayer -> "VidKing"
             isVideasyPlayer -> "Videasy"
+            isStreamingNowPlayer -> "StreamingNow"
             url.contains("vidfast", ignoreCase = true) -> "VidFast"
             url.contains("vidsrc", ignoreCase = true) -> "VidSrc"
             url.contains("mapple", ignoreCase = true) -> "Mapple"
@@ -565,7 +567,14 @@ class PlayerActivity : AppCompatActivity() {
             }
 
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-                val url = request?.url.toString()
+                val url = request?.url.toString() ?: return false
+
+                // Handle navigation to streamingnow.mov
+                if (url.contains("streamingnow.mov", ignoreCase = true) ||
+                    url.contains("multiembed.mov", ignoreCase = true)) {
+                    Log.i(TAG, "[Navigation] Detected streamingnow/multiembed navigation, updating originalStreamUrl to: $url")
+                    originalStreamUrl = url
+                }
 
                 // ★ AdvancedAdBlocker navigation block commented out
                 // if (AdvancedAdBlocker.shouldBlock(url)) {
@@ -581,6 +590,16 @@ class PlayerActivity : AppCompatActivity() {
                 super.onPageStarted(view, url, favicon)
                 isPageLoaded = false
                 isVideoLoaded = false
+
+                // Update originalStreamUrl if navigating to streamingnow.mov or multiembed.mov
+                url?.let {
+                    if (it.contains("streamingnow.mov", ignoreCase = true) ||
+                        it.contains("multiembed.mov", ignoreCase = true)) {
+                        Log.i(TAG, "[Navigation] Page started with streamingnow/multiembed URL, updating originalStreamUrl")
+                        originalStreamUrl = it
+                    }
+                }
+
                 Log.i(TAG, "[WebView] Page started loading: $url")
                 Log.i(TAG, "[AdBlock] Stats so far - Blocked: $blockedRequestsCount / Total: $totalRequestsCount")
             }
