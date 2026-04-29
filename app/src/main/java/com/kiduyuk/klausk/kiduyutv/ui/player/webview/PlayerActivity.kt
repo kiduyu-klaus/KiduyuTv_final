@@ -27,6 +27,7 @@ import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
 import com.kiduyuk.klausk.kiduyutv.util.AdvancedAdBlocker
+import com.kiduyuk.klausk.kiduyutv.util.FilterListUpdater
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import com.kiduyuk.klausk.kiduyutv.util.SingletonDnsResolver
@@ -73,6 +74,10 @@ class PlayerActivity : AppCompatActivity() {
     private var hasShownError = false
     private var videoLoadCheckHandler: Handler? = null
     private var videoLoadCheckRunnable: Runnable? = null
+
+    // ★ Ad blocking statistics
+    private var blockedRequestsCount = 0
+    private var totalRequestsCount = 0
 
     companion object {
         private const val TAG = "VideasyPlayer"
@@ -238,11 +243,13 @@ class PlayerActivity : AppCompatActivity() {
                 isVideoLoaded = false
                 isPageLoaded = false
                 cancelVideoLoadTimeoutCheck()
+                resetAdBlockStats()
                 webView.reload()
             },
             onYes = {
                 Log.i(TAG, "[Error Dialog] User chose to exit")
                 savePlaybackPosition()
+                logAdBlockStats()
                 finish()
             }
         ).show()
@@ -405,6 +412,8 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         Log.i(TAG, "[Provider] Selected: $currentProviderName")
+        Log.i(TAG, "[AdBlocker] Status: ${if (AdvancedAdBlocker.isInitialized()) "Ready" else "Not initialized"}")
+        
         warmUpDnsForUrl(url)
 
         // ── Layout ────────────────────────────────────────────────────────────
@@ -450,253 +459,7 @@ class PlayerActivity : AppCompatActivity() {
                 addJavascriptInterface(VideasyJavaScriptInterface(), "VideasyInterface")
             }
 
-            webViewClient = object : WebViewClient() {
-                override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
-                    val reqUrl = request?.url.toString()
-                    request?.url?.host?.let { warmUpDnsHost(it) }
-                    if (AdvancedAdBlocker.shouldBlock(reqUrl)) {
-                        return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
-                    }
-                    return super.shouldInterceptRequest(view, request)
-                }
-
-                override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean = true
-
-                override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                    super.onPageStarted(view, url, favicon)
-                    isPageLoaded = false
-                    isVideoLoaded = false
-                    Log.i(TAG, "[WebView] Page started loading: $url")
-                }
-
-                @Suppress("DEPRECATION")
-                override fun onReceivedError(view: WebView?, errorCode: Int, description: String?, failingUrl: String?) {
-                    super.onReceivedError(view, errorCode, description, failingUrl)
-                    val errorDescription = description ?: "Unknown error"
-                    Log.e(TAG, "[WebView] Error received: $errorDescription (code: $errorCode)")
-                    if (!hasShownError) {
-                        runOnUiThread {
-                            showVideoErrorDialog("Failed to load video", "Error: $errorDescription (Code: $errorCode)")
-                        }
-                    }
-                }
-
-                override fun onReceivedHttpError(view: WebView?, request: WebResourceRequest?, errorResponse: WebResourceResponse?) {
-                    super.onReceivedHttpError(view, request, errorResponse)
-                    if (request?.isForMainFrame == true) {
-                        val statusCode = errorResponse?.statusCode ?: 0
-                        Log.e(TAG, "[WebView] HTTP Error on main frame: $statusCode")
-                        if (statusCode >= 400 && !hasShownError) {
-                            runOnUiThread {
-                                showVideoErrorDialog("HTTP Error", "Server returned error code: $statusCode")
-                            }
-                        }
-                    }
-                }
-
-                override fun onPageFinished(view: WebView?, url: String?) {
-                    super.onPageFinished(view, url)
-                    isPageLoaded = true
-                    Log.i(TAG, "[WebView] Page finished loading: $url")
-
-                    startVideoLoadTimeoutCheck()
-
-                    val videoDetectionJs = """
-                        (function() {
-                            function checkVideoStatus() {
-                                var videos = document.getElementsByTagName('video');
-                                if (videos.length === 0) {
-                                    return JSON.stringify({ hasVideo: false, isPlaying: false, error: true, message: 'No video element found' });
-                                }
-                                var v = videos[0];
-                                var hasError = v.error !== null && v.error !== undefined;
-                                var isPlaying = !v.paused && !v.ended && v.readyState >= 3;
-                                var hasSource = v.readyState >= 1;
-                                return JSON.stringify({
-                                    hasVideo: true,
-                                    isPlaying: isPlaying,
-                                    hasError: hasError,
-                                    hasSource: hasSource,
-                                    readyState: v.readyState,
-                                    networkState: v.networkState,
-                                    errorCode: v.error ? v.error.code : 0,
-                                    message: hasError ? 'Video error: ' + (v.error ? v.error.message : 'Unknown') : (isPlaying ? 'Video is playing' : 'Video not playing')
-                                });
-                            }
-                            window.getVideoStatus = checkVideoStatus;
-                        })();
-                    """.trimIndent()
-
-                    view?.evaluateJavascript(videoDetectionJs, null)
-
-                    val advancedJs = """
-                        (function() {
-                            function removeAdsAdvanced() {
-                                const elements = document.querySelectorAll('*');
-                                elements.forEach(el => {
-                                    const text = (el.innerText || '').toLowerCase();
-                                    const cls = (el.className || '').toString().toLowerCase();
-                                    if (
-                                        text.includes('advert') ||
-                                        text.includes('sponsored') ||
-                                        cls.includes('ad') ||
-                                        cls.includes('popup')
-                                    ) {
-                                        el.remove();
-                                    }
-                                });
-                            }
-
-                            function blockRedirects() {
-                                window.open = () => null;
-                                window.location.assign = () => {};
-                                window.location.replace = () => {};
-                            }
-
-                            function setupMessageListener() {
-                                console.log('Player message listener initialized');
-
-                                (function() {
-                                    var originalPostMessage = window.postMessage;
-                                    window.postMessage = function(message, targetOrigin, transfer) {
-                                        try {
-                                            if (window.VideasyInterface) {
-                                                if (typeof message === 'string') {
-                                                    window.VideasyInterface.postMessage(message);
-                                                } else {
-                                                    window.VideasyInterface.postMessage(JSON.stringify(message));
-                                                }
-                                            }
-                                        } catch (e) {}
-                                        return originalPostMessage.apply(this, arguments);
-                                    };
-                                })();
-
-                                window.addEventListener('message', function(event) {
-                                    try {
-                                        if (window.VideasyInterface) {
-                                            if (typeof event.data === 'string') {
-                                                window.VideasyInterface.postMessage(event.data);
-                                            } else {
-                                                window.VideasyInterface.postMessage(JSON.stringify(event.data));
-                                            }
-                                        }
-                                    } catch (e) {}
-                                });
-
-                                function getContentInfo() {
-                                    var info = { type: 'movie', id: null, season: 1, episode: 1 };
-                                    try {
-                                        var url = window.location.href;
-                                        var match;
-
-                                        match = url.match(/\/tv\/(\d+)\/(\d+)\/(\d+)/);
-                                        if (match) {
-                                            info.type = 'tv';
-                                            info.id = parseInt(match[1]);
-                                            info.season = parseInt(match[2]);
-                                            info.episode = parseInt(match[3]);
-                                            return info;
-                                        }
-
-                                        match = url.match(/\/movie\/(\d+)/);
-                                        if (match) {
-                                            info.type = 'movie';
-                                            info.id = parseInt(match[1]);
-                                            return info;
-                                        }
-
-                                        match = url.match(/\/anime\/(\d+)\/(\d+)\/(\d+)/);
-                                        if (match) {
-                                            info.type = 'anime';
-                                            info.id = parseInt(match[1]);
-                                            info.season = parseInt(match[2]);
-                                            info.episode = parseInt(match[3]);
-                                            return info;
-                                        }
-                                    } catch (e) {}
-                                    return info;
-                                }
-
-                                function sendVideoProgress() {
-                                    var videos = document.getElementsByTagName('video');
-                                    for (var i = 0; i < videos.length; i++) {
-                                        var v = videos[i];
-                                        if (v.duration > 0 && !isNaN(v.duration)) {
-                                            var contentInfo = getContentInfo();
-                                            var progressData = {
-                                                progress: (v.currentTime / v.duration) * 100,
-                                                timestamp: Math.floor(v.currentTime),
-                                                duration: Math.floor(v.duration),
-                                                currentTime: v.currentTime,
-                                                paused: v.paused,
-                                                ended: v.ended
-                                            };
-                                            if (contentInfo) {
-                                                progressData.id = contentInfo.id;
-                                                progressData.type = contentInfo.type;
-                                                progressData.season = contentInfo.season;
-                                                progressData.episode = contentInfo.episode;
-                                            }
-                                            if (window.VideasyInterface) {
-                                                window.VideasyInterface.postMessage(JSON.stringify(progressData));
-                                            }
-                                            break;
-                                        }
-                                    }
-                                }
-
-                                function enforceVolume(video) {
-                                    video.volume = 1.0;
-                                    video.muted = false;
-                                    video.addEventListener('volumechange', function() {
-                                        if (video.volume < 1.0 || video.muted) {
-                                            video.volume = 1.0;
-                                            video.muted = false;
-                                        }
-                                    });
-                                }
-
-                                function monitorVideoEvents() {
-                                    const videos = document.querySelectorAll('video');
-                                    videos.forEach(video => {
-                                        if (video._monitored) return;
-                                        video._monitored = true;
-                                        video.addEventListener('loadedmetadata', () => sendVideoProgress());
-                                        video.addEventListener('ended', () => sendVideoProgress());
-                                        video.addEventListener('timeupdate', function() {
-                                            if (!video._lastProgressUpdate || Date.now() - video._lastProgressUpdate > 1000) {
-                                                sendVideoProgress();
-                                                video._lastProgressUpdate = Date.now();
-                                            }
-                                        });
-                                        enforceVolume(video);
-                                    });
-                                }
-
-                                function observeVideoElements() {
-                                    const observer = new MutationObserver(() => {
-                                        monitorVideoEvents();
-                                    });
-                                    observer.observe(document.body, { childList: true, subtree: true });
-                                }
-
-                                monitorVideoEvents();
-                                observeVideoElements();
-                                setInterval(monitorVideoEvents, 10000);
-                                setInterval(sendVideoProgress, 15000);
-                            }
-
-                            blockRedirects();
-                            removeAdsAdvanced();
-                            setupMessageListener();
-                        })();
-                    """.trimIndent()
-
-                    view?.evaluateJavascript(AdvancedAdBlocker.getCss(), null)
-                    view?.evaluateJavascript(advancedJs, null)
-                }
-            }
+            webViewClient = createWebViewClient()
 
             webChromeClient = object : WebChromeClient() {
                 override fun onCreateWindow(view: WebView?, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message?): Boolean = false
@@ -724,20 +487,8 @@ class PlayerActivity : AppCompatActivity() {
         rootLayout.isFocusableInTouchMode = true
         rootLayout.requestFocus()
 
-        // ── Full-screen immersive mode (after setContentView so DecorView exists) ──
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            window.insetsController?.let {
-                it.hide(WindowInsets.Type.statusBars())
-                it.systemBarsBehavior =
-                    WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            }
-        } else {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = (
-                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                            or View.SYSTEM_UI_FLAG_FULLSCREEN
-                    )
-        }
+        // ── Full-screen immersive mode ──
+        setupImmersiveMode()
 
         rootLayout.post {
             screenWidth = rootLayout.width
@@ -757,6 +508,455 @@ class PlayerActivity : AppCompatActivity() {
         })
     }
 
+    /**
+     * ★ Create WebViewClient with enhanced ad blocking
+     */
+    private fun createWebViewClient(): WebViewClient {
+        return object : WebViewClient() {
+            
+            override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
+                val reqUrl = request?.url.toString()
+                
+                // Increment total requests counter
+                totalRequestsCount++
+                
+                // ★ Check if this URL should be blocked by the ad blocker
+                if (AdvancedAdBlocker.shouldBlock(reqUrl)) {
+                    blockedRequestsCount++
+                    
+                    // Log blocked requests (sample every 10th to avoid log spam)
+                    if (blockedRequestsCount % 10 == 0) {
+                        Log.d(TAG, "[AdBlock] Blocked $blockedRequestsCount/$totalRequestsCount requests. Latest: ${reqUrl.take(80)}")
+                    }
+                    
+                    // Return empty response to block the resource
+                    return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
+                }
+                
+                // Warm up DNS for allowed requests
+                request?.url?.host?.let { warmUpDnsHost(it) }
+                
+                return super.shouldInterceptRequest(view, request)
+            }
+
+            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                val url = request?.url.toString()
+                
+                // ★ Block known ad/tracking URLs even for navigation requests
+                if (AdvancedAdBlocker.shouldBlock(url)) {
+                    blockedRequestsCount++
+                    Log.d(TAG, "[AdBlock] Blocked navigation to: ${url.take(80)}")
+                    return true // Block the navigation
+                }
+                
+                return false // Allow normal navigation
+            }
+
+            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                super.onPageStarted(view, url, favicon)
+                isPageLoaded = false
+                isVideoLoaded = false
+                Log.i(TAG, "[WebView] Page started loading: $url")
+                Log.i(TAG, "[AdBlock] Stats so far - Blocked: $blockedRequestsCount / Total: $totalRequestsCount")
+            }
+
+            @Suppress("DEPRECATION")
+            override fun onReceivedError(view: WebView?, errorCode: Int, description: String?, failingUrl: String?) {
+                super.onReceivedError(view, errorCode, description, failingUrl)
+                val errorDescription = description ?: "Unknown error"
+                Log.e(TAG, "[WebView] Error received: $errorDescription (code: $errorCode)")
+                
+                // ★ Log ad blocking stats when error occurs
+                logAdBlockStats()
+                
+                if (!hasShownError) {
+                    runOnUiThread {
+                        showVideoErrorDialog("Failed to load video", "Error: $errorDescription (Code: $errorCode)")
+                    }
+                }
+            }
+
+            override fun onReceivedHttpError(view: WebView?, request: WebResourceRequest?, errorResponse: WebResourceResponse?) {
+                super.onReceivedHttpError(view, request, errorResponse)
+                if (request?.isForMainFrame == true) {
+                    val statusCode = errorResponse?.statusCode ?: 0
+                    Log.e(TAG, "[WebView] HTTP Error on main frame: $statusCode")
+                    
+                    // ★ Log ad blocking stats when HTTP error occurs
+                    logAdBlockStats()
+                    
+                    if (statusCode >= 400 && !hasShownError) {
+                        runOnUiThread {
+                            showVideoErrorDialog("HTTP Error", "Server returned error code: $statusCode")
+                        }
+                    }
+                }
+            }
+
+            override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
+                isPageLoaded = true
+                Log.i(TAG, "[WebView] Page finished loading: $url")
+                
+                // ★ Log final ad blocking stats for this page load
+                logAdBlockStats()
+                Log.i(TAG, "[AdBlock] Blocked ${blockedRequestsCount} out of ${totalRequestsCount} requests (${getBlockPercentage()}%)")
+
+                // ★ Inject ad blocking CSS and JavaScript
+                injectAdBlockingScripts(view)
+
+                // Start video load timeout check
+                startVideoLoadTimeoutCheck()
+
+                // Inject video detection script
+                injectVideoDetectionScript(view)
+
+                // Inject advanced player scripts
+                injectAdvancedPlayerScripts(view)
+            }
+        }
+    }
+
+    /**
+     * ★ Inject ad blocking CSS into the page
+     */
+    private fun injectAdBlockingScripts(view: WebView?) {
+        // Inject CSS to hide ad elements
+        val adBlockCss = AdvancedAdBlocker.getCss()
+        if (adBlockCss.isNotEmpty()) {
+            view?.evaluateJavascript(adBlockCss) { result ->
+                Log.d(TAG, "[AdBlock] CSS injection result: ${result?.take(50)}")
+            }
+        }
+        
+        // Inject JavaScript for additional ad blocking
+        val adBlockJs = AdvancedAdBlocker.getBlockingJavaScript()
+        if (adBlockJs.isNotEmpty()) {
+            view?.evaluateJavascript(adBlockJs) { result ->
+                Log.d(TAG, "[AdBlock] JS injection result: ${result?.take(50)}")
+            }
+        }
+        
+        // ★ Inject custom ad removal script for video players
+        val videoSpecificAdBlocking = getVideoSpecificAdBlockingJs()
+        view?.evaluateJavascript(videoSpecificAdBlocking, null)
+    }
+
+    /**
+     * ★ Get video player specific ad blocking JavaScript
+     */
+    private fun getVideoSpecificAdBlockingJs(): String {
+        return """
+        (function() {
+            console.log('[AdBlock] Video player ad blocker initialized');
+            
+            // Remove common video ad elements
+            function removeVideoAds() {
+                var selectors = [
+                    '.video-ads', '.ytp-ad-module', '.ytp-ad-image-overlay',
+                    '.ytp-ad-player-overlay', '.ytp-ad-player-overlay-layout',
+                    '[id*="google_ads"]', '[id*="ad-container"]',
+                    '.ad-container', '.ad-overlay', '.ad-showing',
+                    '.html5-ad-progress-list', '[class*="ad-"]',
+                    'iframe[src*="doubleclick"]', 'iframe[src*="adservice"]',
+                    'div[class*="advertisement"]', 'div[id*="advertisement"]'
+                ];
+                
+                selectors.forEach(function(selector) {
+                    try {
+                        var elements = document.querySelectorAll(selector);
+                        elements.forEach(function(el) {
+                            el.remove();
+                            console.log('[AdBlock] Removed ad element:', selector);
+                        });
+                    } catch(e) {}
+                });
+            }
+            
+            // Run immediately
+            removeVideoAds();
+            
+            // Run periodically to catch dynamically loaded ads
+            setInterval(removeVideoAds, 2000);
+            
+            // Watch for DOM changes
+            var observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.addedNodes.length > 0) {
+                        removeVideoAds();
+                    }
+                });
+            });
+            
+            if (document.body) {
+                observer.observe(document.body, {
+                    childList: true,
+                    subtree: true
+                });
+            }
+            
+            // Block popups
+            window.open = function() { 
+                console.log('[AdBlock] Blocked popup');
+                return null; 
+            };
+            
+            // Override common ad functions
+            if (window.adsbygoogle) {
+                window.adsbygoogle = { push: function() {} };
+                console.log('[AdBlock] Disabled Google Ads');
+            }
+        })();
+        """.trimIndent()
+    }
+
+    /**
+     * ★ Inject video detection JavaScript
+     */
+    private fun injectVideoDetectionScript(view: WebView?) {
+        val videoDetectionJs = """
+        (function() {
+            function checkVideoStatus() {
+                var videos = document.getElementsByTagName('video');
+                if (videos.length === 0) {
+                    return JSON.stringify({ hasVideo: false, isPlaying: false, error: true, message: 'No video element found' });
+                }
+                var v = videos[0];
+                var hasError = v.error !== null && v.error !== undefined;
+                var isPlaying = !v.paused && !v.ended && v.readyState >= 3;
+                var hasSource = v.readyState >= 1;
+                return JSON.stringify({
+                    hasVideo: true,
+                    isPlaying: isPlaying,
+                    hasError: hasError,
+                    hasSource: hasSource,
+                    readyState: v.readyState,
+                    networkState: v.networkState,
+                    errorCode: v.error ? v.error.code : 0,
+                    message: hasError ? 'Video error: ' + (v.error ? v.error.message : 'Unknown') : (isPlaying ? 'Video is playing' : 'Video not playing')
+                });
+            }
+            window.getVideoStatus = checkVideoStatus;
+        })();
+        """.trimIndent()
+        
+        view?.evaluateJavascript(videoDetectionJs, null)
+    }
+
+    /**
+     * ★ Inject advanced player scripts (with ad blocking updates)
+     */
+    private fun injectAdvancedPlayerScripts(view: WebView?) {
+        val advancedJs = """
+        (function() {
+            function removeAdsAdvanced() {
+                const elements = document.querySelectorAll('*');
+                elements.forEach(el => {
+                    const text = (el.innerText || '').toLowerCase();
+                    const cls = (el.className || '').toString().toLowerCase();
+                    const id = (el.id || '').toLowerCase();
+                    if (
+                        text.includes('advert') || text.includes('sponsored') ||
+                        cls.includes('ad') || cls.includes('popup') ||
+                        id.includes('ad') || id.includes('popup')
+                    ) {
+                        el.remove();
+                    }
+                });
+            }
+
+            function blockRedirects() {
+                window.open = () => null;
+                window.location.assign = () => {};
+                window.location.replace = () => {};
+            }
+
+            function setupMessageListener() {
+                console.log('Player message listener initialized');
+
+                (function() {
+                    var originalPostMessage = window.postMessage;
+                    window.postMessage = function(message, targetOrigin, transfer) {
+                        try {
+                            if (window.VideasyInterface) {
+                                if (typeof message === 'string') {
+                                    window.VideasyInterface.postMessage(message);
+                                } else {
+                                    window.VideasyInterface.postMessage(JSON.stringify(message));
+                                }
+                            }
+                        } catch (e) {}
+                        return originalPostMessage.apply(this, arguments);
+                    };
+                })();
+
+                window.addEventListener('message', function(event) {
+                    try {
+                        if (window.VideasyInterface) {
+                            if (typeof event.data === 'string') {
+                                window.VideasyInterface.postMessage(event.data);
+                            } else {
+                                window.VideasyInterface.postMessage(JSON.stringify(event.data));
+                            }
+                        }
+                    } catch (e) {}
+                });
+
+                function getContentInfo() {
+                    var info = { type: 'movie', id: null, season: 1, episode: 1 };
+                    try {
+                        var url = window.location.href;
+                        var match;
+
+                        match = url.match(/\/tv\/(\d+)\/(\d+)\/(\d+)/);
+                        if (match) {
+                            info.type = 'tv';
+                            info.id = parseInt(match[1]);
+                            info.season = parseInt(match[2]);
+                            info.episode = parseInt(match[3]);
+                            return info;
+                        }
+
+                        match = url.match(/\/movie\/(\d+)/);
+                        if (match) {
+                            info.type = 'movie';
+                            info.id = parseInt(match[1]);
+                            return info;
+                        }
+
+                        match = url.match(/\/anime\/(\d+)\/(\d+)\/(\d+)/);
+                        if (match) {
+                            info.type = 'anime';
+                            info.id = parseInt(match[1]);
+                            info.season = parseInt(match[2]);
+                            info.episode = parseInt(match[3]);
+                            return info;
+                        }
+                    } catch (e) {}
+                    return info;
+                }
+
+                function sendVideoProgress() {
+                    var videos = document.getElementsByTagName('video');
+                    for (var i = 0; i < videos.length; i++) {
+                        var v = videos[i];
+                        if (v.duration > 0 && !isNaN(v.duration)) {
+                            var contentInfo = getContentInfo();
+                            var progressData = {
+                                progress: (v.currentTime / v.duration) * 100,
+                                timestamp: Math.floor(v.currentTime),
+                                duration: Math.floor(v.duration),
+                                currentTime: v.currentTime,
+                                paused: v.paused,
+                                ended: v.ended
+                            };
+                            if (contentInfo) {
+                                progressData.id = contentInfo.id;
+                                progressData.type = contentInfo.type;
+                                progressData.season = contentInfo.season;
+                                progressData.episode = contentInfo.episode;
+                            }
+                            if (window.VideasyInterface) {
+                                window.VideasyInterface.postMessage(JSON.stringify(progressData));
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                function enforceVolume(video) {
+                    video.volume = 1.0;
+                    video.muted = false;
+                    video.addEventListener('volumechange', function() {
+                        if (video.volume < 1.0 || video.muted) {
+                            video.volume = 1.0;
+                            video.muted = false;
+                        }
+                    });
+                }
+
+                function monitorVideoEvents() {
+                    const videos = document.querySelectorAll('video');
+                    videos.forEach(video => {
+                        if (video._monitored) return;
+                        video._monitored = true;
+                        video.addEventListener('loadedmetadata', () => sendVideoProgress());
+                        video.addEventListener('ended', () => sendVideoProgress());
+                        video.addEventListener('timeupdate', function() {
+                            if (!video._lastProgressUpdate || Date.now() - video._lastProgressUpdate > 1000) {
+                                sendVideoProgress();
+                                video._lastProgressUpdate = Date.now();
+                            }
+                        });
+                        enforceVolume(video);
+                    });
+                }
+
+                function observeVideoElements() {
+                    const observer = new MutationObserver(() => {
+                        monitorVideoEvents();
+                    });
+                    observer.observe(document.body, { childList: true, subtree: true });
+                }
+
+                monitorVideoEvents();
+                observeVideoElements();
+                setInterval(monitorVideoEvents, 10000);
+                setInterval(sendVideoProgress, 15000);
+            }
+
+            blockRedirects();
+            removeAdsAdvanced();
+            setupMessageListener();
+        })();
+        """.trimIndent()
+        
+        view?.evaluateJavascript(advancedJs, null)
+    }
+
+    // ★ Ad blocking statistics methods
+    
+    private fun resetAdBlockStats() {
+        blockedRequestsCount = 0
+        totalRequestsCount = 0
+    }
+    
+    private fun getBlockPercentage(): String {
+        return if (totalRequestsCount > 0) {
+            String.format("%.1f", (blockedRequestsCount.toFloat() / totalRequestsCount) * 100)
+        } else {
+            "0.0"
+        }
+    }
+    
+    private fun logAdBlockStats() {
+        Log.i(TAG, "[AdBlock] ████████████████████████████████")
+        Log.i(TAG, "[AdBlock] Blocked: $blockedRequestsCount requests")
+        Log.i(TAG, "[AdBlock] Total: $totalRequestsCount requests")
+        Log.i(TAG, "[AdBlock] Rate: ${getBlockPercentage()}%")
+        Log.i(TAG, "[AdBlock] Provider: $currentProviderName")
+        Log.i(TAG, "[AdBlock] ████████████████████████████████")
+    }
+
+    // ... rest of your existing methods (showExitConfirmationDialog, warmUpDnsForUrl, etc.)
+    // Keep all your existing methods unchanged from here onwards
+    
+    private fun setupImmersiveMode() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.insetsController?.let {
+                it.hide(WindowInsets.Type.statusBars())
+                it.systemBarsBehavior =
+                    WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = (
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                            or View.SYSTEM_UI_FLAG_FULLSCREEN
+                    )
+        }
+    }
+
     private fun showExitConfirmationDialog() {
         QuitDialog(
             context = this,
@@ -768,6 +968,7 @@ class PlayerActivity : AppCompatActivity() {
             onNo = { },
             onYes = {
                 savePlaybackPosition()
+                logAdBlockStats() // ★ Log final stats before exit
                 finish()
             }
         ).show()
@@ -795,21 +996,7 @@ class PlayerActivity : AppCompatActivity() {
         webView.onResume()
         webView.resumeTimers()
         progressHandler.postDelayed(progressRunnable, 15_000L)
-        
-        // Re-apply immersive mode when resuming
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            window.insetsController?.let {
-                it.hide(WindowInsets.Type.statusBars())
-                it.systemBarsBehavior =
-                    WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            }
-        } else {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = (
-                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                            or View.SYSTEM_UI_FLAG_FULLSCREEN
-                    )
-        }
+        setupImmersiveMode()
     }
 
     override fun onPause() {
@@ -834,6 +1021,9 @@ class PlayerActivity : AppCompatActivity() {
         progressHandler.removeCallbacks(progressRunnable)
         cursorHideHandler.removeCallbacks(cursorHideRunnable)
         cancelVideoLoadTimeoutCheck()
+        
+        // ★ Log final ad blocking stats on destroy
+        logAdBlockStats()
 
         if (::webView.isInitialized) {
             try {
