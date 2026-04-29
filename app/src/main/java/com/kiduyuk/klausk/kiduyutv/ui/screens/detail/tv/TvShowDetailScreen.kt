@@ -300,11 +300,13 @@ fun TvShowDetailScreen(
 
                             Spacer(modifier = Modifier.height(6.dp))
 
-                            // Overview — 2 lines max
+                            // Overview — 4 lines max
                             Text(
                                 text = tvShow.overview ?: "",
                                 color = TextSecondary,
-                                fontSize = 12.sp
+                                fontSize = 12.sp,
+                                maxLines = 4,
+                                overflow = TextOverflow.Ellipsis
                             )
 
                             Spacer(modifier = Modifier.height(10.dp))
