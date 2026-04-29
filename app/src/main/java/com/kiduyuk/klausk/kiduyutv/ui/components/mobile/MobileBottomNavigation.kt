@@ -80,8 +80,8 @@ fun MobileBottomNavigation(
         }
 
         // Show banner ad only on phone flavour
-        if (BuildConfig.FLAVOR == "phone") {
+        /*if (BuildConfig.FLAVOR == "phone") {
             BannerAdView()
-        }
+        }*/
     }
 }
