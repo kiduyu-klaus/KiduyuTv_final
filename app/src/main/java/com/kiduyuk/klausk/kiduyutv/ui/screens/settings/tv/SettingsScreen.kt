@@ -388,8 +388,12 @@ private fun SettingsSidebar(
     accountNavFocusRequester: FocusRequester,
     modifier: Modifier = Modifier
 ) {
+    val sidebarScrollState = rememberScrollState()
+    
     Column(
-        modifier = modifier.fillMaxHeight(),
+        modifier = modifier
+            .fillMaxHeight()
+            .verticalScroll(sidebarScrollState),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         // Header — back button + "Settings" pill
@@ -718,8 +722,12 @@ private fun AppInformationContent(
     websiteUrl: String,
     onWebsiteClick: () -> Unit
 ) {
+    val contentScrollState = rememberScrollState()
+    
     Column(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(contentScrollState),
         verticalArrangement = Arrangement.Top,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
