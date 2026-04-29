@@ -75,6 +75,12 @@ class PlayerActivity : AppCompatActivity() {
     private var videoLoadCheckHandler: Handler? = null
     private var videoLoadCheckRunnable: Runnable? = null
 
+    // ── Retry state ───────────────────────────────────────────────────────────
+    private var streamRetryCount = 0
+    private val maxStreamRetries = 4
+    private var originalStreamUrl: String = ""
+
+
     // ★ Ad blocking statistics
     private var blockedRequestsCount = 0
     private var totalRequestsCount = 0
@@ -242,9 +248,10 @@ class PlayerActivity : AppCompatActivity() {
                 hasShownError = false
                 isVideoLoaded = false
                 isPageLoaded = false
+                streamRetryCount = 0  // reset retries on manual retry
                 cancelVideoLoadTimeoutCheck()
                 resetAdBlockStats()
-                webView.reload()
+                webView.loadUrl(originalStreamUrl)
             },
             onYes = {
                 Log.i(TAG, "[Error Dialog] User chose to exit")
@@ -253,6 +260,27 @@ class PlayerActivity : AppCompatActivity() {
                 finish()
             }
         ).show()
+    }
+
+    // ── Stream Retry Handler ───────────────────────────────────────────────────
+    private fun handleStreamError(errorDescription: String) {
+        if (hasShownError) return
+
+        if (streamRetryCount < maxStreamRetries) {
+            streamRetryCount++
+            Log.w(TAG, "[Retry] Attempt $streamRetryCount/$maxStreamRetries — reloading original stream URL")
+            cancelVideoLoadTimeoutCheck()
+            isPageLoaded = false
+            isVideoLoaded = false
+            webView.stopLoading()
+            webView.loadUrl(originalStreamUrl)
+        } else {
+            Log.e(TAG, "[Retry] Max retries ($maxStreamRetries) reached — showing error dialog")
+            hasShownError = true
+            runOnUiThread {
+                showVideoErrorDialog("Stream Unavailable", errorDescription)
+            }
+        }
     }
 
     // ── Cursor hide timer ──────────────────────────────────────────────────────
@@ -415,6 +443,7 @@ class PlayerActivity : AppCompatActivity() {
         // Log.i(TAG, "[AdBlocker] Status: ${if (AdvancedAdBlocker.isInitialized()) "Ready" else "Not initialized"}")
 
         warmUpDnsForUrl(url)
+        originalStreamUrl = url
 
         // ── Layout ────────────────────────────────────────────────────────────
         rootLayout = FrameLayout(this).apply {
@@ -563,12 +592,7 @@ class PlayerActivity : AppCompatActivity() {
                 Log.e(TAG, "[WebView] Error received: $errorDescription (code: $errorCode)")
 
                 logAdBlockStats()
-
-                if (!hasShownError) {
-                    runOnUiThread {
-                        showVideoErrorDialog("Failed to load video", "Error: $errorDescription (Code: $errorCode)")
-                    }
-                }
+                handleStreamError("Error: $errorDescription (Code: $errorCode)")
             }
 
             override fun onReceivedHttpError(view: WebView?, request: WebResourceRequest?, errorResponse: WebResourceResponse?) {
@@ -578,11 +602,8 @@ class PlayerActivity : AppCompatActivity() {
                     Log.e(TAG, "[WebView] HTTP Error on main frame: $statusCode")
 
                     logAdBlockStats()
-
-                    if (statusCode >= 400 && !hasShownError) {
-                        runOnUiThread {
-                            showVideoErrorDialog("HTTP Error", "Server returned error code: $statusCode")
-                        }
+                    if (statusCode >= 400) {
+                        handleStreamError("Server returned error code: $statusCode")
                     }
                 }
             }
