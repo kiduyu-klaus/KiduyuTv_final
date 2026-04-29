@@ -26,7 +26,7 @@ import androidx.activity.OnBackPressedCallback
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
-import com.kiduyuk.klausk.kiduyutv.util.AdvancedAdBlocker
+// import com.kiduyuk.klausk.kiduyutv.util.AdvancedAdBlocker
 import com.kiduyuk.klausk.kiduyutv.util.FilterListUpdater
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
@@ -412,8 +412,8 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         Log.i(TAG, "[Provider] Selected: $currentProviderName")
-        Log.i(TAG, "[AdBlocker] Status: ${if (AdvancedAdBlocker.isInitialized()) "Ready" else "Not initialized"}")
-        
+        // Log.i(TAG, "[AdBlocker] Status: ${if (AdvancedAdBlocker.isInitialized()) "Ready" else "Not initialized"}")
+
         warmUpDnsForUrl(url)
 
         // ── Layout ────────────────────────────────────────────────────────────
@@ -509,46 +509,42 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     /**
-     * ★ Create WebViewClient with enhanced ad blocking
+     * ★ Create WebViewClient with ad blocking commented out
      */
     private fun createWebViewClient(): WebViewClient {
         return object : WebViewClient() {
-            
+
             override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
                 val reqUrl = request?.url.toString()
-                
+
                 // Increment total requests counter
                 totalRequestsCount++
-                
-                // ★ Check if this URL should be blocked by the ad blocker
-                if (AdvancedAdBlocker.shouldBlock(reqUrl)) {
-                    blockedRequestsCount++
-                    
-                    // Log blocked requests (sample every 10th to avoid log spam)
-                    if (blockedRequestsCount % 10 == 0) {
-                        Log.d(TAG, "[AdBlock] Blocked $blockedRequestsCount/$totalRequestsCount requests. Latest: ${reqUrl.take(80)}")
-                    }
-                    
-                    // Return empty response to block the resource
-                    return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
-                }
-                
+
+                // ★ AdvancedAdBlocker check commented out
+                // if (AdvancedAdBlocker.shouldBlock(reqUrl)) {
+                //     blockedRequestsCount++
+                //     if (blockedRequestsCount % 10 == 0) {
+                //         Log.d(TAG, "[AdBlock] Blocked $blockedRequestsCount/$totalRequestsCount requests. Latest: ${reqUrl.take(80)}")
+                //     }
+                //     return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
+                // }
+
                 // Warm up DNS for allowed requests
                 request?.url?.host?.let { warmUpDnsHost(it) }
-                
+
                 return super.shouldInterceptRequest(view, request)
             }
 
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val url = request?.url.toString()
-                
-                // ★ Block known ad/tracking URLs even for navigation requests
-                if (AdvancedAdBlocker.shouldBlock(url)) {
-                    blockedRequestsCount++
-                    Log.d(TAG, "[AdBlock] Blocked navigation to: ${url.take(80)}")
-                    return true // Block the navigation
-                }
-                
+
+                // ★ AdvancedAdBlocker navigation block commented out
+                // if (AdvancedAdBlocker.shouldBlock(url)) {
+                //     blockedRequestsCount++
+                //     Log.d(TAG, "[AdBlock] Blocked navigation to: ${url.take(80)}")
+                //     return true
+                // }
+
                 return false // Allow normal navigation
             }
 
@@ -565,10 +561,9 @@ class PlayerActivity : AppCompatActivity() {
                 super.onReceivedError(view, errorCode, description, failingUrl)
                 val errorDescription = description ?: "Unknown error"
                 Log.e(TAG, "[WebView] Error received: $errorDescription (code: $errorCode)")
-                
-                // ★ Log ad blocking stats when error occurs
+
                 logAdBlockStats()
-                
+
                 if (!hasShownError) {
                     runOnUiThread {
                         showVideoErrorDialog("Failed to load video", "Error: $errorDescription (Code: $errorCode)")
@@ -581,10 +576,9 @@ class PlayerActivity : AppCompatActivity() {
                 if (request?.isForMainFrame == true) {
                     val statusCode = errorResponse?.statusCode ?: 0
                     Log.e(TAG, "[WebView] HTTP Error on main frame: $statusCode")
-                    
-                    // ★ Log ad blocking stats when HTTP error occurs
+
                     logAdBlockStats()
-                    
+
                     if (statusCode >= 400 && !hasShownError) {
                         runOnUiThread {
                             showVideoErrorDialog("HTTP Error", "Server returned error code: $statusCode")
@@ -597,13 +591,12 @@ class PlayerActivity : AppCompatActivity() {
                 super.onPageFinished(view, url)
                 isPageLoaded = true
                 Log.i(TAG, "[WebView] Page finished loading: $url")
-                
-                // ★ Log final ad blocking stats for this page load
+
                 logAdBlockStats()
                 Log.i(TAG, "[AdBlock] Blocked ${blockedRequestsCount} out of ${totalRequestsCount} requests (${getBlockPercentage()}%)")
 
-                // ★ Inject ad blocking CSS and JavaScript
-                injectAdBlockingScripts(view)
+                // ★ AdvancedAdBlocker CSS/JS injection commented out
+                // injectAdBlockingScripts(view)
 
                 // Start video load timeout check
                 startVideoLoadTimeoutCheck()
@@ -618,97 +611,48 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     /**
-     * ★ Inject ad blocking CSS into the page
+     * ★ Ad blocking script injection — commented out (AdvancedAdBlocker disabled)
      */
-    private fun injectAdBlockingScripts(view: WebView?) {
-        // Inject CSS to hide ad elements
-        val adBlockCss = AdvancedAdBlocker.getCss()
-        if (adBlockCss.isNotEmpty()) {
-            view?.evaluateJavascript(adBlockCss) { result ->
-                Log.d(TAG, "[AdBlock] CSS injection result: ${result?.take(50)}")
-            }
-        }
-        
-        // Inject JavaScript for additional ad blocking
-        val adBlockJs = AdvancedAdBlocker.getBlockingJavaScript()
-        if (adBlockJs.isNotEmpty()) {
-            view?.evaluateJavascript(adBlockJs) { result ->
-                Log.d(TAG, "[AdBlock] JS injection result: ${result?.take(50)}")
-            }
-        }
-        
-        // ★ Inject custom ad removal script for video players
-        val videoSpecificAdBlocking = getVideoSpecificAdBlockingJs()
-        view?.evaluateJavascript(videoSpecificAdBlocking, null)
-    }
+    // private fun injectAdBlockingScripts(view: WebView?) {
+    //     val adBlockCss = AdvancedAdBlocker.getCss()
+    //     if (adBlockCss.isNotEmpty()) {
+    //         view?.evaluateJavascript(adBlockCss) { result ->
+    //             Log.d(TAG, "[AdBlock] CSS injection result: ${result?.take(50)}")
+    //         }
+    //     }
+    //
+    //     val adBlockJs = AdvancedAdBlocker.getBlockingJavaScript()
+    //     if (adBlockJs.isNotEmpty()) {
+    //         view?.evaluateJavascript(adBlockJs) { result ->
+    //             Log.d(TAG, "[AdBlock] JS injection result: ${result?.take(50)}")
+    //         }
+    //     }
+    //
+    //     val videoSpecificAdBlocking = getVideoSpecificAdBlockingJs()
+    //     view?.evaluateJavascript(videoSpecificAdBlocking, null)
+    // }
 
     /**
-     * ★ Get video player specific ad blocking JavaScript
+     * ★ Video player specific ad blocking JS — commented out (AdvancedAdBlocker disabled)
      */
-    private fun getVideoSpecificAdBlockingJs(): String {
-        return """
-        (function() {
-            console.log('[AdBlock] Video player ad blocker initialized');
-            
-            // Remove common video ad elements
-            function removeVideoAds() {
-                var selectors = [
-                    '.video-ads', '.ytp-ad-module', '.ytp-ad-image-overlay',
-                    '.ytp-ad-player-overlay', '.ytp-ad-player-overlay-layout',
-                    '[id*="google_ads"]', '[id*="ad-container"]',
-                    '.ad-container', '.ad-overlay', '.ad-showing',
-                    '.html5-ad-progress-list', '[class*="ad-"]',
-                    'iframe[src*="doubleclick"]', 'iframe[src*="adservice"]',
-                    'div[class*="advertisement"]', 'div[id*="advertisement"]'
-                ];
-                
-                selectors.forEach(function(selector) {
-                    try {
-                        var elements = document.querySelectorAll(selector);
-                        elements.forEach(function(el) {
-                            el.remove();
-                            console.log('[AdBlock] Removed ad element:', selector);
-                        });
-                    } catch(e) {}
-                });
-            }
-            
-            // Run immediately
-            removeVideoAds();
-            
-            // Run periodically to catch dynamically loaded ads
-            setInterval(removeVideoAds, 2000);
-            
-            // Watch for DOM changes
-            var observer = new MutationObserver(function(mutations) {
-                mutations.forEach(function(mutation) {
-                    if (mutation.addedNodes.length > 0) {
-                        removeVideoAds();
-                    }
-                });
-            });
-            
-            if (document.body) {
-                observer.observe(document.body, {
-                    childList: true,
-                    subtree: true
-                });
-            }
-            
-            // Block popups
-            window.open = function() { 
-                console.log('[AdBlock] Blocked popup');
-                return null; 
-            };
-            
-            // Override common ad functions
-            if (window.adsbygoogle) {
-                window.adsbygoogle = { push: function() {} };
-                console.log('[AdBlock] Disabled Google Ads');
-            }
-        })();
-        """.trimIndent()
-    }
+    // private fun getVideoSpecificAdBlockingJs(): String {
+    //     return """
+    //     (function() {
+    //         console.log('[AdBlock] Video player ad blocker initialized');
+    //         function removeVideoAds() { ... }
+    //         removeVideoAds();
+    //         setInterval(removeVideoAds, 2000);
+    //         var observer = new MutationObserver(function(mutations) {
+    //             mutations.forEach(function(mutation) {
+    //                 if (mutation.addedNodes.length > 0) { removeVideoAds(); }
+    //             });
+    //         });
+    //         if (document.body) { observer.observe(document.body, { childList: true, subtree: true }); }
+    //         window.open = function() { return null; };
+    //         if (window.adsbygoogle) { window.adsbygoogle = { push: function() {} }; }
+    //     })();
+    //     """.trimIndent()
+    // }
 
     /**
      * ★ Inject video detection JavaScript
@@ -739,12 +683,12 @@ class PlayerActivity : AppCompatActivity() {
             window.getVideoStatus = checkVideoStatus;
         })();
         """.trimIndent()
-        
+
         view?.evaluateJavascript(videoDetectionJs, null)
     }
 
     /**
-     * ★ Inject advanced player scripts (with ad blocking updates)
+     * ★ Inject advanced player scripts
      */
     private fun injectAdvancedPlayerScripts(view: WebView?) {
         val advancedJs = """
@@ -910,17 +854,17 @@ class PlayerActivity : AppCompatActivity() {
             setupMessageListener();
         })();
         """.trimIndent()
-        
+
         view?.evaluateJavascript(advancedJs, null)
     }
 
     // ★ Ad blocking statistics methods
-    
+
     private fun resetAdBlockStats() {
         blockedRequestsCount = 0
         totalRequestsCount = 0
     }
-    
+
     private fun getBlockPercentage(): String {
         return if (totalRequestsCount > 0) {
             String.format("%.1f", (blockedRequestsCount.toFloat() / totalRequestsCount) * 100)
@@ -928,7 +872,7 @@ class PlayerActivity : AppCompatActivity() {
             "0.0"
         }
     }
-    
+
     private fun logAdBlockStats() {
         Log.i(TAG, "[AdBlock] ████████████████████████████████")
         Log.i(TAG, "[AdBlock] Blocked: $blockedRequestsCount requests")
@@ -938,9 +882,6 @@ class PlayerActivity : AppCompatActivity() {
         Log.i(TAG, "[AdBlock] ████████████████████████████████")
     }
 
-    // ... rest of your existing methods (showExitConfirmationDialog, warmUpDnsForUrl, etc.)
-    // Keep all your existing methods unchanged from here onwards
-    
     private fun setupImmersiveMode() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.insetsController?.let {
@@ -968,7 +909,7 @@ class PlayerActivity : AppCompatActivity() {
             onNo = { },
             onYes = {
                 savePlaybackPosition()
-                logAdBlockStats() // ★ Log final stats before exit
+                logAdBlockStats()
                 finish()
             }
         ).show()
@@ -1021,8 +962,7 @@ class PlayerActivity : AppCompatActivity() {
         progressHandler.removeCallbacks(progressRunnable)
         cursorHideHandler.removeCallbacks(cursorHideRunnable)
         cancelVideoLoadTimeoutCheck()
-        
-        // ★ Log final ad blocking stats on destroy
+
         logAdBlockStats()
 
         if (::webView.isInitialized) {
