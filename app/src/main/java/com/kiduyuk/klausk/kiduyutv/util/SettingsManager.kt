@@ -20,6 +20,21 @@ class SettingsManager(context: Context) {
     }
 
     /**
+     * Saves the ads disabled preference.
+     * @param disabled true to disable all ads, false to enable ads
+     */
+    fun setAdsDisabled(disabled: Boolean) {
+        preferences.edit().putBoolean(KEY_ADS_DISABLED, disabled).apply()
+    }
+
+    /**
+     * Returns true if ads are disabled, false otherwise.
+     */
+    fun isAdsDisabled(): Boolean {
+        return preferences.getBoolean(KEY_ADS_DISABLED, false)
+    }
+
+    /**
      * Returns a unique device ID for Firebase user identification.
      * Uses Android ID if available, otherwise generates and saves a UUID.
      */
@@ -50,6 +65,7 @@ class SettingsManager(context: Context) {
         private const val PREFS_NAME = "app_settings"
         private const val KEY_DEFAULT_PROVIDER = "default_provider"
         private const val KEY_DEVICE_ID = "device_id"
+        private const val KEY_ADS_DISABLED = "ads_disabled"
 
         /** Sentinel value meaning "ask me each time" — no automatic selection. */
         const val AUTO = "Auto"
