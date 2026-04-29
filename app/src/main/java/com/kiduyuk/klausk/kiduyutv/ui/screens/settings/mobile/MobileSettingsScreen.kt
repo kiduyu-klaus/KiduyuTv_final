@@ -337,6 +337,124 @@ fun MobileSettingsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            // ── Ads Section ─────────────────────────────────────────────────────
+            SettingsGroup(title = "Ads") {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                val newDisabled = !uiState.isAdsDisabled
+                                val settingsManager = SettingsManager(context)
+                                settingsManager.setAdsDisabled(newDisabled)
+                                // Show restart dialog
+                                QuitDialog(
+                                    context = context,
+                                    title = if (newDisabled) "Ads Disabled" else "Ads Enabled",
+                                    message = if (newDisabled) {
+                                        "All ads have been disabled. The app will now restart to apply changes."
+                                    } else {
+                                        "Ads have been enabled. The app will now restart to apply changes."
+                                    },
+                                    positiveButtonText = "Restart",
+                                    negativeButtonText = "Cancel",
+                                    lottieAnimRes = R.raw.exit,
+                                    onNo = {},
+                                    onYes = {
+                                        // Restart the app
+                                        val packageManager = context.packageManager
+                                        val intent = packageManager.getLaunchIntentForPackage(context.packageName)
+                                        if (intent != null) {
+                                            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
+                                            context.startActivity(intent)
+                                            activity?.finishAffinity()
+                                        }
+                                    }
+                                ).show()
+                            }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(SurfaceDark),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (uiState.isAdsDisabled) Icons.Default.CheckCircle else Icons.Default.PlayCircle,
+                                contentDescription = null,
+                                tint = if (uiState.isAdsDisabled) Color(0xFF4CAF50) else PrimaryRed,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (uiState.isAdsDisabled) "Ads Disabled" else "Ads Enabled",
+                                color = TextPrimary,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = if (uiState.isAdsDisabled)
+                                    "Tap to enable advertisements"
+                                else
+                                    "Tap to disable all advertisements",
+                                color = TextSecondary,
+                                fontSize = 12.sp
+                            )
+                        }
+                        Switch(
+                            checked = uiState.isAdsDisabled,
+                            onCheckedChange = { disabled ->
+                                val settingsManager = SettingsManager(context)
+                                settingsManager.setAdsDisabled(disabled)
+                                // Show restart dialog
+                                QuitDialog(
+                                    context = context,
+                                    title = if (disabled) "Ads Disabled" else "Ads Enabled",
+                                    message = if (disabled) {
+                                        "All ads have been disabled. The app will now restart to apply changes."
+                                    } else {
+                                        "Ads have been enabled. The app will now restart to apply changes."
+                                    },
+                                    positiveButtonText = "Restart",
+                                    negativeButtonText = "Cancel",
+                                    lottieAnimRes = R.raw.exit,
+                                    onNo = {},
+                                    onYes = {
+                                        // Restart the app
+                                        val packageManager = context.packageManager
+                                        val intent = packageManager.getLaunchIntentForPackage(context.packageName)
+                                        if (intent != null) {
+                                            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
+                                            context.startActivity(intent)
+                                            activity?.finishAffinity()
+                                        }
+                                    }
+                                ).show()
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = Color(0xFF4CAF50),
+                                uncheckedThumbColor = Color.White,
+                                uncheckedTrackColor = TextTertiary.copy(alpha = 0.3f)
+                            )
+                        )
+                    }
+                    Text(
+                        text = "Changes will take effect after restarting the app.",
+                        color = TextTertiary,
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
             // ── Playback Section ────────────────────────────────────────────────
             SettingsGroup(title = "Playback") {
                 SettingsItem(

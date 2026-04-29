@@ -304,6 +304,39 @@ fun SettingsScreen(
                     )
                 }
 
+                SettingsSection.ADS_SETTINGS -> {
+                    AdsSettingsContent(
+                        context = context,
+                        isAdsDisabled = uiState.isAdsDisabled,
+                        onToggleAdsDisabled = { disabled ->
+                            val settingsManager = SettingsManager(context)
+                            settingsManager.setAdsDisabled(disabled)
+                            // Restart the app to apply changes
+                            QuitDialog(
+                                context = context,
+                                title = if (disabled) "Ads Disabled" else "Ads Enabled",
+                                message = if (disabled) {
+                                    "All ads have been disabled. The app will now restart to apply changes."
+                                } else {
+                                    "Ads have been enabled. The app will now restart to apply changes."
+                                },
+                                positiveButtonText = "Restart",
+                                negativeButtonText = "Cancel",
+                                lottieAnimRes = R.raw.exit,
+                                onNo = {},
+                                onYes = {
+                                    // Restart the app
+                                    val intent = Intent(context, com.kiduyuk.klausk.kiduyutv.activity.mainactivity.MainActivity::class.java).apply {
+                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                    }
+                                    context.startActivity(intent)
+                                    (context as? Activity)?.finish()
+                                }
+                            ).show()
+                        }
+                    )
+                }
+
                 SettingsSection.APP_INFORMATION -> {
                     AppInformationContent(
                         appName = "KiduyuTV",
@@ -1311,6 +1344,7 @@ private enum class SettingsSection(val title: String) {
     ACCOUNT("Account"),
     APP_SETTINGS("App Settings"),
     PLAYBACK("Playback"),
+    ADS_SETTINGS("Ads Settings"),
     APP_INFORMATION("App Information"),
     APP_VERSION("App Version")
 }
@@ -1359,6 +1393,150 @@ private fun AccountContent(
                 onSignInClick = onSignInClick,
                 isLoading = isLoading
             )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ads Settings Section
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Content for the Ads Settings section.
+ * Allows users to disable or enable all in-app advertisements.
+ */
+@Composable
+private fun AdsSettingsContent(
+    context: Context,
+    isAdsDisabled: Boolean,
+    onToggleAdsDisabled: (Boolean) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.Top
+    ) {
+        Text(
+            text = "Ads Settings",
+            color = TextPrimary,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 24.dp)
+        )
+
+        // Ads toggle card
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(CardDark)
+                .padding(24.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(
+                    text = "Disable All Ads",
+                    color = TextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Text(
+                    text = if (isAdsDisabled) {
+                        "All advertisements are currently disabled. Toggle to re-enable ads."
+                    } else {
+                        "Enable this option to remove all in-app advertisements for a cleaner experience."
+                    },
+                    color = TextSecondary,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Toggle switch with focus support
+                val interactionSource = remember { MutableInteractionSource() }
+                val isFocused by interactionSource.collectIsFocusedAsState()
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            when {
+                                isFocused -> SurfaceDark
+                                else -> Color.Transparent
+                            }
+                        )
+                        .border(
+                            width = if (isFocused) 2.dp else 1.dp,
+                            color = when {
+                                isFocused -> DarkRed.copy(alpha = 0.6f)
+                                else -> TextTertiary.copy(alpha = 0.2f)
+                            },
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null,
+                            onClick = { onToggleAdsDisabled(!isAdsDisabled) }
+                        )
+                        .focusable(interactionSource = interactionSource)
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isAdsDisabled) Icons.Default.CheckCircle else Icons.Default.PlayCircle,
+                            contentDescription = null,
+                            tint = if (isAdsDisabled) Color(0xFF4CAF50) else PrimaryRed,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Column {
+                            Text(
+                                text = if (isAdsDisabled) "Ads Disabled" else "Ads Enabled",
+                                color = if (isFocused) TextPrimary else TextSecondary,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = if (isAdsDisabled) "Tap to enable ads" else "Tap to disable ads",
+                                color = TextSecondary,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+
+                    // Switch indicator
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp, 28.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(if (isAdsDisabled) Color(0xFF4CAF50) else TextTertiary.copy(alpha = 0.3f)),
+                        contentAlignment = if (isAdsDisabled) Alignment.CenterEnd else Alignment.CenterStart
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(Color.White)
+                                .padding(2.dp)
+                        )
+                    }
+                }
+
+                // Info text
+                Text(
+                    text = "Changes will take effect after restarting the app.",
+                    color = TextTertiary,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
         }
     }
 }

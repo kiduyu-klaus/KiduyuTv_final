@@ -104,6 +104,9 @@ class SettingsViewModel : ViewModel() {
             val settingsManager = SettingsManager(context)
             _uiState.update { it.copy(defaultProvider = settingsManager.getDefaultProvider()) }
 
+            // Load ads disabled setting
+            _uiState.update { it.copy(isAdsDisabled = settingsManager.isAdsDisabled()) }
+
             // Fetch cache size
             val size = withContext(Dispatchers.IO) {
                 getFolderSize(context.cacheDir)
@@ -613,6 +616,8 @@ data class SettingsUiState(
     val watchHistoryClearSuccess: Boolean = false,
     // Default provider preference
     val defaultProvider: String = com.kiduyuk.klausk.kiduyutv.util.SettingsManager.AUTO,
+    // Ads disabled setting
+    val isAdsDisabled: Boolean = false,
     // Update check states
     val isCheckingForUpdates: Boolean = false,
     val updateCheckResult: String? = null,

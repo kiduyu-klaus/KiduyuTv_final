@@ -32,8 +32,15 @@ object AdManager {
     /**
      * Initialise the Mobile Ads SDK. Call once from KiduyuTvApp.onCreate().
      * Safe to call multiple times — subsequent calls are no-ops.
+     * Respects the ads disabled setting from SettingsManager.
      */
     fun init(context: Context) {
+        // Check if ads are disabled
+        if (SettingsManager(context).isAdsDisabled()) {
+            Log.i(TAG, "Ads disabled by user - skipping initialization")
+            return
+        }
+
         if (isInitialised) return
         MobileAds.initialize(context) { initStatus ->
             isInitialised = true
@@ -48,14 +55,26 @@ object AdManager {
         }
     }
 
+    /**
+     * Check if ads should be shown based on user settings.
+     */
+    private fun shouldShowAds(context: Context): Boolean {
+        return !SettingsManager(context).isAdsDisabled()
+    }
+
     // ── Interstitial ──────────────────────────────────────────────────────
 
     /**
      * Pre-loads an interstitial ad in the background so it is ready to show
      * without delay when needed.
+     * Respects the ads disabled setting from SettingsManager.
      */
     fun preloadInterstitial(context: Context) {
         if (!isInitialised) return
+        if (!shouldShowAds(context)) {
+            Log.i(TAG, "Ads disabled - skipping interstitial preload")
+            return
+        }
         val unitId = if (BuildConfig.FLAVOR == "tv")
             AdUnitIds.TV_INTERSTITIAL
         else
@@ -78,8 +97,14 @@ object AdManager {
      * Shows the pre-loaded interstitial if available, then immediately
      * pre-loads the next one. Calls [onDismissed] when the ad closes
      * (or immediately if no ad is ready).
+     * Respects the ads disabled setting from SettingsManager.
      */
     fun showInterstitial(activity: Activity, onDismissed: () -> Unit = {}) {
+        if (!shouldShowAds(activity)) {
+            Log.i(TAG, "Ads disabled - skipping interstitial show")
+            onDismissed()
+            return
+        }
         val now = System.currentTimeMillis()
         if (now - lastInterstitialShownAt < MIN_INTERSTITIAL_INTERVAL_MS) {
             Log.i(TAG, "Interstitial skipped - too soon since last show")
@@ -110,8 +135,16 @@ object AdManager {
 
     // ── Rewarded (phone only) ─────────────────────────────────────────────
 
+    /**
+     * Pre-loads a rewarded ad in the background.
+     * Respects the ads disabled setting from SettingsManager.
+     */
     fun preloadRewarded(context: Context) {
         if (BuildConfig.FLAVOR != "phone") return
+        if (!shouldShowAds(context)) {
+            Log.i(TAG, "Ads disabled - skipping rewarded preload")
+            return
+        }
         val adRequest = AdRequest.Builder().build()
         RewardedAd.load(context, AdUnitIds.PHONE_REWARDED, adRequest,
             object : RewardedAdLoadCallback() {
@@ -129,12 +162,18 @@ object AdManager {
     /**
      * Shows a rewarded ad. [onRewarded] is only called when the user
      * earns the reward (watched the full ad). [onDismissed] always fires.
+     * Respects the ads disabled setting from SettingsManager.
      */
     fun showRewarded(
         activity: Activity,
         onRewarded: () -> Unit = {},
         onDismissed: () -> Unit = {}
     ) {
+        if (!shouldShowAds(activity)) {
+            Log.i(TAG, "Ads disabled - skipping rewarded show")
+            onDismissed()
+            return
+        }
         val ad = rewardedAd
         if (ad == null) {
             Log.i(TAG, "No rewarded ad ready")
