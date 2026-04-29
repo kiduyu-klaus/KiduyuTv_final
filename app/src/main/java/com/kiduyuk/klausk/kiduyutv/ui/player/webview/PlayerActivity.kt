@@ -619,14 +619,16 @@ class PlayerActivity : AppCompatActivity() {
                 // ★ AdvancedAdBlocker CSS/JS injection commented out
                 // injectAdBlockingScripts(view)
 
-                // Start video load timeout check
-                startVideoLoadTimeoutCheck()
-
                 // Inject video detection script
                 injectVideoDetectionScript(view)
 
                 // Inject advanced player scripts
                 injectAdvancedPlayerScripts(view)
+
+                // Auto-play video after page load
+                injectAutoplayScript(view)
+
+                startVideoLoadTimeoutCheck()
             }
         }
     }
@@ -877,6 +879,91 @@ class PlayerActivity : AppCompatActivity() {
         """.trimIndent()
 
         view?.evaluateJavascript(advancedJs, null)
+    }
+
+    // ★ Inject autoplay script
+    private fun injectAutoplayScript(view: WebView?) {
+        val autoplayJs = """
+        (function() {
+
+            function forcePlay(video) {
+                if (!video) return false;
+
+                try {
+                    video.autoplay = true;
+                    video.controls = true;
+                    video.playsInline = true;
+                    video.volume = 1.0;
+
+                    const playPromise = video.play();
+
+                    if (playPromise !== undefined) {
+                        playPromise
+                            .then(() => {
+                                console.log('[AutoPlay] Playback started');
+                            })
+                            .catch(err => {
+                                console.log('[AutoPlay] Initial play failed:', err);
+
+                                video.muted = true;
+                                video.play().catch(() => {});
+                            });
+                    }
+
+                    return true;
+                } catch(e) {
+                    console.log('[AutoPlay] Error:', e);
+                    return false;
+                }
+            }
+
+            function searchAndPlay() {
+                let video = document.querySelector('video');
+
+                if (video) {
+                    return forcePlay(video);
+                }
+
+                const iframes = document.querySelectorAll('iframe');
+
+                for (let iframe of iframes) {
+                    try {
+                        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                        const iframeVideo = iframeDoc.querySelector('video');
+
+                        if (iframeVideo) {
+                            return forcePlay(iframeVideo);
+                        }
+                    } catch(e) {}
+                }
+
+                return false;
+            }
+
+            let attempts = 0;
+            const maxAttempts = 3;
+
+            const interval = setInterval(() => {
+                attempts++;
+
+                console.log('[AutoPlay] Attempt ' + attempts + '/' + maxAttempts);
+
+                const success = searchAndPlay();
+
+                if (success || attempts >= maxAttempts) {
+                    clearInterval(interval);
+
+                    if (!success) {
+                        console.log('[AutoPlay] No playable video found after retries');
+                    }
+                }
+
+            }, 5000);
+
+        })();
+    """.trimIndent()
+
+        view?.evaluateJavascript(autoplayJs, null)
     }
 
     // ★ Ad blocking statistics methods
