@@ -219,7 +219,7 @@ class HomeViewModel : ViewModel() {
      * Loads all secondary content (GitHub lists) in parallel using awaitAll().
      * Optimized batch loading for maximum concurrency.
      */
-    private suspend fun loadSecondaryContent(context: Context) {
+    private suspend fun loadSecondaryContent(context: Context) = coroutineScope {
         // Base URL for GitHub raw content
         val baseUrl = "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/"
 
@@ -271,20 +271,16 @@ class HomeViewModel : ViewModel() {
         // Process companies and networks
         val networksList: List<NetworkItem> = if (companiesNetworks != null) {
             companiesNetworks.networks
-                .filter { network: com.kiduyuk.klausk.kiduyutv.data.model.GitHubNetwork -> network.logoPath != null }
-                .map { network: com.kiduyuk.klausk.kiduyutv.data.model.GitHubNetwork -> 
-                    NetworkItem(network.id, network.name, network.logoPath, "network") 
-                }
+                .filter { it.logoPath != null }
+                .map { NetworkItem(it.id, it.name, it.logoPath, "network") }
         } else {
             emptyList()
         }
 
         val companiesList: List<NetworkItem> = if (companiesNetworks != null) {
             companiesNetworks.companies
-                .filter { company: com.kiduyuk.klausk.kiduyutv.data.model.GitHubCompany -> company.logoPath != null }
-                .map { company: com.kiduyuk.klausk.kiduyutv.data.model.GitHubCompany -> 
-                    NetworkItem(company.id, company.name, company.logoPath, "company") 
-                }
+                .filter { it.logoPath != null }
+                .map { NetworkItem(it.id, it.name, it.logoPath, "company") }
         } else {
             emptyList()
         }
