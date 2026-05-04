@@ -521,7 +521,7 @@ class PlayerActivity : AppCompatActivity() {
             cursorView.bringToFront()
         }
 
-        setContentView(webView)
+        setContentView(rootLayout)
         rootLayout.isFocusable = true
         rootLayout.isFocusableInTouchMode = true
         rootLayout.requestFocus()
