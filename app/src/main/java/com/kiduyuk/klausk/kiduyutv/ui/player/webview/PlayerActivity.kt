@@ -460,14 +460,14 @@ class PlayerActivity : AppCompatActivity() {
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
-            
+
             // ★ Add window insets listener to prevent system UI from affecting WebView layout
             setOnApplyWindowInsetsListener { _, insets ->
                 // Return the insets without consuming them to maintain fullscreen behavior
                 // This prevents the WebView from being inset by status/navigation bars
                 insets
             }
-            
+
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true

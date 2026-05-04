@@ -36,15 +36,9 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextSecondary
 import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamLinksViewModel
+import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamProviderUi
 import com.kiduyuk.klausk.kiduyutv.util.TvInterstitialManager
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
-
-data class StreamProvider(
-    val name: String,
-    val urlTemplate: String,
-    var isAvailable: Boolean = false,
-    val type: String
-)
 
 @UnstableApi
 @Composable
@@ -230,7 +224,7 @@ fun StreamLinksScreen(
 @Composable
 fun StreamProviderItem(
     index: Int,
-    provider: StreamProvider,
+    provider: StreamProviderUi,
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }

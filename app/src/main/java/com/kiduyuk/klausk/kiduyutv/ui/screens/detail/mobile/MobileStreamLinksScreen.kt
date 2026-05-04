@@ -37,7 +37,7 @@ import android.widget.Toast
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.util.AdManager
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
-import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.StreamProvider
+import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamProviderUi
 
 /**
  * Mobile version of StreamLinksScreen.
@@ -105,12 +105,12 @@ fun MobileStreamLinksScreen(
                         episode = episode,
                         timestamp = timestamp
                     )
-                    
+
                     if (url.isNullOrBlank()) {
                         Log.e("MobileStreamLinks", "Auto-launch: Resolved URL is null or blank for ${match.name}")
                         return@LaunchedEffect
                     }
-                    
+
                     val intent = Intent(context, PlayerActivity::class.java).apply {
                         putExtra("STREAM_URL", url)
                         putExtra("TITLE", title)
@@ -284,7 +284,7 @@ fun MobileStreamLinksScreen(
  */
 private fun launchPlayerWithProvider(
     context: android.content.Context,
-    provider: StreamProvider,
+    provider: StreamProviderUi,
     tmdbId: Int,
     isTv: Boolean,
     title: String,
@@ -335,9 +335,9 @@ private fun launchPlayerWithProvider(
             putExtra("RELEASE_DATE", releaseDate)
             putExtra("STREAM_URL", finalUrl)
         }
-        
+
         context.startActivity(intent)
-        
+
     } catch (e: Exception) {
         android.util.Log.e("MobileStreamLinks", "Failed to launch player for provider: ${provider.name}", e)
         Toast.makeText(
@@ -356,7 +356,7 @@ private fun launchPlayerWithProvider(
  */
 @Composable
 private fun MobileStreamProviderCard(
-    provider: StreamProvider,
+    provider: StreamProviderUi,
     onProviderClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
