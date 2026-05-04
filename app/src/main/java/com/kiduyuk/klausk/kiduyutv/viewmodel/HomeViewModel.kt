@@ -113,7 +113,7 @@ class HomeViewModel : ViewModel() {
                 val sortedTrendingMovies = trendingMovies.sortedByDescending { it.voteAverage }
                 val sortedTrendingMoviesThisWeek = trendingMoviesThisWeek.sortedByDescending { it.voteAverage }
                 val sortedNowPlaying = nowPlaying // No sorting for now playing movies
-                val sortedWatchHistory = watchHistory.sortedByDescending { it.lastWatchedTimestamp }
+                val sortedWatchHistory = watchHistory.sortedByDescending { it.lastWatched }
                 val sortedTopRatedMovies = topRatedMovies.take(30).sortedByDescending { it.voteAverage }
                 val sortedTopRatedTv = topRatedTv.take(30).sortedByDescending { it.voteAverage }
 
