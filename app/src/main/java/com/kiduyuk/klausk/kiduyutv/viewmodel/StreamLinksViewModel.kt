@@ -132,6 +132,16 @@ class StreamLinksViewModel : ViewModel() {
                     name = "VidSrc (WTF) v3 - Multi Providers",
                     urlTemplate = if (isTv) "https://vidsrc.wtf/api/3/tv/?id=$tmdbId&s=$season&e=$episode" else "https://www.vidsrc.wtf/api/3/movie/?id=$tmdbId",
                     type = type
+                ),
+                StreamProvider(
+                    name = "VidZee",
+                    urlTemplate = if (isTv) "https://player.vidzee.wtf/embed/tv/${tmdbId}/${season}/${episode}" else "https://player.vidzee.wtf/embed/movie/${tmdbId}",
+                    type = type
+                ),
+                StreamProvider(
+                    name = "2Embed",
+                    urlTemplate = if (isTv) "https://www.2embed.stream/embed/tv/${tmdbId}/${season}/${episode}" else "https://www.2embed.stream/embed/movie/${tmdbId}",
+                    type = type
                 )
             )
         }
