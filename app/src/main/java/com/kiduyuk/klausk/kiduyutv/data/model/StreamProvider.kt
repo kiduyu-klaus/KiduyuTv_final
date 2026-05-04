@@ -256,6 +256,52 @@ object StreamProviderManager {
             name = "2Embed",
             movieUrlTemplate = "https://www.2embed.stream/embed/movie/%d",
             tvUrlTemplate = "https://www.2embed.stream/embed/tv/%d/%d/%d"
+        ),
+
+        // ═══════════════════════════════════════════════════════════════
+        // 17. Smashystream
+        // ═══════════════════════════════════════════════════════════════
+        StreamProvider(
+            name = "Smashystream",
+            movieUrlTemplate = "https://embed.smashystream.com/playere.php?tmdb=%d",
+            tvUrlTemplate = "https://embed.smashystream.com/playere.php?tmdb=%d&season=%d&episode=%d",
+            iframeAttributes = mapOf(
+                "frameborder" to "0",
+                "allowfullscreen" to ""
+            ),
+            movieParameters = { _, timestamp ->
+                val params = mutableMapOf<String, String>()
+                if (timestamp > 0) params["startAt"] = timestamp.toString()
+                params
+            },
+            tvParameters = { _, _, _, timestamp ->
+                val params = mutableMapOf<String, String>()
+                if (timestamp > 0) params["startAt"] = timestamp.toString()
+                params
+            }
+        ),
+
+        // ═══════════════════════════════════════════════════════════════
+        // 18. 111Movies
+        // ═══════════════════════════════════════════════════════════════
+        StreamProvider(
+            name = "111Movies",
+            movieUrlTemplate = "https://111movies.com/movie/%d",
+            tvUrlTemplate = "https://111movies.com/tv/%d/%d/%d",
+            iframeAttributes = mapOf(
+                "frameborder" to "0",
+                "allowfullscreen" to ""
+            ),
+            movieParameters = { _, timestamp ->
+                val params = mutableMapOf<String, String>()
+                if (timestamp > 0) params["startAt"] = timestamp.toString()
+                params
+            },
+            tvParameters = { _, _, _, timestamp ->
+                val params = mutableMapOf<String, String>()
+                if (timestamp > 0) params["startAt"] = timestamp.toString()
+                params
+            }
         )
     )
 
