@@ -27,6 +27,8 @@ import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
 // import com.kiduyuk.klausk.kiduyutv.util.AdvancedAdBlocker
+import okhttp3.OkHttpClient
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import com.kiduyuk.klausk.kiduyutv.util.FilterListUpdater
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
