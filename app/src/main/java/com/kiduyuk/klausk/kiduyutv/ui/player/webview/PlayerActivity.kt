@@ -30,11 +30,32 @@ import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
 import com.kiduyuk.klausk.kiduyutv.util.FilterListUpdater
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
-import com.kiduyuk.klausk.kiduyutv.util.SingletonDnsResolver
+
 import java.io.ByteArrayInputStream
 import java.util.Collections
 
 class PlayerActivity : AppCompatActivity() {
+
+    // DoH DNS Resolver using custom DoH URL
+    private object DohDnsResolver {
+        private const val DOH_URL = "https://my.ublockdns.com/hjl8rkr1"
+
+        private val okHttpClient = OkHttpClient.Builder()
+            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .writeTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+
+        private val doh = okhttp3.dnsoverhttps.DnsOverHttps.Builder()
+            .client(okHttpClient)
+            .url(DOH_URL.toHttpUrl())
+            .build()
+
+        @Throws(java.net.UnknownHostException::class)
+        fun lookup(hostname: String): List<java.net.InetAddress> {
+            return doh.lookup(hostname)
+        }
+    }
 
     private lateinit var webView: WebView
     private lateinit var cursorView: MouseCursorView
@@ -1051,9 +1072,13 @@ class PlayerActivity : AppCompatActivity() {
         if (host.isBlank()) return
         if (!dnsWarmedHosts.add(host)) return
         Thread {
-            runCatching { SingletonDnsResolver.getDns().lookup(host) }
-                .onSuccess { addresses -> Log.i(TAG, "[DNS] DoH resolved $host -> ${addresses.joinToString()}") }
-                .onFailure { error -> Log.w(TAG, "[DNS] DoH resolve failed for $host: ${error.message}") }
+            runCatching { DohDnsResolver.lookup(host) }
+                .onSuccess { addresses ->
+                    Log.i(TAG, "[DNS] DoH resolved $host -> ${addresses.joinToString()}")
+                }
+                .onFailure { error ->
+                    Log.w(TAG, "[DNS] DoH resolve failed for $host: ${error.message}")
+                }
         }.start()
     }
 
