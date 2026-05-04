@@ -460,6 +460,14 @@ class PlayerActivity : AppCompatActivity() {
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
+            
+            // ★ Add window insets listener to prevent system UI from affecting WebView layout
+            setOnApplyWindowInsetsListener { _, insets ->
+                // Return the insets without consuming them to maintain fullscreen behavior
+                // This prevents the WebView from being inset by status/navigation bars
+                insets
+            }
+            
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
@@ -651,28 +659,6 @@ class PlayerActivity : AppCompatActivity() {
             }
         }
     }
-
-    /**
-     * ★ Ad blocking script injection — commented out (AdvancedAdBlocker disabled)
-     */
-    // private fun injectAdBlockingScripts(view: WebView?) {
-    //     val adBlockCss = AdvancedAdBlocker.getCss()
-    //     if (adBlockCss.isNotEmpty()) {
-    //         view?.evaluateJavascript(adBlockCss) { result ->
-    //             Log.d(TAG, "[AdBlock] CSS injection result: ${result?.take(50)}")
-    //         }
-    //     }
-    //
-    //     val adBlockJs = AdvancedAdBlocker.getBlockingJavaScript()
-    //     if (adBlockJs.isNotEmpty()) {
-    //         view?.evaluateJavascript(adBlockJs) { result ->
-    //             Log.d(TAG, "[AdBlock] JS injection result: ${result?.take(50)}")
-    //         }
-    //     }
-    //
-    //     val videoSpecificAdBlocking = getVideoSpecificAdBlockingJs()
-    //     view?.evaluateJavascript(videoSpecificAdBlocking, null)
-    // }
 
     /**
      * ★ Video player specific ad blocking JS — commented out (AdvancedAdBlocker disabled)
