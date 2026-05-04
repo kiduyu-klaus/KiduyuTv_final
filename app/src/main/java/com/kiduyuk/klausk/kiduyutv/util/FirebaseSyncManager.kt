@@ -549,10 +549,13 @@ object FirebaseSyncManager {
             if (firebaseProvider != null) {
                 Log.i(TAG, "Found default provider in Firebase: $firebaseProvider")
                 
-                // Save to local settings if Firebase has a value
-                // Note: We need context to access SettingsManager
-                // This is handled in SplashActivity after sync completes
+                // Save to local SharedPreferences
+                val context = applicationContext ?: return
+                val settingsManager = SettingsManager(context)
+                settingsManager.saveDefaultProvider(firebaseProvider)
+                
                 _syncMessage.value = "Default provider: $firebaseProvider"
+                Log.i(TAG, "Saved synced default provider to SharedPreferences: $firebaseProvider")
             } else {
                 Log.i(TAG, "No default provider found in Firebase")
             }

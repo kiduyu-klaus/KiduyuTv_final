@@ -103,19 +103,15 @@ object StreamProviderManager {
             name = "VidKing",
             movieUrlTemplate = "https://www.vidking.net/embed/movie/%d",
             tvUrlTemplate = "https://www.vidking.net/embed/tv/%d/%d/%d",
-            movieParameters = { _, timestamp ->
-                val params = mutableMapOf("autoPlay" to "true")
-                if (timestamp > 0) params["progress"] = timestamp.toString()
-                params
+            movieParameters = { _, _ ->
+                mapOf("autoPlay" to "true")
             },
-            tvParameters = { _, _, _, timestamp ->
-                val params = mutableMapOf(
+            tvParameters = { _, _, _, _ ->
+                mapOf(
                     "autoPlay" to "true",
                     "nextEpisode" to "true",
                     "episodeSelector" to "true"
                 )
-                if (timestamp > 0) params["progress"] = timestamp.toString()
-                params
             }
         ),
 

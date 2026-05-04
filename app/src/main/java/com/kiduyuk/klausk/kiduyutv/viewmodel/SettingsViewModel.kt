@@ -180,6 +180,12 @@ class SettingsViewModel : ViewModel() {
                 }
 
                 FirebaseSyncManager.startSync(forceRefresh = true)
+                
+                // Refresh UI with synced provider from SharedPreferences
+                val syncedProvider = SettingsManager(context).getDefaultProvider()
+                _uiState.update { it.copy(defaultProvider = syncedProvider) }
+                
+                _uiState.update { it.copy(isFirebaseSyncing = false) }
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
