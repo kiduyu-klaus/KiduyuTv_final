@@ -26,8 +26,10 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.mutableStateOf
@@ -66,6 +68,7 @@ class QuitDialog(
     private val positiveButtonText: String,
     private val negativeButtonText: String,
     private val lottieAnimRes: Int,
+    private val annotatedMessage: AnnotatedString? = null,
     private val onNo: () -> Unit = {},
     private val onYes: () -> Unit = {}
 ) : Dialog(context, android.R.style.Theme_Translucent_NoTitleBar) {
@@ -106,6 +109,7 @@ class QuitDialog(
                 QuitDialogContent(
                     title = title,
                     message = message,
+                    annotatedMessage = annotatedMessage,
                     positiveButtonText = positiveButtonText,
                     negativeButtonText = negativeButtonText,
                     lottieAnimRes = lottieAnimRes,
@@ -140,6 +144,7 @@ class QuitDialog(
 fun QuitDialogContent(
     title: String,
     message: String,
+    annotatedMessage: AnnotatedString? = null,
     positiveButtonText: String,
     negativeButtonText: String,
     lottieAnimRes: Int,
@@ -188,6 +193,18 @@ fun QuitDialogContent(
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center
             )
+
+            if (annotatedMessage != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = annotatedMessage,
+                    color = ComposeColor.Gray.copy(alpha = 0.8f),
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                    maxLines = 5,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 

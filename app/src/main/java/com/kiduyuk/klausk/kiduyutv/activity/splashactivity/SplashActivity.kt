@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Color.Companion.White
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -363,46 +364,50 @@ class SplashActivity : ComponentActivity() {
     // ── Dialogs ───────────────────────────────────────────────────────────────
 
     private fun showUpdateDialog(remoteVersion: String) {
-        QuitDialog(
-            context = this,
-            title = "v$remoteVersion Update Available",
-            message = "A newer version of Kiduyu TV (v$remoteVersion) is available for your ${getDeviceTypeString()}.\nWould you like to download it now?",
-            positiveButtonText = "Download",
-            negativeButtonText = "Exit",
-            lottieAnimRes = R.raw.exit,
-            onNo = { finish() },
-            onYes = {
-                lifecycleScope.launch {
-                    val apkInfo = UpdateUtil.fetchBestApkInfo(this@SplashActivity)
-                    if (apkInfo != null) {
-                        val localFile = UpdateUtil.getLocalApkFile(this@SplashActivity)
-                        when {
-                            UpdateUtil.isLocalApkValid(this@SplashActivity, apkInfo) -> {
-                                // Cached file is the right version, right device type, right size
-                                Log.i(TAG, "Valid cached APK found, skipping download")
-                                showInstallPrompt(localFile, apkInfo)
-                            }
-                            else -> {
-                                // Stale, wrong device type, incomplete, or missing — delete and re-download
-                                if (localFile.exists()) {
-                                    localFile.delete()
-                                    Log.i(TAG, "Deleted stale cached APK")
+        lifecycleScope.launch {
+            val notes = UpdateUtil.fetchLatestReleaseAnnotated()
+            QuitDialog(
+                context = this@SplashActivity,
+                title = "v$remoteVersion Update Available",
+                message = "A newer version of Kiduyu TV (v$remoteVersion) is available for your ${getDeviceTypeString()}.\nWould you like to download it now?",
+                annotatedMessage = notes,
+                positiveButtonText = "Download",
+                negativeButtonText = "Exit",
+                lottieAnimRes = R.raw.exit,
+                onNo = { finish() },
+                onYes = {
+                    lifecycleScope.launch {
+                        val apkInfo = UpdateUtil.fetchBestApkInfo(this@SplashActivity)
+                        if (apkInfo != null) {
+                            val localFile = UpdateUtil.getLocalApkFile(this@SplashActivity)
+                            when {
+                                UpdateUtil.isLocalApkValid(this@SplashActivity, apkInfo) -> {
+                                    // Cached file is the right version, right device type, right size
+                                    Log.i(TAG, "Valid cached APK found, skipping download")
+                                    showInstallPrompt(localFile, apkInfo)
                                 }
-                                downloadAndInstallApk(apkInfo)
+                                else -> {
+                                    // Stale, wrong device type, incomplete, or missing — delete and re-download
+                                    if (localFile.exists()) {
+                                        localFile.delete()
+                                        Log.i(TAG, "Deleted stale cached APK")
+                                    }
+                                    downloadAndInstallApk(apkInfo)
+                                }
                             }
-                        }
-                    } else {
-                        Log.w(TAG, "No APK found for ${getDeviceTypeString()}, opening releases page")
-                        startActivity(
-                            Intent(
-                                Intent.ACTION_VIEW,
-                                Uri.parse("https://github.com/kiduyu-klaus/KiduyuTv_final/releases/latest")
+                        } else {
+                            Log.w(TAG, "No APK found for ${getDeviceTypeString()}, opening releases page")
+                            startActivity(
+                                Intent(
+                                    Intent.ACTION_VIEW,
+                                    Uri.parse("https://github.com/kiduyu-klaus/KiduyuTv_final/releases/latest")
+                                )
                             )
-                        )
+                        }
                     }
                 }
-            }
-        ).showTracked()
+            ).showTracked()
+        }
     }
 
     private fun downloadAndInstallApk(apkInfo: ApkInfo) {
