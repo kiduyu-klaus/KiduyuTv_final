@@ -237,6 +237,13 @@ object DatabaseManager {
     }
 
     /**
+     * Get all watch history as a Flow.
+     */
+    fun getAllWatchHistory(): Flow<List<WatchHistoryEntity>> {
+        return watchHistoryDao().getAllWatchHistory()
+    }
+
+    /**
      * Get "Continue Watching" items.
      */
     fun getContinueWatching(limit: Int = 10): Flow<List<WatchHistoryEntity>> {

@@ -887,6 +887,18 @@ class PlayerActivity : AppCompatActivity() {
                     });
                 }
 
+                function setMaxVolume() {
+                    var videos = document.getElementsByTagName('video');
+                    for (var i = 0; i < videos.length; i++) {
+                        videos[i].volume = 1.0;
+                        videos[i].muted = false;
+                    }
+                }
+                // Run setMaxVolume 3 times at 3 second intervals
+                setMaxVolume();
+                setTimeout(setMaxVolume, 3000);
+                setTimeout(setMaxVolume, 6000);
+
                 function monitorVideoEvents() {
                     const videos = document.querySelectorAll('video');
                     videos.forEach(video => {
