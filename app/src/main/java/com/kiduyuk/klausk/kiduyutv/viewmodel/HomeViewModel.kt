@@ -3,6 +3,7 @@ package com.kiduyuk.klausk.kiduyutv.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import android.content.Context
+import com.kiduyuk.klausk.kiduyutv.data.model.CompaniesNetworksResponse
 import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
 import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
@@ -102,81 +103,70 @@ class HomeViewModel : ViewModel() {
                 // ========================================================================
                 // Launch all core API calls in parallel using coroutineScope
                 // This ensures all requests run concurrently, reducing total load time
-                val (primaryResults, watchHistory) = coroutineScope {
+                coroutineScope {
                     // Launch all primary content fetches in parallel
-                    val deferreds = listOf(
-                        async { "trendingTv" to repository.getTrendingTvToday() },
-                        async { "trendingMovies" to repository.getTrendingMoviesToday() },
-                        async { "trendingMoviesThisWeek" to repository.getTrendingMoviesThisWeek() },
-                        async { "nowPlaying" to repository.getNowPlayingMovies() },
-                        async { "topRatedMovies" to repository.getTopRatedMovies() },
-                        async { "topRatedTv" to repository.getTopRatedTvShows() },
-                        async { "timeTravelTv" to repository.getTimeTravelTvShows() }
-                    )
+                    val trendingTvDeferred = async { repository.getTrendingTvToday() }
+                    val trendingMoviesDeferred = async { repository.getTrendingMoviesToday() }
+                    val trendingMoviesThisWeekDeferred = async { repository.getTrendingMoviesThisWeek() }
+                    val nowPlayingDeferred = async { repository.getNowPlayingMovies() }
+                    val topRatedMoviesDeferred = async { repository.getTopRatedMovies() }
+                    val topRatedTvDeferred = async { repository.getTopRatedTvShows() }
+                    val timeTravelTvDeferred = async { repository.getTimeTravelTvShows() }
 
-                    // Await all results with awaitAll() for maximum efficiency
-                    val results = deferreds.awaitAll()
+                    // Await all results
+                    val trendingTv = trendingTvDeferred.await().getOrNull() ?: emptyList()
+                    val trendingMovies = trendingMoviesDeferred.await().getOrNull() ?: emptyList()
+                    val trendingMoviesThisWeek = trendingMoviesThisWeekDeferred.await().getOrNull() ?: emptyList()
+                    val nowPlaying = nowPlayingDeferred.await().getOrNull() ?: emptyList()
+                    val topRatedMovies = topRatedMoviesDeferred.await().getOrNull() ?: emptyList()
+                    val topRatedTv = topRatedTvDeferred.await().getOrNull() ?: emptyList()
+                    val timeTravelTv = timeTravelTvDeferred.await().getOrNull() ?: emptyList()
 
                     // Get watch history (runs in parallel with API calls)
-                    val history = repository.getWatchHistory(context)
+                    val watchHistory = repository.getWatchHistory(context)
 
-                    // Process results into a map for easy access
-                    val resultMap = results.associate { it.first to it.second.getOrNull() ?: emptyList<Any>() }
-                    resultMap to history
-                }
+                    // Sort all content rows by vote average (highest first)
+                    val sortedTrendingTv = trendingTv.sortedByDescending { it.voteAverage }
+                    val sortedTrendingMovies = trendingMovies.sortedByDescending { it.voteAverage }
+                    val sortedTrendingMoviesThisWeek = trendingMoviesThisWeek.sortedByDescending { it.voteAverage }
+                    val sortedWatchHistory = watchHistory.sortedByDescending { it.lastWatched }
+                    val sortedTopRatedMovies = topRatedMovies.take(30).sortedByDescending { it.voteAverage }
+                    val sortedTopRatedTv = topRatedTv.take(30).sortedByDescending { it.voteAverage }
 
-                // Extract results with proper typing
-                val trendingTv: List<TvShow> = (primaryResults["trendingTv"] as? List<*>)?.filterIsInstance<TvShow>() ?: emptyList()
-                val trendingMovies: List<Movie> = (primaryResults["trendingMovies"] as? List<*>)?.filterIsInstance<Movie>() ?: emptyList()
-                val trendingMoviesThisWeek: List<Movie> = (primaryResults["trendingMoviesThisWeek"] as? List<*>)?.filterIsInstance<Movie>() ?: emptyList()
-                val nowPlaying: List<Movie> = (primaryResults["nowPlaying"] as? List<*>)?.filterIsInstance<Movie>() ?: emptyList()
-                val topRatedMovies: List<Movie> = (primaryResults["topRatedMovies"] as? List<*>)?.filterIsInstance<Movie>() ?: emptyList()
-                val topRatedTv: List<TvShow> = (primaryResults["topRatedTv"] as? List<*>)?.filterIsInstance<TvShow>() ?: emptyList()
-                val timeTravelTv: List<TvShow> = (primaryResults["timeTravelTv"] as? List<*>)?.filterIsInstance<TvShow>() ?: emptyList()
+                    // Update initial state with primary content first to free up the UI thread
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            trendingTvShows = sortedTrendingTv,
+                            trendingMovies = sortedTrendingMovies,
+                            trendingMoviesThisWeek = sortedTrendingMoviesThisWeek,
+                            nowPlayingMovies = nowPlaying,
+                            continueWatching = sortedWatchHistory,
+                            latestMovies = sortedTopRatedMovies,
+                            topTvShows = sortedTopRatedTv,
+                            timeTravelTvShows = timeTravelTv,
+                            selectedItem = nowPlaying.firstOrNull() ?: sortedTrendingTv.firstOrNull() ?: sortedTrendingMovies.firstOrNull()
+                        )
+                    }
 
-                // Sort all content rows by vote average (highest first)
-                val sortedTrendingTv = trendingTv.sortedByDescending { it.voteAverage }
-                val sortedTrendingMovies = trendingMovies.sortedByDescending { it.voteAverage }
-                val sortedTrendingMoviesThisWeek = trendingMoviesThisWeek.sortedByDescending { it.voteAverage }
-                val sortedWatchHistory = watchHistory.sortedByDescending { it.lastWatched }
-                val sortedTopRatedMovies = topRatedMovies.take(30).sortedByDescending { it.voteAverage }
-                val sortedTopRatedTv = topRatedTv.take(30).sortedByDescending { it.voteAverage }
+                    // Trigger a random recommendation notification if we have content
+                    triggerRandomRecommendation(context, sortedTrendingMovies, sortedTrendingTv)
 
-                // Update initial state with primary content first to free up the UI thread
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        trendingTvShows = sortedTrendingTv,
-                        trendingMovies = sortedTrendingMovies,
-                        trendingMoviesThisWeek = sortedTrendingMoviesThisWeek,
-                        nowPlayingMovies = nowPlaying,
-                        continueWatching = sortedWatchHistory,
-                        latestMovies = sortedTopRatedMovies,
-                        topTvShows = sortedTopRatedTv,
-                        timeTravelTvShows = timeTravelTv,
-                        selectedItem = nowPlaying.firstOrNull() ?: sortedTrendingTv.firstOrNull() ?: sortedTrendingMovies.firstOrNull()
-                    )
-                }
+                    // ========================================================================
+                    // PHASE 2: BACKGROUND WATCH HISTORY ENRICHMENT
+                    // ========================================================================
+                    // Refresh watch history images and enrich items with TMDB details in background
+                    launch {
+                        enrichWatchHistory(context, sortedWatchHistory)
+                    }
 
-                // Trigger a random recommendation notification if we have content
-                triggerRandomRecommendation(context, sortedTrendingMovies, sortedTrendingTv)
-
-                // ========================================================================
-                // PHASE 2: BACKGROUND WATCH HISTORY ENRICHMENT
-                // ========================================================================
-                // Refresh watch history images and enrich items with TMDB details in background
-                // This ensures "Continue Watching" row displays complete and accurate information
-                viewModelScope.launch {
-                    enrichWatchHistory(context, sortedWatchHistory)
-                }
-
-                // ========================================================================
-                // PHASE 3: PARALLEL SECONDARY CONTENT (GITHUB LISTS)
-                // ========================================================================
-                // Load secondary content in background using optimized batch requests
-                // Uses awaitAll() for maximum parallelization of GitHub content fetches
-                viewModelScope.launch {
-                    loadSecondaryContent(context)
+                    // ========================================================================
+                    // PHASE 3: PARALLEL SECONDARY CONTENT (GITHUB LISTS)
+                    // ========================================================================
+                    // Load secondary content in background using optimized batch requests
+                    launch {
+                        loadSecondaryContent(context)
+                    }
                 }
             } catch (e: Exception) {
                 _uiState.update {
@@ -212,7 +202,7 @@ class HomeViewModel : ViewModel() {
             // Also enrich items with missing voteAverage or overview
             val itemsWithMissingDetails = WatchHistoryEnricher.getItemsWithMissingDetails(context)
             for (item in itemsWithMissingDetails) {
-                if (currentWatchHistory.any { it.id == item.id && it.isTv == (item.mediaType == "tv") }) {
+                if (currentWatchHistory.any { watchItem -> watchItem.id == item.id && watchItem.isTv == (item.mediaType == "tv") }) {
                     WatchHistoryEnricher.enrichSingleItem(context, item.id, item.mediaType)
                 }
             }
@@ -229,87 +219,81 @@ class HomeViewModel : ViewModel() {
      * Loads all secondary content (GitHub lists) in parallel using awaitAll().
      * Optimized batch loading for maximum concurrency.
      */
-    private suspend fun loadSecondaryContent(context: Context) = coroutineScope {
+    private suspend fun loadSecondaryContent(context: Context) {
         // Base URL for GitHub raw content
         val baseUrl = "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/"
 
-        // Define all GitHub list requests with their repository methods
-        val githubRequests = listOf(
-            "oscarWinners2026" to { repository.getGitHubMovieList(context, "${baseUrl}oscar_winners_2026.json") },
-            "hallmarkMovies" to { repository.getGitHubMovieList(context, "${baseUrl}hallmark_movies.json") },
-            "trueStoryMovies" to { repository.getGitHubMovieList(context, "${baseUrl}true_story_movies.json") },
-            "bestSitcoms" to { repository.getGitHubTvShowList(context, "${baseUrl}best_sitcoms.json") },
-            "bestClassics" to { repository.getGitHubMovieList(context, "${baseUrl}best_classics.json") },
-            "spyMovies" to { repository.getGitHubMovieList(context, "${baseUrl}cia_mossad_spies.json") },
-            "stathamMovies" to { repository.getGitHubMovieList(context, "${baseUrl}jason_statham_movies.json") },
-            "timeTravelMovies" to { repository.getGitHubMovieList(context, "${baseUrl}time_travel_movies.json") },
-            "christianMovies" to { repository.getGitHubMovieList(context, "${baseUrl}christian_movies.json") },
-            "bibleMovies" to { repository.getGitHubMovieList(context, "${baseUrl}movies_from_the_bible.json") },
-            "christianTvShows" to { repository.getGitHubTvShowList(context, "${baseUrl}christian_tv_shows.json") },
-            "doctorWhoSpecials" to { repository.getGitHubMovieList(context, "${baseUrl}doctor_who_specials.json") },
-            "companiesNetworks" to { repository.getGitHubCompaniesNetworks(context, "${baseUrl}companies_networks.json") }
-        )
-
-        // Launch all requests in parallel
-        val deferredResults = githubRequests.map { (name, request) ->
-            async { name to request().getOrNull() }
-        }
+        // Launch all requests in parallel using async
+        val oscarWinnersDeferred = async { repository.getGitHubMovieList(context, "${baseUrl}oscar_winners_2026.json").getOrNull() ?: emptyList<Movie>() }
+        val hallmarkMoviesDeferred = async { repository.getGitHubMovieList(context, "${baseUrl}hallmark_movies.json").getOrNull() ?: emptyList<Movie>() }
+        val trueStoryMoviesDeferred = async { repository.getGitHubMovieList(context, "${baseUrl}true_story_movies.json").getOrNull() ?: emptyList<Movie>() }
+        val bestSitcomsDeferred = async { repository.getGitHubTvShowList(context, "${baseUrl}best_sitcoms.json").getOrNull() ?: emptyList<TvShow>() }
+        val bestClassicsDeferred = async { repository.getGitHubMovieList(context, "${baseUrl}best_classics.json").getOrNull() ?: emptyList<Movie>() }
+        val spyMoviesDeferred = async { repository.getGitHubMovieList(context, "${baseUrl}cia_mossad_spies.json").getOrNull() ?: emptyList<Movie>() }
+        val stathamMoviesDeferred = async { repository.getGitHubMovieList(context, "${baseUrl}jason_statham_movies.json").getOrNull() ?: emptyList<Movie>() }
+        val timeTravelMoviesDeferred = async { repository.getGitHubMovieList(context, "${baseUrl}time_travel_movies.json").getOrNull() ?: emptyList<Movie>() }
+        val christianMoviesDeferred = async { repository.getGitHubMovieList(context, "${baseUrl}christian_movies.json").getOrNull() ?: emptyList<Movie>() }
+        val bibleMoviesDeferred = async { repository.getGitHubMovieList(context, "${baseUrl}movies_from_the_bible.json").getOrNull() ?: emptyList<Movie>() }
+        val christianTvShowsDeferred = async { repository.getGitHubTvShowList(context, "${baseUrl}christian_tv_shows.json").getOrNull() ?: emptyList<TvShow>() }
+        val doctorWhoSpecialsDeferred = async { repository.getGitHubMovieList(context, "${baseUrl}doctor_who_specials.json").getOrNull() ?: emptyList<Movie>() }
+        val companiesNetworksDeferred = async { repository.getGitHubCompaniesNetworks(context, "${baseUrl}companies_networks.json").getOrNull() }
 
         // Await all results simultaneously
-        val allResults = deferredResults.awaitAll().toMap()
+        val oscarWinners2026 = oscarWinnersDeferred.await()
+        val hallmarkMovies = hallmarkMoviesDeferred.await()
+        val trueStoryMovies = trueStoryMoviesDeferred.await()
+        val bestSitcoms = bestSitcomsDeferred.await()
+        val bestClassics = bestClassicsDeferred.await()
+        val spyMovies = spyMoviesDeferred.await()
+        val stathamMovies = stathamMoviesDeferred.await()
+        val timeTravelMovies = timeTravelMoviesDeferred.await()
+        val christianMovies = christianMoviesDeferred.await()
+        val bibleMovies = bibleMoviesDeferred.await()
+        val christianTvShows = christianTvShowsDeferred.await()
+        val doctorWhoSpecials = doctorWhoSpecialsDeferred.await()
+        val companiesNetworks = companiesNetworksDeferred.await()
 
-        // Process and sort all movie lists
-        val processMovies: (String) -> List<Movie> = { key ->
-            (allResults[key] as? List<*>)?.filterIsInstance<Movie>() ?: emptyList()
-        }
+        // Sort all movie lists by vote average
+        val sortedOscarWinners = oscarWinners2026.sortedByDescending { it.voteAverage }
+        val sortedHallmark = hallmarkMovies.sortedByDescending { it.voteAverage }
+        val sortedTrueStory = trueStoryMovies.sortedByDescending { it.voteAverage }
+        val sortedClassics = bestClassics.sortedByDescending { it.voteAverage }
+        val sortedSpyMovies = spyMovies.sortedByDescending { it.voteAverage }
+        val sortedStathamMovies = stathamMovies.sortedByDescending { it.voteAverage }
+        val sortedTimeTravel = timeTravelMovies.sortedByDescending { it.voteAverage }
+        val sortedChristianMovies = christianMovies.sortedByDescending { it.voteAverage }
+        val sortedBibleMovies = bibleMovies.sortedByDescending { it.voteAverage }
+        val sortedDoctorWhoSpecials = doctorWhoSpecials.sortedByDescending { it.voteAverage }
 
-        val processTvShows: (String) -> List<TvShow> = { key ->
-            (allResults[key] as? List<*>)?.filterIsInstance<TvShow>() ?: emptyList()
-        }
-
-        val oscarWinners2026 = processMovies("oscarWinners2026").sortedByDescending { it.voteAverage }
-        val hallmarkMovies = processMovies("hallmarkMovies").sortedByDescending { it.voteAverage }
-        val trueStoryMovies = processMovies("trueStoryMovies").sortedByDescending { it.voteAverage }
-        val bestClassics = processMovies("bestClassics").sortedByDescending { it.voteAverage }
-        val spyMovies = processMovies("spyMovies").sortedByDescending { it.voteAverage }
-        val stathamMovies = processMovies("stathamMovies").sortedByDescending { it.voteAverage }
-        val timeTravelMovies = processMovies("timeTravelMovies").sortedByDescending { it.voteAverage }
-        val christianMovies = processMovies("christianMovies").sortedByDescending { it.voteAverage }
-        val bibleMovies = processMovies("bibleMovies").sortedByDescending { it.voteAverage }
-        val doctorWhoSpecials = processMovies("doctorWhoSpecials").sortedByDescending { it.voteAverage }
-
-        val bestSitcoms = processTvShows("bestSitcoms").sortedByDescending { it.voteAverage }
-        val christianTvShows = processTvShows("christianTvShows").sortedByDescending { it.voteAverage }
+        val sortedSitcoms = bestSitcoms.sortedByDescending { it.voteAverage }
+        val sortedChristianTvShows = christianTvShows.sortedByDescending { it.voteAverage }
 
         // Process companies and networks
-        val companiesNetworks = allResults["companiesNetworks"]
-        val networks = (companiesNetworks as? com.kiduyuk.klausk.kiduyutv.data.model.CompaniesNetworksResponse)
-            ?.networks
-            ?.filter { it.logoPath != null }
-            ?.map { NetworkItem(it.id, it.name, it.logoPath, "network") }
+        val networks = companiesNetworks?.networks
+            ?.filter { network -> network.logoPath != null }
+            ?.map { network -> NetworkItem(network.id, network.name, network.logoPath, "network") }
             ?: emptyList()
 
-        val companies = (companiesNetworks as? com.kiduyuk.klausk.kiduyutv.data.model.CompaniesNetworksResponse)
-            ?.companies
-            ?.filter { it.logoPath != null }
-            ?.map { NetworkItem(it.id, it.name, it.logoPath, "company") }
+        val companies = companiesNetworks?.companies
+            ?.filter { company -> company.logoPath != null }
+            ?.map { company -> NetworkItem(company.id, company.name, company.logoPath, "company") }
             ?: emptyList()
 
         // Update UI with all secondary content at once
         _uiState.update {
             it.copy(
-                oscarWinners2026 = oscarWinners2026,
-                hallmarkMovies = hallmarkMovies,
-                trueStoryMovies = trueStoryMovies,
-                bestSitcoms = bestSitcoms,
-                bestClassics = bestClassics,
-                spyMovies = spyMovies,
-                stathamMovies = stathamMovies,
-                timeTravelMovies = timeTravelMovies,
-                christianMovies = christianMovies,
-                bibleMovies = bibleMovies,
-                christianTvShows = christianTvShows,
-                doctorWhoSpecials = doctorWhoSpecials,
+                oscarWinners2026 = sortedOscarWinners,
+                hallmarkMovies = sortedHallmark,
+                trueStoryMovies = sortedTrueStory,
+                bestSitcoms = sortedSitcoms,
+                bestClassics = sortedClassics,
+                spyMovies = sortedSpyMovies,
+                stathamMovies = sortedStathamMovies,
+                timeTravelMovies = sortedTimeTravel,
+                christianMovies = sortedChristianMovies,
+                bibleMovies = sortedBibleMovies,
+                christianTvShows = sortedChristianTvShows,
+                doctorWhoSpecials = sortedDoctorWhoSpecials,
                 popularNetworks = networks,
                 popularCompanies = companies
             )
@@ -329,12 +313,12 @@ class HomeViewModel : ViewModel() {
      */
     private fun triggerRandomRecommendation(
         context: Context,
-        movies: List<com.kiduyuk.klausk.kiduyutv.data.model.Movie>,
-        tvShows: List<com.kiduyuk.klausk.kiduyutv.data.model.TvShow>
+        movies: List<Movie>,
+        tvShows: List<TvShow>
     ) {
         val allMedia = mutableListOf<Pair<Any, String>>()
-        allMedia.addAll(movies.map { it to "movie" })
-        allMedia.addAll(tvShows.map { it to "tv" })
+        allMedia.addAll(movies.map { movie -> movie to "movie" })
+        allMedia.addAll(tvShows.map { tv -> tv to "tv" })
 
         if (allMedia.isNotEmpty()) {
             val randomItem = allMedia.random()
@@ -342,7 +326,7 @@ class HomeViewModel : ViewModel() {
             val type = randomItem.second
 
             if (type == "movie") {
-                val movie = media as com.kiduyuk.klausk.kiduyutv.data.model.Movie
+                val movie = media as Movie
                 NotificationHelper.postMediaNotification(
                     context,
                     movie.id,
@@ -351,7 +335,7 @@ class HomeViewModel : ViewModel() {
                     movie.overview ?: "Check out this movie on Kiduyu TV!"
                 )
             } else {
-                val tvShow = media as com.kiduyuk.klausk.kiduyutv.data.model.TvShow
+                val tvShow = media as TvShow
                 NotificationHelper.postMediaNotification(
                     context,
                     tvShow.id,
