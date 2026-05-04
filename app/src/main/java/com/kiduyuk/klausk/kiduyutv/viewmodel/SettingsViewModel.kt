@@ -133,11 +133,20 @@ class SettingsViewModel : ViewModel() {
      * Persist and update the default stream provider preference.
      */
     fun setDefaultProvider(context: Context, provider: String) {
+        // Save to SharedPreferences first
         SettingsManager(context).saveDefaultProvider(provider)
+        
+        // Ensure FirebaseManager is initialized with correct user before saving
+        if (AuthManager.isSignedIn.value) {
+            val userId = AuthManager.currentUser?.uid ?: AuthManager.currentUid
+            if (userId != null) {
+                FirebaseManager.init(userId)
+            }
+        }
         
         // Sync default provider to Firebase for cross-device sync
         // This ensures the setting is saved in the cloud and synced to other devices
-        com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.saveDefaultProvider(provider)
+        FirebaseManager.saveDefaultProvider(provider)
         
         _uiState.update { it.copy(defaultProvider = provider) }
     }

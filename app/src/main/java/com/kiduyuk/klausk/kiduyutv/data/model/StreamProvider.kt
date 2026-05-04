@@ -241,8 +241,12 @@ object StreamProviderManager {
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
             name = "VidZee",
-            movieUrlTemplate = "https://player.vidzee.wtf/embed/movie/%d",
-            tvUrlTemplate = "https://player.vidzee.wtf/embed/tv/%d/%d/%d"
+            // Old URLs (commented)
+            // movieUrlTemplate = "https://player.vidzee.wtf/embed/movie/%d",
+            // tvUrlTemplate = "https://player.vidzee.wtf/embed/tv/%d/%d/%d",
+            // New v2 URLs
+            movieUrlTemplate = "https://player.vidzee.wtf/v2/embed/movie/%d",
+            tvUrlTemplate = "https://player.vidzee.wtf/v2/embed/tv/%d/%d/%d"
         ),
 
         // ═══════════════════════════════════════════════════════════════
