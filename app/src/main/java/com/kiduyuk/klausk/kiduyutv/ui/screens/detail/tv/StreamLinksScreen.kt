@@ -189,7 +189,17 @@ fun StreamLinksScreen(
                                 timestamp = timestamp
                             ) ?: provider.urlTemplate
 
+                            val iframeHtml = com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager.generateIframeHtml(
+                                providerName = provider.name,
+                                tmdbId = tmdbId,
+                                isTv = isTv,
+                                season = season,
+                                episode = episode,
+                                timestamp = timestamp
+                            )
+
                             val intent = Intent(context, PlayerActivity::class.java).apply {
+                                putExtra("IFRAME_HTML", iframeHtml)
                                 putExtra("STREAM_URL", finalUrl)
                                 putExtra("TMDB_ID", tmdbId)
                                 putExtra("IS_TV", isTv)

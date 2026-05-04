@@ -111,7 +111,17 @@ fun MobileStreamLinksScreen(
                         return@LaunchedEffect
                     }
 
+                    val iframeHtml = com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager.generateIframeHtml(
+                        providerName = match.name,
+                        tmdbId = tmdbId,
+                        isTv = isTv,
+                        season = season,
+                        episode = episode,
+                        timestamp = timestamp
+                    )
+
                     val intent = Intent(context, PlayerActivity::class.java).apply {
+                        putExtra("IFRAME_HTML", iframeHtml)
                         putExtra("STREAM_URL", url)
                         putExtra("TITLE", title)
                         putExtra("TMDB_ID", tmdbId)
@@ -321,8 +331,18 @@ private fun launchPlayerWithProvider(
 
         android.util.Log.i("MobileStreamLinks", "Launching PlayerActivity with provider: ${provider.name}, URL: $finalUrl")
 
+        val iframeHtml = com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager.generateIframeHtml(
+            providerName = provider.name,
+            tmdbId = tmdbId,
+            isTv = isTv,
+            season = season,
+            episode = episode,
+            timestamp = timestamp
+        )
+
         // Launch PlayerActivity with the validated URL
         val intent = Intent(context, PlayerActivity::class.java).apply {
+            putExtra("IFRAME_HTML", iframeHtml)
             putExtra("TMDB_ID", tmdbId)
             putExtra("IS_TV", isTv)
             putExtra("SEASON_NUMBER", season ?: 0)

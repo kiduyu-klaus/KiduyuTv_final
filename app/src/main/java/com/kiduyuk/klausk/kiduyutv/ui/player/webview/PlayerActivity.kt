@@ -504,7 +504,14 @@ class PlayerActivity : AppCompatActivity() {
                 override fun onCreateWindow(view: WebView?, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message?): Boolean = false
             }
 
-            loadUrl(url)
+            val iframeHtml = intent.getStringExtra("IFRAME_HTML")
+            if (iframeHtml != null) {
+                // Use the provider's base URL for correct security context and relative links
+                val baseUrl = com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager.getBaseUrl(currentProviderName)
+                loadDataWithBaseURL(baseUrl, iframeHtml, "text/html", "UTF-8", null)
+            } else {
+                loadUrl(url)
+            }
         }
 
         // ── Cursor ────────────────────────────────────────────────────────────
