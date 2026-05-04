@@ -73,6 +73,7 @@ fun SeasonEpisodesScreen(
             seasonsLoaded = true
         }
         viewModel.loadSeasonEpisodes(tvShowId, 1)
+        viewModel.loadTvShowDetail(context, tvShowId)
     }
 
     Box(

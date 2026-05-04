@@ -69,11 +69,13 @@ fun MobileMediaListScreen(
     LaunchedEffect(listState, uiState, type) {
         snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index }
             .distinctUntilChanged()
-            .collect { lastVisibleIndex ->
-                if (lastVisibleIndex != null) {
+            .collect { lastVisibleRowIndex ->
+                if (lastVisibleRowIndex != null) {
+                    // Calculate total rows (items are chunked into 3-column rows)
                     val totalItems = if (type == "company") uiState.movies.size else uiState.tvShows.size
-                    // Load more when user is within 5 items from the end
-                    if (lastVisibleIndex >= totalItems - 5 && !uiState.isLoading && !uiState.isLoadingMore) {
+                    val totalRows = (totalItems + 2) / 3  // Ceiling division for 3-column layout
+                    // Load more when user is within 2 rows from the end
+                    if (lastVisibleRowIndex >= totalRows - 2 && !uiState.isLoading && !uiState.isLoadingMore) {
                         if (type == "company") {
                             viewModel.loadMoreMovies()
                         } else {
