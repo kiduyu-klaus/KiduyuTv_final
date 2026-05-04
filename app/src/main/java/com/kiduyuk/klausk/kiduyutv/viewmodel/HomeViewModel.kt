@@ -269,15 +269,25 @@ class HomeViewModel : ViewModel() {
         val sortedChristianTvShows = christianTvShows.sortedByDescending { it.voteAverage }
 
         // Process companies and networks
-        val networks = companiesNetworks?.networks
-            ?.filter { network -> network.logoPath != null }
-            ?.map { network -> NetworkItem(network.id, network.name, network.logoPath, "network") }
-            ?: emptyList()
+        val networksList: List<NetworkItem> = if (companiesNetworks != null) {
+            companiesNetworks.networks
+                .filter { network: com.kiduyuk.klausk.kiduyutv.data.model.GitHubNetwork -> network.logoPath != null }
+                .map { network: com.kiduyuk.klausk.kiduyutv.data.model.GitHubNetwork -> 
+                    NetworkItem(network.id, network.name, network.logoPath, "network") 
+                }
+        } else {
+            emptyList()
+        }
 
-        val companies = companiesNetworks?.companies
-            ?.filter { company -> company.logoPath != null }
-            ?.map { company -> NetworkItem(company.id, company.name, company.logoPath, "company") }
-            ?: emptyList()
+        val companiesList: List<NetworkItem> = if (companiesNetworks != null) {
+            companiesNetworks.companies
+                .filter { company: com.kiduyuk.klausk.kiduyutv.data.model.GitHubCompany -> company.logoPath != null }
+                .map { company: com.kiduyuk.klausk.kiduyutv.data.model.GitHubCompany -> 
+                    NetworkItem(company.id, company.name, company.logoPath, "company") 
+                }
+        } else {
+            emptyList()
+        }
 
         // Update UI with all secondary content at once
         _uiState.update {
@@ -294,8 +304,8 @@ class HomeViewModel : ViewModel() {
                 bibleMovies = sortedBibleMovies,
                 christianTvShows = sortedChristianTvShows,
                 doctorWhoSpecials = sortedDoctorWhoSpecials,
-                popularNetworks = networks,
-                popularCompanies = companies
+                popularNetworks = networksList,
+                popularCompanies = companiesList
             )
         }
     }
