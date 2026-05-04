@@ -41,6 +41,7 @@ import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import android.widget.Toast
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
 import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamLinksViewModel
+import com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager
 import com.kiduyuk.klausk.kiduyutv.util.AdManager
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import androidx.activity.compose.BackHandler
@@ -167,8 +168,18 @@ fun MobileMovieDetailScreen(
                                     )
                                 } else null
 
+                                val iframeHtml = StreamProviderManager.generateIframeHtml(
+                                    providerName = defaultProvider,
+                                    tmdbId = movie.id,
+                                    isTv = false,
+                                    season = null,
+                                    episode = null,
+                                    timestamp = uiState.watchHistoryItem?.playbackPosition ?: 0L
+                                )
+
                                 if (directUrl != null) {
                                     val intent = Intent(context, PlayerActivity::class.java).apply {
+                                        putExtra("IFRAME_HTML", iframeHtml)
                                         putExtra("STREAM_URL", directUrl)
                                         putExtra("TMDB_ID", movie.id)
                                         putExtra("IS_TV", false)

@@ -46,6 +46,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
 import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamLinksViewModel
+import com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager
 import com.kiduyuk.klausk.kiduyutv.util.TvInterstitialManager
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 
@@ -336,8 +337,18 @@ fun TvShowDetailScreen(
                                             )
                                         } else null
 
+                                        val iframeHtml = StreamProviderManager.generateIframeHtml(
+                                            providerName = defaultProvider,
+                                            tmdbId = tvShow.id,
+                                            isTv = true,
+                                            season = seasonNumber,
+                                            episode = episodeNumber,
+                                            timestamp = timestamp
+                                        )
+
                                         if (directUrl != null) {
                                             val intent = Intent(context, PlayerActivity::class.java).apply {
+                                                putExtra("IFRAME_HTML", iframeHtml)
                                                 putExtra("STREAM_URL", directUrl)
                                                 putExtra("TMDB_ID", tvShow.id)
                                                 putExtra("IS_TV", true)

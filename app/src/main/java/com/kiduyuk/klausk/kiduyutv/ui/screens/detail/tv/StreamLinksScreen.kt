@@ -169,9 +169,9 @@ fun StreamLinksScreen(
                 Text("No providers found", color = TextSecondary)
             } else {
 
-                // 🔥 GRID
+                // 🔥 GRID - 3 columns for better TV navigation
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
+                    columns = GridCells.Fixed(3),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
@@ -180,15 +180,6 @@ fun StreamLinksScreen(
                             index = index + 1,
                             provider = provider
                         ) {
-                            val finalUrl = StreamLinksViewModel.resolveProviderUrl(
-                                providerName = provider.name,
-                                tmdbId = tmdbId,
-                                isTv = isTv,
-                                season = season,
-                                episode = episode,
-                                timestamp = timestamp
-                            ) ?: provider.urlTemplate
-
                             val iframeHtml = com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager.generateIframeHtml(
                                 providerName = provider.name,
                                 tmdbId = tmdbId,
@@ -197,6 +188,15 @@ fun StreamLinksScreen(
                                 episode = episode,
                                 timestamp = timestamp
                             )
+
+                            val finalUrl = StreamLinksViewModel.resolveProviderUrl(
+                                providerName = provider.name,
+                                tmdbId = tmdbId,
+                                isTv = isTv,
+                                season = season,
+                                episode = episode,
+                                timestamp = timestamp
+                            ) ?: provider.urlTemplate
 
                             val intent = Intent(context, PlayerActivity::class.java).apply {
                                 putExtra("IFRAME_HTML", iframeHtml)

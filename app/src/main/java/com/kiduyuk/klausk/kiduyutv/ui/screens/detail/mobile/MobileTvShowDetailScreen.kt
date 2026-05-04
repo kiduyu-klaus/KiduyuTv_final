@@ -40,6 +40,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
 import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamLinksViewModel
+import com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager
 import com.kiduyuk.klausk.kiduyutv.util.AdManager
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import androidx.activity.compose.BackHandler
@@ -180,22 +181,32 @@ fun MobileTvShowDetailScreen(
                                     )
                                 } else null
 
-                                if (directUrl != null) {
-                                    val intent = Intent(context, PlayerActivity::class.java).apply {
-                                        putExtra("STREAM_URL", directUrl)
-                                        putExtra("TMDB_ID", tvShow.id)
-                                        putExtra("IS_TV", true)
-                                        putExtra("TITLE", tvShow.name ?: "")
-                                        putExtra("OVERVIEW", tvShow.overview)
-                                        putExtra("POSTER_PATH", tvShow.posterPath)
-                                        putExtra("BACKDROP_PATH", tvShow.backdropPath)
-                                        putExtra("VOTE_AVERAGE", tvShow.voteAverage)
-                                        putExtra("RELEASE_DATE", tvShow.firstAirDate)
-                                        putExtra("SEASON_NUMBER", seasonNumber)
-                                        putExtra("EPISODE_NUMBER", episodeNumber)
-                                    }
-                                    context.startActivity(intent)
-                                } else {
+                                val iframeHtml = StreamProviderManager.generateIframeHtml(
+                                        providerName = defaultProvider,
+                                        tmdbId = tvShow.id,
+                                        isTv = true,
+                                        season = seasonNumber,
+                                        episode = episodeNumber,
+                                        timestamp = timestamp
+                                    )
+
+                                    if (directUrl != null) {
+                                        val intent = Intent(context, PlayerActivity::class.java).apply {
+                                            putExtra("IFRAME_HTML", iframeHtml)
+                                            putExtra("STREAM_URL", directUrl)
+                                            putExtra("TMDB_ID", tvShow.id)
+                                            putExtra("IS_TV", true)
+                                            putExtra("TITLE", tvShow.name ?: "")
+                                            putExtra("OVERVIEW", tvShow.overview)
+                                            putExtra("POSTER_PATH", tvShow.posterPath)
+                                            putExtra("BACKDROP_PATH", tvShow.backdropPath)
+                                            putExtra("VOTE_AVERAGE", tvShow.voteAverage)
+                                            putExtra("RELEASE_DATE", tvShow.firstAirDate)
+                                            putExtra("SEASON_NUMBER", seasonNumber)
+                                            putExtra("EPISODE_NUMBER", episodeNumber)
+                                        }
+                                        context.startActivity(intent)
+                                    } else {
                                     val route = Screen.MobileStreamLinks.createRoute(
                                         tmdbId = tvShow.id,
                                         isTv = true,
