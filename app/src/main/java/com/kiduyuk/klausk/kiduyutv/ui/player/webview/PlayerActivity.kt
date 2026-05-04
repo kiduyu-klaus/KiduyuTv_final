@@ -693,7 +693,7 @@ class PlayerActivity : AppCompatActivity() {
                 injectAdvancedPlayerScripts(view)
 
                 // Auto-play video after page load
-                injectAutoplayScript(view)
+                // injectAutoplayScript(view)
 
                 startVideoLoadTimeoutCheck()
             }

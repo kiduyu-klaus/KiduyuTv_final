@@ -438,7 +438,7 @@ class TmdbRepository {
 
         var items = emptyList<WatchHistoryItem>()
         applicationScope.launch {
-            val entities = DatabaseManager.getRecentWatchHistory(20).first()
+            val entities = DatabaseManager.getAllWatchHistory().first()
             items = entities.map { DatabaseManager.entityToWatchHistoryItem(it) }
         }
 
@@ -446,7 +446,7 @@ class TmdbRepository {
         return try {
             val dao = DatabaseManager.watchHistoryDao()
             kotlinx.coroutines.runBlocking {
-                dao.getRecentWatchHistory(20).first().map {
+                dao.getAllWatchHistoryItems().map {
                     DatabaseManager.entityToWatchHistoryItem(it)
                 }
             }
@@ -458,13 +458,20 @@ class TmdbRepository {
 
     /**
      * Gets watch history as a Flow for reactive updates.
+     * Pass limit = 0 to get all items without limit.
      *
-     * @param limit Maximum number of items to return
+     * @param limit Maximum number of items to return (0 = unlimited)
      * @return Flow of watch history items
      */
-    fun getWatchHistoryFlow(limit: Int = 20): Flow<List<WatchHistoryItem>> {
-        return DatabaseManager.getRecentWatchHistory(limit).map { entities ->
-            entities.map { DatabaseManager.entityToWatchHistoryItem(it) }
+    fun getWatchHistoryFlow(limit: Int = 0): Flow<List<WatchHistoryItem>> {
+        return if (limit > 0) {
+            DatabaseManager.getRecentWatchHistory(limit).map { entities ->
+                entities.map { DatabaseManager.entityToWatchHistoryItem(it) }
+            }
+        } else {
+            DatabaseManager.getAllWatchHistory().map { entities ->
+                entities.map { DatabaseManager.entityToWatchHistoryItem(it) }
+            }
         }
     }
 
