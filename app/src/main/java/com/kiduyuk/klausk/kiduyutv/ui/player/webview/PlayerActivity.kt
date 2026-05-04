@@ -537,12 +537,12 @@ class PlayerActivity : AppCompatActivity() {
 
             val iframeHtml = intent.getStringExtra("IFRAME_HTML")
             if (iframeHtml != null) {
-                Toast.makeText(this, "Loading via IFRAME mode", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@PlayerActivity, "Loading via IFRAME mode", Toast.LENGTH_SHORT).show()
                 // Use the provider's base URL for correct security context and relative links
                 val baseUrl = com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager.getBaseUrl(currentProviderName)
                 loadDataWithBaseURL(baseUrl, iframeHtml, "text/html", "UTF-8", null)
             } else {
-                Toast.makeText(this, "Loading via DIRECT URL mode", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@PlayerActivity, "Loading via DIRECT URL mode", Toast.LENGTH_SHORT).show()
                 loadUrl(url)
             }
         }
