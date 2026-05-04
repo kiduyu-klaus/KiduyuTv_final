@@ -477,8 +477,10 @@ class PlayerActivity : AppCompatActivity() {
                 setSupportMultipleWindows(false)
                 cacheMode = WebSettings.LOAD_DEFAULT
                 setRenderPriority(WebSettings.RenderPriority.HIGH)
-                useWideViewPort = true
-                loadWithOverviewMode = true
+                useWideViewPort = true          // make page width match WebView width
+                loadWithOverviewMode = true     // zoom out to fit entire page in WebView
+                setSupportZoom(false)           // disable pinch‑zoom
+                displayZoomControls = false
                 allowContentAccess = true
                 databaseEnabled = true
                 allowFileAccess = true
@@ -487,6 +489,11 @@ class PlayerActivity : AppCompatActivity() {
                     safeSetSafeBrowsingEnabled(this, false)
                 }
             }
+
+            // Disable scrollbars
+            isVerticalScrollBarEnabled = false
+            isHorizontalScrollBarEnabled = false
+            setScrollBarStyle(View.SCROLLBARS_INSIDE_OVERLAY)
 
             if (isCursorDisabled) {
                 setLayerType(View.LAYER_TYPE_HARDWARE, null)
