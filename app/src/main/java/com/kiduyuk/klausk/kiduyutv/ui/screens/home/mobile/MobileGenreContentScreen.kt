@@ -30,13 +30,6 @@ import kotlinx.coroutines.launch
 /**
  * Mobile-optimized screen that displays movies or TV shows filtered by a specific genre.
  * Fetches content from TMDB API based on the selected genre.
- *
- * @param mediaType The type of media ("movie" or "tv")
- * @param genreId The TMDB genre ID
- * @param genreName The name of the genre to display as title
- * @param onBackClick Callback for back button navigation
- * @param onMovieClick Callback when a movie is clicked
- * @param onTvShowClick Callback when a TV show is clicked
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -111,13 +104,16 @@ fun MobileGenreContentScreen(
         snapshotFlow {
             val layoutInfo = gridState.layoutInfo
             val totalItemsNumber = layoutInfo.totalItemsCount
-            val lastVisibleItemIndex = (layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0) + 1
-
-            // Check if we're near the end
-            val visibleRows = layoutInfo.visibleItemsInfo.size
-            val threshold = maxOf(1, visibleRows / 2)
-
-            lastVisibleItemIndex >= (totalItemsNumber - (actualColumns * threshold)) && totalItemsNumber > 0
+            val visibleItemsInfo = layoutInfo.visibleItemsInfo
+            
+            if (totalItemsNumber == 0 || visibleItemsInfo.isEmpty()) return@snapshotFlow false
+            
+            val lastVisibleItemIndex = visibleItemsInfo.last().index
+            val lastVisibleRowIndex = lastVisibleItemIndex / actualColumns
+            val totalRows = (totalItemsNumber + actualColumns - 1) / actualColumns
+            
+            // Trigger when we reach 2 rows before the end
+            lastVisibleRowIndex >= (totalRows - 2) && totalItemsNumber > 0
         }.collect { shouldLoadMore ->
             if (shouldLoadMore && !isLoading && !isLoadingMore && hasMorePages) {
                 isLoadingMore = true
