@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
+import com.kiduyuk.klausk.kiduyutv.ui.components.CrewRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.CastRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
@@ -357,6 +358,13 @@ fun MobileTvShowDetailScreen(
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
+
+                    if (uiState.writingAndProductionCrew.isNotEmpty()) {
+                        CrewRow(
+                            title = "Writing & Production",
+                            crew = uiState.writingAndProductionCrew
+                        )
+                    }
 
                     if (uiState.cast.isNotEmpty()) {
                         CastRow(

@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
+import com.kiduyuk.klausk.kiduyutv.ui.components.CrewRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.CastRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.ContentRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
@@ -413,6 +414,16 @@ fun MovieDetailScreen(
                         ) { movie, isSelected, onClick ->
                             MovieCard(movie = movie, isSelected = isSelected, onClick = onClick)
                         }
+                    }
+                }
+
+                // Writing & Production Crew Row
+                if (uiState.writingAndProductionCrew.isNotEmpty()) {
+                    item {
+                        CrewRow(
+                            title = "Writing & Production",
+                            crew = uiState.writingAndProductionCrew
+                        )
                     }
                 }
 

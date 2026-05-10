@@ -36,6 +36,7 @@ data class DetailUiState(
     val similarTvShows: List<TvShow> = emptyList(),
     val collectionDetail: CollectionDetail? = null,
     val cast: List<CastMember> = emptyList(),
+    val writingAndProductionCrew: List<Crew> = emptyList(),
     val isInMyList: Boolean = false,
     val watchHistoryItem: WatchHistoryItem? = null,
     val trailerKey: String? = null,
@@ -85,6 +86,13 @@ class DetailViewModel : ViewModel() {
                 // Get cast members, sorted by order (top billed)
                 val cast = credits?.cast?.sortedBy { it.order ?: Int.MAX_VALUE }?.take(20) ?: emptyList()
 
+                // Filter crew members for Writing & Production roles
+                val writingAndProductionJobs = listOf("Screenplay", "Writer", "Story", "Producer", "Executive Producer", "Co-Producer", "Line Producer")
+                val writingAndProductionCrew = credits?.crew
+                    ?.filter { crew -> writingAndProductionJobs.any { job -> crew.job?.equals(job, ignoreCase = true) == true } }
+                    ?.distinctBy { it.id to it.job }
+                    ?.take(10) ?: emptyList()
+
                 // Fetch collection details if the movie belongs to one.
                 val collectionDetail = movieDetail?.belongsToCollection?.id?.let { collectionId ->
                     repository.getCollectionDetails(collectionId).getOrNull()
@@ -106,6 +114,7 @@ class DetailViewModel : ViewModel() {
                     similarMovies = recommendedMovies,
                     collectionDetail = collectionDetail,
                     cast = cast,
+                    writingAndProductionCrew = writingAndProductionCrew,
                     trailerKey = trailerKey,
                     isInMyList = isInMyList,
                     watchHistoryItem = historyItem
@@ -145,6 +154,13 @@ class DetailViewModel : ViewModel() {
                 // Get cast members, sorted by order (top billed)
                 val cast = credits?.cast?.sortedBy { it.order ?: Int.MAX_VALUE }?.take(20) ?: emptyList()
 
+                // Filter crew members for Writing & Production roles
+                val writingAndProductionJobs = listOf("Screenplay", "Writer", "Story", "Creator", "Producer", "Executive Producer", "Co-Producer", "Line Producer")
+                val writingAndProductionCrew = credits?.crew
+                    ?.filter { crew -> writingAndProductionJobs.any { job -> crew.job?.equals(job, ignoreCase = true) == true } }
+                    ?.distinctBy { it.id to it.job }
+                    ?.take(10) ?: emptyList()
+
                 // Find the first YouTube trailer.
                 val trailerKey = videos.firstOrNull {
                     it.site.equals("YouTube", ignoreCase = true) &&
@@ -166,6 +182,7 @@ class DetailViewModel : ViewModel() {
                     seasons = seasonList,
                     similarTvShows = similarTvShows,
                     cast = cast,
+                    writingAndProductionCrew = writingAndProductionCrew,
                     trailerKey = trailerKey,
                     isInMyList = isInMyList,
                     watchHistoryItem = historyItem
