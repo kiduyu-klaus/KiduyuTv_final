@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
-import com.kiduyuk.klausk.kiduyutv.data.model.Crew
+import com.kiduyuk.klausk.kiduyutv.data.model.CrewMember
 import com.kiduyuk.klausk.kiduyutv.ui.theme.FocusBorder
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextSecondary
@@ -46,9 +46,9 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.TextSecondary
 @Composable
 fun CrewRow(
     title: String,
-    crew: List<Crew>,
+    crew: List<CrewMember>,
     modifier: Modifier = Modifier,
-    onCrewClick: (Crew) -> Unit = {}
+    onCrewClick: (CrewMember) -> Unit = {}
 ) {
     if (crew.isEmpty()) return
 
@@ -105,7 +105,7 @@ fun CrewRow(
  */
 @Composable
 private fun CrewCard(
-    crewMember: Crew,
+    crewMember: CrewMember,
     isSelected: Boolean,
     onFocus: () -> Unit,
     onClick: () -> Unit

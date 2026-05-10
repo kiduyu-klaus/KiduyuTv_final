@@ -36,7 +36,7 @@ data class DetailUiState(
     val similarTvShows: List<TvShow> = emptyList(),
     val collectionDetail: CollectionDetail? = null,
     val cast: List<CastMember> = emptyList(),
-    val writingAndProductionCrew: List<Crew> = emptyList(),
+    val writingAndProductionCrew: List<CrewMember> = emptyList(),
     val isInMyList: Boolean = false,
     val watchHistoryItem: WatchHistoryItem? = null,
     val trailerKey: String? = null,
