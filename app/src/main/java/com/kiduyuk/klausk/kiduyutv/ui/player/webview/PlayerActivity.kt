@@ -532,7 +532,30 @@ class PlayerActivity : AppCompatActivity() {
             webViewClient = createWebViewClient()
 
             webChromeClient = object : WebChromeClient() {
-                override fun onCreateWindow(view: WebView?, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message?): Boolean = false
+                override fun onCreateWindow(view: WebView?, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message?): Boolean {
+                    // Block all new window creation (popups, dialogs, new tabs)
+                    Log.w(TAG, "[Block] New window creation blocked")
+                    return false
+                }
+
+                override fun onCloseWindow(view: WebView?) {
+                    // Ignore close window requests from content
+                    Log.w(TAG, "[Block] Close window request ignored")
+                }
+
+                override fun onJsAlert(view: WebView?, url: String?, message: String?, result: JsResult?): Boolean {
+                    // Block JavaScript alerts that could be used for popups
+                    Log.w(TAG, "[Block] JS Alert blocked: $message")
+                    result?.cancel()
+                    return true
+                }
+
+                override fun onJsConfirm(view: WebView?, url: String?, message: String?, result: JsResult?): Boolean {
+                    // Block JavaScript confirm dialogs
+                    Log.w(TAG, "[Block] JS Confirm blocked: $message")
+                    result?.cancel()
+                    return true
+                }
             }
 
             val iframeHtml = intent.getStringExtra("IFRAME_HTML")
@@ -617,21 +640,55 @@ class PlayerActivity : AppCompatActivity() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 val url = request?.url.toString() ?: return false
 
-                // Handle navigation to streamingnow.mov
+                // Allow navigation only within the same domain as the original stream
+                val originalHost = Uri.parse(originalStreamUrl).host
+                val requestedHost = request?.url?.host
+
+                // Block external navigation to different domains
+                if (requestedHost != null && originalHost != null && requestedHost != originalHost) {
+                    Log.w(TAG, "[Block] External navigation blocked: $requestedHost (original: $originalHost)")
+                    return true // Block the navigation
+                }
+
+                // Allow navigation within streamingnow.mov (known internal navigation)
                 if (url.contains("streamingnow.mov", ignoreCase = true) ||
                     url.contains("multiembed.mov", ignoreCase = true)) {
                     Log.i(TAG, "[Navigation] Detected streamingnow/multiembed navigation, updating originalStreamUrl to: $url")
                     originalStreamUrl = url
+                    return false // Allow
                 }
 
-                // ★ AdvancedAdBlocker navigation block commented out
-                // if (AdvancedAdBlocker.shouldBlock(url)) {
-                //     blockedRequestsCount++
-                //     Log.d(TAG, "[AdBlock] Blocked navigation to: ${url.take(80)}")
-                //     return true
-                // }
+                // Block navigation to known ad/redirect domains
+                val blockedDomains = listOf(
+                    "googleadservices.com",
+                    "doubleclick.net",
+                    "googlesyndication.com",
+                    "analytics.google.com",
+                    "adservice.google.com",
+                    "clicksor.com",
+                    "adcolony.com",
+                    "unity3d.com/ads",
+                    "applovin.com",
+                    "startapp.com",
+                    "facebook.com/tr",
+                    "bat.bing.com"
+                )
 
-                return false // Allow normal navigation
+                for (domain in blockedDomains) {
+                    if (url.contains(domain, ignoreCase = true)) {
+                        Log.w(TAG, "[Block] Ad domain navigation blocked: $domain")
+                        return true
+                    }
+                }
+
+                // Block javascript: and data: URLs (commonly used for redirects)
+                if (url.startsWith("javascript:", ignoreCase = true) ||
+                    url.startsWith("data:", ignoreCase = true)) {
+                    Log.w(TAG, "[Block] Special URL blocked: $url")
+                    return true
+                }
+
+                return false // Allow all other navigation within domain
             }
 
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
@@ -769,18 +826,137 @@ class PlayerActivity : AppCompatActivity() {
                     const id = (el.id || '').toLowerCase();
                     if (
                         text.includes('advert') || text.includes('sponsored') ||
-                        cls.includes('ad') || cls.includes('popup') ||
-                        id.includes('ad') || id.includes('popup')
+                        text.includes('click to continue') || text.includes('skip ad') ||
+                        cls.includes('ad') || cls.includes('popup') || cls.includes('modal') ||
+                        cls.includes('overlay') || cls.includes('banner') ||
+                        id.includes('ad') || id.includes('popup') || id.includes('modal') ||
+                        id.includes('overlay') || id.includes('banner')
                     ) {
                         el.remove();
+                    }
+                });
+
+                // Remove iframes that are not the main player
+                document.querySelectorAll('iframe').forEach(iframe => {
+                    if (!iframe.src.includes('player') && !iframe.src.includes('embed')) {
+                        iframe.remove();
+                    }
+                });
+
+                // Remove div overlays
+                document.querySelectorAll('div').forEach(div => {
+                    const style = window.getComputedStyle(div);
+                    if (style.position === 'fixed' || style.position === 'absolute') {
+                        if (style.zIndex > 1000 && div.innerText.length < 200) {
+                            div.remove();
+                        }
                     }
                 });
             }
 
             function blockRedirects() {
-                window.open = () => null;
-                window.location.assign = () => {};
-                window.location.replace = () => {};
+                // Block all window.open calls
+                const originalOpen = window.open;
+                window.open = function() {
+                    console.log('[Block] window.open() blocked');
+                    return null;
+                };
+
+                // Block location changes
+                const originalAssign = window.location.assign;
+                window.location.assign = function(url) {
+                    console.log('[Block] location.assign() blocked:', url);
+                    return;
+                };
+
+                const originalReplace = window.location.replace;
+                window.location.replace = function(url) {
+                    console.log('[Block] location.replace() blocked:', url);
+                    return;
+                };
+
+                // Block meta refresh and auto-redirect
+                const metaTags = document.querySelectorAll('meta[http-equiv="refresh"]');
+                metaTags.forEach(meta => meta.remove());
+
+                // Block auto-submit forms
+                document.querySelectorAll('form').forEach(form => {
+                    const originalSubmit = form.submit;
+                    form.submit = function() {
+                        console.log('[Block] form.submit() blocked');
+                        return;
+                    };
+                });
+            }
+
+            function blockPopupsAndOverlays() {
+                // Block alert, confirm, and prompt dialogs
+                const originalAlert = window.alert;
+                window.alert = function(msg) {
+                    console.log('[Block] alert() blocked:', msg);
+                    return;
+                };
+
+                const originalConfirm = window.confirm;
+                window.confirm = function(msg) {
+                    console.log('[Block] confirm() blocked:', msg);
+                    return false;
+                };
+
+                const originalPrompt = window.prompt;
+                window.prompt = function(msg) {
+                    console.log('[Block] prompt() blocked:', msg);
+                    return null;
+                };
+
+                // Block beforeunload events
+                window.onbeforeunload = null;
+                window.removeEventListener('beforeunload', window.onbeforeunload);
+
+                // Remove fixed/overlay elements periodically
+                setInterval(() => {
+                    document.querySelectorAll('[style*="position: fixed"], [style*="position:absolute"]').forEach(el => {
+                        const style = window.getComputedStyle(el);
+                        if (style.zIndex > 100 && el.innerText.length < 500) {
+                            el.remove();
+                        }
+                    });
+                }, 2000);
+            }
+
+            function preventExternalNavigation() {
+                // Monitor for any attempts to navigate away
+                let lastUrl = location.href;
+
+                setInterval(() => {
+                    if (location.href !== lastUrl) {
+                        // Check if it's an external domain
+                        try {
+                            const currentHost = new URL(location.href).hostname;
+                            const originalHost = new URL(lastUrl).hostname;
+                            if (currentHost !== originalHost) {
+                                console.log('[Block] External navigation prevented, returning to:', lastUrl);
+                                location.href = lastUrl;
+                            }
+                        } catch(e) {}
+                        lastUrl = location.href;
+                    }
+                }, 1000);
+
+                // Block document.write
+                document.write = function(content) {
+                    console.log('[Block] document.write() blocked');
+                };
+
+                // Block innerHTML assignments that could inject content
+                const originalSetAttribute = Element.prototype.setAttribute;
+                Element.prototype.setAttribute = function(name, value) {
+                    if (name.toLowerCase().includes('on') && name.toLowerCase().startsWith('on')) {
+                        console.log('[Block] Event attribute blocked:', name);
+                        return;
+                    }
+                    return originalSetAttribute.call(this, name, value);
+                };
             }
 
             function setupMessageListener() {
@@ -929,9 +1105,15 @@ class PlayerActivity : AppCompatActivity() {
                 setInterval(sendVideoProgress, 15000);
             }
 
+            // Execute all blocking functions
             blockRedirects();
+            blockPopupsAndOverlays();
+            preventExternalNavigation();
             removeAdsAdvanced();
             setupMessageListener();
+
+            // Run cleanup periodically
+            setInterval(removeAdsAdvanced, 3000);
         })();
         """.trimIndent()
 
