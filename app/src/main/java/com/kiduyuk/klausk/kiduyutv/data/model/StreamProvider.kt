@@ -350,6 +350,32 @@ object StreamProviderManager {
                     "autoNext" to "true"
                 )
             }
+        ),
+
+        // ═══════════════════════════════════════════════════════════════
+        // 21. VidUp
+        // ═══════════════════════════════════════════════════════════════
+        StreamProvider(
+            name = "VidUp",
+            movieUrlTemplate = "https://vidup.to/movie/%d",
+            tvUrlTemplate = "https://vidup.to/tv/%d/%d/%d",
+            movieParameters = { _, _ ->
+                mapOf("autoPlay" to "true")
+            },
+            tvParameters = { _, _, _, _ ->
+                mapOf("autoPlay" to "true")
+            }
+        ),
+
+        // ═══════════════════════════════════════════════════════════════
+        // 22. PrimeSrc
+        // ═══════════════════════════════════════════════════════════════
+        StreamProvider(
+            name = "PrimeSrc",
+            movieUrlTemplate = "https://primesrc.me/embed/movie?tmdb=%d",
+            tvUrlTemplate = "https://primesrc.me/embed/tv?tmdb=%d&season=%d&episode=%d",
+            movieParameters = { _, _ -> emptyMap() },
+            tvParameters = { _, _, _, _ -> emptyMap() }
         )
     )
 
