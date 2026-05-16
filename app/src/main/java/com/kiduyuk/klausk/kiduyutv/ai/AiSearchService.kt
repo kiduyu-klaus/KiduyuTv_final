@@ -60,7 +60,7 @@ class AiSearchService(
                     val items = movies.take(5).map { movie ->
                         SearchItem(
                             id = movie.id,
-                            title = movie.title,
+                            title = movie.title ?: "",
                             overview = movie.overview?.take(200) ?: "",
                             posterPath = movie.posterPath,
                             voteAverage = movie.voteAverage,
@@ -100,7 +100,7 @@ class AiSearchService(
                     val items = tvShows.take(5).map { show ->
                         SearchItem(
                             id = show.id,
-                            title = show.name,
+                            title = show.name ?: "",
                             overview = show.overview?.take(200) ?: "",
                             posterPath = show.posterPath,
                             voteAverage = show.voteAverage,
@@ -148,7 +148,7 @@ class AiSearchService(
                                 overview = searchResult.overview?.take(200) ?: "",
                                 posterPath = searchResult.posterPath,
                                 voteAverage = searchResult.voteAverage,
-                                releaseDate = searchResult.releaseDate ?: "",
+                                releaseDate = "",
                                 mediaType = MediaType.MOVIE
                             )
                         }
