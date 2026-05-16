@@ -9,6 +9,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
+import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -30,7 +31,7 @@ class TraktAuthActivity : AppCompatActivity() {
     private lateinit var errorContainer: LinearLayout
     private lateinit var tvLoadingMessage: TextView
     private lateinit var tvErrorMessage: TextView
-    private lateinit var btnBack: Button
+    private lateinit var btnBack: ImageButton
     private lateinit var btnRetry: Button
     private lateinit var traktAuthManager: TraktAuthManager
 
