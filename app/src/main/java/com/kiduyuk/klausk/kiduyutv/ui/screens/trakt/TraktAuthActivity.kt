@@ -8,6 +8,7 @@ import android.os.Looper
 import android.view.View
 import android.widget.Button
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -33,6 +34,8 @@ class TraktAuthActivity : AppCompatActivity() {
     private lateinit var tvUserCode: TextView
     private lateinit var tvVerificationUrl: TextView
     private lateinit var tvPollingStatus: TextView
+    private lateinit var tvTimeoutWarning: TextView
+    private lateinit var ivTraktLogo: ImageView
     private lateinit var btnBack: ImageButton
     private lateinit var btnRetry: Button
     private lateinit var traktAuthManager: TraktAuthManager
@@ -45,6 +48,9 @@ class TraktAuthActivity : AppCompatActivity() {
 
         // Polling interval in milliseconds
         private const val POLL_INTERVAL_MS = 5000L
+        
+        // Default code expiration time in seconds
+        private const val DEFAULT_EXPIRES_IN = 600
     }
 
     private var isPolling = false
@@ -52,6 +58,8 @@ class TraktAuthActivity : AppCompatActivity() {
     private var deviceCode: String? = null
     private var intervalMs: Int = POLL_INTERVAL_MS.toInt()
     private var pollRunnable: Runnable? = null
+    private var expiresInSeconds: Int = DEFAULT_EXPIRES_IN
+    private var timeoutRunnable: Runnable? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -66,6 +74,8 @@ class TraktAuthActivity : AppCompatActivity() {
         tvUserCode = findViewById(R.id.tvUserCode)
         tvVerificationUrl = findViewById(R.id.tvVerificationUrl)
         tvPollingStatus = findViewById(R.id.tvPollingStatus)
+        tvTimeoutWarning = findViewById(R.id.tvTimeoutWarning)
+        ivTraktLogo = findViewById(R.id.ivTraktLogo)
         btnBack = findViewById(R.id.btnBack)
         btnRetry = findViewById(R.id.btnRetry)
 
@@ -79,6 +89,7 @@ class TraktAuthActivity : AppCompatActivity() {
         // Back button
         btnBack.setOnClickListener {
             stopPolling()
+            stopTimeoutCountdown()
             finish()
         }
 
@@ -97,6 +108,7 @@ class TraktAuthActivity : AppCompatActivity() {
                 if (result) {
                     showCodeContainer()
                     startPollingForAuth()
+                    startTimeoutCountdown()
                 } else {
                     showError("Failed to get device code. Please try again.")
                 }
@@ -128,12 +140,14 @@ class TraktAuthActivity : AppCompatActivity() {
                 val userCode = json.getString("user_code")
                 val verificationUrl = json.getString("verification_url")
                 intervalMs = json.optInt("interval", 5) * 1000
+                expiresInSeconds = json.optInt("expires_in", DEFAULT_EXPIRES_IN)
 
                 // Update UI with codes
                 runOnUiThread {
                     tvUserCode.text = formatUserCode(userCode)
                     tvVerificationUrl.text = "https://trakt.tv/activate"
                     tvPollingStatus.text = "Waiting for authorization..."
+                    updateTimeoutDisplay(expiresInSeconds)
                 }
 
                 true
@@ -146,13 +160,69 @@ class TraktAuthActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Formats user code for display. Supports both 6-character (XXX-XXX) and 8-character (XXXX-XXXX) codes.
+     */
     private fun formatUserCode(code: String): String {
-        // Format as XXX-XXX for better readability
-        return if (code.length == 6) {
-            "${code.substring(0, 3)}-${code.substring(3)}"
-        } else {
-            code
+        return when {
+            code.length == 8 -> {
+                // Format as XXXX-XXXX (like F279C329)
+                "${code.substring(0, 4)}-${code.substring(4)}"
+            }
+            code.length == 6 -> {
+                // Format as XXX-XXX
+                "${code.substring(0, 3)}-${code.substring(3)}"
+            }
+            code.length == 4 -> {
+                // Format as XX-XX
+                "${code.substring(0, 2)}-${code.substring(2)}"
+            }
+            else -> code
         }
+    }
+
+    /**
+     * Starts the countdown timer for code expiration.
+     */
+    private fun startTimeoutCountdown() {
+        stopTimeoutCountdown()
+        
+        timeoutRunnable = object : Runnable {
+            override fun run() {
+                if (expiresInSeconds > 0) {
+                    updateTimeoutDisplay(expiresInSeconds)
+                    expiresInSeconds--
+                    handler.postDelayed(this!!, 1000)
+                } else {
+                    // Code has expired
+                    runOnUiThread {
+                        showError("Authorization code expired. Please try again.")
+                    }
+                }
+            }
+        }
+        
+        handler.post(timeoutRunnable!!)
+    }
+
+    /**
+     * Stops the timeout countdown.
+     */
+    private fun stopTimeoutCountdown() {
+        timeoutRunnable?.let {
+            handler.removeCallbacks(it)
+        }
+        timeoutRunnable = null
+    }
+
+    /**
+     * Updates the timeout display text.
+     */
+    private fun updateTimeoutDisplay(seconds: Int) {
+        val minutes = seconds / 60
+        val remainingSeconds = seconds % 60
+        val timeString = String.format("%d:%02d", minutes, remainingSeconds)
+        tvTimeoutWarning.text = "Code expires in $timeString"
     }
 
     private fun startPollingForAuth() {
@@ -215,6 +285,9 @@ class TraktAuthActivity : AppCompatActivity() {
                 val error = errorJson?.optString("error", "")
                 if (error == "authorization_pending") {
                     // User hasn't authorized yet, continue polling
+                    runOnUiThread {
+                        tvPollingStatus.text = "Waiting for authorization..."
+                    }
                     return false
                 } else if (error == "expired_token") {
                     // Device code expired, need to restart
@@ -233,6 +306,7 @@ class TraktAuthActivity : AppCompatActivity() {
 
     private fun onAuthSuccess() {
         stopPolling()
+        stopTimeoutCountdown()
         isPolling = false
 
         Toast.makeText(
@@ -267,6 +341,7 @@ class TraktAuthActivity : AppCompatActivity() {
 
     private fun showError(message: String) {
         stopPolling()
+        stopTimeoutCountdown()
         loadingContainer.visibility = View.GONE
         codeContainer.visibility = View.GONE
         errorContainer.visibility = View.VISIBLE
@@ -278,11 +353,13 @@ class TraktAuthActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         stopPolling()
+        stopTimeoutCountdown()
     }
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         stopPolling()
+        stopTimeoutCountdown()
         setResult(RESULT_OK, Intent().apply {
             putExtra(EXTRA_RESULT, RESULT_CANCELLED)
         })

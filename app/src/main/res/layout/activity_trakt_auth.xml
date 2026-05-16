@@ -4,14 +4,14 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#141414">
+    android:background="#1A1A1A">
 
     <!-- Toolbar -->
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="#141414"
+        android:background="#1A1A1A"
         android:elevation="4dp">
 
         <ImageButton
@@ -47,23 +47,23 @@
         android:padding="32dp">
 
         <ProgressBar
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:indeterminateTint="#E50914" />
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:indeterminateTint="#ED2324" />
 
         <TextView
             android:id="@+id/tvLoadingMessage"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="24dp"
             android:text="Connecting to Trakt.tv..."
             android:textColor="#AAAAAA"
-            android:textSize="14sp"
+            android:textSize="18sp"
             android:gravity="center" />
 
     </LinearLayout>
 
-    <!-- Device Code Container -->
+    <!-- Device Code Container - Syncler Style -->
     <LinearLayout
         android:id="@+id/codeContainer"
         android:layout_width="match_parent"
@@ -71,66 +71,122 @@
         android:orientation="vertical"
         android:gravity="center"
         android:visibility="gone"
-        android:padding="32dp">
+        android:padding="48dp">
 
+        <!-- Trakt Logo -->
+        <ImageView
+            android:id="@+id/ivTraktLogo"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:src="@drawable/ic_trakt_logo"
+            android:contentDescription="Trakt.tv Logo"
+            android:layout_marginBottom="40dp" />
+
+        <!-- Activation Code Title -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Go to this URL on your computer or phone:"
-            android:textColor="#AAAAAA"
-            android:textSize="16sp"
-            android:gravity="center" />
+            android:text="Activation Code"
+            android:textColor="#FFFFFF"
+            android:textSize="32sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:layout_marginBottom="32dp" />
 
+        <!-- Instruction Text -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Please go to:"
+            android:textColor="#888888"
+            android:textSize="18sp"
+            android:gravity="center"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Verification URL -->
         <TextView
             android:id="@+id/tvVerificationUrl"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
             android:text="https://trakt.tv/activate"
-            android:textColor="#E50914"
-            android:textSize="18sp"
+            android:textColor="#ED2324"
+            android:textSize="22sp"
             android:textStyle="bold"
             android:gravity="center"
-            android:selectAllOnFocus="true" />
+            android:layout_marginBottom="40dp" />
 
+        <!-- User Code Display Box -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="#2A2A2A"
+            android:padding="32dp"
+            android:paddingStart="48dp"
+            android:paddingEnd="48dp">
+
+            <!-- Large Activation Code -->
+            <TextView
+                android:id="@+id/tvUserCode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="X-X-X-X-X-X-X-X"
+                android:textColor="#FFFFFF"
+                android:textSize="52sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.2"
+                android:gravity="center"
+                android:fontFamily="monospace"
+                android:selectAllOnFocus="true" />
+
+        </LinearLayout>
+
+        <!-- Instruction to enter code -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="32dp"
-            android:text="Then enter this code:"
-            android:textColor="#AAAAAA"
+            android:text="Enter the code above to link your Trakt Account"
+            android:textColor="#666666"
             android:textSize="16sp"
             android:gravity="center" />
 
-        <TextView
-            android:id="@+id/tvUserCode"
+        <!-- Polling Status with Progress -->
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="XXX-XXX"
-            android:textColor="#FFFFFF"
-            android:textSize="48sp"
-            android:textStyle="bold"
-            android:letterSpacing="0.15"
-            android:gravity="center"
-            android:fontFamily="monospace"
-            android:selectAllOnFocus="true" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="48dp">
 
+            <ProgressBar
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:indeterminateTint="#666666" />
+
+            <TextView
+                android:id="@+id/tvPollingStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:text="Waiting for authorization..."
+                android:textColor="#666666"
+                android:textSize="16sp"
+                android:gravity="center" />
+
+        </LinearLayout>
+
+        <!-- Timeout Warning -->
         <TextView
-            android:id="@+id/tvPollingStatus"
+            android:id="@+id/tvTimeoutWarning"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
-            android:text="Waiting for authorization..."
+            android:layout_marginTop="24dp"
+            android:text="Code expires in 10:00"
             android:textColor="#666666"
             android:textSize="14sp"
             android:gravity="center" />
-
-        <ProgressBar
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:layout_marginTop="16dp"
-            android:indeterminateTint="#666666" />
 
     </LinearLayout>
 
@@ -142,33 +198,38 @@
         android:orientation="vertical"
         android:gravity="center"
         android:visibility="gone"
-        android:padding="32dp">
+        android:padding="48dp">
 
         <ImageView
-            android:layout_width="64dp"
-            android:layout_height="64dp"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
             android:src="@drawable/ic_error"
             android:contentDescription="Error"
-            app:tint="#AAAAAA" />
+            app:tint="#888888" />
 
         <TextView
             android:id="@+id/tvErrorMessage"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="32dp"
             android:text="Connection failed"
             android:textColor="#FFFFFF"
-            android:textSize="16sp"
+            android:textSize="20sp"
             android:gravity="center" />
 
         <Button
             android:id="@+id/btnRetry"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
+            android:layout_marginTop="32dp"
             android:text="Retry"
-            android:backgroundTint="#E50914"
-            android:textColor="#FFFFFF" />
+            android:backgroundTint="#ED2324"
+            android:textColor="#FFFFFF"
+            android:paddingStart="48dp"
+            android:paddingEnd="48dp"
+            android:paddingTop="16dp"
+            android:paddingBottom="16dp"
+            android:textSize="18sp" />
 
     </LinearLayout>
 

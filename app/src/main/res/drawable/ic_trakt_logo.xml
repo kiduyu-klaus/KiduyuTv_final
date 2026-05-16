@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+
+    <!-- Outer circle (background) -->
+    <path
+        android:fillColor="#ED2324"
+        android:pathData="M60,60m-55,0a55,55 0,1 1,110 0a55,55 0,1 1,-110 0"/>
+
+    <!-- Inner dark circle -->
+    <path
+        android:fillColor="#141414"
+        android:pathData="M60,60m-45,0a45,45 0,1 1,90 0a45,45 0,1 1,-90 0"/>
+
+    <!-- T letter shape -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M35,30 L85,30 L85,40 L65,40 L65,85 L55,85 L55,40 L35,40 Z"/>
+
+</vector>
