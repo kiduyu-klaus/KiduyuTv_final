@@ -27,16 +27,16 @@ object TraktAuthManager {
     const val TRAKT_CLIENT_ID = "98f8c9590ae29a666942f81c5f86628f0dbe2767d28b88cdedbb7bbbd316e1a0"
     const val TRAKT_CLIENT_SECRET = "12c597436f61997d8fcb31d246af7400359533d0411374f456af6df2bf7313d9"
     
-    // OAuth endpoints
-    private const val TRAKT_AUTH_URL = "https://trakt.tv/oauth/device"
-    private const val TRAKT_TOKEN_URL = "https://api.trakt.tv/oauth/device/token"
-    private const val TRAKT_DEVICE_CODE_URL = "https://api.trakt.tv/oauth/device/code"
+    // OAuth endpoints (public for use by other components)
+    const val TRAKT_AUTH_URL = "https://trakt.tv/oauth/device"
+    const val TRAKT_TOKEN_URL = "https://api.trakt.tv/oauth/device/token"
+    const val TRAKT_DEVICE_CODE_URL = "https://api.trakt.tv/oauth/device/code"
     
     // Redirect URI for Device authentication (Out-of-band)
-    private const val REDIRECT_URI = "urn:ietf:wg:oauth:2.0:oob"
+    const val REDIRECT_URI = "urn:ietf:wg:oauth:2.0:oob"
     
     // Scopes
-    private const val SCOPE = "SCROBBLE,SYNC,SETTINGS"
+    const val SCOPE = "SCROBBLE,SYNC,SETTINGS"
     
     // StateFlow for auth state
     private val _isTraktAuthenticated = MutableStateFlow(false)

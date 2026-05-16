@@ -173,7 +173,7 @@ class TraktAuthActivity : AppCompatActivity() {
                         onAuthSuccess()
                     } else {
                         // Schedule next poll
-                        handler.postDelayed(this@Runnable, intervalMs.toLong())
+                        handler.postDelayed(pollRunnable, intervalMs.toLong())
                     }
                 }
             }
