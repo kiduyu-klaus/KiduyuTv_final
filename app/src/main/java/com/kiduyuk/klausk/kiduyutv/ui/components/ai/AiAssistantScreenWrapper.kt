@@ -2,8 +2,8 @@ package com.kiduyuk.klausk.kiduyutv.ui.components.ai
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -38,13 +38,13 @@ fun AiAssistantScreenWrapper(
         // Main content
         content()
 
-        // Floating Action Button
+        // Floating Action Button - positioned above the bottom navigation bar
         AiAssistantFab(
             onClick = { viewModel.showDialog() },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(16.dp)
-                .navigationBarsPadding()
+                .padding(end = 16.dp, bottom = 72.dp)
+                .systemBarsPadding()
         )
 
         // Chat Dialog
