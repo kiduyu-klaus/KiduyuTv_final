@@ -46,10 +46,30 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.kiduyuk.klausk.kiduyutv.ai.model.ActionCommand
 import com.kiduyuk.klausk.kiduyutv.ai.viewmodel.AiAssistantUiState
 import com.kiduyuk.klausk.kiduyutv.ai.viewmodel.AiAssistantViewModel
+import com.pranavpandey.android.dynamic.toast.DynamicToast
+
+/**
+ * Show toast message when toastMessage changes
+ */
+@Composable
+private fun ToastHandler(uiState: AiAssistantUiState) {
+    val context = LocalContext.current
+    
+    LaunchedEffect(uiState.toastMessage) {
+        uiState.toastMessage?.let { message ->
+            if (message.startsWith("Error:")) {
+                DynamicToast.makeError(context, message, 5000).show()
+            } else {
+                DynamicToast.makeSuccess(context, message, 3000).show()
+            }
+        }
+    }
+}
 
 /**
  * Modal bottom sheet containing the AI chat interface.
@@ -77,6 +97,9 @@ fun AiChatDialog(
         }
     }
 
+    // Show toast messages
+    ToastHandler(uiState = uiState)
+    
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,

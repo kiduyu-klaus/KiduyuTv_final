@@ -1,6 +1,8 @@
 package com.kiduyuk.klausk.kiduyutv.ai.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
+import android.util.Log
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.kiduyuk.klausk.kiduyutv.ai.GeminiService
@@ -20,7 +22,8 @@ data class AiAssistantUiState(
     val messages: List<ChatMessage> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
-    val isDialogVisible: Boolean = false
+    val isDialogVisible: Boolean = false,
+    val toastMessage: String? = null
 )
 
 /**
@@ -30,6 +33,8 @@ data class AiAssistantUiState(
 class AiAssistantViewModel(
     private val geminiService: GeminiService
 ) : ViewModel() {
+
+    private val TAG = "AiAssistantViewModel"
 
     private val _uiState = MutableStateFlow(AiAssistantUiState())
     val uiState: StateFlow<AiAssistantUiState> = _uiState.asStateFlow()
@@ -56,7 +61,12 @@ class AiAssistantViewModel(
      * @param message The user's input message
      */
     fun sendMessage(message: String) {
-        if (message.isBlank()) return
+        if (message.isBlank()) {
+            Log.d(TAG, "sendMessage: message is blank, ignoring")
+            return
+        }
+        
+        Log.d(TAG, "sendMessage: sending message: $message")
 
         viewModelScope.launch {
             // Add user message to the list
@@ -65,17 +75,21 @@ class AiAssistantViewModel(
                 state.copy(
                     messages = state.messages + userMessage,
                     isLoading = true,
-                    error = null
+                    error = null,
+                    toastMessage = null
                 )
             }
+            Log.d(TAG, "sendMessage: user message added, setting loading=true")
 
             // Add to conversation history
             conversationHistory.add(Pair("user", message))
 
             // Get AI response
             val result = geminiService.sendMessage(message, conversationHistory)
+            Log.d(TAG, "sendMessage: got result from GeminiService")
 
             result.onSuccess { response ->
+                Log.d(TAG, "sendMessage: success, response length: ${response.length}")
                 val actions = parseActionsFromResponse(response)
                 val aiMessage = ChatMessage(
                     content = cleanResponseText(response),
@@ -86,16 +100,19 @@ class AiAssistantViewModel(
                 _uiState.update { state ->
                     state.copy(
                         messages = state.messages + aiMessage,
-                        isLoading = false
+                        isLoading = false,
+                        toastMessage = "Response received!"
                     )
                 }
 
                 conversationHistory.add(Pair("assistant", response))
             }.onFailure { exception ->
+                Log.e(TAG, "sendMessage: failure", exception)
                 _uiState.update { state ->
                     state.copy(
                         isLoading = false,
-                        error = "Sorry, I couldn't process that. Please try again."
+                        error = "Sorry, I couldn't process that. Please try again.",
+                        toastMessage = "Error: ${exception.message}"
                     )
                 }
             }

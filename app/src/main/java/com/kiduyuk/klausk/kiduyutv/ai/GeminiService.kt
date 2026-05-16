@@ -1,9 +1,12 @@
 package com.kiduyuk.klausk.kiduyutv.ai
 
+import android.util.Log
 import com.google.ai.client.generativeai.GenerativeModel
 import com.google.ai.client.generativeai.type.content
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+
+private const val TAG = "GeminiService"
 
 /**
  * Service class for interacting with the Gemini AI API.
@@ -30,10 +33,21 @@ class GeminiService(private val apiKey: String) {
         conversationHistory: List<Pair<String, String>> = emptyList()
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
+            Log.d(TAG, "sendMessage called with: $userMessage")
+            Log.d(TAG, "API Key length: ${apiKey.length}")
+            
             val prompt = buildPrompt(userMessage, conversationHistory)
+            Log.d(TAG, "Built prompt, length: ${prompt.length}")
+            
             val response = generativeModel.generateContent(prompt)
-            Result.success(response.text ?: "I couldn't generate a response.")
+            Log.d(TAG, "API Response received: ${response.text?.take(100)}...")
+            
+            val text = response.text ?: "I couldn't generate a response."
+            Log.d(TAG, "Returning text: ${text.take(100)}...")
+            Result.success(text)
         } catch (e: Exception) {
+            Log.e(TAG, "API Error: ${e.message}", e)
+            Log.e(TAG, "Error class: ${e.javaClass.simpleName}")
             Result.failure(e)
         }
     }
