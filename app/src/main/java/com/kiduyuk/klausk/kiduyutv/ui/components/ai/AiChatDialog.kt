@@ -48,10 +48,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import android.widget.Toast
 import com.kiduyuk.klausk.kiduyutv.ai.model.ActionCommand
 import com.kiduyuk.klausk.kiduyutv.ai.viewmodel.AiAssistantUiState
 import com.kiduyuk.klausk.kiduyutv.ai.viewmodel.AiAssistantViewModel
-import com.pranavpandey.android.dynamic.toast.DynamicToast
 
 /**
  * Show toast message when toastMessage changes
@@ -62,11 +62,7 @@ private fun ToastHandler(uiState: AiAssistantUiState) {
     
     LaunchedEffect(uiState.toastMessage) {
         uiState.toastMessage?.let { message ->
-            if (message.startsWith("Error:")) {
-                DynamicToast.makeError(context, message, 5000).show()
-            } else {
-                DynamicToast.makeSuccess(context, message, 3000).show()
-            }
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
         }
     }
 }

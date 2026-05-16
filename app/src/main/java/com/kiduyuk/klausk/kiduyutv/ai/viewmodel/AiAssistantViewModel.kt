@@ -2,7 +2,6 @@ package com.kiduyuk.klausk.kiduyutv.ai.viewmodel
 
 import android.util.Log
 import androidx.lifecycle.ViewModel
-import android.util.Log
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.kiduyuk.klausk.kiduyutv.ai.GeminiService
