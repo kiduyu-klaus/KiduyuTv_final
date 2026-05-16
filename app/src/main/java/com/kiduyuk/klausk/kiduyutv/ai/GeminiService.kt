@@ -2,7 +2,6 @@ package com.kiduyuk.klausk.kiduyutv.ai
 
 import com.google.ai.client.generativeai.GenerativeModel
 import com.google.ai.client.generativeai.type.content
-import com.google.ai.client.generativeai.type.GenerationConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -14,17 +13,9 @@ import kotlinx.coroutines.withContext
  */
 class GeminiService(private val apiKey: String) {
 
-    private val generationConfig = GenerationConfig.builder()
-        .temperature(0.7f)
-        .topK(40)
-        .topP(0.95f)
-        .maxOutputTokens(1024)
-        .build()
-
     private val generativeModel = GenerativeModel(
         modelName = "gemini-2.0-flash",
-        apiKey = apiKey,
-        generationConfig = generationConfig
+        apiKey = apiKey
     )
 
     /**

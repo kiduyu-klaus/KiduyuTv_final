@@ -1,5 +1,6 @@
 package com.kiduyuk.klausk.kiduyutv.ai
 
+import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import com.kiduyuk.klausk.kiduyutv.ai.model.ActionCommand
 import com.kiduyuk.klausk.kiduyutv.ai.model.ActionType
@@ -9,7 +10,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
  * Handles navigation actions triggered from the AI chat.
  */
 class NavigationActionHandler(
-    private val navController: NavHostController
+    private val navController: NavController
 ) {
 
     /**
