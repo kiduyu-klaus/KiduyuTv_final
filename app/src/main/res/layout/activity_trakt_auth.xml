@@ -63,12 +63,76 @@
 
     </LinearLayout>
 
-    <!-- WebView for OAuth -->
-    <WebView
-        android:id="@+id/webView"
+    <!-- Device Code Container -->
+    <LinearLayout
+        android:id="@+id/codeContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:visibility="gone" />
+        android:orientation="vertical"
+        android:gravity="center"
+        android:visibility="gone"
+        android:padding="32dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Go to this URL on your computer or phone:"
+            android:textColor="#AAAAAA"
+            android:textSize="16sp"
+            android:gravity="center" />
+
+        <TextView
+            android:id="@+id/tvVerificationUrl"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="https://trakt.tv/activate"
+            android:textColor="#E50914"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:selectAllOnFocus="true" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:text="Then enter this code:"
+            android:textColor="#AAAAAA"
+            android:textSize="16sp"
+            android:gravity="center" />
+
+        <TextView
+            android:id="@+id/tvUserCode"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="XXX-XXX"
+            android:textColor="#FFFFFF"
+            android:textSize="48sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.15"
+            android:gravity="center"
+            android:fontFamily="monospace"
+            android:selectAllOnFocus="true" />
+
+        <TextView
+            android:id="@+id/tvPollingStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:text="Waiting for authorization..."
+            android:textColor="#666666"
+            android:textSize="14sp"
+            android:gravity="center" />
+
+        <ProgressBar
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginTop="16dp"
+            android:indeterminateTint="#666666" />
+
+    </LinearLayout>
 
     <!-- Error State -->
     <LinearLayout

@@ -28,8 +28,9 @@ object TraktAuthManager {
     const val TRAKT_CLIENT_SECRET = "12c597436f61997d8fcb31d246af7400359533d0411374f456af6df2bf7313d9"
     
     // OAuth endpoints
-    private const val TRAKT_AUTH_URL = "https://trakt.tv/oauth/authorize"
-    private const val TRAKT_TOKEN_URL = "https://api.trakt.tv/oauth/token"
+    private const val TRAKT_AUTH_URL = "https://trakt.tv/oauth/device"
+    private const val TRAKT_TOKEN_URL = "https://api.trakt.tv/oauth/device/token"
+    private const val TRAKT_DEVICE_CODE_URL = "https://api.trakt.tv/oauth/device/code"
     
     // Redirect URI for Device authentication (Out-of-band)
     private const val REDIRECT_URI = "urn:ietf:wg:oauth:2.0:oob"
@@ -59,6 +60,11 @@ object TraktAuthManager {
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
+    
+    // Device code flow state
+    private var deviceCode: String? = null
+    private var userCode: String? = null
+    private var intervalMs: Int = 5000
     
     // SharedPreferences for token storage
     private const val PREFS_NAME = "trakt_auth_prefs"
@@ -116,12 +122,11 @@ object TraktAuthManager {
     }
     
     /**
-     * Generate OAuth authorization URL
+     * Generate OAuth authorization URL for device flow
      */
     fun getAuthorizationUrl(redirectUri: String = REDIRECT_URI): String {
         return "$TRAKT_AUTH_URL?" +
-            "response_type=code" +
-            "&client_id=$TRAKT_CLIENT_ID" +
+            "client_id=$TRAKT_CLIENT_ID" +
             "&redirect_uri=${Uri.encode(redirectUri)}" +
             "&scope=${Uri.encode(SCOPE)}"
     }
@@ -294,6 +299,11 @@ object TraktAuthManager {
         clearTokens()
     }
     
+    /**
+     * Get HTTP client for use in other components
+     */
+    fun getHttpClient(): OkHttpClient = client
+
     /**
      * Check if this is a callback URL from Trakt OAuth
      */
