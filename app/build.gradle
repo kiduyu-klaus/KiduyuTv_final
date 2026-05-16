@@ -84,6 +84,16 @@ android {
         compose true
         buildConfig true
     }
+
+    // Read local.properties for API key
+    def localProperties = new Properties()
+    def localPropertiesFile = rootProject.file('local.properties')
+    if (localPropertiesFile.exists()) {
+        localProperties.load(new FileInputStream(localPropertiesFile))
+    }
+
+    // BuildConfig field for Gemini API Key
+    buildConfigField "String", "GEMINI_API_KEY", "\"${localProperties.getProperty('GEMINI_API_KEY', '')}\""
     composeOptions {
         kotlinCompilerExtensionVersion '1.5.14'
     }
@@ -233,6 +243,12 @@ dependencies {
     // ─────────────────────────────────────────────
 
     implementation 'com.pierfrancescosoffritti.androidyoutubeplayer:core:13.0.0'
+
+    // ─────────────────────────────────────────────
+    // Gemini AI
+    // ─────────────────────────────────────────────
+
+    implementation 'com.google.ai.client.generativeai:generativeai:0.2.0'
 
     // ─────────────────────────────────────────────
     // CuteDialog
