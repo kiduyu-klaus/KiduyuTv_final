@@ -440,7 +440,13 @@ class PlayerActivity : AppCompatActivity() {
             withContext(Dispatchers.IO) {
                 if (existsInHistory) {
                     Log.i(TAG, "[WatchHistory] Item exists, updating season $currentSeason episode $currentEpisode")
-                    repository.updateEpisodeInfo(tmdbId, "tv", currentSeason, currentEpisode)
+                    repository.updateEpisodeInfo(tmdbId, if (isTv) "tv" else "movie", currentSeason, currentEpisode)
+                    // Update playback position for TV shows to ensure they appear in Continue Watching
+                    // Set to 1L as a marker to indicate this item has been watched
+                    // The actual playback position is saved periodically during playback
+                    if (isTv) {
+                        repository.updatePlaybackPosition(tmdbId, "tv", 1L)
+                    }
                 } else {
                     Log.i(TAG, "[WatchHistory] New item, saving to history")
                     repository.saveToWatchHistory(
