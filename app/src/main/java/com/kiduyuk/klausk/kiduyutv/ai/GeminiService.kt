@@ -17,7 +17,7 @@ private const val TAG = "GeminiService"
 class GeminiService(private val apiKey: String) {
 
     private val generativeModel = GenerativeModel(
-        modelName = "gemini-2.0-flash",
+        modelName = "gemini-2.5-flash-lite",
         apiKey = apiKey
     )
 
@@ -33,6 +33,17 @@ class GeminiService(private val apiKey: String) {
         conversationHistory: List<Pair<String, String>> = emptyList()
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
+            // Validate API key before making any API calls
+            if (apiKey.isBlank()) {
+                Log.e(TAG, "API Key is missing or blank. Please configure your Gemini API key in local.properties or as a CI/CD secret.")
+                return@withContext Result.failure(
+                    IllegalStateException(
+                        "Gemini API key is not configured. Please add GEMINI_API_KEY to your local.properties file " +
+                        "or configure it in your CI/CD environment."
+                    )
+                )
+            }
+            
             Log.d(TAG, "sendMessage called with: $userMessage")
             Log.d(TAG, "API Key length: ${apiKey.length}")
             

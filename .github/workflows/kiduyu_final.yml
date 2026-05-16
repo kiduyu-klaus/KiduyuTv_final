@@ -138,9 +138,20 @@ jobs:
       - name: Restore keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > kiduyutv_final
 
+      - name: Configure Gemini API Key
+        run: |
+          if [ -n "${{ secrets.GEMINI_API_KEY }}" ]; then
+            echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> local.properties
+            echo "Gemini API key configured from secrets"
+          else
+            echo "WARNING: GEMINI_API_KEY secret not found. AI Assistant feature may not work in this build."
+          fi
+
       # ── Phone Release ─────────────────────────────────────────
       # ── Phone Release ─────────────────────────────────────────
       - name: Build Phone Release APK
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: ./gradlew assemblePhoneRelease
 
       - name: Rename Phone Release APK
@@ -163,6 +174,8 @@ jobs:
       # ── TV Release ────────────────────────────────────────────
       # ── TV Release ────────────────────────────────────────────
       - name: Build TV Release APK
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: ./gradlew assembleTvRelease
 
       - name: Rename TV Release APK
