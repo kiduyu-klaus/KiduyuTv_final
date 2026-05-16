@@ -159,11 +159,11 @@ class AiSearchService(
                         .map { searchResult ->
                             SearchItem(
                                 id = searchResult.id,
-                                title = searchResult.name ?: "",
+                                title = searchResult.title ?: "",
                                 overview = searchResult.overview?.take(200) ?: "",
                                 posterPath = searchResult.posterPath,
                                 voteAverage = searchResult.voteAverage,
-                                releaseDate = searchResult.firstAirDate ?: "",
+                                releaseDate = "",
                                 mediaType = MediaType.TV_SHOW
                             )
                         }
