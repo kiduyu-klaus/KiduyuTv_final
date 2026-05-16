@@ -10,6 +10,7 @@ import android.os.Looper
 import android.os.Message
 import android.os.SystemClock
 import android.util.Log
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
@@ -18,12 +19,20 @@ import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.app.UiModeManager
 import android.content.Context
+import android.widget.FrameLayout
+import android.widget.ImageButton
+import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.TextView
 import android.widget.Toast
 import android.content.res.Configuration
 import android.webkit.*
-import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
@@ -95,6 +104,14 @@ class PlayerActivity : AppCompatActivity() {
     private var hasShownError = false
     private var videoLoadCheckHandler: Handler? = null
     private var videoLoadCheckRunnable: Runnable? = null
+
+    // UI state for fullscreen custom layout
+    private var isLoading = true
+    private var hasError = false
+    private lateinit var controlsOverlay: LinearLayout
+    private lateinit var loadingIndicator: ProgressBar
+    private lateinit var errorContainer: LinearLayout
+    private lateinit var btnBack: ImageButton
 
     // Stream retry state
     private var streamRetryCount = 0
@@ -216,7 +233,9 @@ class PlayerActivity : AppCompatActivity() {
 
                 if (hasVideo && isPlaying) {
                     isVideoLoaded = true
+                    isLoading = false
                     cancelVideoLoadTimeoutCheck()
+                    updateLoadingVisibility(false)
                     Log.i(TAG, "[Video Check] Video loaded and playing successfully")
                     return@evaluateJavascript
                 }
@@ -224,6 +243,8 @@ class PlayerActivity : AppCompatActivity() {
                 if (hasError) {
                     if (!hasShownError) {
                         hasShownError = true
+                        isLoading = false
+                        updateLoadingVisibility(false)
                         runOnUiThread {
                             showVideoErrorDialog("Video Error", message)
                         }
@@ -301,6 +322,7 @@ class PlayerActivity : AppCompatActivity() {
     private val cursorHideRunnable = Runnable {
         if (!isCursorDisabled) {
             cursorView.animate().alpha(0f).setDuration(500).start()
+            hideControlsOverlay()
         }
     }
 
@@ -312,59 +334,64 @@ class PlayerActivity : AppCompatActivity() {
             val isTv = intent.getBooleanExtra("IS_TV", false)
 
             if (tmdbId != -1 && latestTimestamp > 0) {
-                try {
-                    val repository = TmdbRepository()
+                lifecycleScope.launch(Dispatchers.IO) {
+                    try {
+                        val repository = TmdbRepository()
 
-                    val mediaType = when {
-                        latestContentType.isNotEmpty() && latestContentType != "null" -> latestContentType
-                        isTv -> "tv"
-                        else -> "movie"
+                        val mediaType = when {
+                            latestContentType.isNotEmpty() && latestContentType != "null" -> latestContentType
+                            isTv -> "tv"
+                            else -> "movie"
+                        }
+
+                        val playbackPosition = if (latestTimestamp > 0) {
+                            latestTimestamp
+                        } else if (latestDuration > 0 && latestProgress > 0) {
+                            ((latestProgress / 100.0) * latestDuration).toLong()
+                        } else 0L
+
+                        repository.updatePlaybackPosition(tmdbId, mediaType, playbackPosition)
+
+                        val isTvContent = mediaType == "tv" || mediaType == "anime" || isTv
+                        val seasonToSync = if (isTvContent) (if (latestSeason > 0) latestSeason else currentSeason) else null
+                        val episodeToSync = if (isTvContent) (if (latestEpisode > 0) latestEpisode else currentEpisode) else null
+
+                        Log.d(TAG, "Syncing watch history to Firebase: tmdbId=$tmdbId, isTv=$isTvContent, season=$seasonToSync, episode=$episodeToSync, position=${playbackPosition}s")
+
+                        // Run Firebase sync in background
+                        withContext(Dispatchers.IO) {
+                            FirebaseManager.syncWatchHistory(
+                                tmdbId = tmdbId,
+                                isTv = isTvContent,
+                                seasonNumber = seasonToSync,
+                                episodeNumber = episodeToSync,
+                                playbackPosition = playbackPosition,
+                                duration = latestDuration,
+                                title = contentTitle,
+                                overview = contentOverview,
+                                posterPath = contentPosterPath,
+                                backdropPath = contentBackdropPath,
+                                voteAverage = contentVoteAverage,
+                                releaseDate = contentReleaseDate
+                            )
+                        }
+
+                        val seasonToSave = if (latestSeason > 0 && (mediaType == "tv" || mediaType == "anime")) latestSeason else currentSeason
+                        val episodeToSave = if (latestEpisode > 0 && (mediaType == "tv" || mediaType == "anime")) latestEpisode else currentEpisode
+
+                        if (mediaType == "tv" || mediaType == "anime" || isTv) {
+                            repository.updateEpisodeInfo(tmdbId, mediaType, seasonToSave, episodeToSave)
+                            Log.i(TAG, String.format("[Progress Save] position=%ds (%.1f%%), S%dE%d saved", playbackPosition, latestProgress, seasonToSave, episodeToSave))
+                        } else {
+                            Log.i(TAG, String.format("[Progress Save] position=%ds (%.1f%%) saved for movie", playbackPosition, latestProgress))
+                        }
+
+                        if (seasonToSave > 0) currentSeason = seasonToSave
+                        if (episodeToSave > 0) currentEpisode = episodeToSave
+
+                    } catch (e: Exception) {
+                        Log.e(TAG, "[Progress Save] Error saving progress: ${e.message}")
                     }
-
-                    val playbackPosition = if (latestTimestamp > 0) {
-                        latestTimestamp
-                    } else if (latestDuration > 0 && latestProgress > 0) {
-                        ((latestProgress / 100.0) * latestDuration).toLong()
-                    } else 0L
-
-                    repository.updatePlaybackPosition(tmdbId, mediaType, playbackPosition)
-
-                    val isTvContent = mediaType == "tv" || mediaType == "anime" || isTv
-                    val seasonToSync = if (isTvContent) (if (latestSeason > 0) latestSeason else currentSeason) else null
-                    val episodeToSync = if (isTvContent) (if (latestEpisode > 0) latestEpisode else currentEpisode) else null
-
-                    Log.d(TAG, "Syncing watch history to Firebase: tmdbId=$tmdbId, isTv=$isTvContent, season=$seasonToSync, episode=$episodeToSync, position=${playbackPosition}s")
-
-                    FirebaseManager.syncWatchHistory(
-                        tmdbId = tmdbId,
-                        isTv = isTvContent,
-                        seasonNumber = seasonToSync,
-                        episodeNumber = episodeToSync,
-                        playbackPosition = playbackPosition,
-                        duration = latestDuration,
-                        title = contentTitle,
-                        overview = contentOverview,
-                        posterPath = contentPosterPath,
-                        backdropPath = contentBackdropPath,
-                        voteAverage = contentVoteAverage,
-                        releaseDate = contentReleaseDate
-                    )
-
-                    val seasonToSave = if (latestSeason > 0 && (mediaType == "tv" || mediaType == "anime")) latestSeason else currentSeason
-                    val episodeToSave = if (latestEpisode > 0 && (mediaType == "tv" || mediaType == "anime")) latestEpisode else currentEpisode
-
-                    if (mediaType == "tv" || mediaType == "anime" || isTv) {
-                        repository.updateEpisodeInfo(tmdbId, mediaType, seasonToSave, episodeToSave)
-                        Log.i(TAG, String.format("[Progress Save] position=%ds (%.1f%%), S%dE%d saved", playbackPosition, latestProgress, seasonToSave, episodeToSave))
-                    } else {
-                        Log.i(TAG, String.format("[Progress Save] position=%ds (%.1f%%) saved for movie", playbackPosition, latestProgress))
-                    }
-
-                    if (seasonToSave > 0) currentSeason = seasonToSave
-                    if (episodeToSave > 0) currentEpisode = episodeToSave
-
-                } catch (e: Exception) {
-                    Log.e(TAG, "[Progress Save] Error saving progress: ${e.message}")
                 }
             } else {
                 Log.i(TAG, "[Progress Save] No valid timestamp received yet from player")
@@ -406,28 +433,33 @@ class PlayerActivity : AppCompatActivity() {
             Log.i(TAG, "[Device] TV detected, cursor enabled")
         }
 
-        val existsInHistory = repository.isInWatchHistory(this, tmdbId, isTv)
+        // Run watch history check in background thread
+        lifecycleScope.launch(Dispatchers.IO) {
+            val existsInHistory = repository.isInWatchHistory(this@PlayerActivity, tmdbId, isTv)
 
-        if (existsInHistory) {
-            Log.i(TAG, "[WatchHistory] Item exists, updating season $currentSeason episode $currentEpisode")
-            repository.updateEpisodeInfo(tmdbId, "tv", currentSeason, currentEpisode)
-        } else {
-            Log.i(TAG, "[WatchHistory] New item, saving to history")
-            repository.saveToWatchHistory(
-                this,
-                WatchHistoryItem(
-                    id = tmdbId,
-                    title = contentTitle,
-                    overview = contentOverview,
-                    posterPath = contentPosterPath,
-                    backdropPath = contentBackdropPath,
-                    voteAverage = contentVoteAverage,
-                    releaseDate = contentReleaseDate,
-                    isTv = isTv,
-                    seasonNumber = if (isTv) currentSeason else null,
-                    episodeNumber = if (isTv) currentEpisode else null
-                )
-            )
+            withContext(Dispatchers.IO) {
+                if (existsInHistory) {
+                    Log.i(TAG, "[WatchHistory] Item exists, updating season $currentSeason episode $currentEpisode")
+                    repository.updateEpisodeInfo(tmdbId, "tv", currentSeason, currentEpisode)
+                } else {
+                    Log.i(TAG, "[WatchHistory] New item, saving to history")
+                    repository.saveToWatchHistory(
+                        this@PlayerActivity,
+                        WatchHistoryItem(
+                            id = tmdbId,
+                            title = contentTitle,
+                            overview = contentOverview,
+                            posterPath = contentPosterPath,
+                            backdropPath = contentBackdropPath,
+                            voteAverage = contentVoteAverage,
+                            releaseDate = contentReleaseDate,
+                            isTv = isTv,
+                            seasonNumber = if (isTv) currentSeason else null,
+                            episodeNumber = if (isTv) currentEpisode else null
+                        )
+                    )
+                }
+            }
         }
 
         val url = intent.getStringExtra("STREAM_URL") ?: if (isTv) {
@@ -536,6 +568,10 @@ class PlayerActivity : AppCompatActivity() {
                     super.onPageStarted(view, url, favicon)
                     isPageLoaded = false
                     isVideoLoaded = false
+                    isLoading = true
+                    hasError = false
+                    updateLoadingVisibility(true)
+                    updateErrorVisibility(false)
 
                     // Update originalStreamUrl if navigating to streamingnow.mov or multiembed.mov
                     url?.let {
@@ -552,6 +588,8 @@ class PlayerActivity : AppCompatActivity() {
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
                     isPageLoaded = true
+                    isLoading = false
+                    updateLoadingVisibility(false)
                     Log.i(TAG, "[WebView] Page finished loading: $url")
 
                     // Inject video detection script
@@ -567,6 +605,10 @@ class PlayerActivity : AppCompatActivity() {
                     super.onReceivedError(view, errorCode, description, failingUrl)
                     val errorDescription = description ?: "Unknown error"
                     Log.e(TAG, "[WebView] Error received: $errorDescription (code: $errorCode)")
+                    isLoading = false
+                    hasError = true
+                    updateLoadingVisibility(false)
+                    updateErrorVisibility(true)
                     handleStreamError("Error: $errorDescription (Code: $errorCode)")
                 }
 
@@ -576,6 +618,10 @@ class PlayerActivity : AppCompatActivity() {
                         val statusCode = errorResponse?.statusCode ?: 0
                         Log.e(TAG, "[WebView] HTTP Error on main frame: $statusCode")
                         if (statusCode >= 400) {
+                            isLoading = false
+                            hasError = true
+                            updateLoadingVisibility(false)
+                            updateErrorVisibility(true)
                             handleStreamError("Server returned error code: $statusCode")
                         }
                     }
@@ -618,11 +664,100 @@ class PlayerActivity : AppCompatActivity() {
             )
         }
 
+        // Controls Overlay (Back Button - Top Left)
+        controlsOverlay = LinearLayout(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = Gravity.TOP or Gravity.START
+                setMargins(32, 48, 32, 32)
+            }
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(16, 16, 16, 16)
+        }
+
+        btnBack = ImageButton(this).apply {
+            layoutParams = LinearLayout.LayoutParams(96, 96)
+            setBackgroundResource(android.R.drawable.dark_header)
+            alpha = 0.6f
+            setImageResource(android.R.drawable.ic_menu_revert)
+            setOnClickListener {
+                showExitConfirmationDialog()
+            }
+        }
+        controlsOverlay.addView(btnBack)
+
+        // Loading Indicator (Center)
+        loadingIndicator = ProgressBar(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = Gravity.CENTER
+            }
+            isIndeterminate = true
+            visibility = View.VISIBLE
+        }
+
+        // Error Container (Center)
+        errorContainer = LinearLayout(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = Gravity.CENTER
+                setMargins(48, 0, 48, 0)
+            }
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            visibility = View.GONE
+            setPadding(48, 32, 48, 32)
+        }
+
+        val errorIcon = TextView(this).apply {
+            text = "!"
+            textSize = 48f
+            setTextColor(0xFF888888.toInt())
+            gravity = Gravity.CENTER
+        }
+        errorContainer.addView(errorIcon)
+
+        val errorMessage = TextView(this).apply {
+            id = View.generateViewId()
+            text = "Video failed to load"
+            textSize = 18f
+            setTextColor(0xFFFFFFFF.toInt())
+            gravity = Gravity.CENTER
+            setPadding(0, 32, 0, 32)
+        }
+        errorContainer.addView(errorMessage)
+
+        val btnRetry = android.widget.Button(this).apply {
+            text = "Retry"
+            setOnClickListener {
+                hasShownError = false
+                hasError = false
+                isVideoLoaded = false
+                isPageLoaded = false
+                streamRetryCount = 0
+                cancelVideoLoadTimeoutCheck()
+                updateErrorVisibility(false)
+                webView.loadUrl(originalStreamUrl)
+            }
+        }
+        errorContainer.addView(btnRetry)
+
+        // Add all views to root layout
         rootLayout.addView(webView)
         if (!isCursorDisabled) {
             rootLayout.addView(cursorView)
             cursorView.bringToFront()
         }
+        rootLayout.addView(loadingIndicator)
+        rootLayout.addView(errorContainer)
+        rootLayout.addView(controlsOverlay)
+        controlsOverlay.bringToFront()
 
         setContentView(rootLayout)
         rootLayout.isFocusable = true
@@ -648,6 +783,38 @@ class PlayerActivity : AppCompatActivity() {
                 showExitConfirmationDialog()
             }
         })
+    }
+
+    /**
+     * Update loading indicator visibility
+     */
+    private fun updateLoadingVisibility(visible: Boolean) {
+        runOnUiThread {
+            loadingIndicator.visibility = if (visible) View.VISIBLE else View.GONE
+        }
+    }
+
+    /**
+     * Update error container visibility
+     */
+    private fun updateErrorVisibility(visible: Boolean) {
+        runOnUiThread {
+            errorContainer.visibility = if (visible) View.VISIBLE else View.GONE
+        }
+    }
+
+    /**
+     * Show controls overlay when cursor is shown
+     */
+    private fun showControlsOverlay() {
+        controlsOverlay.animate().alpha(1f).setDuration(300).start()
+    }
+
+    /**
+     * Hide controls overlay when cursor is hidden
+     */
+    private fun hideControlsOverlay() {
+        controlsOverlay.animate().alpha(0f).setDuration(300).start()
     }
 
     /**
@@ -1003,6 +1170,8 @@ class PlayerActivity : AppCompatActivity() {
         if (isCursorDisabled) return
         cursorView.animate().cancel()
         cursorView.alpha = 1f
+        cursorView.visibility = View.VISIBLE
+        showControlsOverlay()
         cursorHideHandler.removeCallbacks(cursorHideRunnable)
         cursorHideHandler.postDelayed(cursorHideRunnable, 5000)
     }
@@ -1025,26 +1194,28 @@ class PlayerActivity : AppCompatActivity() {
                     val tmdbId = intent.getIntExtra("TMDB_ID", -1)
                     val isTv = intent.getBooleanExtra("IS_TV", false)
                     if (tmdbId != -1) {
-                        val repository = TmdbRepository()
-                        repository.updatePlaybackPosition(tmdbId, if (isTv) "tv" else "movie", currentTime.toLong())
-                        if (isTv) {
-                            repository.updateEpisodeInfo(tmdbId, "tv", currentSeason, currentEpisode)
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            val repository = TmdbRepository()
+                            repository.updatePlaybackPosition(tmdbId, if (isTv) "tv" else "movie", currentTime.toLong())
+                            if (isTv) {
+                                repository.updateEpisodeInfo(tmdbId, "tv", currentSeason, currentEpisode)
+                            }
+                            FirebaseManager.syncWatchHistory(
+                                tmdbId = tmdbId,
+                                isTv = isTv,
+                                seasonNumber = if (isTv) currentSeason else null,
+                                episodeNumber = if (isTv) currentEpisode else null,
+                                playbackPosition = currentTime.toLong(),
+                                duration = latestDuration,
+                                title = contentTitle,
+                                overview = contentOverview,
+                                posterPath = contentPosterPath,
+                                backdropPath = contentBackdropPath,
+                                voteAverage = contentVoteAverage,
+                                releaseDate = contentReleaseDate
+                            )
+                            Log.i(TAG, "Final playback position saved: ${currentTime}s (S$currentSeason E$currentEpisode) to local and Firebase")
                         }
-                        FirebaseManager.syncWatchHistory(
-                            tmdbId = tmdbId,
-                            isTv = isTv,
-                            seasonNumber = if (isTv) currentSeason else null,
-                            episodeNumber = if (isTv) currentEpisode else null,
-                            playbackPosition = currentTime.toLong(),
-                            duration = latestDuration,
-                            title = contentTitle,
-                            overview = contentOverview,
-                            posterPath = contentPosterPath,
-                            backdropPath = contentBackdropPath,
-                            voteAverage = contentVoteAverage,
-                            releaseDate = contentReleaseDate
-                        )
-                        Log.i(TAG, "Final playback position saved: ${currentTime}s (S$currentSeason E$currentEpisode) to local and Firebase")
                     }
                 } catch (e: Exception) {
                     Log.w(TAG, "Error saving final playback position: ${e.message}")
