@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.Smart
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -61,8 +61,8 @@ fun AiAssistantFab(
                 modifier = Modifier.size(56.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Filled.Chat,
-                    contentDescription = "AI Assistant",
+                    imageVector = Icons.Filled.Smart,
+                    contentDescription = "AI Assistant Robot",
                     modifier = Modifier.size(28.dp)
                 )
             }
