@@ -441,6 +441,7 @@ fun MobileHomeScreen(
             }
         }
     }
+    }
 }
 
 @Composable

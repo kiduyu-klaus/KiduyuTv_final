@@ -205,6 +205,7 @@ fun MobileTvShowsScreen(
             }
         }
     }
+    }
 }
 
 @Composable

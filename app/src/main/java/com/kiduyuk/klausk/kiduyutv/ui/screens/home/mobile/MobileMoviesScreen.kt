@@ -394,6 +394,7 @@ fun MobileMoviesScreen(
             }
         }
     }
+    }
 }
 
 @Composable
