@@ -519,9 +519,10 @@ object NetworkConnectivityChecker {
                 Log.i(TAG, "  - Metered: $isMetered")
                 
                 // Check if DNS, VPN, or Proxy is detected and show warning dialog
-                // Only show if internet is reachable (to avoid showing when there's no connection)
+                // Custom DNS always shows dialog (even without internet reachability)
+                // VPN/proxy only show dialog if internet is reachable
                 val isReachable = testInternetReachability()
-                if (isReachable && (isCustomDns || isVpn || isProxy)) {
+                if (isCustomDns || (isReachable && (isVpn || isProxy))) {
                     withContext(Dispatchers.Main) {
                         // Only show dialog if app is in foreground
                         if (isAppInForeground()) {
