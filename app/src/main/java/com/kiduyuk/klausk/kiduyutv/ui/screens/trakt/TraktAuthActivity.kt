@@ -51,6 +51,7 @@ class TraktAuthActivity : AppCompatActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private var deviceCode: String? = null
     private var intervalMs: Int = POLL_INTERVAL_MS.toInt()
+    private var pollRunnable: Runnable? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -163,7 +164,7 @@ class TraktAuthActivity : AppCompatActivity() {
         }
 
         // Start polling using a runnable
-        val pollRunnable = object : Runnable {
+        pollRunnable = object : Runnable {
             override fun run() {
                 if (!isPolling) return
 
@@ -173,14 +174,14 @@ class TraktAuthActivity : AppCompatActivity() {
                         onAuthSuccess()
                     } else {
                         // Schedule next poll
-                        handler.postDelayed(pollRunnable, intervalMs.toLong())
+                        handler.postDelayed(pollRunnable!!, intervalMs.toLong())
                     }
                 }
             }
         }
 
         // First poll happens immediately
-        handler.post(pollRunnable)
+        handler.post(pollRunnable!!)
     }
 
     private suspend fun pollForToken(): Boolean {
