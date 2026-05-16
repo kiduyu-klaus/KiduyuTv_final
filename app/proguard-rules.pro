@@ -116,4 +116,36 @@
 ##############################################
 
 # Prevent overly aggressive optimization (safer for streaming apps)
--optimizations !code/simplification/arithmetic
+-optimizations !code/simplification/arithmetic##############################################
+# 🤖 GEMINI AI SDK
+##############################################
+
+# Keep Gemini AI SDK classes
+-keep class com.google.ai.client.generativeai.** { *; }
+
+# Keep GenerativeModel and related classes
+-keep class com.google.ai.client.generativeai.GenerativeModel { *; }
+-keep class com.google.ai.client.generativeai.type.** { *; }
+-keep class com.google.ai.client.generativeai.java.** { *; }
+-keep class com.google.ai.client.generativeai.kotlin.** { *; }
+
+# Keep content and response classes
+-keep class com.google.ai.client.generativeai.model.** { *; }
+-keep class com.google.ai.client.generativeai.api.** { *; }
+
+# Prevent warnings for AI SDK dependencies
+-dontwarn com.google.ai.client.generativeai.**
+-dontwarn com.google.protobuf.**
+-dontwarn com.google.api.**
+-dontwarn com.google.errorprone.**
+-dontwarn org.conscrypt.**
+-dontwarn javax.annotation.**
+-dontwarn javax.inject.**
+
+# Keep AI response and request classes
+-keep class com.google.ai.client.generativeai.service.** { *; }
+-keep class com.google.ai.client.generativeai.exception.** { *; }
+
+# Keep Kotlin coroutines support for AI SDK
+-keepclassmembers class kotlinx.coroutines.** { *; }
+-dontwarn kotlinx.coroutines.**

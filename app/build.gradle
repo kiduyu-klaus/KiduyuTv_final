@@ -11,6 +11,13 @@ android {
 
     compileSdk 35
 
+    // Read local.properties for API key
+    def localProperties = new Properties()
+    def localPropertiesFile = rootProject.file('local.properties')
+    if (localPropertiesFile.exists()) {
+        localProperties.load(new FileInputStream(localPropertiesFile))
+    }
+
     defaultConfig {
         applicationId "com.kiduyuk.klausk.kiduyutv"
         minSdk 24
@@ -23,6 +30,9 @@ android {
             useSupportLibrary true
         }
         multiDexEnabled = true
+
+        // BuildConfig field for Gemini API Key
+        buildConfigField "String", "GEMINI_API_KEY", "\"${localProperties.getProperty('GEMINI_API_KEY', '')}\""
     }
 
     signingConfigs {
@@ -85,15 +95,9 @@ android {
         buildConfig true
     }
 
-    // Read local.properties for API key
-    def localProperties = new Properties()
-    def localPropertiesFile = rootProject.file('local.properties')
-    if (localPropertiesFile.exists()) {
-        localProperties.load(new FileInputStream(localPropertiesFile))
-    }
+    // BuildConfig field for Gemini API Key - read from local.properties
+    // Note: Already defined in defaultConfig above
 
-    // BuildConfig field for Gemini API Key
-    buildConfigField "String", "GEMINI_API_KEY", "\"${localProperties.getProperty('GEMINI_API_KEY', '')}\""
     composeOptions {
         kotlinCompilerExtensionVersion '1.5.14'
     }

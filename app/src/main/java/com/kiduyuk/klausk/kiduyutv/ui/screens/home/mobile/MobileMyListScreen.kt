@@ -24,11 +24,14 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
+import com.kiduyuk.klausk.kiduyutv.ai.NavigationActionHandler
+import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileMovieCard
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileTvShowCard
+import com.kiduyuk.klausk.kiduyutv.ui.components.ai.AiAssistantScreenWrapper
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -44,6 +47,9 @@ fun MobileMyListScreen(
     val myList by MyListManager.myList.collectAsState()
     val context = LocalContext.current
 
+    // Create AI Assistant action handler
+    val actionHandler = remember { NavigationActionHandler(navController) }
+
     // Categorize items
     val movies = myList.filter { it.type == "movie" }
     val tvShows = myList.filter { it.type == "tv" }
@@ -55,7 +61,12 @@ fun MobileMyListScreen(
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     val tabs = listOf("Movies", "TV Shows", "Companies", "Networks", "Cast")
 
-    Scaffold(
+    // Wrap with AI Assistant
+    AiAssistantScreenWrapper(
+        apiKey = BuildConfig.GEMINI_API_KEY,
+        onActionClick = { action -> actionHandler.handleAction(action) }
+    ) {
+        Scaffold(
         topBar = {
             TopAppBar(
                 title = {

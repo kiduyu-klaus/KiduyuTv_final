@@ -20,10 +20,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import com.kiduyuk.klausk.kiduyutv.ai.NavigationActionHandler
 import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
 import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
 import com.kiduyuk.klausk.kiduyutv.ui.components.*
+import com.kiduyuk.klausk.kiduyutv.ui.components.ai.AiAssistantScreenWrapper
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeViewModel
@@ -67,6 +69,9 @@ fun MobileHomeScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+    
+    // Create AI Assistant action handler
+    val actionHandler = remember { NavigationActionHandler(navController) }
 
     LaunchedEffect(Unit) {
         viewModel.loadHomeContent(context)
@@ -132,9 +137,14 @@ fun MobileHomeScreen(
     }
     val isSelectedItemInMyList = myList.any { item -> item.id == selectedItemId && item.type == selectedItemType }
 
-    Scaffold(
-        bottomBar = { MobileBottomNavigation(navController, currentRoute) }
-    ) { innerPadding ->
+    // Wrap with AI Assistant
+    AiAssistantScreenWrapper(
+        apiKey = BuildConfig.GEMINI_API_KEY,
+        onActionClick = { action -> actionHandler.handleAction(action) }
+    ) {
+        Scaffold(
+            bottomBar = { MobileBottomNavigation(navController, currentRoute) }
+        ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
