@@ -15,19 +15,33 @@ interface TraktApiService {
      * Get user profile
      */
     @GET("users/me")
-    suspend fun getUserProfile(): Response<TraktUser>
+    suspend fun getUserProfile(
+        @Header("Authorization") token: String
+    ): Response<TraktUser>
+    
+    /**
+     * Get user settings
+     */
+    @GET("users/me/settings")
+    suspend fun getSettings(
+        @Header("Authorization") token: String
+    ): Response<TraktSettings>
     
     /**
      * Get watched movies
      */
     @GET("users/me/watched/movies")
-    suspend fun getWatchedMovies(): Response<List<TraktWatchedMovie>>
+    suspend fun getWatchedMovies(
+        @Header("Authorization") token: String
+    ): Response<List<TraktWatchedMovie>>
     
     /**
      * Get watched shows (includes all seasons/episodes)
      */
     @GET("users/me/watched/shows")
-    suspend fun getWatchedShows(): Response<List<TraktWatchedShow>>
+    suspend fun getWatchedShows(
+        @Header("Authorization") token: String
+    ): Response<List<TraktWatchedShow>>
     
     // ── Sync ────────────────────────────────────────────────────────────────
     
@@ -36,6 +50,7 @@ interface TraktApiService {
      */
     @GET("sync/playback")
     suspend fun getPlaybackProgress(
+        @Header("Authorization") token: String,
         @Query("type") type: String
     ): Response<List<TraktPlaybackProgress>>
     
@@ -44,6 +59,7 @@ interface TraktApiService {
      */
     @GET("users/me/watchlist")
     suspend fun getWatchlist(
+        @Header("Authorization") token: String,
         @Query("type") type: String,
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 100
@@ -54,6 +70,7 @@ interface TraktApiService {
      */
     @POST("sync/watchlist")
     suspend fun addToWatchlist(
+        @Header("Authorization") token: String,
         @Body items: TraktSyncItems
     ): Response<TraktSyncResponse>
     
@@ -62,16 +79,27 @@ interface TraktApiService {
      */
     @DELETE("sync/watchlist")
     suspend fun removeFromWatchlist(
+        @Header("Authorization") token: String,
         @Body items: TraktSyncItems
     ): Response<TraktSyncResponse>
     
     // ── Scrobble ────────────────────────────────────────────────────────────
     
     /**
-     * Start scrobbling (start watching)
+     * Start scrobbling (start watching) for movie
      */
     @POST("scrobble/start")
-    suspend fun scrobbleStart(
+    suspend fun scrobbleMovie(
+        @Header("Authorization") token: String,
+        @Body scrobble: TraktScrobbleRequest
+    ): Response<TraktScrobbleResponse>
+    
+    /**
+     * Start scrobbling (start watching) for episode
+     */
+    @POST("scrobble/start")
+    suspend fun scrobbleEpisode(
+        @Header("Authorization") token: String,
         @Body scrobble: TraktScrobbleRequest
     ): Response<TraktScrobbleResponse>
     
@@ -80,6 +108,7 @@ interface TraktApiService {
      */
     @POST("scrobble/pause")
     suspend fun scrobblePause(
+        @Header("Authorization") token: String,
         @Body scrobble: TraktScrobbleRequest
     ): Response<TraktScrobbleResponse>
     
@@ -88,6 +117,7 @@ interface TraktApiService {
      */
     @POST("scrobble/stop")
     suspend fun scrobbleStop(
+        @Header("Authorization") token: String,
         @Body scrobble: TraktScrobbleRequest
     ): Response<TraktScrobbleResponse>
     
@@ -98,6 +128,7 @@ interface TraktApiService {
      */
     @POST("sync/history")
     suspend fun addToHistory(
+        @Header("Authorization") token: String,
         @Body items: TraktSyncItems
     ): Response<TraktSyncResponse>
     
@@ -105,9 +136,32 @@ interface TraktApiService {
      * Get watch history
      */
     @GET("users/me/history")
-    suspend fun getWatchHistory(
+    suspend fun getWatchedHistory(
+        @Header("Authorization") token: String,
         @Query("type") type: String? = null,
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 100
     ): Response<List<TraktHistoryItem>>
+    
+    // ── Collection ──────────────────────────────────────────────────────────
+    
+    /**
+     * Get user's collection
+     */
+    @GET("users/me/collection")
+    suspend fun getCollection(
+        @Header("Authorization") token: String,
+        @Query("type") type: String = "movies"
+    ): Response<List<TraktCollectionItem>>
+    
+    // ── Recommendations ──────────────────────────────────────────────────────
+    
+    /**
+     * Get user's personalized recommendations
+     */
+    @GET("users/me/recommendations")
+    suspend fun getRecommendations(
+        @Header("Authorization") token: String,
+        @Query("type") type: String = "movies"
+    ): Response<List<TraktRecommendation>>
 }

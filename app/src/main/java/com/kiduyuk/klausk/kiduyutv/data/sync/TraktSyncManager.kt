@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.kiduyuk.klausk.kiduyutv.data.repository.TraktRepository
 import com.google.gson.Gson
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -21,7 +20,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class TraktSyncManager @Inject constructor(
-    @ApplicationContext private val context: Context,
+    private val context: Context,
     private val traktRepository: TraktRepository
 ) {
 
@@ -61,9 +60,9 @@ class TraktSyncManager @Inject constructor(
                 prefs.edit().putLong(KEY_LAST_SYNC, currentTime).apply()
                 _lastSyncTime.value = currentTime
 
-                _syncState.value = SyncState.Success
+                _syncState.value = SyncState.Success(message = null)
             } catch (e: Exception) {
-                _syncState.value = SyncState.Error(e.message ?: "Sync failed")
+                _syncState.value = SyncState.Error(message = e.message ?: "Sync failed")
             }
         }
     }
@@ -75,7 +74,7 @@ class TraktSyncManager @Inject constructor(
         traktRepository.getWatchHistory(page = 1, limit = 100)
             .collect { result ->
                 result.fold(
-                    onSuccess = { history ->
+                    onSuccess = { history: List<com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktHistoryItem> ->
                         // Store watch history in local cache
                         storeWatchHistory(history)
                     },
@@ -213,7 +212,7 @@ class TraktSyncManager @Inject constructor(
     sealed class SyncState {
         object Idle : SyncState()
         object Syncing : SyncState()
-        data class Success(val message: String? = null) : SyncState()
+        data class Success(val message: String?) : SyncState()
         data class Error(val message: String) : SyncState()
     }
 

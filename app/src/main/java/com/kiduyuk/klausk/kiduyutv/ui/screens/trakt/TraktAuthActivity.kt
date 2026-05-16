@@ -4,13 +4,18 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.View
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Button
+import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import com.kiduyuk.klausk.kiduyutv.databinding.ActivityTraktAuthBinding
+import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager
 import kotlinx.coroutines.launch
 
@@ -20,7 +25,13 @@ import kotlinx.coroutines.launch
  */
 class TraktAuthActivity : AppCompatActivity() {
 
-    private lateinit var binding: ActivityTraktAuthBinding
+    private lateinit var webView: WebView
+    private lateinit var loadingContainer: LinearLayout
+    private lateinit var errorContainer: LinearLayout
+    private lateinit var tvLoadingMessage: TextView
+    private lateinit var tvErrorMessage: TextView
+    private lateinit var btnBack: Button
+    private lateinit var btnRetry: Button
     private lateinit var traktAuthManager: TraktAuthManager
 
     companion object {
@@ -35,8 +46,16 @@ class TraktAuthActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityTraktAuthBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+        setContentView(R.layout.activity_trakt_auth)
+
+        // Initialize views manually
+        webView = findViewById(R.id.webView)
+        loadingContainer = findViewById(R.id.loadingContainer)
+        errorContainer = findViewById(R.id.errorContainer)
+        tvLoadingMessage = findViewById(R.id.tvLoadingMessage)
+        tvErrorMessage = findViewById(R.id.tvErrorMessage)
+        btnBack = findViewById(R.id.btnBack)
+        btnRetry = findViewById(R.id.btnRetry)
 
         traktAuthManager = TraktAuthManager.getInstance(this)
 
@@ -46,12 +65,12 @@ class TraktAuthActivity : AppCompatActivity() {
 
     private fun setupViews() {
         // Back button
-        binding.btnBack.setOnClickListener {
+        btnBack.setOnClickListener {
             finish()
         }
 
         // Retry button
-        binding.btnRetry.setOnClickListener {
+        btnRetry.setOnClickListener {
             startAuthentication()
         }
     }
@@ -64,7 +83,7 @@ class TraktAuthActivity : AppCompatActivity() {
         val authUrl = traktAuthManager.getAuthorizationUrl(REDIRECT_URI)
 
         // Configure WebView
-        binding.webView.apply {
+        webView.apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             settings.loadWithOverviewMode = true
@@ -103,7 +122,7 @@ class TraktAuthActivity : AppCompatActivity() {
         }
 
         // Load the authorization URL
-        binding.webView.loadUrl(authUrl)
+        webView.loadUrl(authUrl)
     }
 
     private fun extractCodeFromUrl(url: String): String? {
@@ -151,31 +170,32 @@ class TraktAuthActivity : AppCompatActivity() {
     }
 
     private fun showLoading(message: String) {
-        binding.loadingContainer.visibility = android.view.View.VISIBLE
-        binding.webView.visibility = android.view.View.GONE
-        binding.errorContainer.visibility = android.view.View.GONE
-        binding.tvLoadingMessage.text = message
+        loadingContainer.visibility = View.VISIBLE
+        webView.visibility = View.GONE
+        errorContainer.visibility = View.GONE
+        tvLoadingMessage.text = message
     }
 
     private fun showWebView() {
-        binding.loadingContainer.visibility = android.view.View.GONE
-        binding.webView.visibility = android.view.View.VISIBLE
-        binding.errorContainer.visibility = android.view.View.GONE
+        loadingContainer.visibility = View.GONE
+        webView.visibility = View.VISIBLE
+        errorContainer.visibility = View.GONE
     }
 
     private fun showError(message: String) {
-        binding.loadingContainer.visibility = android.view.View.GONE
-        binding.webView.visibility = android.view.View.GONE
-        binding.errorContainer.visibility = android.view.View.VISIBLE
-        binding.tvErrorMessage.text = message
+        loadingContainer.visibility = View.GONE
+        webView.visibility = View.GONE
+        errorContainer.visibility = View.VISIBLE
+        tvErrorMessage.text = message
 
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
 
+    @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         // If WebView can go back, go back; otherwise cancel the auth
-        if (binding.webView.canGoBack()) {
-            binding.webView.goBack()
+        if (webView.canGoBack()) {
+            webView.goBack()
         } else {
             handleCancellation()
         }

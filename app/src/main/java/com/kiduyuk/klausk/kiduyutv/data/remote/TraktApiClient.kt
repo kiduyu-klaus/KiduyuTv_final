@@ -31,18 +31,6 @@ object TraktApiClient {
     val apiService: TraktApiService
         get() = getInstance()
 
-    private fun getAccessTokenProvider(): () -> String? {
-        return {
-            try {
-                val context = android.app.Application()
-                com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager.getInstance(null)
-                    .getValidAccessToken()
-            } catch (e: Exception) {
-                null
-            }
-        }
-    }
-
     /**
      * Get the TraktApiService singleton instance
      */

@@ -246,3 +246,36 @@ data class TraktHistoryItem(
     @SerializedName("episode") val episode: TraktEpisode?,
     @SerializedName("show") val show: TraktShow?
 )
+
+/**
+ * Trakt user settings/profile
+ */
+data class TraktSettings(
+    @SerializedName("user") val user: TraktUser
+)
+
+/**
+ * Trakt watch history response (list of history items)
+ */
+typealias TraktWatchHistoryResponse = List<TraktHistoryItem>
+
+/**
+ * Trakt collection item (movie or show in user's collection)
+ */
+data class TraktCollectionItem(
+    @SerializedName("added_at") val addedAt: String,
+    @SerializedName("type") val type: String,
+    @SerializedName("movie") val movie: TraktMovie?,
+    @SerializedName("show") val show: TraktShow?
+)
+
+/**
+ * Trakt recommendation item
+ */
+data class TraktRecommendation(
+    @SerializedName("rank") val rank: Int,
+    @SerializedName("listed_at") val listedAt: String,
+    @SerializedName("type") val type: String,
+    @SerializedName("movie") val movie: TraktMovie?,
+    @SerializedName("show") val show: TraktShow?
+)
