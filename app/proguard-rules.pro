@@ -148,4 +148,22 @@
 
 # Keep Kotlin coroutines support for AI SDK
 -keepclassmembers class kotlinx.coroutines.** { *; }
--dontwarn kotlinx.coroutines.**
+-dontwarn kotlinx.coroutines.**##############################################
+# 🚀 KTOR / OKIO (FIX FOR R8 MINIFICATION)
+##############################################
+
+# Ignore missing java.lang.management classes (JVM only, not available on Android)
+-dontwarn java.lang.management.**
+-keep class java.lang.management.** { *; }
+
+# Ktor debug detection uses JVM-specific classes
+-dontwarn io.ktor.util.debug.**
+-keep class io.ktor.util.debug.** { *; }
+
+# Ktor library rules
+-keep class io.ktor.** { *; }
+-dontwarn io.ktor.**
+
+# OkIO library rules
+-keep class okio.** { *; }
+-dontwarn okio.**
