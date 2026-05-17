@@ -604,6 +604,9 @@ class PlayerActivity : AppCompatActivity() {
                     // Inject progress tracking script
                     injectProgressTrackingScript(view)
 
+                    // Inject ad blocking script to hide overlay ads
+                    injectAdBlockingScript(view)
+
                     startVideoLoadTimeoutCheck()
                 }
 
@@ -985,6 +988,186 @@ class PlayerActivity : AppCompatActivity() {
         """.trimIndent()
 
         view?.evaluateJavascript(progressJs, null)
+    }
+
+    /**
+     * Inject CSS and JavaScript to hide common ad overlay elements.
+     * This targets deceptive notification-style ads that mimic system messages.
+     */
+    private fun injectAdBlockingScript(view: WebView?) {
+        val adBlockingJs = """
+        (function() {
+            // CSS to hide common ad elements
+            var style = document.createElement('style');
+            style.type = 'text/css';
+            style.innerHTML = `
+                [class*="overlay-ad"],
+                [class*="popup-ad"],
+                [class*="notification-ad"],
+                [class*="fake-notification"],
+                [id*="ad-overlay"],
+                [id*="popup-ad"],
+                [class*="clickbait"],
+                [class*="fake-call"],
+                [id*="notification-popup"],
+                .video-ad-overlay,
+                .ad-container[class*="overlay"],
+                [class*="vid-ads"],
+                [class*="admodal"],
+                [class*="ad-popup"],
+                div[style*="position: fixed"][style*="z-index"]:not(video):not([class*="player"]),
+                div[style*="position: fixed"][style*="background"] {
+                    display: none !important;
+                    visibility: hidden !important;
+                    pointer-events: none !important;
+                }
+            `;
+            document.head.appendChild(style);
+            
+            // MutationObserver to catch dynamically created ad elements
+            var observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    mutation.addedNodes.forEach(function(node) {
+                        if (node.nodeType === 1) {
+                            // Check for common ad patterns
+                            var classes = node.className || '';
+                            var id = node.id || '';
+                            var text = node.innerText || '';
+                            
+                            if (
+                                classes.includes('overlay') ||
+                                classes.includes('popup') ||
+                                classes.includes('notification') ||
+                                classes.includes('ad') && (
+                                    text.includes('call') ||
+                                    text.includes('missed') ||
+                                    text.includes('click here')
+                                ) ||
+                                id.includes('ad-overlay') ||
+                                id.includes('popup')
+                            ) {
+                                node.style.display = 'none';
+                                node.style.visibility = 'hidden';
+                            }
+                            
+                            // Check for fixed position elements (common for overlays)
+                            if (getComputedStyle(node).position === 'fixed') {
+                                var rect = node.getBoundingClientRect();
+                                // If element covers more than 30% of viewport, likely an ad
+                                if (rect.width > window.innerWidth * 0.3 || 
+                                    rect.height > window.innerHeight * 0.3) {
+                                    // Check if it's not the video player
+                                    if (!node.querySelector('video') && 
+                                        !node.querySelector('iframe')) {
+                                        node.style.display = 'none';
+                                    }
+                                }
+                            }
+                        }
+                    });
+                });
+            });
+            
+            observer.observe(document.body, { childList: true, subtree: true });
+            
+            // Remove fixed position elements that appear after 2 seconds
+            setTimeout(function() {
+                var allElements = document.querySelectorAll('*');
+                allElements.forEach(function(el) {
+                    var style = getComputedStyle(el);
+                    if (style.position === 'fixed' && style.zIndex > 1000) {
+                        var rect = el.getBoundingClientRect();
+                        if (rect.width > 200 && rect.height > 100) {
+                            // Likely an overlay ad
+                            el.style.display = 'none';
+                        }
+                    }
+                });
+            }, 2000);
+            
+            // Create a floating dismiss button for persistent ad removal
+            var dismissBtn = document.createElement('div');
+            dismissBtn.innerHTML = 'X';
+            dismissBtn.title = 'Dismiss Ads';
+            dismissBtn.style.cssText = `
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                width: 36px;
+                height: 36px;
+                background: rgba(0,0,0,0.7);
+                color: white;
+                border-radius: 50%;
+                text-align: center;
+                line-height: 36px;
+                font-size: 16px;
+                font-family: Arial, sans-serif;
+                cursor: pointer;
+                z-index: 99999;
+                border: 2px solid rgba(255,255,255,0.3);
+            `;
+            dismissBtn.onclick = function() {
+                // Find and hide overlays
+                var elements = document.querySelectorAll('*');
+                elements.forEach(function(el) {
+                    try {
+                        var style = getComputedStyle(el);
+                        if ((style.position === 'fixed' || style.position === 'absolute') &&
+                            style.zIndex > 1000) {
+                            var rect = el.getBoundingClientRect();
+                            if (rect.width > 150 && rect.height > 100) {
+                                if (!el.querySelector('video') && 
+                                    !el.querySelector('iframe')) {
+                                    el.style.display = 'none';
+                                    el.style.visibility = 'hidden';
+                                }
+                            }
+                        }
+                    } catch (e) {}
+                });
+            };
+            document.body.appendChild(dismissBtn);
+            
+            // Auto-scan for notification-style ads periodically
+            setInterval(function() {
+                var notificationPatterns = [
+                    /missed.*call/i,
+                    /video.*call/i,
+                    /hot.*singles/i,
+                    /click.*here/i,
+                    /dating/i,
+                    /adult/i
+                ];
+                
+                var textElements = document.querySelectorAll('div, span, p');
+                textElements.forEach(function(el) {
+                    try {
+                        var text = el.innerText || '';
+                        var hasMatch = notificationPatterns.some(function(pattern) {
+                            return pattern.test(text);
+                        });
+                        
+                        if (hasMatch) {
+                            var parent = el.closest('div');
+                            if (parent) {
+                                var style = getComputedStyle(parent);
+                                if (style.backgroundColor.includes('33, 150') || 
+                                    style.backgroundColor.includes('0, 123') ||
+                                    style.backgroundColor.includes('66, 114')) {
+                                    // Likely a notification ad with blue background
+                                    parent.style.display = 'none';
+                                    parent.style.visibility = 'hidden';
+                                }
+                            }
+                        }
+                    } catch (e) {}
+                });
+            }, 3000);
+        })();
+        """.trimIndent()
+        
+        view?.evaluateJavascript(adBlockingJs, null)
+        Log.i(TAG, "[AdBlock] Ad blocking script injected")
     }
 
     private fun setupImmersiveMode() {
