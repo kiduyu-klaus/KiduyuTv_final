@@ -53,6 +53,10 @@ object NetworkConnectivityChecker {
     private val _networkDiagnostics = MutableStateFlow(NetworkDiagnostics())
     val networkDiagnostics: StateFlow<NetworkDiagnostics> = _networkDiagnostics.asStateFlow()
     
+    // StateFlow to track if VPN or custom DNS is being used
+    private val _isUsingCustomDnsOrVpn = MutableStateFlow(false)
+    val isUsingCustomDnsOrVpn: StateFlow<Boolean> = _isUsingCustomDnsOrVpn.asStateFlow()
+    
     // Whether continuous monitoring is active
     @Volatile
     private var isMonitoring = false
@@ -89,6 +93,12 @@ object NetworkConnectivityChecker {
      * Returns the current network diagnostics information.
      */
     fun getNetworkDiagnostics(): NetworkDiagnostics = _networkDiagnostics.value
+    
+    /**
+     * Returns the current network diagnostics (alias for getNetworkDiagnostics).
+     * Useful for NetworkStateDialog compatibility.
+     */
+    fun getCurrentDiagnostics(): NetworkDiagnostics = _networkDiagnostics.value
     
     /**
      * Starts continuous network connectivity monitoring.
@@ -201,6 +211,8 @@ object NetworkConnectivityChecker {
         scope.launch {
             val state = checkConnectivity(context)
             updateState(state)
+            // Also perform network diagnostics to detect DNS and VPN
+            performNetworkDiagnostics()
         }
     }
     
@@ -217,6 +229,8 @@ object NetworkConnectivityChecker {
             scope.launch {
                 val state = checkNetworkAndInternet(context ?: return@launch)
                 updateState(state)
+                // Also perform network diagnostics to detect DNS and VPN
+                performNetworkDiagnostics()
             }
         }
     }
@@ -484,6 +498,15 @@ object NetworkConnectivityChecker {
     }
     
     /**
+     * Updates the combined DNS/VPN state.
+     */
+    private fun updateDnsVpnState(diagnostics: NetworkDiagnostics) {
+        val isUsingCustomDnsOrVpn = diagnostics.isUsingCustomDns || diagnostics.isVpnActive
+        _isUsingCustomDnsOrVpn.value = isUsingCustomDnsOrVpn
+        Log.i(TAG, "Updated isUsingCustomDnsOrVpn: $isUsingCustomDnsOrVpn")
+    }
+    
+    /**
      * Performs a comprehensive network diagnostic check.
      * Detects DNS servers, VPN, proxy, network type, and metered status.
      * Updates the networkDiagnostics StateFlow with the results.
@@ -511,32 +534,16 @@ object NetworkConnectivityChecker {
                 
                 _networkDiagnostics.value = diagnostics
                 
+                // Update the combined DNS/VPN state
+                updateDnsVpnState(diagnostics)
+                
                 Log.i(TAG, "Network Diagnostics:")
                 Log.i(TAG, "  - Network Type: $networkType")
                 Log.i(TAG, "  - Custom DNS: $isCustomDns (Servers: $dnsServers)")
                 Log.i(TAG, "  - VPN Active: $isVpn (Interface: $vpnInterface)")
                 Log.i(TAG, "  - Proxy: $isProxy (Info: $proxyInfo)")
                 Log.i(TAG, "  - Metered: $isMetered")
-                
-                // Check if DNS, VPN, or Proxy is detected and show warning dialog
-                // Custom DNS always shows dialog (even without internet reachability)
-                // VPN/proxy only show dialog if internet is reachable
-                val isReachable = testInternetReachability()
-                if (isCustomDns || (isReachable && (isVpn || isProxy))) {
-                    withContext(Dispatchers.Main) {
-                        // Only show dialog if app is in foreground
-                        if (isAppInForeground()) {
-                            try {
-                                Log.i(TAG, "DNS/VPN/Proxy detected, showing warning dialog")
-                                NetworkStateDialog.showDnsVpnDetectedDialog(AndroidApp.instance, diagnostics)
-                            } catch (e: Exception) {
-                                Log.w(TAG, "Error showing DNS/VPN dialog: ${e.message}")
-                            }
-                        } else {
-                            Log.i(TAG, "App in background, skipping DNS/VPN dialog")
-                        }
-                    }
-                }
+                Log.i(TAG, "  - isUsingCustomDnsOrVpn: ${diagnostics.isUsingCustomDns || diagnostics.isVpnActive}")
             }
         }
     }
@@ -595,3 +602,4 @@ object NetworkConnectivityChecker {
 object AndroidApp {
     lateinit var instance: Application
 }
+

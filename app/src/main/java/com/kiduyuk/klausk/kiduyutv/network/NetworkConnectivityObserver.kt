@@ -5,6 +5,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
@@ -13,7 +16,7 @@ import com.kiduyuk.klausk.kiduyutv.network.NetworkStateDialog
 
 /**
  * Composable that observes network connectivity state.
- * Shows dialog when network is unavailable.
+ * Shows dialog when network is unavailable or when VPN/custom DNS is detected.
  * 
  * Usage:
  * 
@@ -33,6 +36,12 @@ fun NetworkConnectivityObserver(
     
     // Collect network state
     val networkState by NetworkConnectivityChecker.networkState.collectAsState()
+    
+    // Collect network diagnostics (includes DNS/VPN info)
+    val networkDiagnostics by NetworkConnectivityChecker.networkDiagnostics.collectAsState()
+    
+    // Track if we've shown the DNS/VPN dialog to avoid re-showing it
+    var hasShownDnsVpnDialog by remember { mutableStateOf(false) }
     
     // Start monitoring when composable enters composition
     LaunchedEffect(Unit) {
@@ -54,6 +63,22 @@ fun NetworkConnectivityObserver(
             else -> {
                 NetworkStateDialog.dismiss()
             }
+        }
+    }
+    
+    // Observe network diagnostics for DNS/VPN detection
+    LaunchedEffect(networkDiagnostics) {
+        val isCustomDns = networkDiagnostics.isUsingCustomDns
+        val isVpnActive = networkDiagnostics.isVpnActive
+        
+        if ((isCustomDns || isVpnActive) && !hasShownDnsVpnDialog) {
+            // Show the DNS/VPN warning dialog
+            Log.i("NetworkConnectivityObserver", "DNS/VPN detected, showing warning dialog")
+            NetworkStateDialog.showDnsVpnDetectedDialog(context, networkDiagnostics)
+            hasShownDnsVpnDialog = true
+        } else if (!isCustomDns && !isVpnActive) {
+            // Reset the flag when DNS/VPN is no longer active
+            hasShownDnsVpnDialog = false
         }
     }
     
@@ -95,3 +120,4 @@ fun NetworkConnectivityObserver(
 fun rememberNetworkState(): NetworkState {
     return NetworkConnectivityChecker.networkState.collectAsState().value
 }
+
