@@ -7,6 +7,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.runtime.remember
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -236,6 +240,34 @@ fun MobileSettingsScreen(
                             }
                         },
                         isLoading = isAuthLoading
+                    )
+                }
+
+                // ── Telegram Channel Button ─────────────────────────────────────────
+                val telegramInteractionSource = remember { MutableInteractionSource() }
+                val isTelegramFocused by telegramInteractionSource.collectIsFocusedAsState()
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isTelegramFocused) Color.Red else PrimaryRed)
+                        .focusable(interactionSource = telegramInteractionSource)
+                        .clickable {
+                            val intent = Intent(Intent.ACTION_VIEW, "https://t.me/kiduyutv".toUri())
+                            context.startActivity(intent)
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Telegram Channel",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(vertical = 12.dp)
                     )
                 }
             }
