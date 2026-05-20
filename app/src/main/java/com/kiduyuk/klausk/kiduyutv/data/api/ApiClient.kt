@@ -2,15 +2,12 @@ package com.kiduyuk.klausk.kiduyutv.data.api
 
 import android.content.Context
 import android.util.Log
-import okhttp3.Cache
-import okhttp3.CacheControl
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Response
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import java.io.File
 import java.io.IOException
 import java.net.SocketTimeoutException
 import com.kiduyuk.klausk.kiduyutv.util.SingletonDnsResolver
@@ -22,11 +19,6 @@ object ApiClient {
 
     // Bearer token used for Authorization header for all API requests.
     private const val BEARER_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI5ZGUzZGU2MjNiNTc5ZjZlMTI3YzZlYzYwM2I5Zjc0ZCIsIm5iZiI6MTY2MDMwMTIxNC4yNCwic3ViIjoiNjJmNjJmOWVjM2JmZmUwMDdhNzJlODVkIiwic2NvcGVzIjpbImFwaV9yZWFkIl0sInZlcnNpb24iOjF9.S10N9Lag4A71FXL-VsErRF71UhADOKTPeK5FDnsEOhk"
-
-    // Cache configuration
-    private const val CACHE_SIZE = 10L * 1024 * 1024 // 10 MB (main API cache)
-    private const val CACHE_MAX_AGE = 5 // 5 minutes when online
-    private const val CACHE_MAX_STALE = 7 // 7 days when offline
 
     // Interceptor that appends authentication and content-type headers to each request.
     private val authInterceptor = Interceptor { chain ->
@@ -92,65 +84,24 @@ object ApiClient {
         throw exception ?: IOException("Request failed after $maxRetry retries")
     }
 
-    // Cache control interceptor for offline support and reduced network calls
-    private val cacheInterceptor = Interceptor { chain ->
-        var request = chain.request()
-
-        // Add cache control headers based on network availability
-        request = request.newBuilder()
-            .cacheControl(
-                CacheControl.Builder()
-                    .maxAge(CACHE_MAX_AGE, TimeUnit.MINUTES)
-                    .build()
-            )
-            .build()
-
-        val response = chain.proceed(request)
-
-        // Cache responses for offline use
-        response.newBuilder()
-            .header("Cache-Control", "public, max-age=${CACHE_MAX_AGE * 60}")
-            .removeHeader("Pragma")
-            .build()
-    }
-
-    // Force cache interceptor for offline scenarios
-    private val forceCacheInterceptor = Interceptor { chain ->
-        val request = chain.request().newBuilder()
-            .cacheControl(
-                CacheControl.Builder()
-                    .maxStale(CACHE_MAX_STALE, TimeUnit.DAYS)
-                    .build()
-            )
-            .build()
-
-        chain.proceed(request)
-    }
-
     // Logging interceptor to print request/response bodies during debug.
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
     }
 
     /**
-     * Creates OkHttpClient with caching and retry logic enabled.
-     * Should be called with application context to initialize cache directory.
+     * Creates OkHttpClient with retry logic enabled (no caching).
+     * Should be called with application context.
      */
     fun createOkHttpClient(context: Context): OkHttpClient {
-        val cacheDir = File(context.cacheDir, "http_cache" )
-        val cache = Cache(cacheDir, CACHE_SIZE)
-
         return OkHttpClient.Builder()
-            .cache(cache)
             .addInterceptor(authInterceptor)
             //.addInterceptor(retryInterceptor) // Added global retry logic
-            .addNetworkInterceptor(cacheInterceptor) // For online requests with proper cache headers
-            .addInterceptor(forceCacheInterceptor) // For offline requests - fallback to cached data
             //.addInterceptor(loggingInterceptor)
             .dns(SingletonDnsResolver.getDns()) // Cloudflare DNS over HTTPS
-            .connectTimeout(30, TimeUnit.SECONDS) // Updated from 60 to 30
-            .readTimeout(30, TimeUnit.SECONDS)    // Updated from 60 to 30
-            .writeTimeout(30, TimeUnit.SECONDS)   // Updated from 60 to 30
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
             .build()
     }
 
@@ -167,15 +118,15 @@ object ApiClient {
 
     // Lazy initialization for backward compatibility
     private val okHttpClient: OkHttpClient by lazy {
-        // Default client without cache (will be replaced when context is available)
+        // Default client without cache
         OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
             .addInterceptor(retryInterceptor) // Added global retry logic
             //.addInterceptor(loggingInterceptor)
             .dns(SingletonDnsResolver.getDns()) // Cloudflare DNS over HTTPS
-            .connectTimeout(30, TimeUnit.SECONDS) // Updated from 60 to 30
-            .readTimeout(30, TimeUnit.SECONDS)    // Updated from 60 to 30
-            .writeTimeout(30, TimeUnit.SECONDS)   // Updated from 60 to 30
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
             .build()
     }
 
