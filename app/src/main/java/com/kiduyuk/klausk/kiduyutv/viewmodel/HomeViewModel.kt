@@ -8,7 +8,6 @@ import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
 import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
 import com.kiduyuk.klausk.kiduyutv.util.NotificationHelper
-import com.kiduyuk.klausk.kiduyutv.util.WatchHistoryEnricher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -133,56 +132,6 @@ class HomeViewModel : ViewModel() {
 
                 // Trigger a random recommendation notification if we have content
                 triggerRandomRecommendation(context, sortedTrendingMovies, sortedTrendingTv)
-
-                // Refresh watch history images and enrich items with TMDB details in background
-                // This ensures "Continue Watching" row displays complete and accurate information
-                // even for items that were saved with incomplete data.
-                //
-                // The WatchHistoryEnricher handles two types of updates:
-                // 1. refreshAllWatchHistoryImages - Always fetches and overwrites poster/backdrop
-                //    images from TMDB to ensure users see the most current images
-                // 2. enrichAllMissingItems - Fills in other missing fields (title, overview, etc.)
-                //
-                // Items with null/empty vote average or overview will be refreshed when displayed
-                viewModelScope.launch {
-                    try {
-                        // First, refresh all images from TMDB to ensure fresh images
-                        WatchHistoryEnricher.refreshAllWatchHistoryImages(context)
-
-                        // Then, enrich items with missing TMDB details (including voteAverage and overview)
-                        WatchHistoryEnricher.enrichAllMissingItems(context)
-
-                        // Refresh the watch history after enrichment to get updated items
-                        val enrichedWatchHistory = WatchHistoryEnricher.getEnrichedWatchHistory(context)
-                        _uiState.value = _uiState.value.copy(continueWatching = enrichedWatchHistory)
-                    } catch (e: Exception) {
-                        // Log error but don't fail the entire home screen load
-                        android.util.Log.e("HomeViewModel", "Error enriching watch history: ${e.message}")
-                    }
-                }
-
-                // Also enrich items in Continue Watching row that have null/empty vote average or overview
-                // This ensures that items displayed in Continue Watching on any screen (Home, Movies, TV Shows)
-                // will have their details fetched and updated
-                viewModelScope.launch {
-                    try {
-                        // Get items that specifically need voteAverage or overview enrichment
-                        val itemsWithMissingDetails = WatchHistoryEnricher.getItemsWithMissingDetails(context)
-                        for (item in itemsWithMissingDetails) {
-                            // Only enrich items that are in the continue watching list
-                            if (sortedWatchHistory.any { it.id == item.id && it.isTv == (item.mediaType == "tv") }) {
-                                WatchHistoryEnricher.enrichSingleItem(context, item.id, item.mediaType)
-                                android.util.Log.i("HomeViewModel", "Enriched continue watching item: ${item.id} (${item.mediaType})")
-                            }
-                        }
-                        // Refresh the watch history after individual enrichment
-                        val enrichedWatchHistory = WatchHistoryEnricher.getEnrichedWatchHistory(context)
-                        _uiState.value = _uiState.value.copy(continueWatching = enrichedWatchHistory)
-                    } catch (e: Exception) {
-                        // Log error but don't fail the entire home screen load
-                        android.util.Log.e("HomeViewModel", "Error enriching continue watching items: ${e.message}")
-                    }
-                }
 
                 // Load secondary content in background to avoid blocking the UI
                 // Use parallel async calls to load all content simultaneously for faster display

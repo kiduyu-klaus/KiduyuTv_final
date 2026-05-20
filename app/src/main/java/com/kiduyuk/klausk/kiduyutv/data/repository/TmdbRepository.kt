@@ -83,51 +83,14 @@ class TmdbRepository {
 
 // ========== Trending Content ==========
 
-    /** Fetches trending TV shows for today with caching. */
+    /** Fetches trending TV shows for today. */
     suspend fun getTrendingTvToday(): Result<List<TvShow>> = runCatching {
-// Try cache first
-        val cached = tryGetCachedTvShows(CACHE_TYPE_TRENDING)
-// Check if cached items have missing images
-        val hasMissingImages = cached.any { it.posterPath.isNullOrEmpty() && it.backdropPath.isNullOrEmpty() }
-
-// Return cached data if available and has images
-        if (cached.isNotEmpty() && !hasMissingImages) {
-            Log.i(TAG, "Returning cached trending TV shows")
-            return@runCatching cached
-        }
-
-        if (hasMissingImages) {
-            Log.i(TAG, "Cached trending TV shows have missing images, refreshing from API")
-        }
-
-// Fetch from API
-        val result = api.getTrendingTvToday().results
-
-// Cache the results
-        cacheTvShows(result, CACHE_TYPE_TRENDING)
-
-        result
+        api.getTrendingTvToday().results
     }
 
-    /** Fetches trending movies for today with caching. */
+    /** Fetches trending movies for today. */
     suspend fun getTrendingMoviesToday(): Result<List<Movie>> = runCatching {
-        val cached = tryGetCachedMovies(CACHE_TYPE_TRENDING)
-        val hasMissingImages = cached.any { it.posterPath.isNullOrEmpty() && it.backdropPath.isNullOrEmpty() }
-
-// Return cached data if available and has images
-        if (cached.isNotEmpty() && !hasMissingImages) {
-            Log.i(TAG, "Returning cached trending movies")
-            return@runCatching cached
-        }
-
-        if (hasMissingImages) {
-            Log.i(TAG, "Cached trending movies have missing images, refreshing from API")
-        }
-
-        val result = api.getTrendingMoviesToday().results
-        cacheMovies(result, CACHE_TYPE_TRENDING)
-
-        result
+        api.getTrendingMoviesToday().results
     }
 
     /** Fetches trending TV shows for the week. */
@@ -142,90 +105,34 @@ class TmdbRepository {
 
 // ========== General Content ==========
 
-    /** Fetches movies currently playing in theaters with caching. */
+    /** Fetches movies currently playing in theaters. */
     suspend fun getNowPlayingMovies(): Result<List<Movie>> = runCatching {
-        val cached = tryGetCachedMovies(CACHE_TYPE_NOW_PLAYING)
-        if (cached.isNotEmpty()) {
-            Log.i(TAG, "Returning cached now playing movies")
-            return@runCatching cached
-        }
-
-        val result = api.getNowPlayingMovies().results
-        cacheMovies(result, CACHE_TYPE_NOW_PLAYING)
-
-        result
+        api.getNowPlayingMovies().results
     }
 
-    /** Fetches top-rated movies with caching. */
+    /** Fetches top-rated movies. */
     suspend fun getTopRatedMovies(): Result<List<Movie>> = runCatching {
-        val cached = tryGetCachedMovies(CACHE_TYPE_TOP_RATED)
-// Return cached data if available with sufficient items
-        if (cached.isNotEmpty() && cached.size > 25) {
-            Log.i(TAG, "Returning cached top rated movies")
-            return@runCatching cached
-        }
-
-        val result = api.getTopRatedMovies().results
-        cacheMovies(result, CACHE_TYPE_TOP_RATED)
-
-        result
+        api.getTopRatedMovies().results
     }
 
     /** Fetches top-rated TV shows. */
     suspend fun getTopRatedTvShows(): Result<List<TvShow>> = runCatching {
-        val cached = tryGetCachedTvShows(CACHE_TYPE_TOP_RATED)
-// Return cached data if available with sufficient items
-        if (cached.isNotEmpty() && cached.size > 25) {
-            Log.i(TAG, "Returning cached top rated TV shows")
-            return@runCatching cached
-        }
-
-        val result = api.getTopRatedTvShows().results
-        cacheTvShows(result, CACHE_TYPE_TOP_RATED)
-
-        result
+        api.getTopRatedTvShows().results
     }
 
-    /** Fetches popular movies with caching. */
+    /** Fetches popular movies. */
     suspend fun getPopularMovies(): Result<List<Movie>> = runCatching {
-        val cached = tryGetCachedMovies(CACHE_TYPE_POPULAR)
-        if (cached.isNotEmpty()) {
-            Log.i(TAG, "Returning cached popular movies")
-            return@runCatching cached
-        }
-
-        val result = api.getPopularMovies().results
-        cacheMovies(result, CACHE_TYPE_POPULAR)
-
-        result
+        api.getPopularMovies().results
     }
 
     /** Fetches popular TV shows. */
     suspend fun getPopularTvShows(): Result<List<TvShow>> = runCatching {
-        val cached = tryGetCachedTvShows(CACHE_TYPE_POPULAR)
-        if (cached.isNotEmpty()) {
-            Log.i(TAG, "Returning cached popular TV shows")
-            return@runCatching cached
-        }
-
-        val result = api.getPopularTvShows().results
-        cacheTvShows(result, CACHE_TYPE_POPULAR)
-
-        result
+        api.getPopularTvShows().results
     }
 
-    /** Fetches TV shows with the "time travel" keyword with caching. */
+    /** Fetches TV shows with the "time travel" keyword. */
     suspend fun getTimeTravelTvShows(): Result<List<TvShow>> = runCatching {
-        val cached = tryGetCachedTvShows(CACHE_TYPE_TIME_TRAVEL)
-        if (cached.isNotEmpty()) {
-            Log.i(TAG, "Returning cached time travel TV shows")
-            return@runCatching cached
-        }
-
-        val result = api.getTimeTravelTvShows().results
-        cacheTvShows(result, CACHE_TYPE_TIME_TRAVEL)
-
-        result
+        api.getTimeTravelTvShows().results
     }
 
 // ========== Detail Endpoints ==========
@@ -247,44 +154,14 @@ class TmdbRepository {
 
 // ========== Genre Endpoints ==========
 
-    /** Fetches the list of available movie genres with caching. */
+    /** Fetches the list of available movie genres. */
     suspend fun getMovieGenres(): Result<List<Genre>> = runCatching {
-        try {
-// Try to get from cache first
-            val cachedGenres = DatabaseManager.getCachedMovieGenres().first()
-            if (cachedGenres.isNotEmpty()) {
-                Log.i(TAG, "Returning cached movie genres")
-                return@runCatching cachedGenres.map { DatabaseManager.entityToGenre(it) }
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to get cached genres", e)
-        }
-
-// Fetch from API
-        val result = api.getMovieGenres().genres
-
-// Cache the genres
-        DatabaseManager.cacheGenres(result, "movie")
-
-        result
+        api.getMovieGenres().genres
     }
 
-    /** Fetches the list of available TV show genres with caching. */
+    /** Fetches the list of available TV show genres. */
     suspend fun getTvGenres(): Result<List<Genre>> = runCatching {
-        try {
-            val cachedGenres = DatabaseManager.getCachedTvGenres().first()
-            if (cachedGenres.isNotEmpty()) {
-                Log.i(TAG, "Returning cached TV genres")
-                return@runCatching cachedGenres.map { DatabaseManager.entityToGenre(it) }
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to get cached genres", e)
-        }
-
-        val result = api.getTvGenres().genres
-        DatabaseManager.cacheGenres(result, "tv")
-
-        result
+        api.getTvGenres().genres
     }
 
 // ========== Company/Network Endpoints ==========
@@ -561,8 +438,8 @@ class TmdbRepository {
 // ========== GitHub Lists with Caching ==========
 
     /**
-     * Fetches movies from a GitHub JSON list with caching.
-     * Now uses OkHttpClient for better connection management and caching.
+     * Fetches movies from a GitHub JSON list.
+     * Removes caching to always load fresh data from TMDB.
      */
     suspend fun getGitHubMovieList(context: Context, urlString: String): Result<List<Movie>> =
         withContext(Dispatchers.IO) {
@@ -596,20 +473,13 @@ class TmdbRepository {
 
                 Log.i(TAG, "Fetched ${movies.size} movies from GitHub")
 
-// Cache the movies for offline access
-                cacheMovies(
-                    movies,
-                    CACHE_TYPE_GITHUB_LIST,
-                    CachedMovieEntity.LONG_CACHE_DURATION_MS
-                )
-
                 movies
             }
         }
 
     /**
-     * Fetches TV shows from a GitHub JSON list with caching.
-     * Now uses OkHttpClient for better connection management and caching.
+     * Fetches TV shows from a GitHub JSON list.
+     * Removes caching to always load fresh data from TMDB.
      */
     suspend fun getGitHubTvShowList(context: Context, urlString: String): Result<List<TvShow>> =
         withContext(Dispatchers.IO) {
@@ -642,13 +512,6 @@ class TmdbRepository {
                 val tvShows: List<TvShow> = gson.fromJson(responseBody, type)
 
                 Log.i(TAG, "Fetched ${tvShows.size} TV shows from GitHub")
-
-// Cache the TV shows for offline access
-                cacheTvShows(
-                    tvShows,
-                    CACHE_TYPE_GITHUB_LIST,
-                    CachedTvShowEntity.LONG_CACHE_DURATION_MS
-                )
 
                 tvShows
             }
