@@ -2,7 +2,6 @@ package com.kiduyuk.klausk.kiduyutv.ui.player.webview
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -25,40 +24,14 @@ import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.OnBackPressedCallback
 import com.kiduyuk.klausk.kiduyutv.R
+import com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager
 import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
-// import com.kiduyuk.klausk.kiduyutv.util.AdvancedAdBlocker
-import okhttp3.OkHttpClient
-import okhttp3.HttpUrl.Companion.toHttpUrl
-import com.kiduyuk.klausk.kiduyutv.util.FilterListUpdater
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
-
 import java.io.ByteArrayInputStream
-import java.util.Collections
 
 class PlayerActivity : AppCompatActivity() {
-
-    // DoH DNS Resolver using custom DoH URL
-    private object DohDnsResolver {
-        private const val DOH_URL = "https://my.ublockdns.com/hjl8rkr1"
-
-        private val okHttpClient = OkHttpClient.Builder()
-            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-            .writeTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-            .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-            .build()
-
-        private val doh = okhttp3.dnsoverhttps.DnsOverHttps.Builder()
-            .client(okHttpClient)
-            .url(DOH_URL.toHttpUrl())
-            .build()
-
-        @Throws(java.net.UnknownHostException::class)
-        fun lookup(hostname: String): List<java.net.InetAddress> {
-            return doh.lookup(hostname)
-        }
-    }
 
     private lateinit var webView: WebView
     private lateinit var cursorView: MouseCursorView
@@ -73,6 +46,10 @@ class PlayerActivity : AppCompatActivity() {
     private var currentEpisode = 1
     private var isCursorDisabled = false
     private var currentProviderName: String = "VidLink"
+
+    // Loading and error state for AdBlockerWebViewClient
+    private var isPageLoading = true
+    private var hasPageError = false
 
     // Track content metadata for Firebase sync
     private var contentTitle: String = "Unknown"
@@ -90,24 +67,8 @@ class PlayerActivity : AppCompatActivity() {
     private var latestEpisode: Int = 1
     private var latestContentType: String = "movie"
     private var latestContentId: Int = -1
-    private val dnsWarmedHosts = Collections.synchronizedSet(mutableSetOf<String>())
 
-    // Error detection state
-    private var isVideoLoaded = false
-    private var isPageLoaded = false
-    private var hasShownError = false
-    private var videoLoadCheckHandler: Handler? = null
-    private var videoLoadCheckRunnable: Runnable? = null
-
-    // ── Retry state ───────────────────────────────────────────────────────────
-    private var streamRetryCount = 0
-    private val maxStreamRetries = 4
     private var originalStreamUrl: String = ""
-
-
-    // ★ Ad blocking statistics
-    private var blockedRequestsCount = 0
-    private var totalRequestsCount = 0
 
     companion object {
         private const val TAG = "VideasyPlayer"
@@ -180,132 +141,7 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    // ── Video Load Timeout Check ──────────────────────────────────────────────
 
-    private fun startVideoLoadTimeoutCheck() {
-        cancelVideoLoadTimeoutCheck()
-        videoLoadCheckHandler = Handler(Looper.getMainLooper())
-        videoLoadCheckRunnable = Runnable {
-            checkVideoLoadStatus()
-        }
-        videoLoadCheckHandler?.postDelayed(videoLoadCheckRunnable!!, 3000)
-    }
-
-    private fun cancelVideoLoadTimeoutCheck() {
-        videoLoadCheckRunnable?.let { runnable ->
-            videoLoadCheckHandler?.removeCallbacks(runnable)
-        }
-        videoLoadCheckHandler = null
-        videoLoadCheckRunnable = null
-    }
-
-    private fun checkVideoLoadStatus() {
-        if (hasShownError) return
-
-        webView.evaluateJavascript(
-            """
-            (function() {
-                if (window.getVideoStatus) {
-                    return window.getVideoStatus();
-                }
-                return JSON.stringify({ hasVideo: false, isPlaying: false, error: true, message: 'Check script not loaded' });
-            })();
-            """.trimIndent()
-        ) { result ->
-            if (hasShownError) return@evaluateJavascript
-
-            try {
-                val json = org.json.JSONObject(result)
-                val hasVideo = json.optBoolean("hasVideo", false)
-                val isPlaying = json.optBoolean("isPlaying", false)
-                val hasError = json.optBoolean("hasError", false)
-                val message = json.optString("message", "")
-
-                Log.i(TAG, "[Video Check] hasVideo=$hasVideo, isPlaying=$isPlaying, hasError=$hasError, message=$message")
-
-                if (hasVideo && isPlaying) {
-                    isVideoLoaded = true
-                    cancelVideoLoadTimeoutCheck()
-                    Log.i(TAG, "[Video Check] Video loaded and playing successfully")
-                    return@evaluateJavascript
-                }
-
-                if (hasError) {
-                    if (!hasShownError) {
-                        hasShownError = true
-                        runOnUiThread {
-                            showVideoErrorDialog("Video Error", message)
-                        }
-                    }
-                    return@evaluateJavascript
-                }
-
-                if (!isVideoLoaded) {
-                    if (videoLoadCheckHandler != null && videoLoadCheckRunnable != null) {
-                        videoLoadCheckHandler?.postDelayed(videoLoadCheckRunnable!!, 3000)
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "[Video Check] Error parsing video status: ${e.message}")
-                if (!hasShownError && videoLoadCheckHandler != null && videoLoadCheckRunnable != null) {
-                    videoLoadCheckHandler?.postDelayed(videoLoadCheckRunnable!!, 5000)
-                }
-            }
-        }
-    }
-
-    private fun showVideoErrorDialog(title: String, message: String) {
-        if (isFinishing || hasShownError) return
-        hasShownError = true
-
-        Log.e(TAG, "[Error Dialog] Showing error: $title - $message")
-
-        QuitDialog(
-            context = this,
-            title = title,
-            message = "$message\n\nThe video link may be broken or unavailable. Please try another source.",
-            positiveButtonText = "Try Again",
-            negativeButtonText = "Exit",
-            lottieAnimRes = R.raw.loading,
-            onNo = {
-                Log.i(TAG, "[Error Dialog] User chose to try again, reloading...")
-                hasShownError = false
-                isVideoLoaded = false
-                isPageLoaded = false
-                streamRetryCount = 0  // reset retries on manual retry
-                cancelVideoLoadTimeoutCheck()
-                resetAdBlockStats()
-                webView.loadUrl(originalStreamUrl)
-            },
-            onYes = {
-                Log.i(TAG, "[Error Dialog] User chose to exit")
-                savePlaybackPosition()
-                logAdBlockStats()
-                finish()
-            }
-        ).show()
-    }
-
-    // ── Stream Retry Handler ───────────────────────────────────────────────────
-    private fun handleStreamError(errorDescription: String) {
-        if (hasShownError) return
-
-        if (streamRetryCount < maxStreamRetries) {
-            streamRetryCount++
-            Log.w(TAG, "[Retry] Attempt $streamRetryCount/$maxStreamRetries — reloading original stream URL")
-            cancelVideoLoadTimeoutCheck()
-            isPageLoaded = false
-            isVideoLoaded = false
-            webView.stopLoading()
-            webView.loadUrl(originalStreamUrl)
-        } else {
-            Log.e(TAG, "[Retry] Max retries ($maxStreamRetries) reached — showing error dialog")
-            hasShownError = true
-            runOnUiThread {
-                showVideoErrorDialog("Stream Unavailable", errorDescription)
-            }
-        }
-    }
 
     // ── Cursor hide timer ──────────────────────────────────────────────────────
     private val cursorHideHandler = Handler(Looper.getMainLooper())
@@ -447,28 +283,12 @@ class PlayerActivity : AppCompatActivity() {
             "https://vidlink.pro/movie/$tmdbId?autoplay=true"
         }
 
-        val isVideasyPlayer = url.startsWith("https://player.videasy.net")
-        val isVidKingPlayer = url.startsWith("https://www.vidking.net") || url.startsWith("https://vidking.")
-        val isVidLinkPlayer = url.startsWith("https://vidlink.pro")
-        val isStreamingNowPlayer = url.contains("streamingnow.mov", ignoreCase = true) || url.contains("multiembed.mov", ignoreCase = true)
-        val isTrackingEnabled = isVideasyPlayer || isVidKingPlayer || isVidLinkPlayer || isStreamingNowPlayer
-
-        currentProviderName = when {
-            isVidLinkPlayer -> "VidLink"
-            isVidKingPlayer -> "VidKing"
-            isVideasyPlayer -> "Videasy"
-            isStreamingNowPlayer -> "StreamingNow"
-            url.contains("vidfast", ignoreCase = true) -> "VidFast"
-            url.contains("vidsrc", ignoreCase = true) -> "VidSrc"
-            url.contains("mapple", ignoreCase = true) -> "Mapple"
-            url.contains("flixer", ignoreCase = true) -> "Flixer"
-            else -> "VidLink"
-        }
+        // Detect provider using StreamProviderManager
+        currentProviderName = detectProviderFromUrl(url)
+        val isTrackingEnabled = currentProviderName in listOf("Videasy", "VidKing", "VidLink", "StreamingNow")
 
         Log.i(TAG, "[Provider] Selected: $currentProviderName")
-        // Log.i(TAG, "[AdBlocker] Status: ${if (AdvancedAdBlocker.isInitialized()) "Ready" else "Not initialized"}")
 
-        warmUpDnsForUrl(url)
         originalStreamUrl = url
 
         // ── Layout ────────────────────────────────────────────────────────────
@@ -485,33 +305,31 @@ class PlayerActivity : AppCompatActivity() {
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
 
-            // ★ Add window insets listener to prevent system UI from affecting WebView layout
+            // Add window insets listener to prevent system UI from affecting WebView layout
             setOnApplyWindowInsetsListener { _, insets ->
                 // Return the insets without consuming them to maintain fullscreen behavior
                 // This prevents the WebView from being inset by status/navigation bars
                 insets
             }
 
+            setBackgroundColor(0xFF000000.toInt())
+
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
-                mediaPlaybackRequiresUserGesture = false
-                mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                javaScriptCanOpenWindowsAutomatically = false
-                setSupportMultipleWindows(false)
-                cacheMode = WebSettings.LOAD_DEFAULT
-                setRenderPriority(WebSettings.RenderPriority.HIGH)
-                useWideViewPort = true          // make page width match WebView width
-                loadWithOverviewMode = true     // zoom out to fit entire page in WebView
-                setSupportZoom(false)           // disable pinch‑zoom
-                displayZoomControls = false
-                allowContentAccess = true
                 databaseEnabled = true
+                mediaPlaybackRequiresUserGesture = false
                 allowFileAccess = true
-                userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    safeSetSafeBrowsingEnabled(this, false)
-                }
+                allowContentAccess = true
+                loadWithOverviewMode = true
+                useWideViewPort = true
+                builtInZoomControls = false
+                displayZoomControls = false
+                setSupportZoom(false)
+                setSupportMultipleWindows(true)
+                javaScriptCanOpenWindowsAutomatically = false
+                mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                userAgentString = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
             }
 
             // Disable scrollbars
@@ -529,10 +347,37 @@ class PlayerActivity : AppCompatActivity() {
                 addJavascriptInterface(VideasyJavaScriptInterface(), "VideasyInterface")
             }
 
-            webViewClient = createWebViewClient()
+            // Use AdBlockerWebViewClient for ad blocking
+            webViewClient = AdBlockerWebViewClient(
+                onPageFinished = {
+                    isPageLoading = false
+                    Log.i(TAG, "[WebView] Page finished loading with AdBlocker")
+                    injectVideoDetectionScript(this)
+                    // injectAdvancedPlayerScripts(this)
+                    injectAutoplayScript(this)
+                },
+                onError = {
+                    hasPageError = true
+                    isPageLoading = false
+                    Log.e(TAG, "[WebView] Error received with AdBlocker")
+                }
+            )
 
             webChromeClient = object : WebChromeClient() {
-                override fun onCreateWindow(view: WebView?, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message?): Boolean = false
+                override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
+                    super.onShowCustomView(view, callback)
+                    Log.i(TAG, "[WebChrome] onShowCustomView called")
+                }
+
+                override fun onCreateWindow(
+                    view: WebView?,
+                    isDialog: Boolean,
+                    isUserGesture: Boolean,
+                    resultMsg: android.os.Message?
+                ): Boolean {
+                    Log.i(TAG, "[WebChrome] onCreateWindow called, blocking popups")
+                    return false // Popups blocked
+                }
             }
 
             val iframeHtml = intent.getStringExtra("IFRAME_HTML")
@@ -586,144 +431,6 @@ class PlayerActivity : AppCompatActivity() {
             }
         })
     }
-
-    /**
-     * ★ Create WebViewClient with ad blocking commented out
-     */
-    private fun createWebViewClient(): WebViewClient {
-        return object : WebViewClient() {
-
-            override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
-                val reqUrl = request?.url.toString()
-
-                // Increment total requests counter
-                totalRequestsCount++
-
-                // ★ AdvancedAdBlocker check commented out
-                // if (AdvancedAdBlocker.shouldBlock(reqUrl)) {
-                //     blockedRequestsCount++
-                //     if (blockedRequestsCount % 10 == 0) {
-                //         Log.d(TAG, "[AdBlock] Blocked $blockedRequestsCount/$totalRequestsCount requests. Latest: ${reqUrl.take(80)}")
-                //     }
-                //     return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
-                // }
-
-                // Warm up DNS for allowed requests
-                request?.url?.host?.let { warmUpDnsHost(it) }
-
-                return super.shouldInterceptRequest(view, request)
-            }
-
-            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-                val url = request?.url.toString() ?: return false
-
-                // Handle navigation to streamingnow.mov
-                if (url.contains("streamingnow.mov", ignoreCase = true) ||
-                    url.contains("multiembed.mov", ignoreCase = true)) {
-                    Log.i(TAG, "[Navigation] Detected streamingnow/multiembed navigation, updating originalStreamUrl to: $url")
-                    originalStreamUrl = url
-                }
-
-                // ★ AdvancedAdBlocker navigation block commented out
-                // if (AdvancedAdBlocker.shouldBlock(url)) {
-                //     blockedRequestsCount++
-                //     Log.d(TAG, "[AdBlock] Blocked navigation to: ${url.take(80)}")
-                //     return true
-                // }
-
-                return false // Allow normal navigation
-            }
-
-            override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                super.onPageStarted(view, url, favicon)
-                isPageLoaded = false
-                isVideoLoaded = false
-
-                // Update originalStreamUrl if navigating to streamingnow.mov or multiembed.mov
-                url?.let {
-                    if (it.contains("streamingnow.mov", ignoreCase = true) ||
-                        it.contains("multiembed.mov", ignoreCase = true)) {
-                        Log.i(TAG, "[Navigation] Page started with streamingnow/multiembed URL, updating originalStreamUrl")
-                        originalStreamUrl = it
-                    }
-                }
-
-                Log.i(TAG, "[WebView] Page started loading: $url")
-                Log.i(TAG, "[AdBlock] Stats so far - Blocked: $blockedRequestsCount / Total: $totalRequestsCount")
-            }
-
-            @Suppress("DEPRECATION")
-            override fun onReceivedError(view: WebView?, errorCode: Int, description: String?, failingUrl: String?) {
-                super.onReceivedError(view, errorCode, description, failingUrl)
-                val errorDescription = description ?: "Unknown error"
-                Log.e(TAG, "[WebView] Error received: $errorDescription (code: $errorCode)")
-
-                logAdBlockStats()
-                handleStreamError("Error: $errorDescription (Code: $errorCode)")
-            }
-
-            override fun onReceivedHttpError(view: WebView?, request: WebResourceRequest?, errorResponse: WebResourceResponse?) {
-                super.onReceivedHttpError(view, request, errorResponse)
-                if (request?.isForMainFrame == true) {
-                    val statusCode = errorResponse?.statusCode ?: 0
-                    Log.e(TAG, "[WebView] HTTP Error on main frame: $statusCode")
-
-                    logAdBlockStats()
-                    if (statusCode >= 400) {
-                        handleStreamError("Server returned error code: $statusCode")
-                    }
-                }
-            }
-
-            override fun onPageFinished(view: WebView?, url: String?) {
-                super.onPageFinished(view, url)
-                isPageLoaded = true
-                Log.i(TAG, "[WebView] Page finished loading: $url")
-
-                logAdBlockStats()
-                Log.i(TAG, "[AdBlock] Blocked ${blockedRequestsCount} out of ${totalRequestsCount} requests (${getBlockPercentage()}%)")
-
-                // ★ AdvancedAdBlocker CSS/JS injection commented out
-                // injectAdBlockingScripts(view)
-
-                // Inject video detection script
-                injectVideoDetectionScript(view)
-                
-                // Inject stream protection (prevents ads from replacing video src)
-                injectStreamProtectionScript(view)
-
-                // Inject advanced player scripts
-                injectAdvancedPlayerScripts(view)
-
-                // Auto-play video after page load
-                // injectAutoplayScript(view)
-
-                startVideoLoadTimeoutCheck()
-            }
-        }
-    }
-
-    /**
-     * ★ Video player specific ad blocking JS — commented out (AdvancedAdBlocker disabled)
-     */
-    // private fun getVideoSpecificAdBlockingJs(): String {
-    //     return """
-    //     (function() {
-    //         console.log('[AdBlock] Video player ad blocker initialized');
-    //         function removeVideoAds() { ... }
-    //         removeVideoAds();
-    //         setInterval(removeVideoAds, 2000);
-    //         var observer = new MutationObserver(function(mutations) {
-    //             mutations.forEach(function(mutation) {
-    //                 if (mutation.addedNodes.length > 0) { removeVideoAds(); }
-    //             });
-    //         });
-    //         if (document.body) { observer.observe(document.body, { childList: true, subtree: true }); }
-    //         window.open = function() { return null; };
-    //         if (window.adsbygoogle) { window.adsbygoogle = { push: function() {} }; }
-    //     })();
-    //     """.trimIndent()
-    // }
 
     /**
      * ★ Inject video detection JavaScript
@@ -1026,124 +733,6 @@ class PlayerActivity : AppCompatActivity() {
         view?.evaluateJavascript(autoplayJs, null)
     }
 
-    // ★ Simple iframe stream URL protection - prevents ads from replacing video src
-    private fun injectStreamProtectionScript(view: WebView?) {
-        val protectionJs = """
-        (function() {
-            console.log('[StreamProtect] Initializing stream protection');
-            
-            // Store original video source
-            var originalSrc = null;
-            
-            // Watch for video source changes
-            function protectVideoSrc() {
-                var videos = document.querySelectorAll('video');
-                videos.forEach(function(video) {
-                    // Capture original source on first load
-                    if (!originalSrc && video.src && video.src.indexOf('blob:') !== 0) {
-                        originalSrc = video.src;
-                        console.log('[StreamProtect] Original source captured: ' + originalSrc);
-                    }
-                    
-                    // If source changed to blob (likely an ad), try to restore original
-                    if (originalSrc && video.src.indexOf('blob:') === 0) {
-                        console.log('[StreamProtect] Detected blob URL (ad), source may be replaced');
-                        // Don't auto-restore blob URLs as they might be valid playback
-                        // Instead, just log the detection
-                    }
-                    
-                    // Block source changes to known ad domains
-                    var currentSrc = video.src || video.currentSrc || '';
-                    var adDomains = ['doubleclick', 'googlesyndication', 'googleadservices', 'adservice', 'adnxs', 'adsrvr', 'adform', 'taboola', 'outbrain', 'criteo'];
-                    var isAdUrl = adDomains.some(function(domain) {
-                        return currentSrc.indexOf(domain) !== -1;
-                    });
-                    
-                    if (isAdUrl && originalSrc) {
-                        console.log('[StreamProtect] Detected ad URL, keeping original source');
-                    }
-                });
-            }
-            
-            // Remove ad overlays and popups
-            function removeAdOverlays() {
-                var selectors = [
-                    'div[class*="ad-"]', 'div[class*="ads-"]', 'div[class*="advert"]',
-                    'div[id*="ad-"]', 'div[id*="ads-"]', 'div[id*="advert"]',
-                    '.popup-overlay', '.ad-popup', '.video-ad', '.preroll-ad',
-                    '[class*="overlay-ad"]', '[class*="sponsor"]'
-                ];
-                
-                selectors.forEach(function(selector) {
-                    try {
-                        var elements = document.querySelectorAll(selector);
-                        elements.forEach(function(el) {
-                            var style = window.getComputedStyle(el);
-                            if (style.position === 'fixed' || style.position === 'absolute') {
-                                if (style.zIndex > 1000 || el.innerText.toLowerCase().indexOf('advert') !== -1) {
-                                    el.remove();
-                                }
-                            }
-                        });
-                    } catch(e) {}
-                });
-            }
-            
-            // Block popup windows
-            function blockPopups() {
-                window.open = function() { return null; };
-                window.alert = function() {};
-                window.confirm = function() { return true; };
-            }
-            
-            // Run protection
-            protectVideoSrc();
-            removeAdOverlays();
-            blockPopups();
-            
-            // Monitor continuously
-            setInterval(protectVideoSrc, 2000);
-            setInterval(removeAdOverlays, 3000);
-            
-            // Observe for new elements
-            var observer = new MutationObserver(function(mutations) {
-                protectVideoSrc();
-                removeAdOverlays();
-            });
-            
-            if (document.body) {
-                observer.observe(document.body, { childList: true, subtree: true });
-            }
-            
-            console.log('[StreamProtect] Protection active');
-        })();
-        """.trimIndent()
-        
-        view?.evaluateJavascript(protectionJs, null)
-    }
-
-    private fun resetAdBlockStats() {
-        blockedRequestsCount = 0
-        totalRequestsCount = 0
-    }
-
-    private fun getBlockPercentage(): String {
-        return if (totalRequestsCount > 0) {
-            String.format("%.1f", (blockedRequestsCount.toFloat() / totalRequestsCount) * 100)
-        } else {
-            "0.0"
-        }
-    }
-
-    private fun logAdBlockStats() {
-        Log.i(TAG, "[AdBlock] ████████████████████████████████")
-        Log.i(TAG, "[AdBlock] Blocked: $blockedRequestsCount requests")
-        Log.i(TAG, "[AdBlock] Total: $totalRequestsCount requests")
-        Log.i(TAG, "[AdBlock] Rate: ${getBlockPercentage()}%")
-        Log.i(TAG, "[AdBlock] Provider: $currentProviderName")
-        Log.i(TAG, "[AdBlock] ████████████████████████████████")
-    }
-
     private fun setupImmersiveMode() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.insetsController?.let {
@@ -1171,29 +760,9 @@ class PlayerActivity : AppCompatActivity() {
             onNo = { },
             onYes = {
                 savePlaybackPosition()
-                logAdBlockStats()
                 finish()
             }
         ).show()
-    }
-
-    private fun warmUpDnsForUrl(url: String) {
-        val host = runCatching { Uri.parse(url).host }.getOrNull() ?: return
-        warmUpDnsHost(host)
-    }
-
-    private fun warmUpDnsHost(host: String) {
-        if (host.isBlank()) return
-        if (!dnsWarmedHosts.add(host)) return
-        Thread {
-            runCatching { DohDnsResolver.lookup(host) }
-                .onSuccess { addresses ->
-                    Log.i(TAG, "[DNS] DoH resolved $host -> ${addresses.joinToString()}")
-                }
-                .onFailure { error ->
-                    Log.w(TAG, "[DNS] DoH resolve failed for $host: ${error.message}")
-                }
-        }.start()
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -1211,7 +780,6 @@ class PlayerActivity : AppCompatActivity() {
         webView.onPause()
         webView.pauseTimers()
         progressHandler.removeCallbacks(progressRunnable)
-        cancelVideoLoadTimeoutCheck()
     }
 
     private fun safeSetSafeBrowsingEnabled(settings: WebSettings, enabled: Boolean) {
@@ -1227,9 +795,6 @@ class PlayerActivity : AppCompatActivity() {
     override fun onDestroy() {
         progressHandler.removeCallbacks(progressRunnable)
         cursorHideHandler.removeCallbacks(cursorHideRunnable)
-        cancelVideoLoadTimeoutCheck()
-
-        logAdBlockStats()
 
         if (::webView.isInitialized) {
             try {
@@ -1307,6 +872,36 @@ class PlayerActivity : AppCompatActivity() {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    /**
+     * Detect provider name from URL using StreamProviderManager
+     */
+    private fun detectProviderFromUrl(url: String): String {
+        val urlHost = try {
+            android.net.Uri.parse(url).host?.lowercase() ?: ""
+        } catch (e: Exception) {
+            return "VidLink" // Default fallback
+        }
+
+        // Match against all providers from StreamProviderManager
+        StreamProviderManager.providers.forEach { provider ->
+            try {
+                val providerBaseUrl = StreamProviderManager.getBaseUrl(provider.name)
+                    .lowercase()
+                    .removePrefix("https://")
+                    .removePrefix("http://")
+                    .removeSuffix("/")
+
+                if (urlHost.contains(providerBaseUrl) || urlHost.endsWith(".$providerBaseUrl")) {
+                    return provider.name
+                }
+            } catch (e: Exception) {
+                // Continue to next provider
+            }
+        }
+
+        return "VidLink" // Default fallback
+    }
+
     private fun updateCursorPosition() {
         if (isCursorDisabled) return
         cursorView.x = cursorX
@@ -1383,6 +978,68 @@ class PlayerActivity : AppCompatActivity() {
                     Log.w(TAG, "Error saving final playback position: ${e.message}")
                 }
             }
+        }
+    }
+}
+
+/**
+ * AdBlockerWebViewClient - Handles ad blocking and page lifecycle events
+ */
+private class AdBlockerWebViewClient(
+    private val onPageFinished: () -> Unit,
+    private val onError: () -> Unit
+) : WebViewClient() {
+
+    // Common ad domains to block
+    private val adDomains = setOf(
+        "doubleclick.net", "googlesyndication.com", "googleadservices.com",
+        "adnxs.com", "advertising.com", "adsystem.com", "adserver.com",
+        "rubiconproject.com", "openx.net", "pubmatic.com", "criteo.com",
+        "moatads.com", "taboola.com", "outbrain.com", "adroll.com",
+        "imrworldwide.com", "comscore.com", "quantserve.com",
+        "popads.net", "popcash.net", "propellerads.com", "ad-maven.com",
+        "onclickads.net", "adsterra.com", "exo-click.com", "juicyads.com",
+        "trafficjunky.net", "exoclick.com", "mc.yandex.ru", "creativecdn.com",
+        "serving-sys.com", "ads.yahoo.com", "contextweb.com",
+        "adtechtraffic.com", "bet365.com", "1xbet.com", "cloud.mail.ru"
+    )
+
+    override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
+        val url = request?.url?.toString()?.lowercase() ?: return null
+        
+        // Check if the URL contains any blocked domains
+        if (adDomains.any { url.contains(it) }) {
+            // Return an empty response to block the request
+            return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream("".toByteArray()))
+        }
+        
+        return super.shouldInterceptRequest(view, request)
+    }
+
+    override fun onPageFinished(view: WebView?, url: String?) {
+        super.onPageFinished(view, url)
+        onPageFinished()
+        
+        // Inject JS to remove ad elements
+        view?.evaluateJavascript(
+            """
+            (function() {
+                var style = document.createElement('style');
+                style.innerHTML = 'div[id^="ad"], div[class^="ad"], .popup, .overlay { display: none !important; }';
+                document.head.appendChild(style);
+                
+                // Remove existing ad elements
+                var ads = document.querySelectorAll('div[id^="ad"], div[class^="ad"], iframe[src*="doubleclick"], iframe[src*="google"]');
+                ads.forEach(function(ad) { ad.remove(); });
+            })();
+            """.trimIndent(), null
+        )
+    }
+    
+    override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: android.webkit.WebResourceError?) {
+         // Don't trigger error for blocked ads (subresources)
+        if (request?.isForMainFrame == true) {
+            onError()
         }
     }
 }
