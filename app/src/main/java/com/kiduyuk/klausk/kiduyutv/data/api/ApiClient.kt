@@ -132,6 +132,60 @@ object ApiClient {
         level = HttpLoggingInterceptor.Level.BODY
     }
 
+    // Interceptor to handle gzip-related errors with automatic retry
+    // "gzip finished without exhausting source" is a known OkHttp issue
+    // that can occur with malformed gzip responses from servers
+    private val gzipErrorInterceptor = Interceptor { chain ->
+        var attempt = 0
+        val maxGzipRetries = 2
+        var lastException: Exception? = null
+
+        while (attempt <= maxGzipRetries) {
+            try {
+                val response = chain.proceed(chain.request())
+                // Check if response might have gzip issues by reading body
+                if (response.header("Content-Encoding")?.contains("gzip", ignoreCase = true) == true) {
+                    try {
+                        // Attempt to read the body to validate gzip integrity
+                        val body = response.peekBody(Long.MAX_VALUE)
+                        if (body.contentLength() < 0) {
+                            // Body length unknown, might be gzip issue
+                            Log.w(TAG, "Gzip response with unknown content length detected")
+                        }
+                    } catch (e: Exception) {
+                        // Gzip error detected, close and retry
+                        response.close()
+                        lastException = e
+                        attempt++
+                        if (attempt <= maxGzipRetries) {
+                            Log.w(TAG, "Gzip error detected, retrying (attempt $attempt of $maxGzipRetries)")
+                            Thread.sleep(500)
+                            continue
+                        }
+                    }
+                }
+                return@Interceptor response
+            } catch (e: Exception) {
+                lastException = e
+                val message = e.message ?: ""
+
+                // Check if this is a gzip-related error
+                if (message.contains("gzip", ignoreCase = true) ||
+                    message.contains("finished without exhausting", ignoreCase = true) ||
+                    message.contains("unexpected end of stream", ignoreCase = true)) {
+                    attempt++
+                    if (attempt <= maxGzipRetries) {
+                        Log.w(TAG, "Gzip-related error: ${e.message}, retrying (attempt $attempt of $maxGzipRetries)")
+                        Thread.sleep(500)
+                        continue
+                    }
+                }
+                throw e
+            }
+        }
+        throw lastException ?: IOException("Failed after $maxGzipRetries gzip retries")
+    }
+
     /**
      * Creates OkHttpClient with caching and retry logic enabled.
      * Should be called with application context to initialize cache directory.
@@ -143,6 +197,7 @@ object ApiClient {
         return OkHttpClient.Builder()
             .cache(cache)
             .addInterceptor(authInterceptor)
+            .addInterceptor(gzipErrorInterceptor) // Handle gzip errors gracefully
             //.addInterceptor(retryInterceptor) // Added global retry logic
             .addNetworkInterceptor(cacheInterceptor) // For online requests with proper cache headers
             .addInterceptor(forceCacheInterceptor) // For offline requests - fallback to cached data
@@ -170,6 +225,7 @@ object ApiClient {
         // Default client without cache (will be replaced when context is available)
         OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
+            .addInterceptor(gzipErrorInterceptor) // Handle gzip errors gracefully
             .addInterceptor(retryInterceptor) // Added global retry logic
             //.addInterceptor(loggingInterceptor)
             .dns(SingletonDnsResolver.getDns()) // Cloudflare DNS over HTTPS

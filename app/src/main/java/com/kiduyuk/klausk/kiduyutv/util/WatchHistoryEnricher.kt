@@ -281,6 +281,7 @@ object WatchHistoryEnricher {
 
     /**
      * Fetches TMDB details for a media item.
+     * Handles gzip-related errors gracefully with automatic retries.
      *
      * @param mediaId The TMDB ID
      * @param mediaType "movie" or "tv"
@@ -297,6 +298,27 @@ object WatchHistoryEnricher {
                 }
             }
         } catch (e: Exception) {
+            val message = e.message ?: ""
+
+            // Check if this is a gzip-related error
+            if (message.contains("gzip", ignoreCase = true) ||
+                message.contains("finished without exhausting", ignoreCase = true) ||
+                message.contains("unexpected end of stream", ignoreCase = true)) {
+                Log.w(TAG, "Gzip error for $mediaId ($mediaType), retrying...")
+                // Attempt one retry for gzip issues
+                try {
+                    kotlinx.coroutines.delay(500) // Brief delay before retry
+                    when (mediaType) {
+                        "movie" -> return api.getMovieDetail(mediaId)
+                        "tv" -> return api.getTvShowDetail(mediaId)
+                        else -> return null
+                    }
+                } catch (retryException: Exception) {
+                    Log.e(TAG, "Retry failed for $mediaId: ${retryException.message}")
+                    return null
+                }
+            }
+
             Log.e(TAG, "Error fetching TMDB details for $mediaId: ${e.message}")
             null
         }
