@@ -281,47 +281,58 @@ object WatchHistoryEnricher {
 
     /**
      * Fetches TMDB details for a media item.
-     * Handles gzip-related errors gracefully with automatic retries.
+     * Handles gzip-related errors gracefully with automatic retries using exponential backoff.
      *
      * @param mediaId The TMDB ID
      * @param mediaType "movie" or "tv"
+     * @param maxRetries Maximum number of retry attempts (default 3)
      * @return MovieDetail, TvShowDetail, or null if fetch failed
      */
-    private suspend fun fetchTmdbDetails(mediaId: Int, mediaType: String): Any? {
-        return try {
-            when (mediaType) {
-                "movie" -> api.getMovieDetail(mediaId)
-                "tv" -> api.getTvShowDetail(mediaId)
-                else -> {
-                    Log.w(TAG, "Unknown media type: $mediaType")
-                    null
-                }
-            }
-        } catch (e: Exception) {
-            val message = e.message ?: ""
-
-            // Check if this is a gzip-related error
-            if (message.contains("gzip", ignoreCase = true) ||
-                message.contains("finished without exhausting", ignoreCase = true) ||
-                message.contains("unexpected end of stream", ignoreCase = true)) {
-                Log.w(TAG, "Gzip error for $mediaId ($mediaType), retrying...")
-                // Attempt one retry for gzip issues
-                try {
-                    kotlinx.coroutines.delay(500) // Brief delay before retry
-                    when (mediaType) {
-                        "movie" -> return api.getMovieDetail(mediaId)
-                        "tv" -> return api.getTvShowDetail(mediaId)
-                        else -> return null
+    private suspend fun fetchTmdbDetails(mediaId: Int, mediaType: String, maxRetries: Int = 3): Any? {
+        var attempt = 0
+        var lastException: Exception? = null
+        
+        while (attempt <= maxRetries) {
+            try {
+                val result = when (mediaType) {
+                    "movie" -> api.getMovieDetail(mediaId)
+                    "tv" -> api.getTvShowDetail(mediaId)
+                    else -> {
+                        Log.w(TAG, "Unknown media type: $mediaType")
+                        return null
                     }
-                } catch (retryException: Exception) {
-                    Log.e(TAG, "Retry failed for $mediaId: ${retryException.message}")
-                    return null
+                }
+                // Success on first try or after retry
+                return result
+            } catch (e: Exception) {
+                lastException = e
+                val message = e.message ?: ""
+                
+                // Check if this is a gzip-related error
+                val isGzipError = message.contains("gzip", ignoreCase = true) ||
+                        message.contains("finished without exhausting", ignoreCase = true) ||
+                        message.contains("unexpected end of stream", ignoreCase = true)
+                
+                if (isGzipError) {
+                    attempt++
+                    if (attempt <= maxRetries) {
+                        // Exponential backoff: 500ms, 1s, 2s
+                        val delayMs = 500L * (1 shl (attempt - 1))
+                        Log.w(TAG, "Gzip error for $mediaId ($mediaType), retrying in ${delayMs}ms (attempt $attempt of $maxRetries)")
+                        kotlinx.coroutines.delay(delayMs)
+                    } else {
+                        Log.e(TAG, "Gzip error for $mediaId ($mediaType) persists after $maxRetries retries: ${e.message}")
+                    }
+                } else {
+                    // Non-gzip error, don't retry
+                    Log.e(TAG, "Non-retryable error fetching TMDB details for $mediaId: ${e.message}")
+                    break
                 }
             }
-
-            Log.e(TAG, "Error fetching TMDB details for $mediaId: ${e.message}")
-            null
         }
+        
+        Log.e(TAG, "Failed to fetch TMDB details for $mediaId ($mediaType) after $maxRetries retries")
+        return null
     }
 
     /**
