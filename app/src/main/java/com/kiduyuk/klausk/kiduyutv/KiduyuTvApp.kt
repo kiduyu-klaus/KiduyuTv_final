@@ -83,7 +83,7 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
         AdManager.init(this)
 
         // Start network connectivity monitoring
-        NetworkConnectivityChecker.startMonitoring(this)
+        // NetworkConnectivityChecker.startMonitoring(this)
     }
 
     override fun onTerminate() {

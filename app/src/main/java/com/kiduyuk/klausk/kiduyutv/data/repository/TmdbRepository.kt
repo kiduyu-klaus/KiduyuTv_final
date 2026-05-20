@@ -18,31 +18,27 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.Cache
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.io.File
-import com.kiduyuk.klausk.kiduyutv.util.SingletonDnsResolver
 import java.util.concurrent.TimeUnit
 
 /**
  * Repository class that handles data operations, specifically fetching data from the TMDB API.
  * Now uses Room database for caching and watch history management.
- *
- * This implementation provides:
- * - Automatic response caching with configurable expiration
- * - Offline support for previously fetched content
- * - Efficient watch history tracking
- * - Reduced network calls through intelligent cache management
+ * 
+ * DEBUG_MODE: Set to true to enable detailed logging for all API operations
  */
 class TmdbRepository {
 
     private val api = ApiClient.tmdbApiService
     private val gson = Gson()
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
+    
     companion object {
         private const val TAG = "TmdbRepository"
+        
+        // Debug mode flag - set to true to see detailed logs
+        private const val DEBUG_MODE = true
 
         // Cache type constants for different content categories
         const val CACHE_TYPE_TRENDING = "trending"
@@ -51,10 +47,6 @@ class TmdbRepository {
         const val CACHE_TYPE_NOW_PLAYING = "now_playing"
         const val CACHE_TYPE_GITHUB_LIST = "github_list"
         const val CACHE_TYPE_TIME_TRAVEL = "time_travel"
-
-        // OkHttpClient for GitHub JSON fetching
-// Uses longer timeouts suitable for larger JSON payloads
-        private const val GITHUB_CACHE_SIZE = 5L * 1024 * 1024 // 5 MB cache (reduced from 10MB)
 
         @Volatile
         private var githubHttpClient: OkHttpClient? = null
@@ -66,228 +58,501 @@ class TmdbRepository {
         }
 
         private fun createGitHubOkHttpClient(context: Context): OkHttpClient {
-            val cacheDir = File(context.cacheDir, "github_json_cache")
-            val cache = Cache(cacheDir, GITHUB_CACHE_SIZE)
-
+            if (DEBUG_MODE) {
+                Log.d(TAG, "=== Creating GitHub OkHttpClient ===")
+                Log.d(TAG, "Cache dir: ${context.cacheDir}")
+            }
+            
             return OkHttpClient.Builder()
-                .cache(cache)
-                .dns(SingletonDnsResolver.getDns()) // Cloudflare DNS over HTTPS
-// Longer timeouts for fetching larger JSON payloads
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
                 .retryOnConnectionFailure(true)
                 .build()
         }
+        
+        private fun logDebug(message: String) {
+            if (DEBUG_MODE) {
+                Log.d(TAG, message)
+            }
+        }
+        
+        private fun logError(message: String, throwable: Throwable? = null) {
+            Log.e(TAG, message, throwable)
+        }
     }
-
-// ========== Trending Content ==========
+    
+    // ========== Trending Content ==========
 
     /** Fetches trending TV shows for today. */
     suspend fun getTrendingTvToday(): Result<List<TvShow>> = runCatching {
-        api.getTrendingTvToday().results
+        logDebug(">>> getTrendingTvToday() - Fetching trending TV shows for today")
+        try {
+            val response = api.getTrendingTvToday()
+            logDebug("<<< getTrendingTvToday() - Success: ${response.results.size} TV shows")
+            response.results
+        } catch (e: Exception) {
+            logError("!!! getTrendingTvToday() - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
     /** Fetches trending movies for today. */
     suspend fun getTrendingMoviesToday(): Result<List<Movie>> = runCatching {
-        api.getTrendingMoviesToday().results
+        logDebug(">>> getTrendingMoviesToday() - Fetching trending movies for today")
+        try {
+            val response = api.getTrendingMoviesToday()
+            logDebug("<<< getTrendingMoviesToday() - Success: ${response.results.size} movies")
+            response.results
+        } catch (e: Exception) {
+            logError("!!! getTrendingMoviesToday() - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
     /** Fetches trending TV shows for the week. */
     suspend fun getTrendingTvThisWeek(): Result<List<TvShow>> = runCatching {
-        api.getTrendingTvThisWeek().results
+        logDebug(">>> getTrendingTvThisWeek() - Fetching trending TV shows for this week")
+        try {
+            val response = api.getTrendingTvThisWeek()
+            logDebug("<<< getTrendingTvThisWeek() - Success: ${response.results.size} TV shows")
+            response.results
+        } catch (e: Exception) {
+            logError("!!! getTrendingTvThisWeek() - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
     /** Fetches trending movies for the week. */
     suspend fun getTrendingMoviesThisWeek(): Result<List<Movie>> = runCatching {
-        api.getTrendingMoviesThisWeek().results
+        logDebug(">>> getTrendingMoviesThisWeek() - Fetching trending movies for this week")
+        try {
+            val response = api.getTrendingMoviesThisWeek()
+            logDebug("<<< getTrendingMoviesThisWeek() - Success: ${response.results.size} movies")
+            response.results
+        } catch (e: Exception) {
+            logError("!!! getTrendingMoviesThisWeek() - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
-// ========== General Content ==========
+    // ========== General Content ==========
 
     /** Fetches movies currently playing in theaters. */
     suspend fun getNowPlayingMovies(): Result<List<Movie>> = runCatching {
-        api.getNowPlayingMovies().results
+        logDebug(">>> getNowPlayingMovies() - Fetching movies now playing")
+        try {
+            val response = api.getNowPlayingMovies()
+            logDebug("<<< getNowPlayingMovies() - Success: ${response.results.size} movies")
+            response.results
+        } catch (e: Exception) {
+            logError("!!! getNowPlayingMovies() - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
     /** Fetches top-rated movies. */
     suspend fun getTopRatedMovies(): Result<List<Movie>> = runCatching {
-        api.getTopRatedMovies().results
+        logDebug(">>> getTopRatedMovies() - Fetching top rated movies")
+        try {
+            val response = api.getTopRatedMovies()
+            logDebug("<<< getTopRatedMovies() - Success: ${response.results.size} movies")
+            response.results
+        } catch (e: Exception) {
+            logError("!!! getTopRatedMovies() - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
     /** Fetches top-rated TV shows. */
     suspend fun getTopRatedTvShows(): Result<List<TvShow>> = runCatching {
-        api.getTopRatedTvShows().results
+        logDebug(">>> getTopRatedTvShows() - Fetching top rated TV shows")
+        try {
+            val response = api.getTopRatedTvShows()
+            logDebug("<<< getTopRatedTvShows() - Success: ${response.results.size} TV shows")
+            response.results
+        } catch (e: Exception) {
+            logError("!!! getTopRatedTvShows() - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
     /** Fetches popular movies. */
     suspend fun getPopularMovies(): Result<List<Movie>> = runCatching {
-        api.getPopularMovies().results
+        logDebug(">>> getPopularMovies() - Fetching popular movies")
+        try {
+            val response = api.getPopularMovies()
+            logDebug("<<< getPopularMovies() - Success: ${response.results.size} movies")
+            response.results
+        } catch (e: Exception) {
+            logError("!!! getPopularMovies() - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
     /** Fetches popular TV shows. */
     suspend fun getPopularTvShows(): Result<List<TvShow>> = runCatching {
-        api.getPopularTvShows().results
+        logDebug(">>> getPopularTvShows() - Fetching popular TV shows")
+        try {
+            val response = api.getPopularTvShows()
+            logDebug("<<< getPopularTvShows() - Success: ${response.results.size} TV shows")
+            response.results
+        } catch (e: Exception) {
+            logError("!!! getPopularTvShows() - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
     /** Fetches TV shows with the "time travel" keyword. */
     suspend fun getTimeTravelTvShows(): Result<List<TvShow>> = runCatching {
-        api.getTimeTravelTvShows().results
+        logDebug(">>> getTimeTravelTvShows() - Fetching time travel TV shows")
+        try {
+            val response = api.getTimeTravelTvShows()
+            logDebug("<<< getTimeTravelTvShows() - Success: ${response.results.size} TV shows")
+            response.results
+        } catch (e: Exception) {
+            logError("!!! getTimeTravelTvShows() - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
-// ========== Detail Endpoints ==========
+    // ========== Detail Endpoints ==========
 
     /** Fetches detailed information for a specific movie. */
     suspend fun getMovieDetail(movieId: Int): Result<MovieDetail> = runCatching {
-        api.getMovieDetail(movieId)
+        logDebug(">>> getMovieDetail($movieId) - Fetching movie details")
+        try {
+            val response = api.getMovieDetail(movieId)
+            logDebug("<<< getMovieDetail($movieId) - Success: ${response.title}")
+            response
+        } catch (e: Exception) {
+            logError("!!! getMovieDetail($movieId) - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
     /** Fetches detailed information for a specific TV show. */
     suspend fun getTvShowDetail(tvId: Int): Result<TvShowDetail> = runCatching {
-        api.getTvShowDetail(tvId)
+        logDebug(">>> getTvShowDetail($tvId) - Fetching TV show details")
+        try {
+            val response = api.getTvShowDetail(tvId)
+            logDebug("<<< getTvShowDetail($tvId) - Success: ${response.name}")
+            response
+        } catch (e: Exception) {
+            logError("!!! getTvShowDetail($tvId) - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
     /** Fetches detailed information for a specific season of a TV show. */
     suspend fun getSeasonDetail(tvId: Int, seasonNumber: Int): Result<SeasonDetail> = runCatching {
-        api.getSeasonDetail(tvId, seasonNumber)
+        logDebug(">>> getSeasonDetail($tvId, $seasonNumber) - Fetching season details")
+        try {
+            val response = api.getSeasonDetail(tvId, seasonNumber)
+            logDebug("<<< getSeasonDetail($tvId, $seasonNumber) - Success: ${response.name}")
+            response
+        } catch (e: Exception) {
+            logError("!!! getSeasonDetail($tvId, $seasonNumber) - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
-// ========== Genre Endpoints ==========
+    // ========== Genre Endpoints ==========
 
     /** Fetches the list of available movie genres. */
     suspend fun getMovieGenres(): Result<List<Genre>> = runCatching {
-        api.getMovieGenres().genres
+        logDebug(">>> getMovieGenres() - Fetching movie genres")
+        try {
+            val response = api.getMovieGenres()
+            logDebug("<<< getMovieGenres() - Success: ${response.genres.size} genres")
+            response.genres
+        } catch (e: Exception) {
+            logError("!!! getMovieGenres() - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
     /** Fetches the list of available TV show genres. */
     suspend fun getTvGenres(): Result<List<Genre>> = runCatching {
-        api.getTvGenres().genres
+        logDebug(">>> getTvGenres() - Fetching TV genres")
+        try {
+            val response = api.getTvGenres()
+            logDebug("<<< getTvGenres() - Success: ${response.genres.size} genres")
+            response.genres
+        } catch (e: Exception) {
+            logError("!!! getTvGenres() - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
-// ========== Company/Network Endpoints ==========
+    // ========== Company/Network Endpoints ==========
 
     /** Fetches movies filtered by a specific production company. */
-    suspend fun getMoviesByCompany(companyId: Int, page: Int = 1): Result<MovieResponse> =
-        runCatching {
-            api.getMoviesByCompany(companyId, page = page)
+    suspend fun getMoviesByCompany(companyId: Int, page: Int = 1): Result<MovieResponse> = runCatching {
+        logDebug(">>> getMoviesByCompany($companyId, page=$page) - Fetching movies by company")
+        try {
+            val response = api.getMoviesByCompany(companyId, page = page)
+            logDebug("<<< getMoviesByCompany($companyId) - Success: ${response.results.size} movies")
+            response
+        } catch (e: Exception) {
+            logError("!!! getMoviesByCompany($companyId) - Failed: ${e.message}", e)
+            throw e
         }
+    }
 
     /** Fetches TV shows filtered by a specific network. */
-    suspend fun getTvShowsByNetwork(networkId: Int, page: Int = 1): Result<TvShowResponse> =
-        runCatching {
-            api.getTvShowsByNetwork(networkId, page = page)
+    suspend fun getTvShowsByNetwork(networkId: Int, page: Int = 1): Result<TvShowResponse> = runCatching {
+        logDebug(">>> getTvShowsByNetwork($networkId, page=$page) - Fetching TV shows by network")
+        try {
+            val response = api.getTvShowsByNetwork(networkId, page = page)
+            logDebug("<<< getTvShowsByNetwork($networkId) - Success: ${response.results.size} TV shows")
+            response
+        } catch (e: Exception) {
+            logError("!!! getTvShowsByNetwork($networkId) - Failed: ${e.message}", e)
+            throw e
         }
+    }
 
     /** Fetches movies filtered by a specific genre. */
-    suspend fun getMoviesByGenre(genreId: Int, page: Int = 1): Result<MovieResponse> =
-        runCatching {
-            api.getMoviesByGenre(genreId, page = page)
+    suspend fun getMoviesByGenre(genreId: Int, page: Int = 1): Result<MovieResponse> = runCatching {
+        logDebug(">>> getMoviesByGenre($genreId, page=$page) - Fetching movies by genre")
+        try {
+            val response = api.getMoviesByGenre(genreId, page = page)
+            logDebug("<<< getMoviesByGenre($genreId) - Success: ${response.results.size} movies")
+            response
+        } catch (e: Exception) {
+            logError("!!! getMoviesByGenre($genreId) - Failed: ${e.message}", e)
+            throw e
         }
-
+    }
 
     /** Fetches TV shows filtered by a specific genre. */
-    suspend fun getTvShowsByGenre(genreId: Int, page: Int = 1): Result<TvShowResponse> =
-        runCatching {
-            api.getTvShowsByGenre(genreId, page = page)
+    suspend fun getTvShowsByGenre(genreId: Int, page: Int = 1): Result<TvShowResponse> = runCatching {
+        logDebug(">>> getTvShowsByGenre($genreId, page=$page) - Fetching TV shows by genre")
+        try {
+            val response = api.getTvShowsByGenre(genreId, page = page)
+            logDebug("<<< getTvShowsByGenre($genreId) - Success: ${response.results.size} TV shows")
+            response
+        } catch (e: Exception) {
+            logError("!!! getTvShowsByGenre($genreId) - Failed: ${e.message}", e)
+            throw e
         }
+    }
 
     /** Fetches details for a specific network. */
     suspend fun getNetworkDetails(networkId: Int): Result<Network> = runCatching {
-        api.getNetworkDetails(networkId)
+        logDebug(">>> getNetworkDetails($networkId) - Fetching network details")
+        try {
+            val response = api.getNetworkDetails(networkId)
+            logDebug("<<< getNetworkDetails($networkId) - Success: ${response.name}")
+            response
+        } catch (e: Exception) {
+            logError("!!! getNetworkDetails($networkId) - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
     /** Fetches details for a specific production company. */
     suspend fun getCompanyDetails(companyId: Int): Result<ProductionCompany> = runCatching {
-        api.getCompanyDetails(companyId)
+        logDebug(">>> getCompanyDetails($companyId) - Fetching company details")
+        try {
+            val response = api.getCompanyDetails(companyId)
+            logDebug("<<< getCompanyDetails($companyId) - Success: ${response.name}")
+            response
+        } catch (e: Exception) {
+            logError("!!! getCompanyDetails($companyId) - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
-// ========== Video Endpoints ==========
+    // ========== Video Endpoints ==========
 
     /** Fetches videos (trailers, etc.) for a specific movie. */
     suspend fun getMovieVideos(movieId: Int): Result<List<Video>> = runCatching {
-        api.getMovieVideos(movieId).results
+        logDebug(">>> getMovieVideos($movieId) - Fetching movie videos")
+        try {
+            val response = api.getMovieVideos(movieId)
+            logDebug("<<< getMovieVideos($movieId) - Success: ${response.results.size} videos")
+            response.results
+        } catch (e: Exception) {
+            logError("!!! getMovieVideos($movieId) - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
     /** Fetches videos (trailers, etc.) for a specific TV show. */
     suspend fun getTvShowVideos(tvId: Int): Result<List<Video>> = runCatching {
-        api.getTvShowVideos(tvId).results
+        logDebug(">>> getTvShowVideos($tvId) - Fetching TV show videos")
+        try {
+            val response = api.getTvShowVideos(tvId)
+            logDebug("<<< getTvShowVideos($tvId) - Success: ${response.results.size} videos")
+            response.results
+        } catch (e: Exception) {
+            logError("!!! getTvShowVideos($tvId) - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
-// ========== Search Endpoints ==========
+    // ========== Search Endpoints ==========
 
     /** Searches for movies matching a query string. */
     suspend fun searchMovies(query: String): Result<List<Movie>> = runCatching {
-        api.searchMovies(query).results
+        logDebug(">>> searchMovies('$query') - Searching movies")
+        try {
+            val response = api.searchMovies(query)
+            logDebug("<<< searchMovies('$query') - Success: ${response.results.size} movies")
+            response.results
+        } catch (e: Exception) {
+            logError("!!! searchMovies('$query') - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
     /** Searches for TV shows matching a query string. */
     suspend fun searchTvShows(query: String): Result<List<TvShow>> = runCatching {
-        api.searchTvShows(query).results
+        logDebug(">>> searchTvShows('$query') - Searching TV shows")
+        try {
+            val response = api.searchTvShows(query)
+            logDebug("<<< searchTvShows('$query') - Success: ${response.results.size} TV shows")
+            response.results
+        } catch (e: Exception) {
+            logError("!!! searchTvShows('$query') - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
     /** Searches for both movies and TV shows matching a query string. */
     suspend fun searchMulti(query: String): Result<List<SearchResult>> = runCatching {
-        val response = api.searchMulti(query)
-        response.results.mapNotNull { it.toSearchResult() }
+        logDebug(">>> searchMulti('$query') - Multi-search")
+        try {
+            val response = api.searchMulti(query)
+            val results = response.results.mapNotNull { it.toSearchResult() }
+            logDebug("<<< searchMulti('$query') - Success: ${results.size} results")
+            results
+        } catch (e: Exception) {
+            logError("!!! searchMulti('$query') - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
-// ========== Recommendations ==========
+    // ========== Recommendations ==========
 
     /** Fetches recommended movies for a specific movie. */
     suspend fun getRecommendedMovies(movieId: Int): Result<List<Movie>> = runCatching {
-        api.getRecommendedMovies(movieId).results
+        logDebug(">>> getRecommendedMovies($movieId) - Fetching movie recommendations")
+        try {
+            val response = api.getRecommendedMovies(movieId)
+            logDebug("<<< getRecommendedMovies($movieId) - Success: ${response.results.size} movies")
+            response.results
+        } catch (e: Exception) {
+            logError("!!! getRecommendedMovies($movieId) - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
     /** Fetches recommended TV shows for a specific TV show. */
     suspend fun getRecommendedTvShows(tvId: Int): Result<List<TvShow>> = runCatching {
-        api.getRecommendedTvShows(tvId).results
+        logDebug(">>> getRecommendedTvShows($tvId) - Fetching TV show recommendations")
+        try {
+            val response = api.getRecommendedTvShows(tvId)
+            logDebug("<<< getRecommendedTvShows($tvId) - Success: ${response.results.size} TV shows")
+            response.results
+        } catch (e: Exception) {
+            logError("!!! getRecommendedTvShows($tvId) - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
     /** Fetches detailed information for a movie collection. */
     suspend fun getCollectionDetails(collectionId: Int): Result<CollectionDetail> = runCatching {
-        api.getCollectionDetails(collectionId)
+        logDebug(">>> getCollectionDetails($collectionId) - Fetching collection details")
+        try {
+            val response = api.getCollectionDetails(collectionId)
+            logDebug("<<< getCollectionDetails($collectionId) - Success: ${response.name}")
+            response
+        } catch (e: Exception) {
+            logError("!!! getCollectionDetails($collectionId) - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
-// ========== Credits (Cast & Crew) ==========
+    // ========== Credits (Cast & Crew) ==========
 
     /** Fetches movie credits (cast and crew) for a specific movie. */
     suspend fun getMovieCredits(movieId: Int): Result<MovieCreditsResponse> = runCatching {
-        api.getMovieCredits(movieId)
+        logDebug(">>> getMovieCredits($movieId) - Fetching movie credits")
+        try {
+            val response = api.getMovieCredits(movieId)
+            logDebug("<<< getMovieCredits($movieId) - Success: ${response.cast.size} cast members")
+            response
+        } catch (e: Exception) {
+            logError("!!! getMovieCredits($movieId) - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
     /** Fetches TV show credits (cast and crew) for a specific TV show. */
     suspend fun getTvShowCredits(tvId: Int): Result<TvShowCreditsResponse> = runCatching {
-        api.getTvShowCredits(tvId)
+        logDebug(">>> getTvShowCredits($tvId) - Fetching TV show credits")
+        try {
+            val response = api.getTvShowCredits(tvId)
+            logDebug("<<< getTvShowCredits($tvId) - Success: ${response.cast.size} cast members")
+            response
+        } catch (e: Exception) {
+            logError("!!! getTvShowCredits($tvId) - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
-// ========== Person Credits ==========
+    // ========== Person Credits ==========
 
     /** Fetches movie credits for a specific person. */
     suspend fun getPersonMovieCredits(personId: Int): Result<PersonMovieCreditsResponse> = runCatching {
-        api.getPersonMovieCredits(personId)
+        logDebug(">>> getPersonMovieCredits($personId) - Fetching person movie credits")
+        try {
+            val response = api.getPersonMovieCredits(personId)
+            logDebug("<<< getPersonMovieCredits($personId) - Success: ${response.cast.size} movies")
+            response
+        } catch (e: Exception) {
+            logError("!!! getPersonMovieCredits($personId) - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
     /** Fetches TV show credits for a specific person. */
     suspend fun getPersonTvCredits(personId: Int): Result<PersonTvCreditsResponse> = runCatching {
-        api.getPersonTvCredits(personId)
+        logDebug(">>> getPersonTvCredits($personId) - Fetching person TV credits")
+        try {
+            val response = api.getPersonTvCredits(personId)
+            logDebug("<<< getPersonTvCredits($personId) - Success: ${response.cast.size} TV shows")
+            response
+        } catch (e: Exception) {
+            logError("!!! getPersonTvCredits($personId) - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
     /** Fetches detailed information for a specific person. */
     suspend fun getPersonDetails(personId: Int): Result<PersonDetail> = runCatching {
-        api.getPersonDetails(personId)
+        logDebug(">>> getPersonDetails($personId) - Fetching person details")
+        try {
+            val response = api.getPersonDetails(personId)
+            logDebug("<<< getPersonDetails($personId) - Success: ${response.name}")
+            response
+        } catch (e: Exception) {
+            logError("!!! getPersonDetails($personId) - Failed: ${e.message}", e)
+            throw e
+        }
     }
 
-// ========== Watch History (Now using Room) ==========
-
+    // ========== Watch History (Now using Room) ==========
 
     /**
      * Saves a media item to the watch history using Room database.
      * Replaces the old SharedPreferences-based implementation.
-     *
-     * @param context Context for database operations
-     * @param item The watch history item to save
      */
     fun saveToWatchHistory(context: Context, item: WatchHistoryItem) {
+        logDebug(">>> saveToWatchHistory() - ID: ${item.id}, Title: ${item.title}")
         DatabaseManager.init(context)
 
         DatabaseManager.addToWatchHistory(
@@ -302,15 +567,14 @@ class TmdbRepository {
             seasonNumber = item.seasonNumber,
             episodeNumber = item.episodeNumber
         )
+        logDebug("<<< saveToWatchHistory() - Saved successfully")
     }
 
     /**
      * Retrieves the watch history from Room database.
-     *
-     * @param context Context for database operations
-     * @return List of watch history items
      */
     fun getWatchHistory(context: Context): List<WatchHistoryItem> {
+        logDebug(">>> getWatchHistory() - Fetching watch history")
         DatabaseManager.init(context)
 
         var items = emptyList<WatchHistoryItem>()
@@ -319,28 +583,26 @@ class TmdbRepository {
             items = entities.map { DatabaseManager.entityToWatchHistoryItem(it) }
         }
 
-// For synchronous access, fall back to the database directly
         return try {
             val dao = DatabaseManager.watchHistoryDao()
-            kotlinx.coroutines.runBlocking {
+            val result = kotlinx.coroutines.runBlocking {
                 dao.getAllWatchHistoryItems().map {
                     DatabaseManager.entityToWatchHistoryItem(it)
                 }
             }
+            logDebug("<<< getWatchHistory() - Success: ${result.size} items")
+            result
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to get watch history", e)
+            logError("!!! getWatchHistory() - Failed: ${e.message}", e)
             items
         }
     }
 
     /**
      * Gets watch history as a Flow for reactive updates.
-     * Pass limit = 0 to get all items without limit.
-     *
-     * @param limit Maximum number of items to return (0 = unlimited)
-     * @return Flow of watch history items
      */
     fun getWatchHistoryFlow(limit: Int = 0): Flow<List<WatchHistoryItem>> {
+        logDebug(">>> getWatchHistoryFlow(limit=$limit)")
         return if (limit > 0) {
             DatabaseManager.getRecentWatchHistory(limit).map { entities ->
                 entities.map { DatabaseManager.entityToWatchHistoryItem(it) }
@@ -354,11 +616,9 @@ class TmdbRepository {
 
     /**
      * Gets "Continue Watching" items as a Flow.
-     *
-     * @param limit Maximum number of items to return
-     * @return Flow of continue watching items
      */
     fun getContinueWatchingFlow(limit: Int = 10): Flow<List<WatchHistoryItem>> {
+        logDebug(">>> getContinueWatchingFlow(limit=$limit)")
         return DatabaseManager.getContinueWatching(limit).map { entities ->
             entities.map { DatabaseManager.entityToWatchHistoryItem(it) }
         }
@@ -366,24 +626,17 @@ class TmdbRepository {
 
     /**
      * Updates playback position for a media item.
-     *
-     * @param mediaId The TMDB ID of the media
-     * @param mediaType "movie" or "tv"
-     * @param position The playback position in milliseconds
      */
     fun updatePlaybackPosition(mediaId: Int, mediaType: String, position: Long) {
+        logDebug(">>> updatePlaybackPosition() - ID: $mediaId, Type: $mediaType, Position: $position")
         DatabaseManager.updatePlaybackPosition(mediaId, mediaType, position)
     }
 
     /**
      * Updates episode info for a TV show.
-     *
-     * @param mediaId The TMDB ID of the TV show
-     * @param mediaType "tv"
-     * @param seasonNumber The current season number
-     * @param episodeNumber The current episode number
      */
     fun updateEpisodeInfo(mediaId: Int, mediaType: String, seasonNumber: Int, episodeNumber: Int) {
+        logDebug(">>> updateEpisodeInfo() - ID: $mediaId, S$seasonNumber E$episodeNumber")
         DatabaseManager.updateEpisodeInfo(mediaId, mediaType, seasonNumber, episodeNumber)
     }
 
@@ -391,6 +644,7 @@ class TmdbRepository {
      * Checks if a media item is in the watch history.
      */
     fun getWatchHistoryItem(context: Context, id: Int, isTv: Boolean): WatchHistoryItem? {
+        logDebug(">>> getWatchHistoryItem() - ID: $id, isTv: $isTv")
         DatabaseManager.init(context)
 
         return try {
@@ -400,21 +654,16 @@ class TmdbRepository {
                 entity?.let { DatabaseManager.entityToWatchHistoryItem(it) }
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to get watch history item", e)
+            logError("!!! getWatchHistoryItem() - Failed: ${e.message}", e)
             null
         }
     }
 
     /**
      * Checks if a media item exists in the watch history.
-     * This is a synchronous check using runBlocking.
-     *
-     * @param context Context for database operations
-     * @param id The TMDB ID of the media
-     * @param isTv Whether the media is a TV show
-     * @return true if the item exists in watch history, false otherwise
      */
     fun isInWatchHistory(context: Context, id: Int, isTv: Boolean): Boolean {
+        logDebug(">>> isInWatchHistory() - ID: $id, isTv: $isTv")
         DatabaseManager.init(context)
 
         return try {
@@ -423,7 +672,7 @@ class TmdbRepository {
                 dao.isInWatchHistory(id, if (isTv) "tv" else "movie")
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to check watch history existence", e)
+            logError("!!! isInWatchHistory() - Failed: ${e.message}", e)
             false
         }
     }
@@ -432,19 +681,19 @@ class TmdbRepository {
      * Clears all watch history.
      */
     fun clearWatchHistory() {
+        logDebug(">>> clearWatchHistory() - Clearing all watch history")
         DatabaseManager.clearWatchHistory()
     }
 
-// ========== GitHub Lists with Caching ==========
+    // ========== GitHub Lists ==========
 
     /**
      * Fetches movies from a GitHub JSON list.
-     * Removes caching to always load fresh data from TMDB.
      */
     suspend fun getGitHubMovieList(context: Context, urlString: String): Result<List<Movie>> =
         withContext(Dispatchers.IO) {
             runCatching {
-                Log.i(TAG, "Fetching GitHub movie list from: $urlString")
+                logDebug(">>> getGitHubMovieList() - URL: $urlString")
 
                 val client = getGitHubOkHttpClient(context)
                 val request = Request.Builder()
@@ -455,13 +704,14 @@ class TmdbRepository {
 
                 if (!response.isSuccessful) {
                     val errorBody = response.body?.string() ?: "Unknown error"
-                    Log.e(TAG, "GitHub API error: ${response.code} - $errorBody")
+                    logError("!!! getGitHubMovieList() - HTTP Error: ${response.code}")
                     response.close()
                     throw Exception("Failed to fetch GitHub list: HTTP ${response.code}")
                 }
 
                 val responseBody = response.body?.string()
                 if (responseBody.isNullOrEmpty()) {
+                    logError("!!! getGitHubMovieList() - Empty response")
                     response.close()
                     throw Exception("Empty response from GitHub")
                 }
@@ -471,20 +721,18 @@ class TmdbRepository {
                 val type = object : TypeToken<List<Movie>>() {}.type
                 val movies: List<Movie> = gson.fromJson(responseBody, type)
 
-                Log.i(TAG, "Fetched ${movies.size} movies from GitHub")
-
+                logDebug("<<< getGitHubMovieList() - Success: ${movies.size} movies")
                 movies
             }
         }
 
     /**
      * Fetches TV shows from a GitHub JSON list.
-     * Removes caching to always load fresh data from TMDB.
      */
     suspend fun getGitHubTvShowList(context: Context, urlString: String): Result<List<TvShow>> =
         withContext(Dispatchers.IO) {
             runCatching {
-                Log.i(TAG, "Fetching GitHub TV show list from: $urlString")
+                logDebug(">>> getGitHubTvShowList() - URL: $urlString")
 
                 val client = getGitHubOkHttpClient(context)
                 val request = Request.Builder()
@@ -495,13 +743,14 @@ class TmdbRepository {
 
                 if (!response.isSuccessful) {
                     val errorBody = response.body?.string() ?: "Unknown error"
-                    Log.e(TAG, "GitHub API error: ${response.code} - $errorBody")
+                    logError("!!! getGitHubTvShowList() - HTTP Error: ${response.code}")
                     response.close()
                     throw Exception("Failed to fetch GitHub list: HTTP ${response.code}")
                 }
 
                 val responseBody = response.body?.string()
                 if (responseBody.isNullOrEmpty()) {
+                    logError("!!! getGitHubTvShowList() - Empty response")
                     response.close()
                     throw Exception("Empty response from GitHub")
                 }
@@ -511,20 +760,18 @@ class TmdbRepository {
                 val type = object : TypeToken<List<TvShow>>() {}.type
                 val tvShows: List<TvShow> = gson.fromJson(responseBody, type)
 
-                Log.i(TAG, "Fetched ${tvShows.size} TV shows from GitHub")
-
+                logDebug("<<< getGitHubTvShowList() - Success: ${tvShows.size} TV shows")
                 tvShows
             }
         }
 
     /**
      * Fetches companies and networks from a GitHub JSON list.
-     * Now uses OkHttpClient for better connection management and caching.
      */
     suspend fun getGitHubCompaniesNetworks(context: Context, urlString: String): Result<CompaniesNetworksResponse> =
         withContext(Dispatchers.IO) {
             runCatching {
-                Log.i(TAG, "Fetching GitHub companies/networks list from: $urlString")
+                logDebug(">>> getGitHubCompaniesNetworks() - URL: $urlString")
 
                 val client = getGitHubOkHttpClient(context)
                 val request = Request.Builder()
@@ -535,13 +782,14 @@ class TmdbRepository {
 
                 if (!response.isSuccessful) {
                     val errorBody = response.body?.string() ?: "Unknown error"
-                    Log.e(TAG, "GitHub API error: ${response.code} - $errorBody")
+                    logError("!!! getGitHubCompaniesNetworks() - HTTP Error: ${response.code}")
                     response.close()
                     throw Exception("Failed to fetch GitHub list: HTTP ${response.code}")
                 }
 
                 val responseBody = response.body?.string()
                 if (responseBody.isNullOrEmpty()) {
+                    logError("!!! getGitHubCompaniesNetworks() - Empty response")
                     response.close()
                     throw Exception("Empty response from GitHub")
                 }
@@ -550,38 +798,41 @@ class TmdbRepository {
 
                 val result: CompaniesNetworksResponse = gson.fromJson(responseBody, CompaniesNetworksResponse::class.java)
 
-                Log.i(TAG, "Fetched companies/networks from GitHub")
-
+                logDebug("<<< getGitHubCompaniesNetworks() - Success")
                 result
             }
         }
 
-// ========== Private Helper Methods ==========
+    // ========== Private Helper Methods ==========
 
     /**
      * Attempts to get cached movies of a specific type.
-     * Returns empty list if no valid cache exists.
      */
     private suspend fun tryGetCachedMovies(cacheType: String): List<Movie> {
+        logDebug(">>> tryGetCachedMovies($cacheType)")
         return try {
-            DatabaseManager.getCachedMoviesByType(cacheType).first()
+            val cached = DatabaseManager.getCachedMoviesByType(cacheType).first()
                 .map { DatabaseManager.entityToMovie(it) }
+            logDebug("<<< tryGetCachedMovies() - Found ${cached.size} cached movies")
+            cached
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to get cached movies for type: $cacheType", e)
+            logError("!!! tryGetCachedMovies() - Failed: ${e.message}", e)
             emptyList()
         }
     }
 
     /**
      * Attempts to get cached TV shows of a specific type.
-     * Returns empty list if no valid cache exists.
      */
     private suspend fun tryGetCachedTvShows(cacheType: String): List<TvShow> {
+        logDebug(">>> tryGetCachedTvShows($cacheType)")
         return try {
-            DatabaseManager.getCachedTvShowsByType(cacheType).first()
+            val cached = DatabaseManager.getCachedTvShowsByType(cacheType).first()
                 .map { DatabaseManager.entityToTvShow(it) }
+            logDebug("<<< tryGetCachedTvShows() - Found ${cached.size} cached TV shows")
+            cached
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to get cached TV shows for type: $cacheType", e)
+            logError("!!! tryGetCachedTvShows() - Failed: ${e.message}", e)
             emptyList()
         }
     }
@@ -594,6 +845,7 @@ class TmdbRepository {
         cacheType: String,
         expirationMs: Long = CachedMovieEntity.CACHE_DURATION_MS
     ) {
+        logDebug(">>> cacheMovies() - Type: $cacheType, Count: ${movies.size}")
         DatabaseManager.cacheMovies(movies, cacheType, expirationMs)
     }
 
@@ -605,6 +857,7 @@ class TmdbRepository {
         cacheType: String,
         expirationMs: Long = CachedTvShowEntity.CACHE_DURATION_MS
     ) {
+        logDebug(">>> cacheTvShows() - Type: $cacheType, Count: ${tvShows.size}")
         DatabaseManager.cacheTvShows(tvShows, cacheType, expirationMs)
     }
 
@@ -612,6 +865,7 @@ class TmdbRepository {
      * Cleans up expired cache entries.
      */
     fun cleanExpiredCache() {
+        logDebug(">>> cleanExpiredCache() - Cleaning expired cache")
         DatabaseManager.cleanExpiredCache()
     }
 }

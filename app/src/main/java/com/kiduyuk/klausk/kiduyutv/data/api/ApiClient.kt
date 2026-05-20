@@ -10,128 +10,254 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.io.IOException
 import java.net.SocketTimeoutException
-import com.kiduyuk.klausk.kiduyutv.util.SingletonDnsResolver
 import java.util.concurrent.TimeUnit
 
 object ApiClient {
 
     private const val TAG = "ApiClient"
+    
+    // Debug mode flag - set to true to see detailed logs
+    private const val DEBUG_MODE = true
 
     // Bearer token used for Authorization header for all API requests.
-    private const val BEARER_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI5ZGUzZGU2MjNiNTc5ZjZlMTI3YzZlYzYwM2I5Zjc0ZCIsIm5iZiI6MTY2MDMwMTIxNC4yNCwic3ViIjoiNjJmNjJmOWVjM2JmZmUwMDdhNzJlODVkIiwic2NvcGVzIjpbImFwaV9yZWFkIl0sInZlcnNpb24iOjF9.S10N9Lag4A71FXL-VsErRF71UhADOKTPeK5FDnsEOhk"
+    private const val BEARER_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI1NmE4YjFmMGFhYzQ4NTA0ODI2ZTgwNjY4NjViMDc0MCIsIm5iZiI6MTYyNjIwNDQ3NS4wOTksInN1YiI6IjYwZWRlOTNiMGYwZGE1MDA1ZmQzMzk0YSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.cpc2FUt6ENj6p-16b4ER0Sq5x34NTMHE4HErcSlb13o"
 
     // Interceptor that appends authentication and content-type headers to each request.
     private val authInterceptor = Interceptor { chain ->
-        val originalRequest = chain.request( ) // save the original outgoing request
+        val originalRequest = chain.request()
+        if (DEBUG_MODE) {
+            Log.d(TAG, "=== AUTH INTERCEPTOR ===")
+            Log.d(TAG, "Original URL: ${originalRequest.url}")
+            Log.d(TAG, "Original Headers: ${originalRequest.headers}")
+        }
+        
         val newRequest = originalRequest.newBuilder()
-            .header("Authorization", "Bearer $BEARER_TOKEN") // attach auth token
-            .header("Content-Type", "application/json") // send JSON payload
+            .header("Authorization", "Bearer $BEARER_TOKEN")
+            .header("Content-Type", "application/json")
             .build()
-        chain.proceed(newRequest) // continue with the modified request
+        
+        if (DEBUG_MODE) {
+            Log.d(TAG, "Auth Header: Bearer [TOKEN_LENGTH=${BEARER_TOKEN.length}]")
+            Log.d(TAG, "New URL: ${newRequest.url}")
+            Log.d(TAG, "New Headers: ${newRequest.headers}")
+        }
+        
+        val response = chain.proceed(newRequest)
+        
+        if (DEBUG_MODE) {
+            Log.d(TAG, "Response Code: ${response.code}")
+            Log.d(TAG, "Response Message: ${response.message}")
+            Log.d(TAG, "Response Headers: ${response.headers}")
+        }
+        
+        return@Interceptor response
     }
 
     // Global Retry Interceptor: Retries 3 times with delay on timeout or IO error
     private val retryInterceptor = Interceptor { chain ->
         var attempt = 0
         val maxRetry = 3
-        val retryDelayMs = 3000L // 3 seconds (reduced from 30s)
+        val retryDelayMs = 3000L
         var response: Response? = null
         var exception: Exception? = null
+
+        if (DEBUG_MODE) {
+            Log.d(TAG, "=== RETRY INTERCEPTOR ===")
+            Log.d(TAG, "Request URL: ${chain.request().url}")
+        }
 
         while (attempt <= maxRetry) {
             try {
                 if (attempt > 0) {
-                    // CRITICAL: Close previous response before retrying
                     response?.close()
-                    Log.i(TAG, "Retrying request (attempt $attempt of $maxRetry) after ${retryDelayMs / 1000}s...")
+                    if (DEBUG_MODE) {
+                        Log.w(TAG, "RETRY attempt $attempt of $maxRetry after ${retryDelayMs / 1000}s")
+                    }
                     Thread.sleep(retryDelayMs)
                 }
+                
+                if (DEBUG_MODE) {
+                    Log.d(TAG, "Attempt $attempt: Proceeding with request to ${chain.request().url}")
+                }
+                
                 response = chain.proceed(chain.request())
-                if (response.isSuccessful) return@Interceptor response
+                
+                if (DEBUG_MODE) {
+                    Log.d(TAG, "Attempt $attempt: Response code = ${response.code}")
+                }
+                
+                if (response.isSuccessful) {
+                    if (DEBUG_MODE) {
+                        Log.d(TAG, "Attempt $attempt: SUCCESS - ${response.code}")
+                    }
+                    return@Interceptor response
+                }
 
-                // If not successful, close and check if retryable
                 val code = response.code
                 response.close()
 
-                // Only retry on specific server error codes
                 if (code == 503 || code == 504 || code == 429) {
-                    Log.w(TAG, "Request failed with code $code, will retry")
+                    if (DEBUG_MODE) {
+                        Log.w(TAG, "Attempt $attempt: Retryable error $code")
+                    }
                 } else {
-                    // For non-retryable codes, return the response (will be handled by caller)
+                    if (DEBUG_MODE) {
+                        Log.e(TAG, "Attempt $attempt: Non-retryable error $code")
+                    }
                     throw IOException("Request failed with non-retryable code: $code")
                 }
             } catch (e: Exception) {
                 exception = e
-                // Check if the request was canceled (e.g., by Coroutine cancellation)
                 if (e is IOException && e.message?.contains("Canceled", ignoreCase = true) == true) {
-                    Log.i(TAG, "Request was canceled, stopping retries")
+                    if (DEBUG_MODE) {
+                        Log.i(TAG, "Request was canceled, stopping retries")
+                    }
                     throw e
                 }
 
                 if (e is SocketTimeoutException || e is IOException) {
-                    Log.w(TAG, "Request failed (attempt $attempt): ${e.message}")
-                    // Don't close response here as it might be null or already closed
+                    if (DEBUG_MODE) {
+                        Log.w(TAG, "Attempt $attempt: Network error - ${e.message}")
+                    }
                 } else {
-                    // For non-retryable exceptions, throw immediately
+                    if (DEBUG_MODE) {
+                        Log.e(TAG, "Attempt $attempt: Non-retryable exception - ${e.message}")
+                    }
                     throw e
                 }
             }
             attempt++
         }
 
-        // If we reached here, all attempts failed
         response?.close()
+        if (DEBUG_MODE) {
+            Log.e(TAG, "All $maxRetry retries failed!")
+        }
         throw exception ?: IOException("Request failed after $maxRetry retries")
     }
 
     // Logging interceptor to print request/response bodies during debug.
-    private val loggingInterceptor = HttpLoggingInterceptor().apply {
+    private val loggingInterceptor = HttpLoggingInterceptor { message ->
+        if (DEBUG_MODE) {
+            Log.d(TAG, "[HTTP] $message")
+        }
+    }.apply {
         level = HttpLoggingInterceptor.Level.BODY
     }
 
     /**
      * Creates OkHttpClient with retry logic enabled (no caching).
-     * Should be called with application context.
      */
     fun createOkHttpClient(context: Context): OkHttpClient {
-        return OkHttpClient.Builder()
+        if (DEBUG_MODE) {
+            Log.d(TAG, "=== createOkHttpClient() ===")
+            Log.d(TAG, "Context: $context")
+            Log.d(TAG, "Cache dir: ${context.cacheDir}")
+        }
+        
+        val client = OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
-            //.addInterceptor(retryInterceptor) // Added global retry logic
-            //.addInterceptor(loggingInterceptor)
-            .dns(SingletonDnsResolver.getDns()) // Cloudflare DNS over HTTPS
+            .addInterceptor(loggingInterceptor)
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
             .build()
+            
+        if (DEBUG_MODE) {
+            Log.d(TAG, "OkHttpClient created successfully")
+            Log.d(TAG, "Connection timeout: 30s")
+            Log.d(TAG, "Read timeout: 30s")
+            Log.d(TAG, "Write timeout: 30s")
+        }
+        
+        return client
     }
 
     /**
      * Creates Retrofit client with provided OkHttpClient.
      */
     fun createRetrofit(okHttpClient: OkHttpClient): Retrofit {
-        return Retrofit.Builder()
+        if (DEBUG_MODE) {
+            Log.d(TAG, "=== createRetrofit() ===")
+            Log.d(TAG, "Base URL: ${TmdbApiService.BASE_URL}")
+        }
+        
+        val retrofit = Retrofit.Builder()
             .baseUrl(TmdbApiService.BASE_URL)
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
+            
+        if (DEBUG_MODE) {
+            Log.d(TAG, "Retrofit client created successfully")
+        }
+        
+        return retrofit
     }
 
     // Lazy initialization for backward compatibility
     private val okHttpClient: OkHttpClient by lazy {
-        // Default client without cache
-        OkHttpClient.Builder()
+        if (DEBUG_MODE) {
+            Log.d(TAG, "=== Lazy OkHttpClient Initialization ===")
+        }
+        
+        val client = OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
-            .addInterceptor(retryInterceptor) // Added global retry logic
-            //.addInterceptor(loggingInterceptor)
-            .dns(SingletonDnsResolver.getDns()) // Cloudflare DNS over HTTPS
+            .addInterceptor(retryInterceptor)
+            .addInterceptor(loggingInterceptor)
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
             .build()
+            
+        if (DEBUG_MODE) {
+            Log.d(TAG, "Lazy OkHttpClient created successfully")
+        }
+        
+        client
     }
 
     // Singleton access point for the API service interface.
     val tmdbApiService: TmdbApiService by lazy {
-        createRetrofit(okHttpClient).create(TmdbApiService::class.java)
+        if (DEBUG_MODE) {
+            Log.d(TAG, "=== Creating TmdbApiService ===")
+            Log.d(TAG, "Base URL: ${TmdbApiService.BASE_URL}")
+        }
+        
+        val service = createRetrofit(okHttpClient).create(TmdbApiService::class.java)
+        
+        if (DEBUG_MODE) {
+            Log.d(TAG, "TmdbApiService created successfully")
+        }
+        
+        service
+    }
+    
+    /**
+     * Utility method to check if the API token is valid (not expired).
+     */
+    fun isTokenValid(): Boolean {
+        return try {
+            val parts = BEARER_TOKEN.split(".")
+            if (parts.size != 3) {
+                Log.w(TAG, "Token format invalid - not 3 parts")
+                return false
+            }
+            // Decode payload (second part) to check expiration
+            val payload = String(android.util.Base64.decode(parts[1], android.util.Base64.URL_SAFE))
+            val expMatch = Regex("\"exp\":(\\d+)").find(payload)
+            if (expMatch != null) {
+                val exp = expMatch.groupValues[1].toLong()
+                val currentTime = System.currentTimeMillis() / 1000
+                val isValid = exp > currentTime
+                Log.d(TAG, "Token exp=$exp, current=$currentTime, valid=$isValid")
+                return isValid
+            }
+            Log.w(TAG, "Could not parse token expiration")
+            true // Assume valid if can't parse
+        } catch (e: Exception) {
+            Log.e(TAG, "Error validating token: ${e.message}")
+            true // Assume valid on error
+        }
     }
 }
