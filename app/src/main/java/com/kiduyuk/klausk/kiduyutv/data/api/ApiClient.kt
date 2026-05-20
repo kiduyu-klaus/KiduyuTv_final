@@ -21,7 +21,7 @@ object ApiClient {
     private const val TAG = "ApiClient"
 
     // Bearer token used for Authorization header for all API requests.
-    private const val BEARER_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI0MTAzZmMzMDY1YzEyMmViNWRiNmJkY2ZmNzQ5ZmRlNyIsIm5iZiI6MTY2ODA2NDAzNC4yNDk5OTk4LCJzdWIiOiI2MzZjYTMyMjA0OTlmMjAwN2ZlYjA4MWEiLCJzY29wZXMiOlsiYXBpX3JlYWQiXSwidmVyc2lvbiI6MX0.tjvtYPTPfLOyMdOouQ14GGgOzmfnZRW4RgvOzfoq19w"
+    private const val BEARER_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiI5ZGUzZGU2MjNiNTc5ZjZlMTI3YzZlYzYwM2I5Zjc0ZCIsIm5iZiI6MTY2MDMwMTIxNC4yNCwic3ViIjoiNjJmNjJmOWVjM2JmZmUwMDdhNzJlODVkIiwic2NvcGVzIjpbImFwaV9yZWFkIl0sInZlcnNpb24iOjF9.S10N9Lag4A71FXL-VsErRF71UhADOKTPeK5FDnsEOhk"
 
     // Cache configuration
     private const val CACHE_SIZE = 10L * 1024 * 1024 // 10 MB (main API cache)
