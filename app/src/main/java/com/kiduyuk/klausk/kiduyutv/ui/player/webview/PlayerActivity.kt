@@ -219,6 +219,15 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    // ── WebView sync handler ───────────────────────────────────────────────────
+    private val syncHandler = Handler(Looper.getMainLooper())
+    private val syncRunnable = object : Runnable {
+        override fun run() {
+            syncWebViewMediaState()
+            syncHandler.postDelayed(this, 10000) // Sync every 10 seconds
+        }
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -303,10 +312,7 @@ class PlayerActivity : AppCompatActivity() {
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
 
-            // Add window insets listener to prevent system UI from affecting WebView layout
-            setOnApplyWindowInsetsListener { _, insets ->
-                insets
-            }
+            setOnApplyWindowInsetsListener { _, insets -> insets }
 
             setBackgroundColor(0xFF000000.toInt())
 
@@ -328,7 +334,6 @@ class PlayerActivity : AppCompatActivity() {
                 userAgentString = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
             }
 
-            // Disable scrollbars
             isVerticalScrollBarEnabled = false
             isHorizontalScrollBarEnabled = false
             setScrollBarStyle(View.SCROLLBARS_INSIDE_OVERLAY)
@@ -343,7 +348,6 @@ class PlayerActivity : AppCompatActivity() {
                 addJavascriptInterface(VideasyJavaScriptInterface(), "VideasyInterface")
             }
 
-            // Use AdBlockerWebViewClient for ad blocking
             webViewClient = AdBlockerWebViewClient(
                 onPageFinished = {
                     isPageLoading = false
@@ -353,6 +357,28 @@ class PlayerActivity : AppCompatActivity() {
                     injectAutoplayScript(this)
                     forceAutoplayOnPageLoad(this)
                     verifyAutoplaySuccess()
+                    
+                    // Force WebView update after delays
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        forceWebViewUpdate()
+                    }, 500)
+                    
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        forceWebViewUpdate()
+                        webView.evaluateJavascript(
+                            """
+                            (function() {
+                                var videos = document.querySelectorAll('video');
+                                videos.forEach(function(video) {
+                                    if (!video.paused) {
+                                        var event = new Event('timeupdate');
+                                        video.dispatchEvent(event);
+                                    }
+                                });
+                            })();
+                            """.trimIndent(), null
+                        )
+                    }, 2000)
                 },
                 onError = {
                     hasPageError = true
@@ -371,7 +397,7 @@ class PlayerActivity : AppCompatActivity() {
                     view: WebView?,
                     isDialog: Boolean,
                     isUserGesture: Boolean,
-                    resultMsg: android.os.Message?
+                    resultMsg: Message?
                 ): Boolean {
                     Log.i(TAG, "[WebChrome] onCreateWindow called, blocking popups")
                     return false
@@ -389,7 +415,6 @@ class PlayerActivity : AppCompatActivity() {
             }
         }
 
-        // ── Cursor ────────────────────────────────────────────────────────────
         cursorView = MouseCursorView(this).apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -408,7 +433,6 @@ class PlayerActivity : AppCompatActivity() {
         rootLayout.isFocusableInTouchMode = true
         rootLayout.requestFocus()
 
-        // ── Full-screen immersive mode ──
         setupImmersiveMode()
 
         rootLayout.post {
@@ -470,7 +494,6 @@ class PlayerActivity : AppCompatActivity() {
         (function() {
             function removeAdsAdvanced() {
                 function killPopups() {
-                    // 1. Auto-click close/dismiss buttons
                     var closeSelectors = [
                         '[class*="close"]', '[id*="close"]',
                         '[class*="dismiss"]', '[aria-label="Close"]',
@@ -483,7 +506,6 @@ class PlayerActivity : AppCompatActivity() {
                         });
                     });
 
-                    // 2. Remove high z-index fixed/absolute overlays that aren't the video
                     document.querySelectorAll('div, section, aside').forEach(function(el) {
                         try {
                             var style = window.getComputedStyle(el);
@@ -502,7 +524,6 @@ class PlayerActivity : AppCompatActivity() {
                         } catch(e) {}
                     });
 
-                    // 3. Remove elements by keyword matching
                     const elements = document.querySelectorAll('*');
                     elements.forEach(el => {
                         const text = (el.innerText || '').toLowerCase();
@@ -517,12 +538,10 @@ class PlayerActivity : AppCompatActivity() {
                         }
                     });
 
-                    // 4. Restore body scroll in case a popup locked it
                     document.body.style.overflow = 'auto';
                     document.documentElement.style.overflow = 'auto';
                 }
 
-                // Inject CSS to hide common overlay patterns
                 var style = document.createElement('style');
                 style.innerHTML = `
                     [class*="overlay"],[id*="overlay"],
@@ -540,10 +559,8 @@ class PlayerActivity : AppCompatActivity() {
                 `;
                 document.head && document.head.appendChild(style);
 
-                // Run immediately
                 killPopups();
 
-                // MutationObserver to catch dynamically injected popups
                 var observer = new MutationObserver(function(mutations) {
                     mutations.forEach(function(m) {
                         if (m.addedNodes.length > 0) {
@@ -553,13 +570,11 @@ class PlayerActivity : AppCompatActivity() {
                 });
                 observer.observe(document.body, { childList: true, subtree: true });
 
-                // Periodic sweep as fallback
                 setInterval(killPopups, 3000);
 
-                // Block JS dialog-based popups
-                window.alert   = function() { return undefined; };
+                window.alert = function() { return undefined; };
                 window.confirm = function() { return true; };
-                window.prompt  = function() { return ''; };
+                window.prompt = function() { return ''; };
             }
 
             function blockRedirects() {
@@ -671,9 +686,7 @@ class PlayerActivity : AppCompatActivity() {
                         video.muted = false;
                         
                         if (video.paused) {
-                            video.play().catch(function(e) {
-                                console.log('[Volume] Could not auto-play: ' + e);
-                            });
+                            video.play().catch(function(e) {});
                         }
                         
                         video.addEventListener('volumechange', function() {
@@ -684,14 +697,9 @@ class PlayerActivity : AppCompatActivity() {
                                 video.setAttribute('muted', 'false');
                                 video.volume = 1.0;
                                 video.muted = false;
-                                console.log('[Volume] Forced unmute and max volume');
                             }
                         });
-                        
-                        console.log('[Volume] Successfully enforced volume');
-                    } catch(e) {
-                        console.log('[Volume] Error enforcing volume: ' + e);
-                    }
+                    } catch(e) {}
                 }
 
                 function setMaxVolume() {
@@ -966,20 +974,33 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     /**
-     * Force autoplay when page finishes loading
+     * Force autoplay when page finishes loading with WebView state sync
      */
     private fun forceAutoplayOnPageLoad(view: WebView?) {
         val forceAutoplayJs = """
         (function() {
             console.log('[ForceAutoplay] Starting forced autoplay on page load');
             
+            function updateWebViewState() {
+                var event = new Event('resize');
+                window.dispatchEvent(event);
+                
+                window.scrollBy(0, 1);
+                window.scrollBy(0, -1);
+                
+                var customEvent = new CustomEvent('webviewUpdate', { detail: { forceUpdate: true } });
+                document.dispatchEvent(customEvent);
+            }
+            
             function findAndPlayVideo() {
+                var played = false;
+                
                 var videos = document.querySelectorAll('video');
                 for (var i = 0; i < videos.length; i++) {
                     var video = videos[i];
                     if (tryPlayVideo(video)) {
                         console.log('[ForceAutoplay] Successfully played direct video');
-                        return true;
+                        played = true;
                     }
                 }
                 
@@ -991,7 +1012,7 @@ class PlayerActivity : AppCompatActivity() {
                         for (var j = 0; j < iframeVideos.length; j++) {
                             if (tryPlayVideo(iframeVideos[j])) {
                                 console.log('[ForceAutoplay] Successfully played iframe video');
-                                return true;
+                                played = true;
                             }
                         }
                     } catch(e) {}
@@ -1016,41 +1037,39 @@ class PlayerActivity : AppCompatActivity() {
                             if (btn && btn.click) {
                                 btn.click();
                                 console.log('[ForceAutoplay] Clicked play button with selector:', selector);
-                                return true;
+                                played = true;
+                                var clickEvent = new MouseEvent('click', {
+                                    view: window,
+                                    bubbles: true,
+                                    cancelable: true
+                                });
+                                btn.dispatchEvent(clickEvent);
                             }
                         }
                     } catch(e) {}
                 }
                 
-                var allButtons = document.querySelectorAll('button, div[role="button"], a');
-                for (var i = 0; i < allButtons.length; i++) {
-                    var element = allButtons[i];
-                    try {
-                        var hasPlayIcon = false;
-                        var svgs = element.querySelectorAll('svg');
-                        for (var j = 0; j < svgs.length; j++) {
-                            var svgHtml = svgs[j].outerHTML.toLowerCase();
-                            if (svgHtml.includes('play') || (svgHtml.includes('path') && svgHtml.includes('d="'))) {
-                                var paths = svgs[j].querySelectorAll('path');
-                                for (var k = 0; k < paths.length; k++) {
-                                    var dAttr = paths[k].getAttribute('d') || '';
-                                    if (dAttr.includes('M') && dAttr.includes('v') && (dAttr.includes('l') || dAttr.includes('z'))) {
-                                        hasPlayIcon = true;
-                                        break;
-                                    }
-                                }
+                if (played) {
+                    updateWebViewState();
+                    
+                    setTimeout(function() {
+                        var mediaElements = document.querySelectorAll('video, audio');
+                        mediaElements.forEach(function(media) {
+                            var playEvent = new Event('play');
+                            media.dispatchEvent(playEvent);
+                            
+                            if (media.paused === false) {
+                                var timeUpdateEvent = new Event('timeupdate');
+                                media.dispatchEvent(timeUpdateEvent);
                             }
-                        }
+                        });
                         
-                        if (hasPlayIcon) {
-                            element.click();
-                            console.log('[ForceAutoplay] Clicked button with play SVG icon');
-                            return true;
-                        }
-                    } catch(e) {}
+                        window.dispatchEvent(new Event('orientationchange'));
+                        document.body.dispatchEvent(new Event('touchstart'));
+                    }, 100);
                 }
                 
-                return false;
+                return played;
             }
             
             function tryPlayVideo(video) {
@@ -1071,12 +1090,32 @@ class PlayerActivity : AppCompatActivity() {
                     if (playPromise !== undefined) {
                         playPromise.then(function() {
                             console.log('[ForceAutoplay] Video playing successfully');
+                            
+                            var playingEvent = new Event('playing');
+                            video.dispatchEvent(playingEvent);
+                            
+                            var canPlayEvent = new Event('canplaythrough');
+                            video.dispatchEvent(canPlayEvent);
+                            
+                            if (navigator.mediaSession) {
+                                navigator.mediaSession.playbackState = 'playing';
+                            }
+                            
                             return true;
                         }).catch(function(error) {
                             console.log('[ForceAutoplay] Play failed:', error);
                             video.muted = true;
                             video.setAttribute('muted', 'true');
-                            video.play().catch(function(e) {});
+                            video.play().then(function() {
+                                console.log('[ForceAutoplay] Playback started muted');
+                                setTimeout(function() {
+                                    video.muted = false;
+                                    video.removeAttribute('muted');
+                                    video.volume = 1.0;
+                                    var unmuteEvent = new Event('volumechange');
+                                    video.dispatchEvent(unmuteEvent);
+                                }, 1000);
+                            }).catch(function(e) {});
                             return false;
                         });
                         return true;
@@ -1087,7 +1126,36 @@ class PlayerActivity : AppCompatActivity() {
                 return false;
             }
             
+            function wakeUpWebView() {
+                var touchStart = new TouchEvent('touchstart', {
+                    bubbles: true,
+                    cancelable: true,
+                    touches: [{ identifier: 0, target: document.body }]
+                });
+                document.body.dispatchEvent(touchStart);
+                
+                var touchEnd = new TouchEvent('touchend', {
+                    bubbles: true,
+                    cancelable: true,
+                    touches: []
+                });
+                document.body.dispatchEvent(touchEnd);
+                
+                window.focus();
+                document.body.focus();
+                document.body.offsetHeight;
+                
+                var mediaElements = document.querySelectorAll('video');
+                mediaElements.forEach(function(media) {
+                    if (!media.paused) {
+                        var timeUpdate = new Event('timeupdate');
+                        media.dispatchEvent(timeUpdate);
+                    }
+                });
+            }
+            
             var played = findAndPlayVideo();
+            wakeUpWebView();
             
             if (!played) {
                 console.log('[ForceAutoplay] Initial attempt failed, scheduling retries');
@@ -1097,12 +1165,13 @@ class PlayerActivity : AppCompatActivity() {
                     setTimeout(function() {
                         console.log('[ForceAutoplay] Retry ' + (index + 1) + '/' + retries.length);
                         findAndPlayVideo();
+                        wakeUpWebView();
                         
                         var visibleButtons = document.querySelectorAll('button');
                         for (var i = 0; i < visibleButtons.length; i++) {
                             var btn = visibleButtons[i];
                             var rect = btn.getBoundingClientRect();
-                            if (rect.width > 0 && rect.height > 0) {
+                            if (rect.width > 0 && rect.height > 0 && rect.width < 200 && rect.height < 200) {
                                 btn.click();
                                 console.log('[ForceAutoplay] Clicked visible button');
                                 break;
@@ -1110,6 +1179,8 @@ class PlayerActivity : AppCompatActivity() {
                         }
                     }, delay);
                 });
+            } else {
+                setTimeout(wakeUpWebView, 200);
             }
             
             var observer = new MutationObserver(function(mutations) {
@@ -1130,6 +1201,7 @@ class PlayerActivity : AppCompatActivity() {
                     console.log('[ForceAutoplay] New video/button detected, attempting play');
                     setTimeout(function() {
                         findAndPlayVideo();
+                        wakeUpWebView();
                     }, 100);
                 }
             });
@@ -1139,31 +1211,115 @@ class PlayerActivity : AppCompatActivity() {
             }
             
             var checkCount = 0;
-            var maxChecks = 15;
+            var maxChecks = 20;
             var interval = setInterval(function() {
                 checkCount++;
-                var success = findAndPlayVideo();
+                var videos = document.querySelectorAll('video');
+                var isPlaying = false;
                 
-                if (!success) {
-                    var centerX = window.innerWidth / 2;
-                    var centerY = window.innerHeight / 2;
-                    var centerElement = document.elementFromPoint(centerX, centerY);
-                    if (centerElement && centerElement.click) {
-                        centerElement.click();
-                        console.log('[ForceAutoplay] Clicked element at screen center');
-                        success = true;
+                for (var i = 0; i < videos.length; i++) {
+                    if (!videos[i].paused && videos[i].currentTime > 0) {
+                        isPlaying = true;
+                        break;
                     }
                 }
                 
-                if (success || checkCount >= maxChecks) {
+                if (!isPlaying && checkCount < maxChecks) {
+                    console.log('[ForceAutoplay] Video not playing, retrying...');
+                    findAndPlayVideo();
+                    wakeUpWebView();
+                } else if (isPlaying) {
+                    videos.forEach(function(video) {
+                        if (!video.paused) {
+                            var timeUpdate = new Event('timeupdate');
+                            video.dispatchEvent(timeUpdate);
+                        }
+                    });
+                }
+                
+                if (checkCount >= maxChecks) {
                     clearInterval(interval);
                 }
             }, 2000);
+            
+            var updateInterval = setInterval(function() {
+                var videos = document.querySelectorAll('video');
+                var anyPlaying = false;
+                videos.forEach(function(video) {
+                    if (!video.paused) {
+                        anyPlaying = true;
+                        var timeUpdate = new Event('timeupdate');
+                        video.dispatchEvent(timeUpdate);
+                    }
+                });
+                
+                if (!anyPlaying) {
+                    clearInterval(updateInterval);
+                }
+            }, 5000);
             
         })();
         """.trimIndent()
         
         view?.evaluateJavascript(forceAutoplayJs, null)
+    }
+
+    /**
+     * Force WebView to update its internal state
+     */
+    private fun forceWebViewUpdate() {
+        webView.post {
+            try {
+                webView.invalidate()
+                webView.evaluateJavascript("window.dispatchEvent(new Event('resize'));", null)
+                webView.requestFocus()
+                webView.onResume()
+                Log.d(TAG, "[WebView] Forced WebView state update")
+            } catch (e: Exception) {
+                Log.e(TAG, "[WebView] Error forcing update: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Sync WebView media state with JavaScript
+     */
+    private fun syncWebViewMediaState() {
+        webView.evaluateJavascript(
+            """
+            (function() {
+                var videos = document.querySelectorAll('video');
+                var state = {
+                    hasVideo: videos.length > 0,
+                    isPlaying: false,
+                    currentTime: 0,
+                    duration: 0
+                };
+                
+                if (videos.length > 0) {
+                    var v = videos[0];
+                    state.isPlaying = !v.paused && !v.ended;
+                    state.currentTime = v.currentTime;
+                    state.duration = v.duration;
+                    
+                    if (state.isPlaying) {
+                        var timeUpdate = new Event('timeupdate');
+                        v.dispatchEvent(timeUpdate);
+                        var playingEvent = new Event('playing');
+                        v.dispatchEvent(playingEvent);
+                    }
+                }
+                
+                return JSON.stringify(state);
+            })();
+            """.trimIndent()
+        ) { result ->
+            try {
+                Log.d(TAG, "[WebView Sync] Media state: $result")
+            } catch (e: Exception) {
+                Log.e(TAG, "[WebView Sync] Error: ${e.message}")
+            }
+        }
     }
 
     /**
@@ -1188,6 +1344,7 @@ class PlayerActivity : AppCompatActivity() {
                     "not_playing" -> {
                         Log.w(TAG, "[Autoplay] Verification: Video not playing, forcing again")
                         forceAutoplayOnPageLoad(webView)
+                        forceWebViewUpdate()
                     }
                     else -> Log.w(TAG, "[Autoplay] Verification: No video element found")
                 }
@@ -1234,6 +1391,7 @@ class PlayerActivity : AppCompatActivity() {
         webView.onResume()
         webView.resumeTimers()
         progressHandler.postDelayed(progressRunnable, 15_000L)
+        syncHandler.postDelayed(syncRunnable, 5000)
         setupImmersiveMode()
     }
 
@@ -1242,10 +1400,12 @@ class PlayerActivity : AppCompatActivity() {
         webView.onPause()
         webView.pauseTimers()
         progressHandler.removeCallbacks(progressRunnable)
+        syncHandler.removeCallbacks(syncRunnable)
     }
 
     override fun onDestroy() {
         progressHandler.removeCallbacks(progressRunnable)
+        syncHandler.removeCallbacks(syncRunnable)
         cursorHideHandler.removeCallbacks(cursorHideRunnable)
 
         if (::webView.isInitialized) {
@@ -1479,7 +1639,7 @@ private class AdBlockerWebViewClient(
         )
     }
     
-    override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: android.webkit.WebResourceError?) {
+    override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
         if (request?.isForMainFrame == true) {
             onError()
         }

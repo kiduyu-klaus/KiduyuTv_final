@@ -132,10 +132,6 @@ class YouTubePlayerActivity : AppCompatActivity() {
                     PlayerConstants.PlayerState.ENDED -> {
                         finish()
                     }
-                    PlayerConstants.PlayerState.ERROR -> {
-                        hideLoading()
-                        openInYouTubeApp()
-                    }
                     else -> {
                         // Other states (UNSTARTED, PAUSED, VIDEO_CUED, UNKNOWN)
                         // Keep the loading overlay visible
