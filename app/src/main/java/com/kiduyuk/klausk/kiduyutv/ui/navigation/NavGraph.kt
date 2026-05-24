@@ -30,6 +30,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.HomeScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.MoviesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.MyListScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.TvShowsScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.LiveTvScreen
 import com.kiduyuk.klausk.kiduyutv.viewmodel.SearchViewModelFactory
 import com.kiduyuk.klausk.kiduyutv.viewmodel.SearchViewModel
 
@@ -154,6 +155,29 @@ fun NavGraph(navController: NavHostController) {
                     navController.navigate(
                         "cast_detail/${castMember.id}/${Uri.encode(castMember.name)}/${Uri.encode(castMember.character ?: "")}/${Uri.encode(castMember.profilePath ?: "")}/${Uri.encode(castMember.knownForDepartment ?: "")}"
                     )
+                }
+            )
+        }
+
+        // Live TV Screen: Screen for live TV channels.
+        composable(Screen.LiveTv.route) {
+            LiveTvScreen(
+                onMovieClick = { movieId ->
+                    navController.navigate(Screen.MovieDetail.createRoute(movieId))
+                },
+                onTvShowClick = { tvId ->
+                    navController.navigate(Screen.TvShowDetail.createRoute(tvId))
+                },
+                onNavigate = { route ->
+                    if (route != Screen.LiveTv.route) {
+                        navController.navigate(route)
+                    }
+                },
+                onSearchClick = {
+                    navController.navigate(Screen.Search.route)
+                },
+                onSettingsClick = {
+                    navController.navigate(Screen.Settings.route)
                 }
             )
         }
