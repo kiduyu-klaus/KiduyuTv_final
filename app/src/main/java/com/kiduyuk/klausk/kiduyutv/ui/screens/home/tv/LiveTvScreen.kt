@@ -414,12 +414,12 @@ private fun SearchContent(
                 }
             }
         } else if (searchResults.isNotEmpty()) {
+            val firstChannelFocusRequester = remember { FocusRequester() }
+
             // Request focus on first channel when grid is ready
             LaunchedEffect(searchResults) {
                 firstChannelFocusRequester.requestFocus()
             }
-
-            val firstChannelFocusRequester = remember { FocusRequester() }
 
             LazyVerticalGrid(
                 state = gridState,

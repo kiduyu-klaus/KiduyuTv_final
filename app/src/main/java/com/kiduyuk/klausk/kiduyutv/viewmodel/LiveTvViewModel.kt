@@ -152,35 +152,40 @@ class LiveTvViewModel : ViewModel() {
     }
     
     /**
-     * Gets all channels (for "All Channels" view).
+     * Gets all channels for search across entire playlist.
      *
      * @return List of all channels in the playlist
      */
     fun getAllChannels(): List<IptvChannel> {
         return cachedPlaylist?.allChannels ?: emptyList()
     }
-    
+
     /**
-     * Clears the memory cache.
+     * Clears in-memory cached playlist (for testing or forced refresh).
      */
     fun clearMemoryCache() {
-        repository.clearMemoryCache()
+        cachedPlaylist = null
     }
-    
+
     /**
-     * Clears both memory and disk cache.
+     * Clears all cached data (both memory and disk).
+     *
+     * @param context Application context for disk operations
      */
-    fun clearCache() {
-        appContext?.let {
-            repository.clearCache(it)
-        }
+    fun clearCache(context: Context) {
+        cachedPlaylist = null
+        repository.clearCache(context)
     }
 
     /**
      * Activates search mode.
      */
     fun activateSearch() {
-        _uiState.value = _uiState.value.copy(isSearchActive = true)
+        _uiState.value = _uiState.value.copy(
+            isSearchActive = true,
+            searchQuery = "",
+            searchResults = emptyList()
+        )
     }
 
     /**
@@ -195,39 +200,29 @@ class LiveTvViewModel : ViewModel() {
     }
 
     /**
-     * Updates the search query and filters channels.
+     * Updates search query and filters channels.
      *
      * @param query The search query string
      */
     fun updateSearchQuery(query: String) {
         val allChannels = cachedPlaylist?.allChannels ?: emptyList()
-
-        val filteredChannels = if (query.isBlank()) {
+        val results = if (query.isBlank()) {
             emptyList()
         } else {
             allChannels.filter { channel ->
                 channel.name.contains(query, ignoreCase = true) ||
-                channel.group?.contains(query, ignoreCase = true) == true
+                channel.category?.contains(query, ignoreCase = true) == true
             }
         }
 
         _uiState.value = _uiState.value.copy(
             searchQuery = query,
-            searchResults = filteredChannels
+            searchResults = results
         )
     }
 
     /**
-     * Gets all channels for search across entire playlist.
-     *
-     * @return List of all channels in the playlist
-     */
-    fun getAllChannels(): List<IptvChannel> {
-        return cachedPlaylist?.allChannels ?: emptyList()
-    }
-
-    /**
-     * Gets the total count of all channels.
+     * Gets total channel count across all categories.
      *
      * @return Total number of channels
      */
