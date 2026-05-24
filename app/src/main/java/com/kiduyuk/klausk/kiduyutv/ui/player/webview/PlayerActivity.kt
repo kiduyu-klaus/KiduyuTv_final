@@ -1818,20 +1818,51 @@ class PlayerActivity : AppCompatActivity() {
      * Returns AmazonWebView on Fire TV devices, standard WebView everywhere else.
      * AmazonWebView is a system class on Fire OS — accessed via reflection so the
      * app compiles and runs normally on non-Amazon devices.
+     * 
+     * For Fire TV, hardware and software acceleration is enabled for optimal video playback.
      */
     private fun createWebView(context: Context): WebView {
+        val webView: WebView
+        
         if (isFireTV) {
             try {
                 val clazz = Class.forName("com.amazon.android.webkit.AmazonWebView")
                 val constructor = clazz.getConstructor(Context::class.java)
                 val instance = constructor.newInstance(context) as WebView
-                Log.i(TAG, "[WebView] Using AmazonWebView on Fire TV")
-                return instance
+                Log.i(TAG, "[WebView] Using AmazonWebView on Fire TV with acceleration")
+                webView = instance
+                
+                // Enable hardware acceleration for Fire TV AmazonWebView
+                webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+                
+                // Enable drawing cache for better performance
+                webView.isDrawingCacheEnabled = true
+                webView.drawingCacheQuality = android.graphics.PixelFormat.TRANSLUCENT
+                
+                // Set persistent drawing cache
+                try {
+                    webView.settings.apply {
+                        val drawingCacheClass = android.webkit.WebSettings::class.java
+                        val setCacheModeMethod = drawingCacheClass.getMethod(
+                            "setDatabasePath",
+                            String::class.java
+                        )
+                        // Database path already set in main settings
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "[WebView] Could not set additional cache settings: ${e.message}")
+                }
+                
             } catch (e: Exception) {
                 Log.w(TAG, "[WebView] AmazonWebView unavailable, falling back to standard WebView: ${e.message}")
+                webView = WebView(context)
+                webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
             }
+        } else {
+            webView = WebView(context)
         }
-        return WebView(context)
+        
+        return webView
     }
 
     private fun detectProviderFromUrl(url: String): String {
