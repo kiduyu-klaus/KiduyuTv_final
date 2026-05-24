@@ -1837,16 +1837,24 @@ class PlayerActivity : AppCompatActivity() {
                 Log.w(TAG, "[WebView] AmazonWebView unavailable, falling back to standard WebView: ${e.message}")
                 webView = WebView(context)
             }
+
+            // Fire TV: always use software rendering regardless of the hardware acceleration flag.
+            // With LAYER_TYPE_HARDWARE the video surface (SurfaceView) renders on a separate
+            // hardware overlay that does not composite with the WebView GPU layer, producing a
+            // black screen on certain streams. Software rendering composites everything onto one
+            // canvas and eliminates the issue.
+            webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+            Log.i(TAG, "[WebView] Fire TV: software rendering forced to prevent black screen")
         } else {
             webView = WebView(context)
-        }
 
-        if (isHardwareAccelerated) {
-            webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
-            Log.i(TAG, "[WebView] Hardware acceleration enabled")
-        } else {
-            webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
-            Log.w(TAG, "[WebView] Hardware acceleration unavailable, falling back to software rendering")
+            if (isHardwareAccelerated) {
+                webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+                Log.i(TAG, "[WebView] Hardware acceleration enabled")
+            } else {
+                webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+                Log.w(TAG, "[WebView] Hardware acceleration unavailable, falling back to software rendering")
+            }
         }
         
         return webView
