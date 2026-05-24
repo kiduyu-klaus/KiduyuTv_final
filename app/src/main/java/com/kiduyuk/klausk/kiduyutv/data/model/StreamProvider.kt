@@ -385,8 +385,8 @@ object StreamProviderManager {
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
                 <style>
-                    body, html { margin: 0; padding: 0; width: 100%; height: 100vh; background: #000; }
-                    iframe { width: 100%; height: 100%; frameborder: 0; position: absolute; top: 0; left: 0;allow="autoplay; fullscreen *; picture-in-picture; encrypted-media" }
+                    body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+                    iframe { width: 100%; height: 100%; border: none; overflow: hidden; position: absolute; top: 0; left: 0; }
                 </style>
             </head>
             <body>
