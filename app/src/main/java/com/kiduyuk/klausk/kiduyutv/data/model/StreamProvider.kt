@@ -144,14 +144,18 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
-        // 6. Vidsync
+        // 6. VidUp
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
-            name = "Vidsync",
-            movieUrlTemplate = "https://vidsync.xyz/embed/movie/%d",
-            tvUrlTemplate = "https://vidsync.xyz/embed/tv/%d/%d/%d",
-            movieParameters = { _, _ -> mapOf("autoPlay" to "true") },
-            tvParameters = { _, _, _, _ -> mapOf("autoPlay" to "true", "autoNext" to "true") }
+            name = "VidUp",
+            movieUrlTemplate = "https://vidup.to/movie/%d",
+            tvUrlTemplate = "https://vidup.to/tv/%d/%d/%d",
+            movieParameters = { _, _ ->
+                mapOf("autoPlay" to "true")
+            },
+            tvParameters = { _, _, _, _ ->
+                mapOf("autoPlay" to "true")
+            }
         ),
 
         // ═══════════════════════════════════════════════════════════════
@@ -183,12 +187,25 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
-        // 9. Autoembed
+        // 9. VidCore
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
-            name = "Autoembed",
-            movieUrlTemplate = "https://autoembed.co/movie/tmdb/%d",
-            tvUrlTemplate = "https://autoembed.co/tv/tmdb/%d-%d-%d"
+            name = "VidCore",
+            movieUrlTemplate = "https://vidcore.net/movie/%d",
+            tvUrlTemplate = "https://vidcore.net/tv/%d/%d/%d",
+            movieParameters = { _, _ ->
+                mapOf(
+                    "autoPlay" to "true",
+                    "sub" to "en"
+                )
+            },
+            tvParameters = { _, _, _, _ ->
+                mapOf(
+                    "autoPlay" to "true",
+                    "nextButton" to "true",
+                    "autoNext" to "true"
+                )
+            }
         ),
 
         // ═══════════════════════════════════════════════════════════════
@@ -278,25 +295,12 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
-        // 16. VidCore
+        // 16. Autoembed
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
-            name = "VidCore",
-            movieUrlTemplate = "https://vidcore.net/movie/%d",
-            tvUrlTemplate = "https://vidcore.net/tv/%d/%d/%d",
-            movieParameters = { _, _ ->
-                mapOf(
-                    "autoPlay" to "true",
-                    "sub" to "en"
-                )
-            },
-            tvParameters = { _, _, _, _ ->
-                mapOf(
-                    "autoPlay" to "true",
-                    "nextButton" to "true",
-                    "autoNext" to "true"
-                )
-            }
+            name = "Autoembed",
+            movieUrlTemplate = "https://autoembed.co/movie/tmdb/%d",
+            tvUrlTemplate = "https://autoembed.co/tv/tmdb/%d-%d-%d"
         ),
 
         // ═══════════════════════════════════════════════════════════════
@@ -319,18 +323,14 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
-        // 18. VidUp
+        // 18. Vidsync
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
-            name = "VidUp",
-            movieUrlTemplate = "https://vidup.to/movie/%d",
-            tvUrlTemplate = "https://vidup.to/tv/%d/%d/%d",
-            movieParameters = { _, _ ->
-                mapOf("autoPlay" to "true")
-            },
-            tvParameters = { _, _, _, _ ->
-                mapOf("autoPlay" to "true")
-            }
+            name = "Vidsync",
+            movieUrlTemplate = "https://vidsync.xyz/embed/movie/%d",
+            tvUrlTemplate = "https://vidsync.xyz/embed/tv/%d/%d/%d",
+            movieParameters = { _, _ -> mapOf("autoPlay" to "true") },
+            tvParameters = { _, _, _, _ -> mapOf("autoPlay" to "true", "autoNext" to "true") }
         ),
 
         // ═══════════════════════════════════════════════════════════════
