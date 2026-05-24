@@ -1,7 +1,6 @@
 package com.kiduyuk.klausk.kiduyutv.ui.player.webview
 
 import android.annotation.SuppressLint
-import android.graphics.Bitmap
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -45,6 +44,7 @@ class PlayerActivity : AppCompatActivity() {
     private var currentSeason = 1
     private var currentEpisode = 1
     private var isCursorDisabled = false
+    private var isFireTV = false
     private var currentProviderName: String = "VidLink"
 
     // Loading and error state for AdBlockerWebViewClient
@@ -256,8 +256,12 @@ class PlayerActivity : AppCompatActivity() {
         if (uiModeManager.currentModeType != Configuration.UI_MODE_TYPE_TELEVISION) {
             isCursorDisabled = true
             Log.i(TAG, "[Device] Mobile/Tablet detected, disabling cursor")
+            Toast.makeText(this, "Device: Mobile / Tablet", Toast.LENGTH_SHORT).show()
         } else {
-            Log.i(TAG, "[Device] TV detected, cursor enabled")
+            isFireTV = Build.MANUFACTURER.equals("Amazon", ignoreCase = true)
+            Log.i(TAG, "[Device] TV detected, cursor enabled, isFireTV=$isFireTV")
+            val deviceLabel = if (isFireTV) "Fire TV (AmazonWebView)" else "Android TV (WebView)"
+            Toast.makeText(this, "Device: $deviceLabel", Toast.LENGTH_SHORT).show()
         }
 
         val existsInHistory = repository.isInWatchHistory(this, tmdbId, isTv)
@@ -306,7 +310,7 @@ class PlayerActivity : AppCompatActivity() {
             )
         }
 
-        webView = WebView(this).apply {
+        webView = createWebView(this).apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
@@ -331,7 +335,12 @@ class PlayerActivity : AppCompatActivity() {
                 setSupportMultipleWindows(true)
                 javaScriptCanOpenWindowsAutomatically = false
                 mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                userAgentString = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                userAgentString = if (isFireTV) {
+                    // Fire TV desktop UA — streaming sites serve the correct player layout
+                    "Mozilla/5.0 (Linux; Android 9; AFTMM Build/PS7233) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                } else {
+                    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                }
             }
 
             isVerticalScrollBarEnabled = false
@@ -1229,12 +1238,49 @@ class PlayerActivity : AppCompatActivity() {
                     findAndPlayVideo();
                     wakeUpWebView();
                 } else if (isPlaying) {
+                    console.log('[ForceAutoplay] Video is playing, sending progress update');
                     videos.forEach(function(video) {
                         if (!video.paused) {
                             var timeUpdate = new Event('timeupdate');
                             video.dispatchEvent(timeUpdate);
                         }
                     });
+                    // Trigger immediate progress save for Continue Watching feature
+                    if (typeof sendVideoProgress === 'function') {
+                        sendVideoProgress();
+                    } else if (window.VideasyInterface) {
+                        // Fallback: directly send video state to native layer
+                        var v = videos[0];
+                        if (v && v.duration > 0) {
+                            var contentInfo = { type: 'tv', id: null, season: 1, episode: 1 };
+                            try {
+                                var url = window.location.href;
+                                var match = url.match(/\/tv\/(\d+)\/(\d+)\/(\d+)/);
+                                if (match) {
+                                    contentInfo.type = 'tv';
+                                    contentInfo.id = parseInt(match[1]);
+                                    contentInfo.season = parseInt(match[2]);
+                                    contentInfo.episode = parseInt(match[3]);
+                                }
+                            } catch(e) {}
+                            
+                            var progressData = {
+                                progress: (v.currentTime / v.duration) * 100,
+                                timestamp: Math.floor(v.currentTime),
+                                duration: Math.floor(v.duration),
+                                currentTime: v.currentTime,
+                                paused: v.paused,
+                                ended: v.ended
+                            };
+                            if (contentInfo) {
+                                progressData.id = contentInfo.id;
+                                progressData.type = contentInfo.type;
+                                progressData.season = contentInfo.season;
+                                progressData.episode = contentInfo.episode;
+                            }
+                            window.VideasyInterface.postMessage(JSON.stringify(progressData));
+                        }
+                    }
                 }
                 
                 if (checkCount >= maxChecks) {
@@ -1252,6 +1298,11 @@ class PlayerActivity : AppCompatActivity() {
                         video.dispatchEvent(timeUpdate);
                     }
                 });
+                
+                // Also trigger progress save during periodic updates
+                if (anyPlaying && typeof sendVideoProgress === 'function') {
+                    sendVideoProgress();
+                }
                 
                 if (!anyPlaying) {
                     clearInterval(updateInterval);
@@ -1489,6 +1540,26 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /**
+     * Returns AmazonWebView on Fire TV devices, standard WebView everywhere else.
+     * AmazonWebView is a system class on Fire OS — accessed via reflection so the
+     * app compiles and runs normally on non-Amazon devices.
+     */
+    private fun createWebView(context: Context): WebView {
+        if (isFireTV) {
+            try {
+                val clazz = Class.forName("com.amazon.android.webkit.AmazonWebView")
+                val constructor = clazz.getConstructor(Context::class.java)
+                val instance = constructor.newInstance(context) as WebView
+                Log.i(TAG, "[WebView] Using AmazonWebView on Fire TV")
+                return instance
+            } catch (e: Exception) {
+                Log.w(TAG, "[WebView] AmazonWebView unavailable, falling back to standard WebView: ${e.message}")
+            }
+        }
+        return WebView(context)
+    }
 
     private fun detectProviderFromUrl(url: String): String {
         val urlHost = try {
