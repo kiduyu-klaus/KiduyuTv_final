@@ -49,6 +49,25 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
+        // 7. Vidrock - MOVED TO POSITION 2
+        // ═══════════════════════════════════════════════════════════════
+        StreamProvider(
+            name = "Vidrock",
+            movieUrlTemplate = "https://vidrock.net/movie/%d",
+            tvUrlTemplate = "https://vidrock.net/tv/%d/%d/%d",
+            movieParameters = { _, timestamp ->
+                val params = mutableMapOf("autoplay" to "true")
+                if (timestamp > 0) params["startAt"] = timestamp.toString()
+                params
+            },
+            tvParameters = { _, _, _, timestamp ->
+                val params = mutableMapOf("autoplay" to "true", "autonext" to "true")
+                if (timestamp > 0) params["startAt"] = timestamp.toString()
+                params
+            }
+        ),
+
+        // ═══════════════════════════════════════════════════════════════
         // 2. VidLink - with frameborder
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
@@ -152,25 +171,6 @@ object StreamProviderManager {
             },
             tvParameters = { _, _, _, _ ->
                 mapOf("autoPlay" to "true")
-            }
-        ),
-
-        // ═══════════════════════════════════════════════════════════════
-        // 7. Vidrock
-        // ═══════════════════════════════════════════════════════════════
-        StreamProvider(
-            name = "Vidrock",
-            movieUrlTemplate = "https://vidrock.net/movie/%d",
-            tvUrlTemplate = "https://vidrock.net/tv/%d/%d/%d",
-            movieParameters = { _, timestamp ->
-                val params = mutableMapOf("autoplay" to "true")
-                if (timestamp > 0) params["startAt"] = timestamp.toString()
-                params
-            },
-            tvParameters = { _, _, _, timestamp ->
-                val params = mutableMapOf("autoplay" to "true", "autonext" to "true")
-                if (timestamp > 0) params["startAt"] = timestamp.toString()
-                params
             }
         ),
 

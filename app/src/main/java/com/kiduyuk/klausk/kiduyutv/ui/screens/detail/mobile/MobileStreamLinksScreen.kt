@@ -380,6 +380,19 @@ private fun MobileStreamProviderCard(
     onProviderClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    
+    // List of providers 1-9 that should show HIGH SPEED tag
+    val highSpeedProviders = listOf(
+        "Videasy",
+        "Vidrock",
+        "VidLink",
+        "VidFast",
+        "VidKing",
+        "VidNest",
+        "VidUp",
+        "Flixer",
+        "VidCore"
+    )
 
     Column(
         modifier = Modifier
@@ -424,6 +437,22 @@ private fun MobileStreamProviderCard(
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
                             fontSize = 11.sp
                         )
+                    }
+
+                    // HIGH SPEED tag for providers 1-9
+                    if (provider.name in highSpeedProviders) {
+                        Surface(
+                            color = Color(0xFF2196F3),
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = "HIGH SPEED",
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                fontSize = 11.sp
+                            )
+                        }
                     }
 
                     when {
