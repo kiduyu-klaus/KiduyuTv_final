@@ -383,9 +383,10 @@ class PlayerActivity : AppCompatActivity() {
                 }
             }
 
-            isVerticalScrollBarEnabled = false
             isHorizontalScrollBarEnabled = false
-            setScrollBarStyle(View.SCROLLBARS_INSIDE_OVERLAY)
+            isVerticalScrollBarEnabled = false
+            setScrollBarStyle(View.SCROLLBARS_OUTSIDE_OVERLAY)
+            overScrollMode = View.OVER_SCROLL_NEVER
 
             if (isCursorDisabled) {
                 setLayerType(View.LAYER_TYPE_HARDWARE, null)
