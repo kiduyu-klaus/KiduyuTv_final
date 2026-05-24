@@ -32,7 +32,6 @@
         android:usesCleartextTraffic="true"
         android:networkSecurityConfig="@xml/network_security_config"
         tools:targetApi="28">
-        <!-- Add the AdMob app ID -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-3803477439180910~6736398964"/>
@@ -61,12 +60,21 @@
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:hardwareAccelerated="true"
             android:theme="@style/Theme.KiduyuTv.Player" />
+        
         <activity
             android:name=".ui.player.youtube.YouTubePlayerActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:hardwareAccelerated="true"
             android:screenOrientation="landscape"
             android:theme="@style/Theme.KiduyuTv.Player" />
+            
+        <activity
+            android:name=".ui.player.iptv.IptvPlayerActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:hardwareAccelerated="true"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.KiduyuTv.Player" />
+
         <activity
             android:name=".activity.splashactivity.SplashActivity"
             android:exported="true"
@@ -77,11 +85,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        
         <activity
             android:name=".activity.mainactivity.MainActivity"
             android:exported="false"
             android:screenOrientation="unspecified"
             android:theme="@style/Theme.KiduyuTv" />
+            
         <activity
             android:name=".ui.screens.trakt.TraktAuthActivity"
             android:exported="false"
@@ -89,3 +99,4 @@
     </application>
 
 </manifest>
+
