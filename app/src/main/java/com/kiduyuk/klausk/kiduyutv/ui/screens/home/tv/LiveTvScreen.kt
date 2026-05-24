@@ -12,25 +12,30 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -315,6 +320,7 @@ private fun SearchContent(
     val backFocusRequester = remember { FocusRequester() }
     val searchFocusRequester = remember { FocusRequester() }
     val gridState = rememberLazyGridState()
+    val focusManager = LocalFocusManager.current
 
     // Request focus on search field when screen opens
     LaunchedEffect(Unit) {
@@ -325,6 +331,14 @@ private fun SearchContent(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = {
+                    // Keep focus on search field when clicking outside
+                    searchFocusRequester.requestFocus()
+                }
+            )
     ) {
         // Back button and search header
         Row(
@@ -339,10 +353,18 @@ private fun SearchContent(
                     .focusRequester(backFocusRequester)
                     .clip(RoundedCornerShape(8.dp))
                     .background(if (isBackFocused) PrimaryRed else DarkRed)
+                    .border(
+                        width = if (isBackFocused) 2.dp else 0.dp,
+                        color = if (isBackFocused) Color.White else Color.Transparent,
+                        shape = RoundedCornerShape(8.dp)
+                    )
                     .clickable(
                         interactionSource = backInteractionSource,
                         indication = null,
-                        onClick = onBackClick
+                        onClick = {
+                            focusManager.clearFocus()
+                            onBackClick()
+                        }
                     )
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
@@ -367,7 +389,11 @@ private fun SearchContent(
         SearchInputField(
             query = searchQuery,
             onQueryChange = onSearchQueryChange,
-            onClear = { onSearchQueryChange("") },
+            onClear = {
+                onSearchQueryChange("")
+                // Keep focus after clearing
+                searchFocusRequester.requestFocus()
+            },
             focusRequester = searchFocusRequester
         )
 
@@ -414,13 +440,6 @@ private fun SearchContent(
                 }
             }
         } else if (searchResults.isNotEmpty()) {
-            val firstChannelFocusRequester = remember { FocusRequester() }
-
-            // Request focus on first channel when grid is ready
-            LaunchedEffect(searchResults) {
-                firstChannelFocusRequester.requestFocus()
-            }
-
             LazyVerticalGrid(
                 state = gridState,
                 columns = GridCells.Fixed(4),
@@ -431,14 +450,9 @@ private fun SearchContent(
                     .padding(bottom = 16.dp)
             ) {
                 itemsIndexed(searchResults) { index, channel ->
-                    val modifier = if (index == 0) {
-                        Modifier.focusRequester(firstChannelFocusRequester)
-                    } else {
-                        Modifier
-                    }
                     ChannelCard(
                         channel = channel,
-                        modifier = modifier,
+                        modifier = Modifier,
                         onClick = { onChannelClick(channel) }
                     )
                 }
@@ -471,9 +485,7 @@ private fun SearchInputField(
                 color = if (isFocused) PrimaryRed else Color.Transparent,
                 shape = RoundedCornerShape(12.dp)
             )
-            .focusable(
-                interactionSource = interactionSource
-            )
+            .focusable(interactionSource = interactionSource)
             .padding(horizontal = 16.dp),
         contentAlignment = Alignment.CenterStart
     ) {
@@ -490,29 +502,43 @@ private fun SearchInputField(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            Box(modifier = Modifier.weight(1f)) {
-                if (query.isEmpty()) {
+            TextField(
+                value = query,
+                onValueChange = onQueryChange,
+                textStyle = TextStyle(
+                    color = Color.White,
+                    fontSize = 16.sp
+                ),
+                cursorBrush = SolidColor(PrimaryRed),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    imeAction = ImeAction.Search,
+                    autoCorrect = false
+                ),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    disabledContainerColor = Color.Transparent,
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent,
+                    disabledIndicatorColor = Color.Transparent,
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedSupportingTextColor = TextSecondary,
+                    unfocusedSupportingTextColor = TextSecondary
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester)
+                    .focusable(),
+                placeholder = {
                     Text(
                         text = "Type channel name to search...",
                         color = TextSecondary,
                         fontSize = 16.sp
                     )
                 }
-
-                BasicTextField(
-                    value = query,
-                    onValueChange = onQueryChange,
-                    textStyle = TextStyle(
-                        color = Color.White,
-                        fontSize = 16.sp
-                    ),
-                    cursorBrush = SolidColor(PrimaryRed),
-                    singleLine = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusRequester(focusRequester)
-                )
-            }
+            )
 
             if (query.isNotEmpty()) {
                 IconButton(onClick = onClear) {
@@ -618,6 +644,11 @@ private fun ChannelsContent(
                     .focusRequester(backFocusRequester)
                     .clip(RoundedCornerShape(8.dp))
                     .background(if (isBackFocused) PrimaryRed else DarkRed)
+                    .border(
+                        width = if (isBackFocused) 2.dp else 0.dp,
+                        color = if (isBackFocused) Color.White else Color.Transparent,
+                        shape = RoundedCornerShape(8.dp)
+                    )
                     .clickable(
                         interactionSource = backInteractionSource,
                         indication = null,

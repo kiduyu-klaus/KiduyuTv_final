@@ -149,7 +149,7 @@ class IptvPlayerActivity : ComponentActivity() {
     }
 
     /**
-     * Replaced old helper with a Jetpack Compose dialog layer
+     * Shows the Jetpack Compose tabbed track selection dialog
      */
     private fun showTrackOptionsDialog() {
         // If a dialog is already showing, do not stack another one
@@ -275,7 +275,7 @@ fun TabbedTrackSelectionDialog(
 ) {
     var selectedTab by remember { mutableStateOf(0) }
     val tabs = listOf("Video", "Audio", "Subtitles")
-    val currentTracks by remember { mutableStateOf(player.currentTracks) }
+    val currentTracks = player.currentTracks
 
     AlertDialog(
         onDismissRequest = onDismissRequest,
@@ -315,6 +315,7 @@ fun VideoTrackList(player: ExoPlayer, tracks: Tracks) {
     
     LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
         item {
+            // Use clearOverridesOfType instead of clearOverrideForType
             val isAutoSelected = !player.trackSelectionParameters.overrides.containsKey(C.TRACK_TYPE_VIDEO)
             TrackSelectionRow(
                 title = "Auto (Adjusts to stream)",
@@ -322,7 +323,7 @@ fun VideoTrackList(player: ExoPlayer, tracks: Tracks) {
                 onClick = {
                     player.trackSelectionParameters = player.trackSelectionParameters
                         .buildUpon()
-                        .clearOverrideForType(C.TRACK_TYPE_VIDEO)
+                        .clearOverridesOfType(C.TRACK_TYPE_VIDEO)
                         .build()
                 }
             )
@@ -343,14 +344,16 @@ fun VideoTrackList(player: ExoPlayer, tracks: Tracks) {
                     if (mbps >= 1f) String.format("%.1f Mbps", mbps) else "${format.bitrate / 1_000} Kbps"
                 } else ""
                 val displayTitle = if (speedLabel.isNotEmpty()) "$resolution — $speedLabel" else resolution
+                
                 TrackSelectionRow(
                     title = displayTitle,
                     isSelected = isSelected,
                     onClick = {
                         val override = TrackSelectionOverride(group.mediaTrackGroup, trackIndex)
+                        // setOverrideForType takes only one argument (the override object)
                         player.trackSelectionParameters = player.trackSelectionParameters
                             .buildUpon()
-                            .setOverrideForType(C.TRACK_TYPE_VIDEO, override)
+                            .setOverrideForType(override)
                             .build()
                     }
                 )
@@ -365,9 +368,11 @@ fun GenericTrackList(player: ExoPlayer, tracks: Tracks, @C.TrackType trackType: 
     
     LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
         item {
+            // Use isDisabled instead of getTrackTypeDisabled
             val isAutoSelected = !player.trackSelectionParameters.overrides.containsKey(trackType)
             val isTextDisabled = trackType == C.TRACK_TYPE_TEXT && 
-                player.trackSelectionParameters.getTrackTypeDisabled(C.TRACK_TYPE_TEXT)
+                player.trackSelectionParameters.disabledTrackTypes.contains(trackType)
+            
             val isSelected = if (trackType == C.TRACK_TYPE_TEXT) isTextDisabled else isAutoSelected
             val disabledText = if (trackType == C.TRACK_TYPE_TEXT) "None (Turn off subtitles)" else "Auto (Default)"
             
@@ -376,7 +381,7 @@ fun GenericTrackList(player: ExoPlayer, tracks: Tracks, @C.TrackType trackType: 
                 isSelected = isSelected,
                 onClick = {
                     val builder = player.trackSelectionParameters.buildUpon()
-                    builder.clearOverrideForType(trackType)
+                    builder.clearOverridesOfType(trackType)
                     if (trackType == C.TRACK_TYPE_TEXT) {
                         builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
                     }
@@ -389,11 +394,7 @@ fun GenericTrackList(player: ExoPlayer, tracks: Tracks, @C.TrackType trackType: 
             itemsIndexed(List(group.length) { it }) { _, trackIndex ->
                 val format = group.getTrackFormat(trackIndex)
                 val isSelected = group.isTrackSelected(trackIndex)
-                val trackName = if (!format.language.isNullOrEmpty()) {
-                    format.language.uppercase()
-                } else {
-                    "Track ${trackIndex + 1}"
-                }
+                val trackName = format.language?.uppercase() ?: "Track ${trackIndex + 1}"
                 
                 TrackSelectionRow(
                     title = trackName,
@@ -404,7 +405,8 @@ fun GenericTrackList(player: ExoPlayer, tracks: Tracks, @C.TrackType trackType: 
                             builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
                         }
                         val override = TrackSelectionOverride(group.mediaTrackGroup, trackIndex)
-                        builder.setOverrideForType(trackType, override)
+                        // Correct API usage: setOverrideForType takes only the override object
+                        builder.setOverrideForType(override)
                         player.trackSelectionParameters = builder.build()
                     }
                 )
