@@ -27,7 +27,7 @@ import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTube
  *
  * Features:
  * - Loading Lottie animation overlay while video is preparing
- * - 5-second timeout to fallback to YouTube app if video doesn't start
+ * - 10-second timeout to fallback to YouTube app if video doesn't start
  * - Error handling that redirects to YouTube app
  */
 class YouTubePlayerActivity : AppCompatActivity() {
@@ -52,7 +52,7 @@ class YouTubePlayerActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "YouTubePlayer"
-        private const val LOADING_TIMEOUT_MS = 5000L // 5 seconds timeout
+        private const val LOADING_TIMEOUT_MS = 10000L // 10 seconds timeout
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
