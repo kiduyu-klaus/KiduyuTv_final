@@ -1,14 +1,16 @@
 package com.kiduyuk.klausk.kiduyutv.ui.player.iptv
 
+import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.view.View
+import android.view.KeyEvent
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import androidx.activity.ComponentActivity
 import androidx.annotation.OptIn
-import androidx.appcompat.app.AppCompatActivity
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -17,15 +19,16 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.ui.PlayerView
+import androidx.media3.ui.TrackSelectionDialogBuilder
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 
 /**
  * Activity for playing IPTV live streams using ExoPlayer.
- * Supports live TV streaming with proper buffering and error handling.
+ * Supports live TV streaming with proper buffering, error handling, and full track controls.
  */
 @OptIn(UnstableApi::class)
-class IptvPlayerActivity : AppCompatActivity() {
+class IptvPlayerActivity : ComponentActivity() {
     
     companion object {
         private const val TAG = "IptvPlayerActivity"
@@ -37,12 +40,6 @@ class IptvPlayerActivity : AppCompatActivity() {
         
         /**
          * Creates an Intent to start the IPTV player activity.
-         *
-         * @param context Application context
-         * @param channelName Name of the channel being played
-         * @param streamUrl URL of the stream to play
-         * @param channelLogo URL of the channel logo
-         * @return Intent to start the activity
          */
         fun createIntent(
             context: Context,
@@ -60,13 +57,14 @@ class IptvPlayerActivity : AppCompatActivity() {
     
     private var player: ExoPlayer? = null
     private var playerView: PlayerView? = null
+    private lateinit var trackSelector: DefaultTrackSelector
+    
     private var channelName: String = ""
     private var streamUrl: String = ""
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Get intent extras
         channelName = intent.getStringExtra(EXTRA_CHANNEL_NAME) ?: "Live TV"
         streamUrl = intent.getStringExtra(EXTRA_STREAM_URL) ?: ""
         
@@ -78,41 +76,48 @@ class IptvPlayerActivity : AppCompatActivity() {
         setupPlayer()
     }
     
-    /**
-     * Sets up the ExoPlayer with the stream URL.
-     */
     private fun setupPlayer() {
-        // Create track selector for adaptive streaming
-        val trackSelector = DefaultTrackSelector(this)
+        trackSelector = DefaultTrackSelector(this)
         trackSelector.setParameters(
             trackSelector.buildUponParameters()
                 .setMaxVideoSizeSd()
                 .setForceLowestBitrate(false)
         )
         
-        // Create renderers factory
         val renderersFactory = DefaultRenderersFactory(this)
             .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
         
-        // Create ExoPlayer with corrected Builder syntax
         player = ExoPlayer.Builder(this)
             .setRenderersFactory(renderersFactory)
             .setTrackSelector(trackSelector)
             .setHandleAudioBecomingNoisy(true)
             .build()
         
-        // Create PlayerView
         playerView = PlayerView(this).apply {
             player = this@IptvPlayerActivity.player
             useController = true
             setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+            
+            // --- ENABLE ALL CONTROLS ---
+            setShowSubtitleButton(true)
+            setShowFastForwardButton(true)
+            setShowRewindButton(true)
+            setShowNextButton(true)
+            setShowPreviousButton(true)
+            
+            // Enabling the listener forces the Fullscreen toggle button to appear
+            setFullscreenButtonClickListener { isFullScreen ->
+                if (!isFullScreen) {
+                    showExitConfirmationDialog()
+                }
+            }
+            
             layoutParams = FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
         }
         
-        // Create root layout
         val rootLayout = FrameLayout(this).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -123,7 +128,6 @@ class IptvPlayerActivity : AppCompatActivity() {
         
         setContentView(rootLayout)
         
-        // Prepare and play
         player?.apply {
             val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
             setMediaItem(mediaItem)
@@ -132,37 +136,57 @@ class IptvPlayerActivity : AppCompatActivity() {
             prepare()
         }
     }
-    
-    /**
-     * Player listener for handling playback events.
-     */
-    private val playerListener = object : Player.Listener {
-        override fun onPlaybackStateChanged(playbackState: Int) {
-            when (playbackState) {
-                Player.STATE_BUFFERING -> {
-                    // Show buffering indicator if needed
+
+    private fun showTrackOptionsDialog() {
+        val options = arrayOf("Audio Tracks", "Subtitles")
+        AlertDialog.Builder(this)
+            .setTitle("Select Track Type")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> showAudioTracksDialog()
+                    1 -> showTextTracksDialog()
                 }
-                Player.STATE_READY -> {
-                    // Player is ready to play
-                }
-                Player.STATE_ENDED -> {
-                    // Live stream ended (rare for live TV)
-                }
-                Player.STATE_IDLE -> {
-                    // Player is idle
+            }
+            .show()
+    }
+
+    private fun showAudioTracksDialog() {
+        player?.let {
+            TrackSelectionDialogBuilder(this, "Audio Tracks", it, C.TRACK_TYPE_AUDIO)
+                .setShowDisableOption(false)
+                .build()
+                .show()
+        }
+    }
+
+    private fun showTextTracksDialog() {
+        player?.let {
+            TrackSelectionDialogBuilder(this, "Subtitles", it, C.TRACK_TYPE_TEXT)
+                .setShowDisableOption(true)
+                .build()
+                .show()
+        }
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_MENU,
+                KeyEvent.KEYCODE_SETTINGS -> {
+                    showTrackOptionsDialog()
+                    return true
                 }
             }
         }
-        
+        return super.dispatchKeyEvent(event)
+    }
+    
+    private val playerListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
-            // Handle playback error
             showErrorDialog(error.message ?: "Playback error occurred")
         }
     }
     
-    /**
-     * Shows an error dialog when playback fails.
-     */
     private fun showErrorDialog(message: String) {
         QuitDialog(
             context = this,
@@ -212,9 +236,6 @@ class IptvPlayerActivity : AppCompatActivity() {
         showExitConfirmationDialog()
     }
     
-    /**
-     * Shows exit confirmation dialog.
-     */
     private fun showExitConfirmationDialog() {
         QuitDialog(
             context = this,
@@ -228,3 +249,4 @@ class IptvPlayerActivity : AppCompatActivity() {
         ).show()
     }
 }
+
