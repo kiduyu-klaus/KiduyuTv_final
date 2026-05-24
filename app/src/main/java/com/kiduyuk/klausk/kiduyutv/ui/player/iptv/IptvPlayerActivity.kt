@@ -1,159 +1,253 @@
 package com.kiduyuk.klausk.kiduyutv.ui.player.iptv
 
+import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
-import android.content.res.ColorStateList
-import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
-import android.view.Gravity
 import android.view.KeyEvent
 import android.view.ViewGroup
-import android.view.WindowManager
 import android.widget.FrameLayout
-import android.widget.ImageButton
-import android.widget.LinearLayout
-import android.widget.TextView
 import androidx.activity.ComponentActivity
-import androidx.activity.OnBackPressedCallback
 import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
-import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import androidx.media3.ui.TrackSelectionDialogBuilder
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 
+/**
+ * Activity for playing IPTV live streams using ExoPlayer.
+ * Supports live TV streaming with proper buffering, error handling, and full track controls.
+ */
 @OptIn(UnstableApi::class)
 class IptvPlayerActivity : ComponentActivity() {
-
-    private enum class ResizeMode(val exoMode: Int, val label: String) {
-        FIT(AspectRatioFrameLayout.RESIZE_MODE_FIT, "Fit"),
-        FILL(AspectRatioFrameLayout.RESIZE_MODE_FILL, "Fill"),
-        ZOOM(AspectRatioFrameLayout.RESIZE_MODE_ZOOM, "Zoom");
-        fun next(): ResizeMode = entries[(ordinal + 1) % entries.size]
-    }
-
+    
     companion object {
-        const val EXTRA_CHANNEL_NAME = "channel_name"
-        const val EXTRA_STREAM_URL   = "stream_url"
+        private const val TAG = "IptvPlayerActivity"
         
-        fun createIntent(context: Context, channelName: String, streamUrl: String) = 
-            Intent(context, IptvPlayerActivity::class.java).apply {
+        // Intent extras keys
+        const val EXTRA_CHANNEL_NAME = "channel_name"
+        const val EXTRA_STREAM_URL = "stream_url"
+        const val EXTRA_CHANNEL_LOGO = "channel_logo"
+        
+        /**
+         * Creates an Intent to start the IPTV player activity.
+         */
+        fun createIntent(
+            context: Context,
+            channelName: String,
+            streamUrl: String,
+            channelLogo: String? = null
+        ): Intent {
+            return Intent(context, IptvPlayerActivity::class.java).apply {
                 putExtra(EXTRA_CHANNEL_NAME, channelName)
                 putExtra(EXTRA_STREAM_URL, streamUrl)
+                putExtra(EXTRA_CHANNEL_LOGO, channelLogo)
             }
+        }
     }
-
-    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
-
+    
     private var player: ExoPlayer? = null
     private var playerView: PlayerView? = null
     private lateinit var trackSelector: DefaultTrackSelector
+    
     private var channelName: String = ""
     private var streamUrl: String = ""
-    private var currentResize = ResizeMode.FIT
-    private var isMuted = false
-
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        
         channelName = intent.getStringExtra(EXTRA_CHANNEL_NAME) ?: "Live TV"
-        streamUrl   = intent.getStringExtra(EXTRA_STREAM_URL)   ?: ""
-
-        if (streamUrl.isBlank()) { finish(); return }
-
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() = showExitConfirmationDialog()
-        })
-
+        streamUrl = intent.getStringExtra(EXTRA_STREAM_URL) ?: ""
+        
+        if (streamUrl.isBlank()) {
+            finish()
+            return
+        }
+        
         setupPlayer()
     }
-
+    
     private fun setupPlayer() {
-        trackSelector = DefaultTrackSelector(this).apply {
-            setParameters(buildUponParameters().setViewportSizeToPhysicalDisplaySize(this@IptvPlayerActivity, true))
-        }
-
+        trackSelector = DefaultTrackSelector(this)
+        trackSelector.setParameters(
+            trackSelector.buildUponParameters()
+                //.setMaxVideoSizeSd()
+                  .clearVideoSizeConstraints() 
+                .setForceLowestBitrate(false)
+        )
+        
+        val renderersFactory = DefaultRenderersFactory(this)
+            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+        
         player = ExoPlayer.Builder(this)
-            .setRenderersFactory(DefaultRenderersFactory(this))
+            .setRenderersFactory(renderersFactory)
             .setTrackSelector(trackSelector)
+            .setHandleAudioBecomingNoisy(true)
             .build()
-
+        
         playerView = PlayerView(this).apply {
             player = this@IptvPlayerActivity.player
-            resizeMode = currentResize.exoMode
-            layoutParams = FrameLayout.LayoutParams(-1, -1)
+            useController = true
+            setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
+            
+            // --- ENABLE ALL CONTROLS ---
+            setShowSubtitleButton(true)
+            setShowFastForwardButton(true)
+            setShowRewindButton(true)
+            setShowNextButton(true)
+            setShowPreviousButton(true)
+            
+            // Enabling the listener forces the Fullscreen toggle button to appear
+            setFullscreenButtonClickListener { isFullScreen ->
+                if (!isFullScreen) {
+                    showExitConfirmationDialog()
+                }
+            }
+            
+            layoutParams = FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
         }
-
+        
         val rootLayout = FrameLayout(this).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
             addView(playerView)
-            addView(buildControlBar())
         }
+        
         setContentView(rootLayout)
-
+        
         player?.apply {
-            setMediaItem(MediaItem.fromUri(Uri.parse(streamUrl)))
-            prepare()
+            val mediaItem = MediaItem.fromUri(Uri.parse(streamUrl))
+            setMediaItem(mediaItem)
             playWhenReady = true
+            addListener(playerListener)
+            prepare()
         }
     }
 
-    private fun buildControlBar(): LinearLayout {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(12), dp(10), dp(12), dp(10))
-            layoutParams = FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply { bottomMargin = dp(48) }
-            background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(Color.TRANSPARENT, 0xCC000000.toInt()))
-
-            addView(iconButton(R.drawable.exo_icon_quality) { showTrackDialog(C.TRACK_TYPE_VIDEO) })
-            addView(iconButton(R.drawable.exo_icon_audio) { showTrackDialog(C.TRACK_TYPE_AUDIO) })
-            addView(iconButton(R.drawable.exo_icon_subtitle_on) { showTrackDialog(C.TRACK_TYPE_TEXT) })
-        }
+    private fun showTrackOptionsDialog() {
+        val options = arrayOf("Audio Tracks", "Subtitles")
+        AlertDialog.Builder(this)
+            .setTitle("Select Track Type")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> showAudioTracksDialog()
+                    1 -> showTextTracksDialog()
+                }
+            }
+            .show()
     }
 
-    private fun showTrackDialog(trackType: Int) {
+    private fun showAudioTracksDialog() {
         player?.let {
-            TrackSelectionDialogBuilder(this, "Select Track", it, trackType)
-                .setShowDisableOption(trackType != C.TRACK_TYPE_VIDEO)
+            TrackSelectionDialogBuilder(this, "Audio Tracks", it, C.TRACK_TYPE_AUDIO)
+                .setShowDisableOption(false)
                 .build()
                 .show()
         }
     }
 
-    private fun iconButton(resId: Int, onClick: () -> Unit) = ImageButton(this).apply {
-        setImageResource(resId)
-        background = null
-        imageTintList = ColorStateList.valueOf(Color.WHITE)
-        setPadding(dp(8), dp(8), dp(8), dp(8))
-        layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
-        setOnClickListener { onClick() }
+    private fun showTextTracksDialog() {
+        player?.let {
+            TrackSelectionDialogBuilder(this, "Subtitles", it, C.TRACK_TYPE_TEXT)
+                .setShowDisableOption(true)
+                .build()
+                .show()
+        }
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.action == KeyEvent.ACTION_DOWN && (event.keyCode == KeyEvent.KEYCODE_MENU || event.keyCode == KeyEvent.KEYCODE_SETTINGS)) {
-            showTrackDialog(C.TRACK_TYPE_VIDEO)
-            return true
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_MENU,
+                KeyEvent.KEYCODE_SETTINGS -> {
+                    showTrackOptionsDialog()
+                    return true
+                }
+            }
         }
         return super.dispatchKeyEvent(event)
     }
-
-    private fun showExitConfirmationDialog() {
-        QuitDialog(this, "Stop Playback?", "Exit $channelName?", "Stop", "Continue", R.raw.exit, {}, { finish() }).show()
+    
+    private val playerListener = object : Player.Listener {
+        override fun onPlayerError(error: PlaybackException) {
+            showErrorDialog(error.message ?: "Playback error occurred")
+        }
     }
-
+    
+    private fun showErrorDialog(message: String) {
+        QuitDialog(
+            context = this,
+            title = "Playback Error",
+            message = message,
+            positiveButtonText = "Retry",
+            negativeButtonText = "Exit",
+            lottieAnimRes = R.raw.exit,
+            onNo = { finish() },
+            onYes = { 
+                player?.prepare()
+                player?.play()
+            }
+        ).show()
+    }
+    
+    override fun onStart() {
+        super.onStart()
+        player?.play()
+    }
+    
+    override fun onResume() {
+        super.onResume()
+        player?.play()
+    }
+    
+    override fun onPause() {
+        super.onPause()
+        player?.pause()
+    }
+    
+    override fun onStop() {
+        super.onStop()
+        player?.pause()
+    }
+    
     override fun onDestroy() {
-        player?.release()
         super.onDestroy()
+        player?.removeListener(playerListener)
+        player?.release()
+        player = null
+        playerView = null
+    }
+    
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        showExitConfirmationDialog()
+    }
+    
+    private fun showExitConfirmationDialog() {
+        QuitDialog(
+            context = this,
+            title = "Stop Playback?",
+            message = "Are you sure you want to stop watching $channelName?",
+            positiveButtonText = "Stop",
+            negativeButtonText = "Continue",
+            lottieAnimRes = R.raw.exit,
+            onNo = { },
+            onYes = { finish() }
+        ).show()
     }
 }
 
