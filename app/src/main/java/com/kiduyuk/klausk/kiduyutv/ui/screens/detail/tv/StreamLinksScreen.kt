@@ -239,20 +239,6 @@ fun StreamProviderItem(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
-    
-    // List of providers 1-9 that should show HIGH SPEED tag
-    val highSpeedProviders = listOf(
-        "Videasy",
-        "Vidrock",
-        "VidLink",
-        "VidFast",
-        "VidKing",
-        "VidNest",
-        "VidUp",
-        "Flixer",
-        "VidCore"
-    )
-    
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
@@ -306,11 +292,6 @@ fun StreamProviderItem(
                         "Vidsync", "EmbedMaster", "Autoembed", "VidSrc (WTF) v1" -> Tag("may show black screen on firetv devices", Color(0xFFFFC107), Color.Black)
                         else -> Tag("FAST", Color(0xFF4CAF50), Color.White)
                     }
-                    
-                    // HIGH SPEED tag for providers 1-9
-                    if (provider.name in highSpeedProviders) {
-                        Tag("HIGH SPEED", Color(0xFF2196F3), Color.White)
-                    }
 
                     when (provider.name) {
                         "Videasy" -> Tag("BEST FOR TV", Color(0xFFFFC107), Color.Black)
@@ -340,3 +321,4 @@ fun Tag(text: String, bg: Color, fg: Color) {
         Text(text, color = fg, style = MaterialTheme.typography.labelSmall)
     }
 }
+
