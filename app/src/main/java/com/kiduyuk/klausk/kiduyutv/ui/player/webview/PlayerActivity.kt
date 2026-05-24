@@ -60,6 +60,7 @@ class PlayerActivity : AppCompatActivity() {
     // Loading and error state for AdBlockerWebViewClient
     private var isPageLoading = true
     private var hasPageError = false
+    private var isPlayerFullyLoaded = false
 
     // Track content metadata for Firebase sync
     private var contentTitle: String = "Unknown"
@@ -111,6 +112,9 @@ class PlayerActivity : AppCompatActivity() {
                     json.has("type") && json.getString("type") == "PLAYER_EVENT" && json.has("data") -> {
                         val data = json.getJSONObject("data")
                         processPlayerProgressData(data)
+                    }
+                    json.has("type") && json.getString("type") == "PAGE_FULLY_LOADED" -> {
+                        onPlayerFullyLoaded()
                     }
                     json.has("progress") && json.has("timestamp") -> {
                         processPlayerProgressData(json)
@@ -389,9 +393,8 @@ class PlayerActivity : AppCompatActivity() {
                 setLayerType(View.LAYER_TYPE_NONE, null)
             }
 
-            if (isTrackingEnabled) {
-                addJavascriptInterface(VideasyJavaScriptInterface(), "VideasyInterface")
-            }
+            // Always register so PAGE_FULLY_LOADED and progress messages both work
+            addJavascriptInterface(VideasyJavaScriptInterface(), "VideasyInterface")
 
             webViewClient = AdBlockerWebViewClient(
                 onPageFinished = {
@@ -421,6 +424,14 @@ class PlayerActivity : AppCompatActivity() {
                 ): Boolean {
                     Log.i(TAG, "[WebChrome] onCreateWindow called, blocking popups")
                     return false
+                }
+
+                override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                    super.onProgressChanged(view, newProgress)
+                    Log.d(TAG, "[WebChrome] Load progress: $newProgress%")
+                    if (newProgress == 100 && !isPlayerFullyLoaded) {
+                        injectFullyLoadedCheck(view)
+                    }
                 }
             }
 
@@ -791,6 +802,51 @@ class PlayerActivity : AppCompatActivity() {
         view?.evaluateJavascript(advancedJs, null)
     }
 
+
+    /**
+     * Injected when onProgressChanged hits 100%.
+     * - If the page already finished (readyState === 'complete'), fires immediately.
+     * - Otherwise waits for the window 'load' event so all iframes/images/scripts
+     *   are guaranteed to be done before we notify Kotlin.
+     */
+    private fun injectFullyLoadedCheck(view: WebView?) {
+        view?.evaluateJavascript("""
+            (function() {
+                function notifyLoaded() {
+                    if (window.VideasyInterface) {
+                        window.VideasyInterface.postMessage(
+                            JSON.stringify({ type: 'PAGE_FULLY_LOADED' })
+                        );
+                    }
+                }
+                if (document.readyState === 'complete') {
+                    notifyLoaded();
+                } else {
+                    window.addEventListener('load', function() {
+                        notifyLoaded();
+                    }, { once: true });
+                }
+            })();
+        """.trimIndent(), null)
+    }
+
+    /**
+     * Called once when the page and all sub-resources are fully loaded.
+     * Shows a toast and performs an initial click at the cursor's starting position.
+     */
+    private fun onPlayerFullyLoaded() {
+        if (isPlayerFullyLoaded) return
+        isPlayerFullyLoaded = true
+
+        Log.i(TAG, "[Player] Fully loaded — showing toast and simulating initial click")
+
+        runOnUiThread {
+            Toast.makeText(this, "Player ready", Toast.LENGTH_SHORT).show()
+            Handler(Looper.getMainLooper()).postDelayed({
+                simulateClick(cursorX, cursorY)
+            }, 500)
+        }
+    }
 
     private fun setupImmersiveMode() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
