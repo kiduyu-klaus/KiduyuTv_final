@@ -94,8 +94,10 @@ class IptvPlayerActivity : AppCompatActivity() {
         val renderersFactory = DefaultRenderersFactory(this)
             .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
         
-        // Create ExoPlayer
-        player = ExoPlayer.Builder(this, renderersFactory, trackSelector)
+        // Create ExoPlayer with corrected Builder syntax
+        player = ExoPlayer.Builder(this)
+            .setRenderersFactory(renderersFactory)
+            .setTrackSelector(trackSelector)
             .setHandleAudioBecomingNoisy(true)
             .build()
         
