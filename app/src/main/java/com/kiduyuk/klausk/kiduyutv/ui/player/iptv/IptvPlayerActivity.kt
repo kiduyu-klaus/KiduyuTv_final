@@ -16,8 +16,6 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.ImageButton
-import android.widget.ImageView
-import android.widget.LinearLayout
 import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
@@ -67,7 +65,6 @@ import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
  *  • Top bar       – channel name / ● LIVE badge / info
  *  • Overlay       – lock, channel-up (skip), next channel, channel list,
  *                    live seekbar (buffer indicator), Fill·CC·Settings·Volume·Cast·PiP
- *  • Bottom bar    – Share stream URL, Favourites, Edit name, Delete channel, More
  */
 @OptIn(UnstableApi::class)
 class IptvPlayerActivity : AppCompatActivity() {
@@ -135,14 +132,6 @@ class IptvPlayerActivity : AppCompatActivity() {
     private lateinit var btnCast: ImageButton
     private lateinit var btnPip: ImageButton
 
-    // Bottom action bar
-    private lateinit var btnShare: LinearLayout
-    private lateinit var btnFavourites: LinearLayout
-    private lateinit var ivFavourite: ImageView
-    private lateinit var btnEdit: LinearLayout
-    private lateinit var btnDelete: LinearLayout
-    private lateinit var btnMore: LinearLayout
-
     // ── State ────────────────────────────────────────────────────────────────
 
     private var channelName = "Live TV"
@@ -151,8 +140,7 @@ class IptvPlayerActivity : AppCompatActivity() {
     private var isOverlayVisible = true
     private var isLocked         = false
     private var isFillMode       = true
-    private var isMuted          = false
-    private var isFavourited     = false
+private var isMuted = false
 
     // Compose dialog overlay (track selector or any other sheet)
     private var composeDialogView: ComposeView? = null
@@ -193,7 +181,6 @@ class IptvPlayerActivity : AppCompatActivity() {
         wireOverlayToggle()
         wireOverlayButtons()
         wireLiveSeekBar()
-        wireBottomBar()
         initPlayer()
     }
 
@@ -233,10 +220,9 @@ class IptvPlayerActivity : AppCompatActivity() {
     ) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
         val vis = if (isInPictureInPictureMode) View.GONE else View.VISIBLE
-        findViewById<View>(R.id.topBar).visibility          = vis
-        overlayControls.visibility                          = if (isInPictureInPictureMode) View.GONE else View.VISIBLE
-        findViewById<View>(R.id.bottomActionBar).visibility = vis
-        composeDialogView?.visibility                       = vis
+        findViewById<View>(R.id.topBar).visibility = vis
+        overlayControls.visibility = if (isInPictureInPictureMode) View.GONE else View.VISIBLE
+        composeDialogView?.visibility = vis
     }
 
     // ── Hardware key routing ─────────────────────────────────────────────────
@@ -294,13 +280,6 @@ class IptvPlayerActivity : AppCompatActivity() {
         btnVolume       = findViewById(R.id.btnVolume)
         btnCast         = findViewById(R.id.btnCast)
         btnPip          = findViewById(R.id.btnPip)
-
-        btnShare        = findViewById(R.id.btnShare)
-        btnFavourites   = findViewById(R.id.btnFavourites)
-        ivFavourite     = findViewById(R.id.ivFavourite)
-        btnEdit         = findViewById(R.id.btnEdit)
-        btnDelete       = findViewById(R.id.btnDelete)
-        btnMore         = findViewById(R.id.btnMore)
     }
 
     // ── Top bar ──────────────────────────────────────────────────────────────
@@ -480,101 +459,6 @@ class IptvPlayerActivity : AppCompatActivity() {
         }
     }
 
-    // ── Bottom action bar ────────────────────────────────────────────────────
-
-    private fun wireBottomBar() {
-
-        // Share stream URL
-        btnShare.setOnClickListener {
-            val sendIntent = Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_TEXT, "Watch $channelName live: $streamUrl")
-            }
-            startActivity(Intent.createChooser(sendIntent, "Share channel via"))
-        }
-
-        // Favourites toggle
-        btnFavourites.setOnClickListener {
-            isFavourited = !isFavourited
-            ivFavourite.setImageResource(
-                if (isFavourited) R.drawable.ic_favorite else R.drawable.ic_favorite_border
-            )
-            // Clear tint when heart is filled (it's already red in the drawable)
-            ivFavourite.imageTintList = if (isFavourited) null
-            else android.content.res.ColorStateList.valueOf(0xFFFFFFFF.toInt())
-
-            val msg = if (isFavourited) "$channelName added to Favourites"
-            else "$channelName removed from Favourites"
-            Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
-        }
-
-        // Edit channel name
-        btnEdit.setOnClickListener {
-            showRenameChannelDialog()
-        }
-
-        // Delete channel
-        btnDelete.setOnClickListener {
-            showDeleteChannelDialog()
-        }
-
-        // More (EPG, stream info, sleep timer…)
-        btnMore.setOnClickListener {
-            showMoreOptionsMenu()
-        }
-    }
-
-    private fun showRenameChannelDialog() {
-        val input = android.widget.EditText(this).apply {
-            setText(channelName)
-            hint = "Channel name"
-        }
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("Rename Channel")
-            .setView(input)
-            .setPositiveButton("Save") { _, _ ->
-                val newName = input.text.toString().trim()
-                if (newName.isNotEmpty()) {
-                    channelName = newName
-                    tvChannelName.text = newName
-                    Toast.makeText(this, "Channel renamed to \"$newName\"", Toast.LENGTH_SHORT).show()
-                }
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-
-    private fun showDeleteChannelDialog() {
-        QuitDialog(
-            context             = this,
-            title               = "Remove Channel?",
-            message             = "Remove \"$channelName\" from your channel list?",
-            positiveButtonText  = "Remove",
-            negativeButtonText  = "Keep",
-            lottieAnimRes       = R.raw.exit,
-            onNo                = { },
-            onYes               = {
-                Toast.makeText(this, "\"$channelName\" removed", Toast.LENGTH_SHORT).show()
-                finish()
-            }
-        ).show()
-    }
-
-    private fun showMoreOptionsMenu() {
-        val items = arrayOf("Program Guide (EPG)", "Stream Info", "Sleep Timer", "Report Problem")
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("More Options")
-            .setItems(items) { _, which ->
-                when (which) {
-                    0 -> Toast.makeText(this, "EPG — wire your EPG source here", Toast.LENGTH_SHORT).show()
-                    1 -> Toast.makeText(this, "URL: $streamUrl", Toast.LENGTH_LONG).show()
-                    2 -> Toast.makeText(this, "Sleep timer — implement as needed", Toast.LENGTH_SHORT).show()
-                    3 -> Toast.makeText(this, "Reporting issue with $channelName…", Toast.LENGTH_SHORT).show()
-                }
-            }
-            .show()
-    }
-
     // ── Track Selection Dialog (Compose) ─────────────────────────────────────
 
     /**
@@ -725,10 +609,11 @@ fun TabbedTrackSelectionDialog(
     onDismissRequest: () -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(initialTab) }
+    // Force recomposition when track selection changes
+    val currentTracks by remember { mutableStateOf(player.currentTracks) }
     val closeInteractionSource = remember { MutableInteractionSource() }
     val isCloseFocused by closeInteractionSource.collectIsFocusedAsState()
     val tabs = listOf("Video", "Audio", "Subtitles")
-    val currentTracks = player.currentTracks
 
     AlertDialog(
         onDismissRequest = onDismissRequest,
@@ -780,9 +665,9 @@ fun TabbedTrackSelectionDialog(
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 when (selectedTab) {
-                    0 -> VideoTrackList(player, currentTracks)
-                    1 -> GenericTrackList(player, currentTracks, C.TRACK_TYPE_AUDIO)
-                    2 -> GenericTrackList(player, currentTracks, C.TRACK_TYPE_TEXT)
+                    0 -> VideoTrackList(player, currentTracks, onDismissRequest)
+                    1 -> GenericTrackList(player, currentTracks, C.TRACK_TYPE_AUDIO, onDismissRequest)
+                    2 -> GenericTrackList(player, currentTracks, C.TRACK_TYPE_TEXT, onDismissRequest)
                 }
             }
         },
@@ -792,7 +677,7 @@ fun TabbedTrackSelectionDialog(
 
 @OptIn(UnstableApi::class)
 @Composable
-fun VideoTrackList(player: ExoPlayer, tracks: Tracks) {
+fun VideoTrackList(player: ExoPlayer, tracks: Tracks, onDismiss: () -> Unit) {
     val groups = tracks.groups.filter { it.type == C.TRACK_TYPE_VIDEO }
 
     LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
@@ -807,6 +692,7 @@ fun VideoTrackList(player: ExoPlayer, tracks: Tracks) {
                         .buildUpon()
                         .clearOverridesOfType(C.TRACK_TYPE_VIDEO)
                         .build()
+                    onDismiss()
                 }
             )
         }
@@ -832,6 +718,7 @@ fun VideoTrackList(player: ExoPlayer, tracks: Tracks) {
                             .buildUpon()
                             .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, trackIndex))
                             .build()
+                        onDismiss()
                     }
                 )
             }
@@ -841,7 +728,7 @@ fun VideoTrackList(player: ExoPlayer, tracks: Tracks) {
 
 @OptIn(UnstableApi::class)
 @Composable
-fun GenericTrackList(player: ExoPlayer, tracks: Tracks, trackType: Int) {
+fun GenericTrackList(player: ExoPlayer, tracks: Tracks, trackType: Int, onDismiss: () -> Unit) {
     val groups = tracks.groups.filter { it.type == trackType }
     val isText = trackType == C.TRACK_TYPE_TEXT
 
@@ -861,6 +748,7 @@ fun GenericTrackList(player: ExoPlayer, tracks: Tracks, trackType: Int) {
                         .clearOverridesOfType(trackType)
                         .apply { if (isText) setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true) }
                         .build()
+                    onDismiss()
                 }
             )
         }
@@ -877,6 +765,7 @@ fun GenericTrackList(player: ExoPlayer, tracks: Tracks, trackType: Int) {
                             .apply { if (isText) setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false) }
                             .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, trackIndex))
                             .build()
+                        onDismiss()
                     }
                 )
             }
