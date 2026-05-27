@@ -2719,7 +2719,19 @@ private fun PreviewAppSettingsIdle() {
                 onClearCastsClick = {},
                 isClearingWatchHistory = false,
                 watchHistoryClearSuccess = false,
-                onClearWatchHistoryClick = {}
+                onClearWatchHistoryClick = {},
+                // Live TV
+                playlistUrl = "https://example.com/playlist.m3u",
+                epgUrl = "https://example.com/epg.xml",
+                isUpdatingLiveTv = false,
+                liveTvUpdateSuccess = false,
+                liveTvUpdateError = null,
+                isClearingLiveTvCache = false,
+                liveTvClearSuccess = false,
+                onPlaylistUrlChange = {},
+                onEpgUrlChange = {},
+                onUpdateLiveTvClick = {},
+                onClearLiveTvCacheClick = {}
             )
         }
     }
@@ -2761,7 +2773,19 @@ private fun PreviewAppSettingsCacheClearing() {
                 onClearCastsClick = {},
                 isClearingWatchHistory = false,
                 watchHistoryClearSuccess = false,
-                onClearWatchHistoryClick = {}
+                onClearWatchHistoryClick = {},
+                // Live TV
+                playlistUrl = "https://example.com/playlist.m3u",
+                epgUrl = "https://example.com/epg.xml",
+                isUpdatingLiveTv = false,
+                liveTvUpdateSuccess = false,
+                liveTvUpdateError = null,
+                isClearingLiveTvCache = false,
+                liveTvClearSuccess = false,
+                onPlaylistUrlChange = {},
+                onEpgUrlChange = {},
+                onUpdateLiveTvClick = {},
+                onClearLiveTvCacheClick = {}
             )
         }
     }
@@ -2803,7 +2827,19 @@ private fun PreviewAppSettingsAllSuccess() {
                 onClearCastsClick = {},
                 isClearingWatchHistory = false,
                 watchHistoryClearSuccess = true,
-                onClearWatchHistoryClick = {}
+                onClearWatchHistoryClick = {},
+                // Live TV
+                playlistUrl = "https://example.com/playlist.m3u",
+                epgUrl = "https://example.com/epg.xml",
+                isUpdatingLiveTv = false,
+                liveTvUpdateSuccess = true,
+                liveTvUpdateError = null,
+                isClearingLiveTvCache = false,
+                liveTvClearSuccess = true,
+                onPlaylistUrlChange = {},
+                onEpgUrlChange = {},
+                onUpdateLiveTvClick = {},
+                onClearLiveTvCacheClick = {}
             )
         }
     }

@@ -460,7 +460,7 @@ private fun showOverlay() {
     private fun hideOverlay() {
         if (isLocked) {
             // Keep only the lock button visible
-            setOverlayChildrenVisibility(View.INVISIBLE)
+            setOverlayChildrenVisibility(View.GONE)
             btnLock.visibility = View.VISIBLE
             overlayControls.visibility = View.VISIBLE
             overlayControls.alpha = 1f
@@ -469,13 +469,13 @@ private fun showOverlay() {
         isOverlayVisible = false
         
         // Hide top bar
-        topBar.animate().alpha(0f).setDuration(300).withEndAction {
-            topBar.visibility = View.INVISIBLE
+        topBar.animate().alpha(0f).setDuration(500).withEndAction {
+            topBar.visibility = View.GONE
             topBar.alpha = 1f // Reset alpha for next show
         }.start()
         
         // Hide overlay controls
-        overlayControls.animate().alpha(0f).setDuration(300).withEndAction {
+        overlayControls.animate().alpha(0f).setDuration(500).withEndAction {
             overlayControls.visibility = View.INVISIBLE
             overlayControls.alpha = 1f // Reset alpha for next show
         }.start()
