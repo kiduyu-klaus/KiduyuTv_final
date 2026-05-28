@@ -148,7 +148,7 @@ class SchedulePlayerActivity : AppCompatActivity() {
             }
 
             webChromeClient = object : android.webkit.WebChromeClient() {
-                override fun onShowCustomView(view: View?, callback: android.webkit.CustomViewCallback?) {
+                override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
                     super.onShowCustomView(view, callback)
                     android.util.Log.i(TAG, "[WebChrome] onShowCustomView called")
                 }
@@ -163,7 +163,7 @@ class SchedulePlayerActivity : AppCompatActivity() {
             val baseUrl = "https://dlhd.pk"
             loadDataWithBaseURL(
                 baseUrl,
-                currentIframeHtml,
+                currentIframeHtml.toString(),
                 "text/html",
                 "UTF-8",
                 null
