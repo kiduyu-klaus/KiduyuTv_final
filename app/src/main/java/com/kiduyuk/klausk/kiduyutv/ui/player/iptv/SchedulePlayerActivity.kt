@@ -318,7 +318,7 @@ class SchedulePlayerActivity : ComponentActivity() {
                 </style>
             </head>
             <body>
-                <iframe src="$streamUrl" allowfullscreen frameborder="0"></iframe>
+                <iframe src="$streamUrl" width="100%" height="100%" style="border:0;" allowfullscreen></iframe>
             </body>
             </html>
         """.trimIndent()

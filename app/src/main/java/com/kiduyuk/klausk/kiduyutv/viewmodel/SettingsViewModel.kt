@@ -12,6 +12,8 @@ import com.kiduyuk.klausk.kiduyutv.data.local.entity.SavedMediaEntity
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.util.AuthManager
 import com.kiduyuk.klausk.kiduyutv.util.LiveTvCacheManager
+import com.kiduyuk.klausk.kiduyutv.data.repository.ChannelScraper
+import com.kiduyuk.klausk.kiduyutv.util.ScrapedChannelsCache
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseSyncManager
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
@@ -520,12 +522,85 @@ class SettingsViewModel : ViewModel() {
             _uiState.update { it.copy(isClearingLiveTvCache = true, liveTvClearSuccess = false) }
             try {
                 LiveTvCacheManager.clearLiveTvCache(context)
+                ScrapedChannelsCache.clearCache(context)
                 delay(600)
                 _uiState.update { it.copy(isClearingLiveTvCache = false, liveTvClearSuccess = true) }
                 delay(3000)
                 _uiState.update { it.copy(liveTvClearSuccess = false) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isClearingLiveTvCache = false) }
+            }
+        }
+    }
+
+    // ── Scrape Channels Functions ────────────────────────────────────────────────
+
+    /**
+     * Scrape channels from dlhd.pk
+     * Downloads channel list and fetches stream URLs
+     */
+    fun scrapeChannels(context: Context) {
+        if (_uiState.value.isScrapingChannels) return
+
+        _uiState.update {
+            it.copy(
+                isScrapingChannels = true,
+                scrapeChannelsSuccess = false,
+                scrapeChannelsError = null
+            )
+        }
+
+        viewModelScope.launch {
+            try {
+                val result = ChannelScraper.fetchChannels(fetchStreamUrls = true)
+
+                result.fold(
+                    onSuccess = { channels ->
+                        // Save channels to cache
+                        ScrapedChannelsCache.saveChannels(context, channels)
+                        _uiState.update {
+                            it.copy(
+                                isScrapingChannels = false,
+                                scrapeChannelsSuccess = true,
+                                scrapeChannelsError = null,
+                                scrapedChannelsCount = channels.size
+                            )
+                        }
+                        delay(3000)
+                        _uiState.update { it.copy(scrapeChannelsSuccess = false) }
+                    },
+                    onFailure = { error ->
+                        _uiState.update {
+                            it.copy(
+                                isScrapingChannels = false,
+                                scrapeChannelsSuccess = false,
+                                scrapeChannelsError = error.message ?: "Failed to scrape channels"
+                            )
+                        }
+                    }
+                )
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isScrapingChannels = false,
+                        scrapeChannelsSuccess = false,
+                        scrapeChannelsError = e.message ?: "Failed to scrape channels"
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Refresh scraped channels from cache (doesn't re-scrape)
+     */
+    fun refreshScrapedChannels(context: Context) {
+        viewModelScope.launch {
+            val channels = ScrapedChannelsCache.loadChannels(context)
+            _uiState.update {
+                it.copy(
+                    scrapedChannelsCount = channels.size
+                )
             }
         }
     }
@@ -729,5 +804,10 @@ data class SettingsUiState(
     val liveTvUpdateSuccess: Boolean = false,
     val liveTvUpdateError: String? = null,
     val isClearingLiveTvCache: Boolean = false,
-    val liveTvClearSuccess: Boolean = false
+    val liveTvClearSuccess: Boolean = false,
+    // Scrape Channels settings
+    val isScrapingChannels: Boolean = false,
+    val scrapeChannelsSuccess: Boolean = false,
+    val scrapeChannelsError: String? = null,
+    val scrapedChannelsCount: Int = 0
 )

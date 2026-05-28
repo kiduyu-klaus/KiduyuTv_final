@@ -1,5 +1,6 @@
 package com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv
 
+import android.content.Context
 import android.content.Intent
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
@@ -48,6 +49,7 @@ import coil.request.ImageRequest
 import com.kiduyuk.klausk.kiduyutv.data.model.*
 import com.kiduyuk.klausk.kiduyutv.data.model.ScrapedChannel
 import com.kiduyuk.klausk.kiduyutv.data.repository.ChannelScraper
+import com.kiduyuk.klausk.kiduyutv.util.ScrapedChannelsCache
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.TopBar
 import com.kiduyuk.klausk.kiduyutv.ui.player.iptv.SchedulePlayerActivity
@@ -120,6 +122,7 @@ fun LiveTvScreen(
     LaunchedEffect(selectedTabIndex) {
         if (selectedTabIndex == 2 && scrapedChannels.isEmpty() && !isLoadingChannels) {
             loadScrapedChannels(
+                context = context,
                 onLoading = { isLoadingChannels = true },
                 onSuccess = { channels ->
                     scrapedChannels = channels
@@ -208,6 +211,7 @@ fun LiveTvScreen(
                         },
                         onRetry = {
                             loadScrapedChannels(
+                                context = context,
                                 onLoading = { isLoadingChannels = true },
                                 onSuccess = { channels ->
                                     scrapedChannels = channels
@@ -217,7 +221,8 @@ fun LiveTvScreen(
                                 onError = { error ->
                                     channelsError = error
                                     isLoadingChannels = false
-                                }
+                                },
+                                forceRefresh = true
                             )
                         }
                     )
@@ -405,23 +410,51 @@ private data class TabItem(
 
 /**
  * Helper function to load scraped channels
+ * First tries to load from cache, then fetches from network and saves to cache
  */
 private fun loadScrapedChannels(
+    context: Context,
     onLoading: () -> Unit,
     onSuccess: (List<ScrapedChannel>) -> Unit,
-    onError: (String) -> Unit
+    onError: (String) -> Unit,
+    forceRefresh: Boolean = false
 ) {
     onLoading()
     CoroutineScope(Dispatchers.Main).launch {
+        // First try to load from cache (unless force refresh)
+        if (!forceRefresh) {
+            val cachedChannels = withContext(Dispatchers.IO) {
+                ScrapedChannelsCache.loadChannels(context)
+            }
+            if (cachedChannels.isNotEmpty()) {
+                android.util.Log.i("LiveTvScreen", "Loaded ${cachedChannels.size} channels from cache")
+                onSuccess(cachedChannels)
+                return@launch
+            }
+        }
+
+        // Fetch from network
         val result = withContext(Dispatchers.IO) {
-            ChannelScraper.fetchChannels()
+            ChannelScraper.fetchChannels(fetchStreamUrls = true)
         }
         result.fold(
             onSuccess = { channels ->
+                // Save to cache
+                kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                    ScrapedChannelsCache.saveChannels(context, channels)
+                }
                 onSuccess(channels)
             },
             onFailure = { error ->
-                onError(error.message ?: "Failed to load channels")
+                // Try cache as fallback
+                val cachedChannels = withContext(Dispatchers.IO) {
+                    ScrapedChannelsCache.loadChannels(context)
+                }
+                if (cachedChannels.isNotEmpty()) {
+                    onSuccess(cachedChannels)
+                } else {
+                    onError(error.message ?: "Failed to load channels")
+                }
             }
         )
     }

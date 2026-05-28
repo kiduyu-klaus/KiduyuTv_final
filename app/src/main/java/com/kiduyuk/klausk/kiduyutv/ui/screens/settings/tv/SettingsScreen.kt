@@ -313,6 +313,13 @@ fun SettingsScreen(
                                 onYes = { viewModel.clearLiveTvCache(context) }
                             ).show()
                         },
+                        // Scrape Channels
+                        isScrapingChannels = uiState.isScrapingChannels,
+                        scrapeChannelsSuccess = uiState.scrapeChannelsSuccess,
+                        scrapeChannelsError = uiState.scrapeChannelsError,
+                        scrapedChannelsCount = uiState.scrapedChannelsCount,
+                        onScrapeChannelsClick = { viewModel.scrapeChannels(context) },
+                        onRefreshScrapedChannelsClick = { viewModel.refreshScrapedChannels(context) },
                         // Firebase Sync
                         isFirebaseSyncing = uiState.isFirebaseSyncing,
                         firebaseSyncProgress = uiState.firebaseSyncProgress,
@@ -604,6 +611,13 @@ private fun AppSettingsContent(
     onEpgUrlChange: (String) -> Unit,
     onUpdateLiveTvClick: () -> Unit,
     onClearLiveTvCacheClick: () -> Unit,
+    // Scrape Channels
+    isScrapingChannels: Boolean,
+    scrapeChannelsSuccess: Boolean,
+    scrapeChannelsError: String?,
+    scrapedChannelsCount: Int,
+    onScrapeChannelsClick: () -> Unit,
+    onRefreshScrapedChannelsClick: () -> Unit,
     // Firebase Sync
     isFirebaseSyncing: Boolean = false,
     firebaseSyncProgress: Int = 0,
@@ -778,7 +792,14 @@ private fun AppSettingsContent(
             onPlaylistUrlChange = onPlaylistUrlChange,
             onEpgUrlChange = onEpgUrlChange,
             onUpdateClick = onUpdateLiveTvClick,
-            onClearCacheClick = onClearLiveTvCacheClick
+            onClearCacheClick = onClearLiveTvCacheClick,
+            // Scrape Channels
+            isScrapingChannels = isScrapingChannels,
+            scrapeChannelsSuccess = scrapeChannelsSuccess,
+            scrapeChannelsError = scrapeChannelsError,
+            scrapedChannelsCount = scrapedChannelsCount,
+            onScrapeChannelsClick = onScrapeChannelsClick,
+            onRefreshScrapedChannelsClick = onRefreshScrapedChannelsClick
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -1422,6 +1443,7 @@ private fun SettingsActionCard(
 
 /**
  * Card component for Live TV settings with URL inputs and action buttons.
+ * Includes Scrape Channels button for dlhd.pk integration.
  */
 @Composable
 private fun LiveTvSettingsCard(
@@ -1435,11 +1457,17 @@ private fun LiveTvSettingsCard(
     onPlaylistUrlChange: (String) -> Unit,
     onEpgUrlChange: (String) -> Unit,
     onUpdateClick: () -> Unit,
-    onClearCacheClick: () -> Unit
+    onClearCacheClick: () -> Unit,
+    // Scrape Channels
+    isScrapingChannels: Boolean,
+    scrapeChannelsSuccess: Boolean,
+    scrapeChannelsError: String?,
+    scrapedChannelsCount: Int,
+    onScrapeChannelsClick: () -> Unit,
+    onRefreshScrapedChannelsClick: () -> Unit
 ) {
     var playlistText by remember { mutableStateOf(playlistUrl) }
     var epgText by remember { mutableStateOf(epgUrl) }
-
 
     // Update local state when prop changes
     LaunchedEffect(playlistUrl) {
@@ -1510,7 +1538,6 @@ private fun LiveTvSettingsCard(
             // Update/Save button
             val updateInteractionSource = remember { MutableInteractionSource() }
             val isUpdateFocused by updateInteractionSource.collectIsFocusedAsState()
-
 
             Box(
                 modifier = Modifier
@@ -1661,6 +1688,129 @@ private fun LiveTvSettingsCard(
                 modifier = Modifier.padding(top = 4.dp)
             )
         }
+
+        // ── Scrape Channels Section ───────────────────────────────────────────
+        HorizontalDivider(
+            color = TextTertiary.copy(alpha = 0.2f),
+            thickness = 1.dp,
+            modifier = Modifier.padding(vertical = 8.dp)
+        )
+
+        // Scrape Channels header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Scrape Channels from dlhd.pk",
+                    color = TextPrimary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = if (scrapedChannelsCount > 0) {
+                        "$scrapedChannelsCount channels cached"
+                    } else {
+                        "Fetch live channels from DaddyLive"
+                    },
+                    color = TextSecondary,
+                    fontSize = 12.sp
+                )
+            }
+        }
+
+        // Scrape Channels button
+        val scrapeInteractionSource = remember { MutableInteractionSource() }
+        val isScrapeFocused by scrapeInteractionSource.collectIsFocusedAsState()
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(48.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(
+                    when {
+                        isScrapingChannels -> PrimaryRed.copy(alpha = 0.5f)
+                        isScrapeFocused -> PrimaryRed.copy(alpha = 0.8f)
+                        else -> PrimaryRed
+                    }
+                )
+                .border(
+                    width = if (isScrapeFocused) 2.dp else 0.dp,
+                    color = if (isScrapeFocused) Color.White.copy(alpha = 0.5f) else Color.Transparent,
+                    shape = RoundedCornerShape(12.dp)
+                )
+                .clickable(
+                    interactionSource = scrapeInteractionSource,
+                    indication = null,
+                    enabled = !isScrapingChannels,
+                    onClick = onScrapeChannelsClick
+                )
+                .focusable(interactionSource = scrapeInteractionSource),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (isScrapingChannels) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+                    Text(
+                        text = "Scraping...",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Download,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "Scrape Channels",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+
+        // Scrape status messages
+        if (scrapeChannelsSuccess) {
+            Text(
+                text = "Channels scraped successfully! ($scrapedChannelsCount channels)",
+                color = Color(0xFF4CAF50),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+
+        if (!scrapeChannelsError.isNullOrBlank()) {
+            Text(
+                text = scrapeChannelsError,
+                color = Color(0xFFFF6B6B),
+                fontSize = 13.sp,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+
+        // Info text
+        Text(
+            text = "Scraped channels are cached for 24 hours. Go to Live TV > Channels tab to view and play channels.",
+            color = TextTertiary,
+            fontSize = 12.sp,
+            modifier = Modifier.padding(top = 8.dp)
+        )
     }
 }
 

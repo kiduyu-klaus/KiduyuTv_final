@@ -5,12 +5,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
-import org.jsoup.nodes.Element
-import java.net.URLEncoder
 
 /**
  * Repository for scraping live TV channels from dlhd.pk
  * Uses Jsoup for HTML parsing
+ *
+ * Correct flow:
+ * 1. Load https://dlhd.pk/24-7-channels.php
+ * 2. Inside div.grid, get all a tags with class="card"
+ * 3. Save href as watchPageUrl, div.card__title text as name, id from link, category="Channels"
+ * 4. When channel is clicked, open watchPageUrl, get iframeUrls from button data-url in div#playerBtns
+ * 5. Build iframes and play in SchedulePlayerActivity
  */
 object ChannelScraper {
 
@@ -18,56 +23,40 @@ object ChannelScraper {
     private const val BASE_URL = "https://dlhd.pk"
     private const val CHANNELS_URL = "$BASE_URL/24-7-channels.php"
     private const val TIMEOUT_MS = 15000
-    private const val MAX_CHANNELS_TO_SCRAPE = 50 // Limit to prevent too many requests
 
     /**
      * Fetches and parses all channels from the 24-7 channels page
-     * Then fetches each channel page to extract stream URLs
      *
      * @param fetchStreamUrls If true, fetches each channel page to get stream URLs
-     * @return Result containing list of ScrapedChannel with iframeUrls or an exception
+     * @return Result containing list of ScrapedChannel
      */
     suspend fun fetchChannels(fetchStreamUrls: Boolean = true): Result<List<ScrapedChannel>> = withContext(Dispatchers.IO) {
         try {
             android.util.Log.i(TAG, "Fetching channels from: $CHANNELS_URL")
-            
-            // Fetch the HTML document
+
             val document: Document = Jsoup.connect(CHANNELS_URL)
                 .timeout(TIMEOUT_MS)
                 .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
                 .referrer(BASE_URL)
                 .get()
 
-            // Parse channels from grid elements
             val channels = parseChannelsFromGrid(document)
-            
+
             android.util.Log.i(TAG, "Parsed ${channels.size} channels from grid")
 
-            // If we need stream URLs, fetch them from each channel page
             if (fetchStreamUrls && channels.isNotEmpty()) {
+                // Fetch stream URLs for each channel
                 val channelsWithStreams = mutableListOf<ScrapedChannel>()
-                
-                // Limit the number of channels to scrape to avoid too many requests
-                val channelsToProcess = channels.take(MAX_CHANNELS_TO_SCRAPE)
-                
-                for ((index, channel) in channelsToProcess.withIndex()) {
+                for (channel in channels) {
                     try {
-                        android.util.Log.d(TAG, "Fetching stream URLs for channel ${index + 1}/${channelsToProcess.size}: ${channel.name}")
-                        
                         val streamUrls = fetchStreamUrlsFromChannel(channel.watchPageUrl)
-                        val updatedChannel = channel.copy(iframeUrls = streamUrls)
-                        channelsWithStreams.add(updatedChannel)
-                        
-                        // Small delay to avoid overwhelming the server
-                        kotlinx.coroutines.delay(100)
+                        channelsWithStreams.add(channel.copy(iframeUrls = streamUrls))
+                        kotlinx.coroutines.delay(50)
                     } catch (e: Exception) {
                         android.util.Log.w(TAG, "Failed to fetch streams for ${channel.name}: ${e.message}")
-                        // Add channel with empty iframeUrls
                         channelsWithStreams.add(channel)
                     }
                 }
-                
-                android.util.Log.i(TAG, "Successfully processed ${channelsWithStreams.size} channels with stream URLs")
                 Result.success(channelsWithStreams)
             } else {
                 Result.success(channels)
@@ -79,11 +68,77 @@ object ChannelScraper {
     }
 
     /**
-     * Fetches stream URLs from a channel's watch page
-     * Parses the playerBtns div to extract all data-url attributes
+     * Parses channel elements from div.grid > a.card
      *
-     * @param watchPageUrl The URL of the channel's watch page
-     * @return List of stream URLs from the channel page
+     * HTML structure:
+     * <div class="grid">
+     *   <a class="card" href="/watch.php?id=51" data-title="abc usa" data-first="A">
+     *     <div class="card__title">ABC USA</div>
+     *     <div class="">ID: 51</div>
+     *   </a>
+     * </div>
+     */
+    private fun parseChannelsFromGrid(document: Document): List<ScrapedChannel> {
+        val channels = mutableListOf<ScrapedChannel>()
+
+        // Find div.grid
+        val grid = document.selectFirst("div.grid")
+        if (grid == null) {
+            android.util.Log.w(TAG, "No div.grid found in document")
+            return channels
+        }
+
+        // Get all a.card elements
+        val cardLinks = grid.select("a.card")
+        android.util.Log.d(TAG, "Found ${cardLinks.size} a.card elements")
+
+        for (link in cardLinks) {
+            try {
+                // Get href and build watchPageUrl
+                val href = link.attr("href")
+                if (!href.contains("/watch.php?id=")) continue
+
+                val watchPageUrl = if (href.startsWith("http")) href else "$BASE_URL$href"
+
+                // Get name from div.card__title
+                val titleElement = link.selectFirst("div.card__title")
+                val name = titleElement?.text()?.trim() ?: "Unknown Channel"
+
+                // Get id from href (e.g., /watch.php?id=51 -> 51)
+                val idMatch = Regex("""id=(\d+)""").find(href)
+                val channelId = idMatch?.groupValues?.get(1) ?: "0"
+
+                // Category is always "Channels"
+                val category = "Channels"
+
+                channels.add(
+                    ScrapedChannel(
+                        id = channelId,
+                        name = name,
+                        thumbnailUrl = null,
+                        watchPageUrl = watchPageUrl,
+                        iframeUrls = emptyList(),
+                        category = category
+                    )
+                )
+            } catch (e: Exception) {
+                android.util.Log.w(TAG, "Failed to parse card: ${e.message}")
+            }
+        }
+
+        return channels.sortedBy { it.name }
+    }
+
+    /**
+     * Fetches stream URLs from a channel's watch page
+     *
+     * HTML structure:
+     * <div class="btn-group" id="playerBtns">
+     *   <button type="button" class="btn player-btn is-active" data-url="https://dlhd.pk/stream/stream-304.php" title="PLAYER 1">
+     *     Player 1
+     *   </button>
+     *   ...
+     * </div>
      */
     private fun fetchStreamUrlsFromChannel(watchPageUrl: String): List<String> {
         return try {
@@ -93,43 +148,47 @@ object ChannelScraper {
                 .referrer(BASE_URL)
                 .get()
 
-            // First try to get the iframe URL from watch__playerFrame
-            val iframeUrl = document.selectFirst("div.watch__playerFrame iframe[id=playerFrame]")?.attr("src")
-            
-            // Parse all player buttons from playerBtns
-            val playerButtons = document.select("div#playerBtns button.player-btn[data-url]")
-            
             val streamUrls = mutableListOf<String>()
-            
-            // If we found player buttons, extract their data-url attributes
-            if (playerButtons.isNotEmpty()) {
-                for (button in playerButtons) {
-                    val dataUrl = button.attr("data-url").trim()
-                    if (dataUrl.isNotEmpty() && dataUrl.startsWith("http")) {
-                        streamUrls.add(dataUrl)
-                    }
+
+            // Get all buttons in div#playerBtns and extract data-url
+            val playerButtons = document.select("div#playerBtns button.player-btn[data-url]")
+            android.util.Log.d(TAG, "Found ${playerButtons.size} player buttons")
+
+            for (button in playerButtons) {
+                val dataUrl = button.attr("data-url").trim()
+                if (dataUrl.isNotEmpty() && dataUrl.startsWith("http")) {
+                    streamUrls.add(dataUrl)
                 }
-                android.util.Log.d(TAG, "Found ${streamUrls.size} stream URLs from playerBtns")
             }
-            
-            // If no player buttons found, try to get the iframe URL from playerFrame
-            if (streamUrls.isEmpty() && !iframeUrl.isNullOrEmpty()) {
-                streamUrls.add(iframeUrl)
-                android.util.Log.d(TAG, "Added iframe URL from playerFrame: $iframeUrl")
-            }
-            
-            // Try alternative selectors if still no URLs
+
+            // Fallback: if no buttons found, try to get iframe src from embed code
             if (streamUrls.isEmpty()) {
-                // Try to find any iframe with stream URL
-                val iframes = document.select("iframe[src*=stream]")
-                for (iframe in iframes) {
-                    val src = iframe.attr("src")
-                    if (src.isNotEmpty() && src.contains("stream")) {
-                        streamUrls.add(if (src.startsWith("http")) src else "$BASE_URL$src")
+                val iframe = document.selectFirst("iframe[src*='dlhd.pk/stream'], iframe[src*='stream-']")
+                if (iframe != null) {
+                    val src = iframe.attr("src").trim()
+                    if (src.isNotEmpty()) {
+                        streamUrls.add(src)
                     }
                 }
             }
-            
+
+            // Fallback: construct URLs from channel ID
+            if (streamUrls.isEmpty()) {
+                val idMatch = Regex("""id=(\d+)""").find(watchPageUrl)
+                if (idMatch != null) {
+                    val channelId = idMatch.groupValues[1]
+                    val baseUrls = listOf(
+                        "$BASE_URL/stream/stream-$channelId.php",
+                        "$BASE_URL/cast/stream-$channelId.php",
+                        "$BASE_URL/watch/stream-$channelId.php",
+                        "$BASE_URL/plus/stream-$channelId.php",
+                        "$BASE_URL/casting/stream-$channelId.php",
+                        "$BASE_URL/player/stream-$channelId.php"
+                    )
+                    streamUrls.addAll(baseUrls)
+                }
+            }
+
             streamUrls.distinct()
         } catch (e: Exception) {
             android.util.Log.e(TAG, "Error fetching stream URLs from $watchPageUrl: ${e.message}")
@@ -138,195 +197,25 @@ object ChannelScraper {
     }
 
     /**
-     * Parses channel elements from the grid container
-     * Expected HTML structure: <div class="grid"> contains channel items
+     * Generates iframe HTML for a given stream URL
      */
-    private fun parseChannelsFromGrid(document: Document): List<ScrapedChannel> {
-        val channels = mutableListOf<ScrapedChannel>()
-
-        // Try different selectors to find grid items
-        val gridSelectors = listOf(
-            "div.grid",
-            "div.grid-item",
-            "div.channel-item",
-            "a.channel-link",
-            ".grid a",
-            "[class*=channel]",
-            "[class*=grid] a[href*='stream']"
-        )
-
-        var gridContainer: Element? = null
-        
-        // Find the grid container
-        for (selector in gridSelectors) {
-            gridContainer = document.selectFirst(selector)
-            if (gridContainer != null) {
-                android.util.Log.d(TAG, "Found grid with selector: $selector")
-                break
-            }
-        }
-
-        // If no specific grid found, look for all channel links
-        if (gridContainer == null) {
-            // Try to find any links that look like channel pages
-            val allLinks = document.select("a[href*='stream']")
-            for (link in allLinks) {
-                val channel = parseChannelFromLink(link)
-                if (channel != null) {
-                    channels.add(channel)
-                }
-            }
-        } else {
-            // Extract channels from grid items
-            val gridItems = when {
-                gridContainer.hasClass("grid") -> {
-                    // Grid container itself contains items
-                    gridContainer.select("> *")
-                }
-                else -> {
-                    // Grid items are children
-                    gridContainer.select("div, a")
-                }
-            }
-
-            for (item in gridItems) {
-                val channel = parseChannelFromElement(item)
-                if (channel != null) {
-                    channels.add(channel)
-                }
-            }
-        }
-
-        // Remove duplicates based on ID
-        return channels.distinctBy { it.id }
-    }
-
-    /**
-     * Parses a single channel from a DOM element
-     */
-    private fun parseChannelFromElement(element: Element): ScrapedChannel? {
-        try {
-            // Try to find the link within the element
-            val link = element.selectFirst("a[href*='stream']") ?: 
-                       if (element.tagName() == "a" && element.attr("href").contains("stream")) element else null
-
-            if (link == null) return null
-
-            val href = link.attr("href")
-            val watchPageUrl = if (href.startsWith("http")) href else "$BASE_URL/$href"
-
-            // Extract channel ID from URL
-            val channelId = extractChannelId(watchPageUrl)
-
-            // Get channel name
-            val name = extractChannelName(element, link)
-
-            // Try to get thumbnail
-            val thumbnailUrl = extractThumbnail(element)
-
-            return ScrapedChannel(
-                id = channelId,
-                name = name,
-                thumbnailUrl = thumbnailUrl,
-                watchPageUrl = watchPageUrl
-            )
-        } catch (e: Exception) {
-            android.util.Log.w(TAG, "Failed to parse element: ${e.message}")
-            return null
-        }
-    }
-
-    /**
-     * Parses a channel from a link element directly
-     */
-    private fun parseChannelFromLink(link: Element): ScrapedChannel? {
-        try {
-            val href = link.attr("href")
-            if (!href.contains("stream")) return null
-
-            val watchPageUrl = if (href.startsWith("http")) href else "$BASE_URL/$href"
-            val channelId = extractChannelId(watchPageUrl)
-            val name = link.text().trim().ifEmpty { 
-                link.attr("title").ifEmpty { "Channel $channelId" }
-            }
-
-            // Try to get thumbnail from img tag
-            val thumbnail = link.selectFirst("img[src]")
-            val thumbnailUrl = thumbnail?.attr("src")?.let { 
-                if (it.startsWith("http")) it else "$BASE_URL/$it"
-            }
-
-            return ScrapedChannel(
-                id = channelId,
-                name = name,
-                thumbnailUrl = thumbnailUrl,
-                watchPageUrl = watchPageUrl
-            )
-        } catch (e: Exception) {
-            android.util.Log.w(TAG, "Failed to parse link: ${e.message}")
-            return null
-        }
-    }
-
-    /**
-     * Extracts channel ID from the watch page URL
-     */
-    private fun extractChannelId(url: String): String {
-        // Pattern: stream-XXX.php or stream/XXX or similar
-        val patterns = listOf(
-            Regex("stream[-_]?(\\d+)"),
-            Regex("channel[-_]?(\\d+)"),
-            Regex("/(\\d+)/?"),
-            Regex("id=(\\d+)")
-        )
-
-        for (pattern in patterns) {
-            val match = pattern.find(url)
-            if (match != null) {
-                return match.groupValues[1]
-            }
-        }
-
-        // Fallback: encode the URL
-        return URLEncoder.encode(url, "UTF-8").take(32)
-    }
-
-    /**
-     * Extracts the channel name from an element
-     */
-    private fun extractChannelName(element: Element, link: Element): String {
-        // Try different text sources
-        val name = listOf(
-            link.text().trim(),
-            link.attr("title").trim(),
-            element.selectFirst("img")?.attr("alt")?.trim(),
-            element.selectFirst("[class*=name]")?.text()?.trim(),
-            element.selectFirst("[class*=title]")?.text()?.trim(),
-            element.text().trim()
-        ).filter { !it.isNullOrEmpty() }.firstOrNull()
-
-        return name ?: "Unknown Channel"
-    }
-
-    /**
-     * Extracts thumbnail URL from an element
-     */
-    private fun extractThumbnail(element: Element): String? {
-        // Try to find an image
-        val img = element.selectFirst("img[src]")
-        
-        if (img != null) {
-            val src = img.attr("src")
-            return if (src.startsWith("http")) {
-                src
-            } else if (src.startsWith("/")) {
-                "$BASE_URL$src"
-            } else {
-                "$BASE_URL/$src"
-            }
-        }
-
-        return null
+    fun generateIframeHtml(streamUrl: String): String {
+        return """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
+                    iframe { width: 100%; height: 100%; border: 0; }
+                </style>
+            </head>
+            <body>
+                <iframe src="$streamUrl" width="100%" height="100%" style="border:0;" allowfullscreen></iframe>
+            </body>
+            </html>
+        """.trimIndent()
     }
 
     /**
@@ -334,7 +223,6 @@ object ChannelScraper {
      */
     fun searchChannels(channels: List<ScrapedChannel>, query: String): List<ScrapedChannel> {
         if (query.isBlank()) return channels
-        
         val lowerQuery = query.lowercase()
         return channels.filter { channel ->
             channel.name.lowercase().contains(lowerQuery) ||
