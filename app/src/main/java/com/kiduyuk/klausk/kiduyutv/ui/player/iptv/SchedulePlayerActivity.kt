@@ -8,6 +8,7 @@ import android.os.Looper
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.JavascriptInterface
 import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -24,7 +25,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -82,7 +82,7 @@ class SchedulePlayerActivity : ComponentActivity() {
     private var iframeUrls: List<String> = emptyList()
     private var hasDirectIframeUrls: Boolean = false
 
-    // UI State â€” backed by Compose state so the UI reacts to changes
+    // UI State — backed by Compose state so the UI reacts to changes
     private val isTopBarVisible = mutableStateOf(true)
 
     companion object {
@@ -122,7 +122,7 @@ class SchedulePlayerActivity : ComponentActivity() {
         }
     }
 
-    // Unified idle timer â€” hides both cursor and top bar
+    // Unified idle timer — hides both cursor and top bar
     private val cursorHideHandler = Handler(Looper.getMainLooper())
     private val cursorHideRunnable = Runnable {
         if (!isCursorDisabled && isCursorVisible) {
@@ -331,6 +331,181 @@ class SchedulePlayerActivity : ComponentActivity() {
         scheduleTopBarHide()
     }
 
+    /**
+     * Injects JavaScript code that continuously monitors for video tags and forces volume to max
+     * Shows a toast message when videos are found
+     */
+    private fun injectVideoVolumeController() {
+        if (!::webView.isInitialized) return
+
+        val jsCode = """
+            (function() {
+                console.log('[VideoController] Initializing video volume controller');
+                
+                // Function to force volume to max on a video element
+                function setVideoVolumeMax(video) {
+                    try {
+                        if (video.volume !== 1 || video.muted) {
+                            video.volume = 1;
+                            video.muted = false;
+                            console.log('[VideoController] Set volume to max for video:', video);
+                        }
+                    } catch(e) {
+                        console.error('[VideoController] Error setting volume:', e);
+                    }
+                }
+                
+                // Function to process all existing videos
+                function processAllVideos() {
+                    try {
+                        // Check main document
+                        var videos = document.querySelectorAll('video');
+                        if (videos.length > 0) {
+                            console.log('[VideoController] Found ' + videos.length + ' video(s) in main document');
+                            videos.forEach(function(video) {
+                                setVideoVolumeMax(video);
+                            });
+                        }
+                        
+                        // Check all iframes (same origin only)
+                        var iframes = document.querySelectorAll('iframe');
+                        iframes.forEach(function(iframe) {
+                            try {
+                                if (iframe.contentDocument) {
+                                    var iframeVideos = iframe.contentDocument.querySelectorAll('video');
+                                    if (iframeVideos.length > 0) {
+                                        console.log('[VideoController] Found ' + iframeVideos.length + ' video(s) in iframe');
+                                        iframeVideos.forEach(function(video) {
+                                            setVideoVolumeMax(video);
+                                        });
+                                    }
+                                }
+                            } catch(e) {
+                                // Cross-origin iframe - can't access
+                                console.log('[VideoController] Cannot access iframe (cross-origin)');
+                            }
+                        });
+                    } catch(e) {
+                        console.error('[VideoController] Error processing videos:', e);
+                    }
+                }
+                
+                // Function to show toast notification via Android
+                function showToast(message) {
+                    try {
+                        // Try to use Android interface if available
+                        if (window.Android && window.Android.showToast) {
+                            window.Android.showToast(message);
+                        }
+                        console.log('[VideoController] Toast:', message);
+                    } catch(e) {
+                        console.log('[VideoController] Toast (console):', message);
+                    }
+                }
+                
+                // Track if we've already shown toast for this session
+                var hasShownToast = false;
+                
+                // Setup MutationObserver to watch for dynamically added video elements
+                var observer = new MutationObserver(function(mutations) {
+                    var videoFound = false;
+                    
+                    mutations.forEach(function(mutation) {
+                        // Check added nodes for videos
+                        if (mutation.addedNodes && mutation.addedNodes.length > 0) {
+                            for (var i = 0; i < mutation.addedNodes.length; i++) {
+                                var node = mutation.addedNodes[i];
+                                
+                                // Check if the added node itself is a video
+                                if (node.nodeName && node.nodeName.toLowerCase() === 'video') {
+                                    setVideoVolumeMax(node);
+                                    videoFound = true;
+                                }
+                                
+                                // Check if the added node contains videos
+                                if (node.querySelectorAll) {
+                                    var videos = node.querySelectorAll('video');
+                                    if (videos.length > 0) {
+                                        videos.forEach(function(video) {
+                                            setVideoVolumeMax(video);
+                                        });
+                                        videoFound = true;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Check for attribute changes (like src being set)
+                        if (mutation.type === 'attributes' && mutation.target && 
+                            mutation.target.nodeName && mutation.target.nodeName.toLowerCase() === 'video') {
+                            setVideoVolumeMax(mutation.target);
+                            videoFound = true;
+                        }
+                    });
+                    
+                    if (videoFound && !hasShownToast) {
+                        showToast('Video stream found! Adjusting volume to maximum.');
+                        hasShownToast = true;
+                    }
+                });
+                
+                // Start observing the entire document for video additions
+                if (document.body) {
+                    observer.observe(document.body, {
+                        childList: true,
+                        subtree: true,
+                        attributes: true,
+                        attributeFilter: ['src']
+                    });
+                    
+                    // Also observe document for dynamic iframe creation
+                    var iframeObserver = new MutationObserver(function(mutations) {
+                        mutations.forEach(function(mutation) {
+                            if (mutation.addedNodes && mutation.addedNodes.length > 0) {
+                                for (var i = 0; i < mutation.addedNodes.length; i++) {
+                                    var node = mutation.addedNodes[i];
+                                    if (node.nodeName && node.nodeName.toLowerCase() === 'iframe') {
+                                        console.log('[VideoController] New iframe detected');
+                                        // Try to monitor the iframe when it loads
+                                        if (node.addEventListener) {
+                                            node.addEventListener('load', function() {
+                                                processAllVideos();
+                                            });
+                                        }
+                                        processAllVideos();
+                                    }
+                                }
+                            }
+                        });
+                    });
+                    
+                    iframeObserver.observe(document.body, {
+                        childList: true,
+                        subtree: true
+                    });
+                }
+                
+                // Process any videos that already exist
+                processAllVideos();
+                
+                // Set up periodic scanning as a fallback (every 2 seconds)
+                var intervalId = setInterval(function() {
+                    processAllVideos();
+                }, 2000);
+                
+                // Store interval ID for cleanup (optional)
+                window.__videoControllerInterval = intervalId;
+                
+                console.log('[VideoController] Video monitoring initialized successfully');
+                
+                // Return success
+                'VideoController initialized';
+            })();
+        """.trimIndent()
+
+        webView.evaluateJavascript(jsCode, null)
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupLayout() {
         // Create root layout
@@ -391,34 +566,8 @@ class SchedulePlayerActivity : ComponentActivity() {
                         })();
                     """.trimIndent(), null)
 
-                    // After 3 seconds, set volume to max on any video
-                    // inside the page or its nested iframes
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        view?.evaluateJavascript("""
-                            (function() {
-                                function setVolumeMax(doc) {
-                                    try {
-                                        var videos = doc.querySelectorAll('video');
-                                        videos.forEach(function(v) {
-                                            v.volume = 1;
-                                            v.muted = false;
-                                        });
-                                    } catch(e) {}
-                                }
-
-                                // Target the top-level document
-                                setVolumeMax(document);
-
-                                // Target any same-origin iframes
-                                var iframes = document.querySelectorAll('iframe');
-                                iframes.forEach(function(f) {
-                                    try {
-                                        if (f.contentDocument) setVolumeMax(f.contentDocument);
-                                    } catch(e) {}
-                                });
-                            })();
-                        """.trimIndent(), null)
-                    }, 3000)
+                    // Inject the video volume controller with MutationObserver
+                    injectVideoVolumeController()
                 }
 
                 override fun onReceivedError(
@@ -451,6 +600,16 @@ class SchedulePlayerActivity : ComponentActivity() {
                 }
             }
         }
+
+        // Set up JavaScript interface for showing toasts from WebView
+        webView.addJavascriptInterface(object {
+            @JavascriptInterface
+            fun showToast(message: String) {
+                runOnUiThread {
+                    Toast.makeText(this@SchedulePlayerActivity, message, Toast.LENGTH_LONG).show()
+                }
+            }
+        }, "Android")
 
         // Create cursor view for TV navigation
         cursorView = MouseCursorView(this).apply {
@@ -614,7 +773,7 @@ class SchedulePlayerActivity : ComponentActivity() {
         ).show()
     }
 
-    // â”€â”€ Top bar visibility â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ——————————————————————————————————————————————————
 
     private fun showTopBar() {
         isTopBarVisible.value = true
@@ -636,7 +795,7 @@ class SchedulePlayerActivity : ComponentActivity() {
         topBarHideHandler.postDelayed(topBarHideRunnable, TOPBAR_HIDE_DELAY_MS)
     }
 
-    // â”€â”€ Lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ——————————————————————————————————————————————————
 
     override fun onResume() {
         super.onResume()
@@ -656,6 +815,11 @@ class SchedulePlayerActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        // Clean up JavaScript interval
+        if (::webView.isInitialized) {
+            webView.evaluateJavascript("if(window.__videoControllerInterval) clearInterval(window.__videoControllerInterval);", null)
+        }
+        
         cursorHideHandler.removeCallbacks(cursorHideRunnable)
         topBarHideHandler.removeCallbacks(topBarHideRunnable)
 
@@ -680,10 +844,10 @@ class SchedulePlayerActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    // â”€â”€ D-pad input â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ——————————————————————————————————————————————————
 
     override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
-        // Track dpad navigation activity â€” unified into showCursorAndResetTimer
+        // Track dpad navigation activity — unified into showCursorAndResetTimer
         if (isDpadKey(event)) {
             isDpadNavigating = true
             showCursorAndResetTimer()
@@ -773,7 +937,7 @@ class SchedulePlayerActivity : ComponentActivity() {
         )
     }
 
-    // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ——————————————————————————————————————————————————
 
     private fun updateCursorPosition() {
         if (isCursorDisabled) return
@@ -801,7 +965,7 @@ class SchedulePlayerActivity : ComponentActivity() {
     }
 
     /**
-     * Unified idle timer reset â€” shows both cursor and top bar, then hides both after 5 seconds.
+     * Unified idle timer reset — shows both cursor and top bar, then hides both after 5 seconds.
      * Works on TV (cursor + top bar) and non-TV (top bar only) devices.
      */
     private fun showCursorAndResetTimer() {
@@ -826,7 +990,7 @@ class SchedulePlayerActivity : ComponentActivity() {
 }
 
 // ============================================================================
-// COMPOSE â€” Player Source Selection Top Bar
+// COMPOSE — Player Source Selection Top Bar
 // ============================================================================
 
 /**
