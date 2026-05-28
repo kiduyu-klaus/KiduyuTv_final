@@ -12,11 +12,15 @@ import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -28,8 +32,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.text.font.FontWeight
@@ -78,8 +81,8 @@ class SchedulePlayerActivity : ComponentActivity() {
     private var iframeUrls: List<String> = emptyList()
     private var hasDirectIframeUrls: Boolean = false
 
-    // UI State
-    private var isTopBarVisible = true
+    // UI State — backed by Compose state so the UI reacts to changes
+    private val isTopBarVisible = mutableStateOf(true)
 
     companion object {
         private const val TAG = "SchedulePlayer"
@@ -118,20 +121,22 @@ class SchedulePlayerActivity : ComponentActivity() {
         }
     }
 
-    // Cursor hide timer
+    // Unified idle timer — hides both cursor and top bar
     private val cursorHideHandler = Handler(Looper.getMainLooper())
     private val cursorHideRunnable = Runnable {
         if (!isCursorDisabled && isCursorVisible) {
             cursorView.animate().alpha(0f).setDuration(500).start()
             isCursorVisible = false
         }
+        // Hide top bar together with cursor
+        hideTopBar()
     }
     private var isCursorVisible = false
 
-    // Top bar auto-hide timer
+    // Top bar auto-hide timer (kept for legacy reference but unified into cursor timer)
     private val topBarHideHandler = Handler(Looper.getMainLooper())
     private val topBarHideRunnable = Runnable {
-        if (isTopBarVisible && !isDpadNavigating) {
+        if (isTopBarVisible.value && !isDpadNavigating) {
             hideTopBar()
         }
     }
@@ -174,19 +179,10 @@ class SchedulePlayerActivity : ComponentActivity() {
         // Setup layout with Compose top bar
         setupLayout()
 
-        // Handle back press
-        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                showExitConfirmationDialog()
-            }
-        })
-
         // Use direct iframe URLs if available, otherwise fetch from channel page
         if (hasDirectIframeUrls) {
-            // Use the passed iframe URLs directly
             setupWithDirectIframeUrls()
         } else {
-            // Fetch ChannelWatchPage with player options
             fetchChannelWatchPage(channelId)
         }
     }
@@ -325,17 +321,17 @@ class SchedulePlayerActivity : ComponentActivity() {
     }
 
     /**
-     * Updates the top bar with current player options
+     * Updates the top bar with current player options.
+     * The ComposeView recomposes automatically when Compose state changes.
      */
     private fun updateTopBar() {
-        // The ComposeView will automatically recompose when state changes
+        // Trigger recomposition by resetting top bar visibility
+        isTopBarVisible.value = true
+        scheduleTopBarHide()
     }
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupLayout() {
-        // Create state for player options to update UI reactively
-        val playerOptionsState = mutableStateOf<List<PlayerOption>>(emptyList())
-
         // Create root layout
         rootLayout = FrameLayout(this).apply {
             layoutParams = ViewGroup.LayoutParams(
@@ -393,6 +389,48 @@ class SchedulePlayerActivity : ComponentActivity() {
                             document.head.appendChild(style);
                         })();
                     """.trimIndent(), null)
+
+                    // After 3 seconds, attempt autoplay and max volume on any video
+                    // inside the page or its nested iframes
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        view?.evaluateJavascript("""
+                            (function() {
+                                function activateVideos(doc) {
+                                    try {
+                                        var videos = doc.querySelectorAll('video');
+                                        videos.forEach(function(v) {
+                                            v.volume = 1;
+                                            v.muted = false;
+                                            if (v.paused) {
+                                                v.play().catch(function(e) {
+                                                    // Autoplay blocked — try muted first then unmute
+                                                    v.muted = true;
+                                                    v.play().then(function() {
+                                                        v.muted = false;
+                                                        v.volume = 1;
+                                                    }).catch(function() {});
+                                                });
+                                            } else {
+                                                v.volume = 1;
+                                                v.muted = false;
+                                            }
+                                        });
+                                    } catch(e) {}
+                                }
+
+                                // Target the top-level document
+                                activateVideos(document);
+
+                                // Target any same-origin iframes
+                                var iframes = document.querySelectorAll('iframe');
+                                iframes.forEach(function(f) {
+                                    try {
+                                        if (f.contentDocument) activateVideos(f.contentDocument);
+                                    } catch(e) {}
+                                });
+                            })();
+                        """.trimIndent(), null)
+                    }, 3000)
                 }
 
                 override fun onReceivedError(
@@ -443,19 +481,26 @@ class SchedulePlayerActivity : ComponentActivity() {
                 topMargin = 0
             }
             setContent {
+                val topBarVisible by isTopBarVisible
                 MaterialTheme {
-                    PlayerSourceTopBar(
-                        channelName = channelName,
-                        eventTitle = eventTitle,
-                        playerOptions = playerOptions,
-                        selectedIndex = selectedPlayerIndex,
-                        onSourceSelected = { index ->
-                            if (index != selectedPlayerIndex && index in playerOptions.indices) {
-                                switchToPlayer(index)
-                            }
-                        },
-                        onBackPressed = { showExitConfirmationDialog() }
-                    )
+                    AnimatedVisibility(
+                        visible = topBarVisible,
+                        enter = fadeIn() + slideInVertically { -it },
+                        exit = fadeOut() + slideOutVertically { -it }
+                    ) {
+                        PlayerSourceTopBar(
+                            channelName = channelName,
+                            eventTitle = eventTitle,
+                            playerOptions = playerOptions,
+                            selectedIndex = selectedPlayerIndex,
+                            onSourceSelected = { index ->
+                                if (index != selectedPlayerIndex && index in playerOptions.indices) {
+                                    switchToPlayer(index)
+                                }
+                            },
+                            onBackPressed = { showExitConfirmationDialog() }
+                        )
+                    }
                 }
             }
         }
@@ -584,12 +629,12 @@ class SchedulePlayerActivity : ComponentActivity() {
     // ── Top bar visibility ────────────────────────────────────────────────────
 
     private fun showTopBar() {
-        isTopBarVisible = true
+        isTopBarVisible.value = true
         scheduleTopBarHide()
     }
 
     private fun hideTopBar() {
-        isTopBarVisible = false
+        isTopBarVisible.value = false
     }
 
     private fun scheduleTopBarHide() {
@@ -650,11 +695,10 @@ class SchedulePlayerActivity : ComponentActivity() {
     // ── D-pad input ───────────────────────────────────────────────────────────
 
     override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
-        // Track dpad navigation activity
+        // Track dpad navigation activity — unified into showCursorAndResetTimer
         if (isDpadKey(event)) {
             isDpadNavigating = true
-            showTopBar()
-            scheduleTopBarHide()
+            showCursorAndResetTimer()
         }
 
         if (event.action == KeyEvent.ACTION_DOWN) {
@@ -671,11 +715,10 @@ class SchedulePlayerActivity : ComponentActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        // Track dpad navigation
+        // Unified: show both cursor and top bar, reset shared idle timer
         if (isDpadKeyCode(keyCode)) {
             isDpadNavigating = true
-            showTopBar()
-            scheduleTopBarHide()
+            showCursorAndResetTimer()
         }
 
         if (isCursorDisabled) return super.onKeyDown(keyCode, event)
@@ -769,8 +812,23 @@ class SchedulePlayerActivity : ComponentActivity() {
         upEvent.recycle()
     }
 
+    /**
+     * Unified idle timer reset — shows both cursor and top bar, then hides both after 5 seconds.
+     * Works on TV (cursor + top bar) and non-TV (top bar only) devices.
+     */
     private fun showCursorAndResetTimer() {
-        if (isCursorDisabled) return
+        // Always show top bar and cancel any pending top bar hide
+        isTopBarVisible.value = true
+        topBarHideHandler.removeCallbacks(topBarHideRunnable)
+
+        if (isCursorDisabled) {
+            // Non-TV: no cursor, but still drive top bar hide via the cursor timer slot
+            cursorHideHandler.removeCallbacks(cursorHideRunnable)
+            cursorHideHandler.postDelayed(cursorHideRunnable, 5000)
+            return
+        }
+
+        // TV: show cursor and reset shared idle timer
         cursorView.animate().cancel()
         cursorView.alpha = 1f
         isCursorVisible = true
@@ -787,6 +845,7 @@ class SchedulePlayerActivity : ComponentActivity() {
  * Composable top bar showing channel info and a focusable row of player source options.
  * Designed for TV navigation with D-pad controls.
  * Uses PlayerOption from ChannelWatchPage for handling multiple streams.
+ * Focus automatically shifts to the currently selected source button.
  */
 @Composable
 fun PlayerSourceTopBar(
@@ -797,16 +856,6 @@ fun PlayerSourceTopBar(
     onSourceSelected: (Int) -> Unit,
     onBackPressed: () -> Unit
 ) {
-    // Focus requester for the first source button
-    val firstSourceFocusRequester = remember { FocusRequester() }
-
-    // Request focus on first source when composable is first displayed
-    LaunchedEffect(Unit) {
-        if (playerOptions.isNotEmpty()) {
-            firstSourceFocusRequester.requestFocus()
-        }
-    }
-
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -889,8 +938,6 @@ fun PlayerSourceTopBar(
                     PlayerOptionButton(
                         playerNumber = playerOption.playerNumber,
                         isSelected = index == selectedIndex,
-                        isFirst = index == 0,
-                        focusRequester = if (index == 0) firstSourceFocusRequester else null,
                         onClick = { onSourceSelected(index) }
                     )
                 }
@@ -906,21 +953,18 @@ fun PlayerSourceTopBar(
 private fun BackButton(
     onBackPressed: () -> Unit
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isFocused by interactionSource.collectIsFocusedAsState()
-
+    var isFocused by remember { mutableStateOf(false) }
+    
     Surface(
         modifier = Modifier
-            .focusable(interactionSource = interactionSource)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null
-            ) {
-                onBackPressed()
-            },
+            .focusable()
+            .onFocusChanged { focusState ->
+                isFocused = focusState.isFocused
+            }
+            .clickable { onBackPressed() },
         shape = RoundedCornerShape(8.dp),
         color = if (isFocused) Color(0xFF424242) else Color.Transparent,
-        border = if (isFocused) androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF448AFF)) else null
+        border = if (isFocused) border(1.dp, Color(0xFF448AFF), RoundedCornerShape(8.dp)) else null
     ) {
         Icon(
             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -936,58 +980,45 @@ private fun BackButton(
 /**
  * A focusable button for selecting a player option.
  * Styled similar to the image reference - dark background with blue border when focused.
+ * Focus is programmatically set when this button's index matches the selected index.
  */
 @Composable
 private fun PlayerOptionButton(
     playerNumber: Int,
     isSelected: Boolean,
-    isFirst: Boolean,
-    focusRequester: FocusRequester?,
     onClick: () -> Unit
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val isFocused by interactionSource.collectIsFocusedAsState()
+    var isFocused by remember { mutableStateOf(false) }
 
     // Determine button colors based on state (matching image reference style)
     val backgroundColor = when {
         isSelected -> Color(0xFF2196F3) // Blue for selected
         isFocused -> Color(0xFF2D2D2D) // Dark gray for focused
-        else -> Color(0xFF1A1A1A) // Darker default
+        else -> Color(0xFF1A1A1A)      // Darker default
     }
 
     val textColor = when {
         isSelected -> Color.White
         isFocused -> Color(0xFF448AFF) // Accent blue for focused
-        else -> Color(0xFFE0E0E0) // Light gray for default
+        else -> Color(0xFFE0E0E0)      // Light gray for default
     }
 
     val borderColor = when {
         isSelected -> Color(0xFFFF1744) // Red border for selected (like in image)
-        isFocused -> Color(0xFF448AFF) // Blue border for focused
-        else -> Color(0xFF404040) // Subtle border for default
+        isFocused -> Color(0xFF448AFF)  // Blue border for focused
+        else -> Color(0xFF404040)       // Subtle border for default
     }
 
     Surface(
         modifier = Modifier
-            .then(
-                if (focusRequester != null) {
-                    Modifier.focusRequester(focusRequester)
-                } else {
-                    Modifier
-                }
-            )
-            .focusable(
-                interactionSource = interactionSource
-            )
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null
-            ) {
-                onClick()
-            },
+            .focusable()
+            .onFocusChanged { focusState ->
+                isFocused = focusState.isFocused
+            }
+            .clickable { onClick() },
         shape = RoundedCornerShape(8.dp),
         color = backgroundColor,
-        border = androidx.compose.foundation.BorderStroke(2.dp, borderColor)
+        border = border(2.dp, borderColor, RoundedCornerShape(8.dp))
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
