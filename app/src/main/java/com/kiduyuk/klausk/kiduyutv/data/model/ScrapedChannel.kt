@@ -19,43 +19,131 @@ data class ScrapedChannel(
     val iframeUrls: List<String> = emptyList(),
     val category: String? = null
 ) {
+    
+    init {
+        android.util.Log.v("ScrapedChannel", "Creating channel: id='$id', name='$name', category='$category', watchPageUrl='$watchPageUrl', iframeUrlsCount=${iframeUrls.size}")
+        
+        if (id.isEmpty()) {
+            android.util.Log.w("ScrapedChannel", "Channel created with empty ID! name='$name'")
+        }
+        
+        if (name.isEmpty()) {
+            android.util.Log.w("ScrapedChannel", "Channel created with empty name! id='$id'")
+        }
+        
+        if (watchPageUrl.isEmpty()) {
+            android.util.Log.w("ScrapedChannel", "Channel created with empty watchPageUrl! id='$id', name='$name'")
+        }
+    }
+    
     /**
      * Returns the number of available stream players
      */
-    val playerCount: Int get() = iframeUrls.size
+    val playerCount: Int get() {
+        val count = iframeUrls.size
+        if (count > 0) {
+            android.util.Log.v("ScrapedChannel", "playerCount for '$name': $count streams")
+        }
+        return count
+    }
 
     /**
      * Returns true if channel has multiple stream options
      */
-    val hasMultiplePlayers: Boolean get() = iframeUrls.size > 1
+    val hasMultiplePlayers: Boolean get() {
+        val multiple = iframeUrls.size > 1
+        if (multiple) {
+            android.util.Log.d("ScrapedChannel", "Channel '$name' has ${iframeUrls.size} player options")
+        }
+        return multiple
+    }
 
     /**
      * Returns the first (primary) iframe URL
      */
-    val primaryStreamUrl: String? get() = iframeUrls.firstOrNull()
+    val primaryStreamUrl: String? get() {
+        val url = iframeUrls.firstOrNull()
+        if (url == null) {
+            android.util.Log.w("ScrapedChannel", "primaryStreamUrl for '$name' is null - no streams available")
+        } else {
+            android.util.Log.v("ScrapedChannel", "primaryStreamUrl for '$name': $url")
+        }
+        return url
+    }
 
     /**
      * Returns a formatted iframe HTML for the given URL
      */
-    fun getIframeHtml(url: String): String = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
-                * { margin: 0; padding: 0; box-sizing: border-box; }
-                html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
-                iframe { width: 100%; height: 100%; border: 0; }
-            </style>
-        </head>
-        <body>
-            <iframe src="$url" allowfullscreen frameborder="0"></iframe>
-        </body>
-        </html>
-    """.trimIndent()
+    fun getIframeHtml(url: String): String {
+        android.util.Log.d("ScrapedChannel", "getIframeHtml for '$name' with URL: $url")
+        
+        if (url.isEmpty()) {
+            android.util.Log.e("ScrapedChannel", "getIframeHtml called with empty URL for channel '$name'")
+            return "<html><body>Error: Empty stream URL</body></html>"
+        }
+        
+        val html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
+                    iframe { width: 100%; height: 100%; border: 0; }
+                </style>
+            </head>
+            <body>
+                <iframe src="$url" allowfullscreen frameborder="0"></iframe>
+            </body>
+            </html>
+        """.trimIndent()
+        
+        android.util.Log.v("ScrapedChannel", "Generated iframe HTML for '$name' (${html.length} bytes)")
+        return html
+    }
 
     /**
      * Returns iframe HTML for the primary stream
      */
-    fun getPrimaryIframeHtml(): String? = primaryStreamUrl?.let { getIframeHtml(it) }
+    fun getPrimaryIframeHtml(): String? {
+        android.util.Log.d("ScrapedChannel", "getPrimaryIframeHtml called for '$name'")
+        val primaryUrl = primaryStreamUrl
+        
+        return if (primaryUrl != null) {
+            getIframeHtml(primaryUrl)
+        } else {
+            android.util.Log.w("ScrapedChannel", "getPrimaryIframeHtml returned null for '$name' - no primary stream")
+            null
+        }
+    }
+    
+    /**
+     * Get stream URL by player index (0-based)
+     */
+    fun getStreamUrlAt(index: Int): String? {
+        return if (index in iframeUrls.indices) {
+            val url = iframeUrls[index]
+            android.util.Log.v("ScrapedChannel", "getStreamUrlAt($index) for '$name': $url")
+            url
+        } else {
+            android.util.Log.w("ScrapedChannel", "getStreamUrlAt($index) failed for '$name' - index out of bounds (size=${iframeUrls.size})")
+            null
+        }
+    }
+    
+    /**
+     * Get all stream URLs with their player numbers
+     */
+    fun getStreamUrlsWithLabels(): List<Pair<Int, String>> {
+        val labeled = iframeUrls.mapIndexed { index, url ->
+            index + 1 to url
+        }
+        android.util.Log.v("ScrapedChannel", "getStreamUrlsWithLabels for '$name': ${labeled.size} streams")
+        return labeled
+    }
+    
+    override fun toString(): String {
+        return "ScrapedChannel(id='$id', name='$name', category='$category', streams=${iframeUrls.size}, watchPageUrl='$watchPageUrl')"
+    }
 }
