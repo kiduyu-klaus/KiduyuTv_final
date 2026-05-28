@@ -2881,7 +2881,14 @@ private fun PreviewAppSettingsIdle() {
                 onPlaylistUrlChange = {},
                 onEpgUrlChange = {},
                 onUpdateLiveTvClick = {},
-                onClearLiveTvCacheClick = {}
+                onClearLiveTvCacheClick = {},
+                // Scrape Channels
+                isScrapingChannels = false,
+                scrapeChannelsSuccess = false,
+                scrapeChannelsError = null,
+                scrapedChannelsCount = 0,
+                onScrapeChannelsClick = {},
+                onRefreshScrapedChannelsClick = {}
             )
         }
     }
@@ -2935,7 +2942,14 @@ private fun PreviewAppSettingsCacheClearing() {
                 onPlaylistUrlChange = {},
                 onEpgUrlChange = {},
                 onUpdateLiveTvClick = {},
-                onClearLiveTvCacheClick = {}
+                onClearLiveTvCacheClick = {},
+                // Scrape Channels
+                isScrapingChannels = false,
+                scrapeChannelsSuccess = false,
+                scrapeChannelsError = null,
+                scrapedChannelsCount = 0,
+                onScrapeChannelsClick = {},
+                onRefreshScrapedChannelsClick = {}
             )
         }
     }
@@ -2989,7 +3003,14 @@ private fun PreviewAppSettingsAllSuccess() {
                 onPlaylistUrlChange = {},
                 onEpgUrlChange = {},
                 onUpdateLiveTvClick = {},
-                onClearLiveTvCacheClick = {}
+                onClearLiveTvCacheClick = {},
+                // Scrape Channels
+                isScrapingChannels = false,
+                scrapeChannelsSuccess = true,
+                scrapeChannelsError = null,
+                scrapedChannelsCount = 125,
+                onScrapeChannelsClick = {},
+                onRefreshScrapedChannelsClick = {}
             )
         }
     }
