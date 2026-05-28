@@ -10,7 +10,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Rational
-import android.util.TypedValue
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
@@ -39,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusTarget
 import androidx.compose.ui.unit.dp
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.os.HandlerCompat.postDelayed
@@ -173,7 +173,7 @@ class IptvPlayerActivity : AppCompatActivity() {
     private var isMuted = false
 
     // D-pad navigation tracking for keeping controls visible
-    //private var isDpadNavigating = false
+    private var isDpadNavigating = false
 
     // Compose dialog overlay (track selector or any other sheet)
     private var composeDialogView: ComposeView? = null
@@ -198,8 +198,7 @@ class IptvPlayerActivity : AppCompatActivity() {
         }
     }
 
-    // D-pad navigation tracking
-    private var isDpadNavigating = false
+
     private val dpadTimeoutHandler = Handler(Looper.getMainLooper())
     private val dpadTimeoutRunnable = Runnable {
         isDpadNavigating = false
@@ -323,15 +322,15 @@ class IptvPlayerActivity : AppCompatActivity() {
     private fun isDpadKey(event: KeyEvent): Boolean {
         return event.source and android.view.InputDevice.SOURCE_DPAD == android.view.InputDevice.SOURCE_DPAD ||
                 event.keyCode in listOf(
-                    KeyEvent.KEYCODE_DPAD_UP,
-                    KeyEvent.KEYCODE_DPAD_DOWN,
-                    KeyEvent.KEYCODE_DPAD_LEFT,
-                    KeyEvent.KEYCODE_DPAD_RIGHT,
-                    KeyEvent.KEYCODE_DPAD_CENTER,
-                    KeyEvent.KEYCODE_ENTER,
-                    KeyEvent.KEYCODE_MENU,
-                    KeyEvent.KEYCODE_SETTINGS
-                )
+            KeyEvent.KEYCODE_DPAD_UP,
+            KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_DPAD_CENTER,
+            KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_MENU,
+            KeyEvent.KEYCODE_SETTINGS
+        )
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
@@ -1032,6 +1031,14 @@ fun TabbedTrackSelectionDialog(
     val isCloseFocused by closeInteractionSource.collectIsFocusedAsState()
     val tabs = listOf("Video", "Audio", "Subtitles")
 
+    // Focus requester for first item in track lists
+    val firstItemFocusRequester = remember { FocusRequester() }
+
+    // Request focus on first item when dialog opens
+    LaunchedEffect(Unit) {
+        firstItemFocusRequester.requestFocus()
+    }
+
     AlertDialog(
         onDismissRequest = onDismissRequest,
         confirmButton = {
@@ -1082,9 +1089,26 @@ fun TabbedTrackSelectionDialog(
                 }
                 Spacer(modifier = Modifier.height(16.dp))
                 when (selectedTab) {
-                    0 -> VideoTrackList(player, currentTracks, onDismissRequest)
-                    1 -> GenericTrackList(player, currentTracks, C.TRACK_TYPE_AUDIO, onDismissRequest)
-                    2 -> GenericTrackList(player, currentTracks, C.TRACK_TYPE_TEXT, onDismissRequest)
+                    0 -> VideoTrackList(
+                        player = player,
+                        tracks = currentTracks,
+                        onDismiss = onDismissRequest,
+                        firstItemFocusRequester = firstItemFocusRequester
+                    )
+                    1 -> GenericTrackList(
+                        player = player,
+                        tracks = currentTracks,
+                        trackType = C.TRACK_TYPE_AUDIO,
+                        onDismiss = onDismissRequest,
+                        firstItemFocusRequester = if (selectedTab == 1) firstItemFocusRequester else null
+                    )
+                    2 -> GenericTrackList(
+                        player = player,
+                        tracks = currentTracks,
+                        trackType = C.TRACK_TYPE_TEXT,
+                        onDismiss = onDismissRequest,
+                        firstItemFocusRequester = if (selectedTab == 2) firstItemFocusRequester else null
+                    )
                 }
             }
         },
@@ -1094,7 +1118,12 @@ fun TabbedTrackSelectionDialog(
 
 @OptIn(UnstableApi::class)
 @Composable
-fun VideoTrackList(player: ExoPlayer, tracks: Tracks, onDismiss: () -> Unit) {
+fun VideoTrackList(
+    player: ExoPlayer,
+    tracks: Tracks,
+    onDismiss: () -> Unit,
+    firstItemFocusRequester: FocusRequester? = null
+) {
     val groups = tracks.groups.filter { it.type == C.TRACK_TYPE_VIDEO }
 
     LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
@@ -1110,7 +1139,10 @@ fun VideoTrackList(player: ExoPlayer, tracks: Tracks, onDismiss: () -> Unit) {
                         .clearOverridesOfType(C.TRACK_TYPE_VIDEO)
                         .build()
                     onDismiss()
-                }
+                },
+                focusModifier = if (firstItemFocusRequester != null) {
+                    Modifier.focusRequester(firstItemFocusRequester)
+                } else Modifier
             )
         }
         groups.forEach { group ->
@@ -1145,7 +1177,13 @@ fun VideoTrackList(player: ExoPlayer, tracks: Tracks, onDismiss: () -> Unit) {
 
 @OptIn(UnstableApi::class)
 @Composable
-fun GenericTrackList(player: ExoPlayer, tracks: Tracks, trackType: Int, onDismiss: () -> Unit) {
+fun GenericTrackList(
+    player: ExoPlayer,
+    tracks: Tracks,
+    trackType: Int,
+    onDismiss: () -> Unit,
+    firstItemFocusRequester: FocusRequester? = null
+) {
     val groups = tracks.groups.filter { it.type == trackType }
     val isText = trackType == C.TRACK_TYPE_TEXT
 
@@ -1166,7 +1204,10 @@ fun GenericTrackList(player: ExoPlayer, tracks: Tracks, trackType: Int, onDismis
                         .apply { if (isText) setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true) }
                         .build()
                     onDismiss()
-                }
+                },
+                focusModifier = if (firstItemFocusRequester != null) {
+                    Modifier.focusRequester(firstItemFocusRequester)
+                } else Modifier
             )
         }
         groups.forEach { group ->
@@ -1191,7 +1232,12 @@ fun GenericTrackList(player: ExoPlayer, tracks: Tracks, trackType: Int, onDismis
 }
 
 @Composable
-fun TrackSelectionRow(title: String, isSelected: Boolean, onClick: () -> Unit) {
+fun TrackSelectionRow(
+    title: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    focusModifier: Modifier = Modifier
+) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
@@ -1208,6 +1254,7 @@ fun TrackSelectionRow(title: String, isSelected: Boolean, onClick: () -> Unit) {
                     Modifier
                 }
             )
+            .then(focusModifier)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
