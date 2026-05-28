@@ -540,6 +540,16 @@ private fun EventItem(
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
+    // Focus requester for the first channel chip when expanded
+    val firstChannelFocusRequester = remember { FocusRequester() }
+
+    // Request focus on first channel when event is expanded
+    LaunchedEffect(isExpanded) {
+        if (isExpanded && event.channels.isNotEmpty()) {
+            firstChannelFocusRequester.requestFocus()
+        }
+    }
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -589,15 +599,33 @@ private fun EventItem(
                     modifier = Modifier.weight(1f)
                 )
 
-                // Expand icon
-                Icon(
-                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = if (isExpanded) "Collapse" else "Expand",
-                    tint = TextSecondary
-                )
+                // Expand icon with channel count badge
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (event.channels.size > 1) {
+                        Surface(
+                            color = if (isExpanded) PrimaryRed else DarkRed,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                text = "${event.channels.size}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Icon(
+                        imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = if (isExpanded) "Collapse" else "Expand",
+                        tint = TextSecondary
+                    )
+                }
             }
 
-            // Expanded channels
+            // Expanded channels - always focusable even with single channel
             AnimatedVisibility(
                 visible = isExpanded,
                 enter = expandVertically() + fadeIn(),
@@ -611,14 +639,17 @@ private fun EventItem(
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
 
-                    // Channel chips
-                    Row(
+                    // Channel chips - use LazyRow for better focus management
+                    LazyRow(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        event.channels.forEach { channel ->
+                        items(event.channels.size) { index ->
+                            val channel = event.channels[index]
                             ChannelChip(
                                 channel = channel,
+                                isFirst = index == 0,
+                                focusRequester = if (index == 0) firstChannelFocusRequester else null,
                                 onClick = { onChannelClick(channel) }
                             )
                         }
@@ -630,11 +661,13 @@ private fun EventItem(
 }
 
 /**
- * Clickable channel chip
+ * Clickable channel chip - always focusable for D-pad navigation
  */
 @Composable
 private fun ChannelChip(
     channel: ScheduleChannel,
+    isFirst: Boolean = false,
+    focusRequester: FocusRequester? = null,
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -642,6 +675,13 @@ private fun ChannelChip(
 
     Surface(
         modifier = Modifier
+            .then(
+                if (focusRequester != null) {
+                    Modifier.focusRequester(focusRequester)
+                } else {
+                    Modifier
+                }
+            )
             .focusable(interactionSource = interactionSource)
             .clickable(
                 interactionSource = interactionSource,
@@ -650,7 +690,7 @@ private fun ChannelChip(
             ),
         color = if (isFocused) Color.White else PrimaryRed,
         shape = RoundedCornerShape(16.dp),
-        border = if (isFocused) BorderStroke(1.dp, PrimaryRed) else null
+        border = if (isFocused) BorderStroke(2.dp, PrimaryRed) else null
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -666,7 +706,8 @@ private fun ChannelChip(
             Text(
                 text = channel.name,
                 style = MaterialTheme.typography.labelMedium,
-                color = if (isFocused) PrimaryRed else Color.White
+                color = if (isFocused) PrimaryRed else Color.White,
+                fontWeight = if (isFocused) FontWeight.Bold else FontWeight.Medium
             )
         }
     }
