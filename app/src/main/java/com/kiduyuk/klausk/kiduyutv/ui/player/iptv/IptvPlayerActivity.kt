@@ -879,7 +879,28 @@ class IptvPlayerActivity : AppCompatActivity() {
 
     private val playerListener = object : Player.Listener {
         override fun onPlayerError(error: PlaybackException) {
-            showPlaybackErrorDialog(error.message ?: "Playback error")
+            // Extract the underlying system cause if it exists
+            val cause = error.cause
+            val causeMessage = cause?.localizedMessage ?: cause?.message
+
+            val fullDetailedMessage = buildString {
+                appendLine("Error Code: ${error.errorCodeName} (${error.errorCode})")
+                appendLine()
+                appendLine("Primary Message: ${error.message}")
+                if (causeMessage != null) {
+                    appendLine()
+                    appendLine("Underlying Cause:")
+                    appendLine(causeMessage)
+                }
+                // If it's an HTTP status error, extract the exact status code (e.g., 403, 404, 500)
+                if (cause is androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException) {
+                    appendLine()
+                    appendLine("HTTP Status Code: ${cause.responseCode}")
+                    appendLine("Request URI: ${cause.dataSpec.uri}")
+                }
+            }
+
+            showPlaybackErrorDialog(fullDetailedMessage)
         }
     }
 
