@@ -9,6 +9,8 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
+import android.webkit.WebResourceResponse
+import android.webkit.WebSettings
 import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -18,13 +20,13 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -39,13 +41,13 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.lifecycleScope
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.data.model.ChannelWatchPage
 import com.kiduyuk.klausk.kiduyutv.data.model.PlayerOption
 import com.kiduyuk.klausk.kiduyutv.data.repository.ScheduleRepository
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.MouseCursorView
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -56,6 +58,15 @@ import kotlinx.coroutines.withContext
  * Takes an iframe HTML as intent extra and plays the scheduled channel in WebView
  * Includes a focusable row of player source options at the top for easy stream switching
  * Uses ChannelWatchPage and playerOptions for handling multiple streams
+ *
+ * Fixes applied:
+ * - playerOptions and selectedPlayerIndex are now mutableStateOf so Compose reacts to changes
+ * - lifecycleScope used instead of raw CoroutineScope to prevent coroutine leaks
+ * - isDpadNavigating is reset to false after the auto-hide timer fires
+ * - generateIframeHtml is consolidated (no more duplicate)
+ * - PlayerOption.isActive flag is kept in sync when switching players
+ * - Autoplay/unmute works via shouldInterceptRequest HTML injection into every iframe frame,
+ *   bypassing cross-origin restrictions that defeat JS injection into the top frame
  */
 class SchedulePlayerActivity : ComponentActivity() {
 
@@ -76,9 +87,11 @@ class SchedulePlayerActivity : ComponentActivity() {
     // Prevent multiple activity launches when a stream is sniffed
     private var isStreamSniffed = false
 
-    // Player sources - now uses ChannelWatchPage and PlayerOption
-    private var playerOptions: List<PlayerOption> = emptyList()
-    private var selectedPlayerIndex: Int = 0
+    // FIX: playerOptions and selectedPlayerIndex backed by mutableStateOf so
+    // the Compose top bar recomposes automatically when these change.
+    private var playerOptions by mutableStateOf<List<PlayerOption>>(emptyList())
+    private var selectedPlayerIndex by mutableStateOf(0)
+
     private var channelWatchPage: ChannelWatchPage? = null
 
     // Direct iframe URLs passed from scraped channels
@@ -131,9 +144,9 @@ class SchedulePlayerActivity : ComponentActivity() {
     // Top bar auto-hide timer
     private val topBarHideHandler = Handler(Looper.getMainLooper())
     private val topBarHideRunnable = Runnable {
-        if (isTopBarVisible.value && !isDpadNavigating) {
-            hideTopBar()
-        }
+        // FIX: reset isDpadNavigating here so future timer callbacks are not permanently blocked
+        isDpadNavigating = false
+        hideTopBar()
     }
     private var isDpadNavigating = false
     private val TOPBAR_HIDE_DELAY_MS = 5000L
@@ -209,7 +222,8 @@ class SchedulePlayerActivity : ComponentActivity() {
     }
 
     private fun fetchChannelWatchPage(channelId: String) {
-        CoroutineScope(Dispatchers.Main).launch {
+        // FIX: use lifecycleScope instead of raw CoroutineScope to avoid leaks
+        lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
                 ScheduleRepository.getInstance().fetchChannelWatchPage(channelId)
             }
@@ -217,18 +231,18 @@ class SchedulePlayerActivity : ComponentActivity() {
             result.fold(
                 onSuccess = { watchPage ->
                     channelWatchPage = watchPage
+
+                    // FIX: assign to mutableStateOf-backed property so Compose reacts
                     playerOptions = watchPage.playerOptions
 
                     if (playerOptions.isEmpty()) {
-                        currentIframeHtml = ScheduleRepository.getInstance()
-                            .generateIframeHtml(watchPage.defaultIframeUrl)
+                        currentIframeHtml = generateIframeHtml(watchPage.defaultIframeUrl)
                     } else {
                         val playerToUse = playerOptions.getOrNull(selectedPlayerIndex)
                             ?: playerOptions.find { it.isActive }
                             ?: playerOptions.first()
 
-                        currentIframeHtml = ScheduleRepository.getInstance()
-                            .generateIframeHtml(playerToUse.url)
+                        currentIframeHtml = generateIframeHtml(playerToUse.url)
                         selectedPlayerIndex = playerOptions.indexOf(playerToUse)
                     }
 
@@ -237,8 +251,9 @@ class SchedulePlayerActivity : ComponentActivity() {
                 },
                 onFailure = { error ->
                     android.util.Log.e(TAG, "Failed to fetch watch page: ${error.message}")
-                    currentIframeHtml = ScheduleRepository.getInstance()
-                        .generateIframeHtml("https://dlhd.pk/player/stream-$channelId.php")
+                    currentIframeHtml = generateIframeHtml(
+                        "https://dlhd.pk/player/stream-$channelId.php"
+                    )
                     loadCurrentStream()
                 }
             )
@@ -267,8 +282,13 @@ class SchedulePlayerActivity : ComponentActivity() {
         }
 
         val totalIframes = iframeUrls.size
-        Toast.makeText(this, "$totalIframes stream option(s) available for $channelName", Toast.LENGTH_LONG).show()
+        Toast.makeText(
+            this,
+            "$totalIframes stream option(s) available for $channelName",
+            Toast.LENGTH_LONG
+        ).show()
 
+        // FIX: assign to mutableStateOf-backed property
         playerOptions = iframeUrls.mapIndexed { index, url ->
             PlayerOption(
                 playerNumber = index + 1,
@@ -289,6 +309,14 @@ class SchedulePlayerActivity : ComponentActivity() {
         updateTopBar()
     }
 
+    /**
+     * FIX: Single source of truth for iframe HTML generation.
+     * Removed the duplicate in setupWithDirectIframeUrls/fetchChannelWatchPage
+     * that previously called ScheduleRepository.generateIframeHtml separately.
+     *
+     * Added allow="autoplay; encrypted-media; fullscreen" which is required for
+     * Chromium to permit autoplay inside nested iframes.
+     */
     private fun generateIframeHtml(streamUrl: String): String {
         return """
             <!DOCTYPE html>
@@ -302,7 +330,17 @@ class SchedulePlayerActivity : ComponentActivity() {
                 </style>
             </head>
             <body>
-                <iframe src="$streamUrl" width="100%" height="100%" scrolling="no" frameborder="0" allowfullscreen="true" allow="autoplay;" allowtransparency="true" id="thatframe"></iframe>
+                <iframe
+                    src="$streamUrl"
+                    width="100%"
+                    height="100%"
+                    scrolling="no"
+                    frameborder="0"
+                    allow="autoplay; encrypted-media; fullscreen"
+                    allowfullscreen="true"
+                    allowtransparency="true"
+                    id="thatframe">
+                </iframe>
             </body>
             </html>
         """.trimIndent()
@@ -313,59 +351,183 @@ class SchedulePlayerActivity : ComponentActivity() {
         scheduleTopBarHide()
     }
 
+    /**
+     * FIX: Autoplay/unmute injection.
+     *
+     * The old approach injected JS into the top frame via onPageFinished, which can
+     * never reach videos inside cross-origin iframes (silent DOMException).
+     *
+     * The new approach intercepts each HTML response at the network level inside
+     * shouldInterceptRequest and injects the autoplay script directly into that
+     * frame's <head> before it parses — so it runs in the correct origin context
+     * regardless of nesting depth.
+     *
+     * This method is kept as a fallback for same-origin frames or the top-level page.
+     */
     private fun injectVideoVolumeController() {
         if (!::webView.isInitialized) return
         val jsCode = """
             (function() {
-                console.log('[VideoController] Initializing video volume controller');
-                function setVideoVolumeMax(video) {
+                console.log('[VideoController] Initializing top-frame volume controller');
+
+                function forcePlayAndUnmute(video) {
                     try {
-                        if (video.volume !== 1 || video.muted) {
-                            video.volume = 1;
-                            video.muted = false;
+                        if (video.paused) {
+                            video.muted = true;
+                            video.play().catch(function(e) {
+                                console.warn('[VideoController] play() blocked:', e.message);
+                            });
                         }
-                    } catch(e) { }
-                }
-                function processAllVideos() {
-                    try {
-                        var videos = document.querySelectorAll('video');
-                        if (videos.length > 0) videos.forEach(function(v) { setVideoVolumeMax(v); });
-                        
-                        var iframes = document.querySelectorAll('iframe');
-                        iframes.forEach(function(iframe) {
+                        setTimeout(function() {
                             try {
-                                if (iframe.contentDocument) {
-                                    var iframeVideos = iframe.contentDocument.querySelectorAll('video');
-                                    if (iframeVideos.length > 0) iframeVideos.forEach(function(v) { setVideoVolumeMax(v); });
-                                }
-                            } catch(e) { }
-                        });
-                    } catch(e) { }
-                }
-                
-                var observer = new MutationObserver(function(mutations) {
-                    mutations.forEach(function(mutation) {
-                        if (mutation.addedNodes && mutation.addedNodes.length > 0) {
-                            for (var i = 0; i < mutation.addedNodes.length; i++) {
-                                var node = mutation.addedNodes[i];
-                                if (node.nodeName && node.nodeName.toLowerCase() === 'video') setVideoVolumeMax(node);
-                                if (node.querySelectorAll) {
-                                    var videos = node.querySelectorAll('video');
-                                    if (videos.length > 0) videos.forEach(function(v) { setVideoVolumeMax(v); });
-                                }
+                                video.muted = false;
+                                video.volume = 1;
+                                console.log('[VideoController] Unmuted');
+                            } catch(e) {
+                                console.warn('[VideoController] Unmute failed:', e.message);
                             }
-                        }
-                    });
-                });
-                
-                if (document.body) {
-                    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
+                        }, 800);
+                    } catch(e) {}
                 }
-                processAllVideos();
-                setInterval(processAllVideos, 2000);
+
+                function processVideos(root) {
+                    try {
+                        root.querySelectorAll('video').forEach(function(v) {
+                            forcePlayAndUnmute(v);
+                        });
+                    } catch(e) {}
+                }
+
+                // Process top-level document
+                processVideos(document);
+
+                // Same-origin iframes only — cross-origin iframes are handled via
+                // shouldInterceptRequest injection at the network level.
+                document.querySelectorAll('iframe').forEach(function(iframe) {
+                    try {
+                        if (iframe.contentDocument) {
+                            processVideos(iframe.contentDocument);
+                            new MutationObserver(function() {
+                                processVideos(iframe.contentDocument);
+                            }).observe(iframe.contentDocument.body, { childList: true, subtree: true });
+                        }
+                    } catch(e) {
+                        console.log('[VideoController] Cross-origin iframe — handled via network injection');
+                    }
+                });
+
+                // Watch for dynamically added videos in top frame
+                new MutationObserver(function(mutations) {
+                    mutations.forEach(function(m) {
+                        m.addedNodes.forEach(function(node) {
+                            if (node.nodeName === 'VIDEO') forcePlayAndUnmute(node);
+                            if (node.querySelectorAll) processVideos(node);
+                        });
+                    });
+                }).observe(document.body, { childList: true, subtree: true });
+
+                // Retry loop — clears itself after 10 iterations
+                var retryCount = 0;
+                var retryInterval = setInterval(function() {
+                    processVideos(document);
+                    if (++retryCount >= 10) clearInterval(retryInterval);
+                }, 1000);
+
+                window.__videoControllerInterval = retryInterval;
             })();
         """.trimIndent()
         webView.evaluateJavascript(jsCode, null)
+    }
+
+    /**
+     * FIX: Intercepts every HTML response (including nested iframes) and injects
+     * the autoplay/unmute script directly into that frame's <head>.
+     *
+     * This is the only approach that reliably reaches videos inside cross-origin
+     * iframes, because the script executes in the iframe's own origin context.
+     *
+     * Falls back gracefully (returns null) on any network or parse error so the
+     * WebView loads the page normally.
+     */
+    private fun tryInjectAutoplayScript(
+        url: String,
+        headers: Map<String, String>?
+    ): WebResourceResponse? {
+        return try {
+            val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+            connection.connectTimeout = 5000
+            connection.readTimeout = 8000
+            // Forward the original request headers so the server doesn't reject us
+            headers?.forEach { (k, v) ->
+                try { connection.setRequestProperty(k, v) } catch (e: Exception) { /* skip restricted headers */ }
+            }
+            connection.connect()
+
+            val contentType = connection.contentType ?: return null
+            if (!contentType.contains("html", ignoreCase = true)) return null
+
+            val charset = Regex("charset=([\\w-]+)")
+                .find(contentType)?.groupValues?.get(1) ?: "UTF-8"
+
+            val originalHtml = connection.inputStream.bufferedReader(
+                charset(charset)
+            ).readText()
+
+            val autoplayScript = """
+                <script>
+                (function() {
+                    function unlock(v) {
+                        try {
+                            v.muted = true;
+                            var p = v.play();
+                            if (p && p.then) {
+                                p.then(function() {
+                                    setTimeout(function() {
+                                        try { v.muted = false; v.volume = 1; } catch(e) {}
+                                    }, 800);
+                                }).catch(function(e) {
+                                    console.warn('[AutoplayInject] play() blocked:', e.message);
+                                });
+                            } else {
+                                setTimeout(function() {
+                                    try { v.muted = false; v.volume = 1; } catch(e) {}
+                                }, 800);
+                            }
+                        } catch(e) {}
+                    }
+                    function scan(root) {
+                        try { (root || document).querySelectorAll('video').forEach(unlock); } catch(e) {}
+                    }
+                    new MutationObserver(function() { scan(document); })
+                        .observe(document.documentElement, { childList: true, subtree: true });
+                    document.addEventListener('DOMContentLoaded', function() { scan(document); });
+                    setTimeout(function() { scan(document); }, 500);
+                    setTimeout(function() { scan(document); }, 2000);
+                    setTimeout(function() { scan(document); }, 4000);
+                })();
+                </script>
+            """.trimIndent()
+
+            val injected = when {
+                originalHtml.contains("</head>", ignoreCase = true) ->
+                    originalHtml.replace("</head>", "$autoplayScript</head>", ignoreCase = true)
+                originalHtml.contains("<body", ignoreCase = true) ->
+                    originalHtml.replace(
+                        Regex("<body", RegexOption.IGNORE_CASE),
+                        "$autoplayScript<body"
+                    )
+                else -> autoplayScript + originalHtml
+            }
+
+            WebResourceResponse(
+                "text/html",
+                charset,
+                injected.byteInputStream(charset(charset))
+            )
+        } catch (e: Exception) {
+            android.util.Log.w(TAG, "[AutoplayInject] Failed for $url: ${e.message}")
+            null // Graceful fallback — WebView loads the URL normally
+        }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -396,9 +558,13 @@ class SchedulePlayerActivity : ComponentActivity() {
                 builtInZoomControls = false
                 displayZoomControls = false
                 setSupportZoom(false)
-                setSupportMultipleWindows(true)
+                // FIX: setSupportMultipleWindows(false) prevents popup-style players
+                // that open a new window and break the autoplay context
+                setSupportMultipleWindows(false)
                 javaScriptCanOpenWindowsAutomatically = false
-                mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                // FIX: disable cache so stale player configs don't interfere
+                cacheMode = WebSettings.LOAD_NO_CACHE
             }
 
             isHorizontalScrollBarEnabled = false
@@ -413,33 +579,47 @@ class SchedulePlayerActivity : ComponentActivity() {
             }
 
             webViewClient = object : android.webkit.WebViewClient() {
-                
+
                 override fun shouldInterceptRequest(
                     view: android.webkit.WebView?,
                     request: android.webkit.WebResourceRequest?
-                ): android.webkit.WebResourceResponse? {
-                    val url = request?.url?.toString() ?: return super.shouldInterceptRequest(view, request)
+                ): WebResourceResponse? {
+                    val url = request?.url?.toString()
+                        ?: return super.shouldInterceptRequest(view, request)
                     val headers = request.requestHeaders
 
+                    // ── Stream Sniffer ────────────────────────────────────────────
                     if (!isStreamSniffed) {
-                        // 1. Master Catch-All Stream Sniffer
-                        val isKnownExtension = url.contains(".m3u8") || 
-                                               url.contains(".mpd") || 
-                                               url.contains("master.m3u8") || 
-                                               url.contains("playlist.m3u8")
+                        val isKnownExtension = url.contains(".m3u8") ||
+                                url.contains(".mpd") ||
+                                url.contains("master.m3u8") ||
+                                url.contains("playlist.m3u8")
 
-                        // Prevent false positives on js/css files
-                        val isMediaChunk = url.contains("chunk") && !url.endsWith(".js") && !url.endsWith(".css")
+                        val isMediaChunk = url.contains("chunk") &&
+                                !url.endsWith(".js") &&
+                                !url.endsWith(".css")
 
-                        // 2. Catch Stream Headers
                         val acceptHeader = headers?.get("Accept") ?: ""
-                        val isVideoRequest = acceptHeader.contains("video/") || 
-                                             acceptHeader.contains("application/x-mpegURL") || 
-                                             acceptHeader.contains("application/dash+xml")
+                        val isVideoRequest = acceptHeader.contains("video/") ||
+                                acceptHeader.contains("application/x-mpegURL") ||
+                                acceptHeader.contains("application/dash+xml")
 
                         if (isKnownExtension || isMediaChunk || isVideoRequest) {
                             handleSniffedStream(url)
+                            // Return null so the WebView still loads the resource normally
+                            // while ExoPlayer takes over — avoids a blank screen flash
+                            return null
                         }
+                    }
+
+                    // ── Autoplay Injection ────────────────────────────────────────
+                    // FIX: intercept every HTML response and inject the autoplay script
+                    // directly into that frame's DOM — the only reliable way to reach
+                    // videos inside cross-origin nested iframes.
+                    val acceptHeader = headers?.get("Accept") ?: ""
+                    if (acceptHeader.contains("text/html")) {
+                        val injected = tryInjectAutoplayScript(url, headers)
+                        if (injected != null) return injected
                     }
 
                     return super.shouldInterceptRequest(view, request)
@@ -449,7 +629,7 @@ class SchedulePlayerActivity : ComponentActivity() {
                     super.onPageFinished(view, url)
                     android.util.Log.i(TAG, "[WebView] Page finished: $url")
 
-                    // Inject CSS to hide ads
+                    // Inject CSS to suppress common ad overlays
                     view?.evaluateJavascript("""
                         (function() {
                             var style = document.createElement('style');
@@ -458,9 +638,10 @@ class SchedulePlayerActivity : ComponentActivity() {
                         })();
                     """.trimIndent(), null)
 
+                    // Top-frame JS injection as a complementary fallback
                     injectVideoVolumeController()
 
-                    // 3. Edge Case: JavaScript Blob Streams (XHR/Fetch Interceptor)
+                    // Fetch/XHR interceptor for blob/dynamic streams
                     val blobSnifferJs = """
                         (function() {
                             console.log('[StreamSniffer] Injecting Fetch/XHR interceptors...');
@@ -509,13 +690,16 @@ class SchedulePlayerActivity : ComponentActivity() {
             }
 
             webChromeClient = object : android.webkit.WebChromeClient() {
-                override fun onProgressChanged(view: android.webkit.WebView?, newProgress: Int) {
+                override fun onProgressChanged(
+                    view: android.webkit.WebView?,
+                    newProgress: Int
+                ) {
                     super.onProgressChanged(view, newProgress)
                 }
             }
         }
 
-        // Set up JavaScript interface for showing toasts and catching blob streams
+        // JavaScript interface for toast messages and blob stream sniffing
         webView.addJavascriptInterface(object {
             @JavascriptInterface
             fun showToast(message: String) {
@@ -545,6 +729,9 @@ class SchedulePlayerActivity : ComponentActivity() {
                 topMargin = 0
             }
             setContent {
+                // FIX: playerOptions and selectedPlayerIndex are now mutableStateOf,
+                // so reading them here automatically subscribes to their changes
+                // and triggers recomposition when switchToPlayer() updates them.
                 val topBarVisible by isTopBarVisible
                 MaterialTheme {
                     AnimatedVisibility(
@@ -596,38 +783,64 @@ class SchedulePlayerActivity : ComponentActivity() {
         scheduleTopBarHide()
     }
 
+    /**
+     * FIX: Updates selectedPlayerIndex and playerOptions together, keeping isActive in sync.
+     * Previously, isActive flags on PlayerOption were never updated when switching sources,
+     * causing the "active" concept to diverge from selectedPlayerIndex.
+     */
     private fun switchToPlayer(index: Int) {
         if (index in playerOptions.indices) {
-            isStreamSniffed = false // Reset sniffer for new source
+            isStreamSniffed = false
             selectedPlayerIndex = index
+            // FIX: rebuild the list with the correct isActive flags
+            playerOptions = playerOptions.mapIndexed { i, option ->
+                option.copy(isActive = i == index)
+            }
             val player = playerOptions[index]
             currentIframeHtml = generateIframeHtml(player.url)
             loadCurrentStream()
-            Toast.makeText(this, "Switched to: Player ${player.playerNumber}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                this,
+                "Switched to: Player ${player.playerNumber}",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
     private fun tryNextPlayer() {
         if (playerOptions.size > 1) {
             val nextIndex = (selectedPlayerIndex + 1) % playerOptions.size
-            Toast.makeText(this, "Stream failed. Trying: Player ${playerOptions[nextIndex].playerNumber}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                this,
+                "Stream failed. Trying: Player ${playerOptions[nextIndex].playerNumber}",
+                Toast.LENGTH_SHORT
+            ).show()
             switchToPlayer(nextIndex)
         }
     }
 
     private fun tryNextStreamUrl() {
         if (iframeUrls.size > 1) {
-            isStreamSniffed = false // Reset sniffer for new source
+            isStreamSniffed = false
             val nextIndex = (selectedPlayerIndex + 1) % iframeUrls.size
-            Toast.makeText(this, "Stream failed. Trying: Player ${nextIndex + 1}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                this,
+                "Stream failed. Trying: Player ${nextIndex + 1}",
+                Toast.LENGTH_SHORT
+            ).show()
             selectedPlayerIndex = nextIndex
+            // FIX: keep playerOptions isActive in sync here too
+            playerOptions = playerOptions.mapIndexed { i, option ->
+                option.copy(isActive = i == nextIndex)
+            }
             currentIframeHtml = generateIframeHtml(iframeUrls[nextIndex])
             loadCurrentStream()
         }
     }
 
     private fun detectDeviceType() {
-        val uiModeManager = getSystemService(android.content.Context.UI_MODE_SERVICE) as android.app.UiModeManager
+        val uiModeManager =
+            getSystemService(android.content.Context.UI_MODE_SERVICE) as android.app.UiModeManager
         if (uiModeManager.currentModeType != android.content.res.Configuration.UI_MODE_TYPE_TELEVISION) {
             isCursorDisabled = true
         }
@@ -636,7 +849,8 @@ class SchedulePlayerActivity : ComponentActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     private fun createWebView(context: android.content.Context): android.webkit.WebView {
         val webView = android.webkit.WebView(context)
-        val isHardwareAccelerated = context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_HARDWARE_ACCELERATED != 0
+        val isHardwareAccelerated =
+            context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_HARDWARE_ACCELERATED != 0
 
         if (isHardwareAccelerated) {
             webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
@@ -686,10 +900,16 @@ class SchedulePlayerActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        // Clear JS interval before destroying WebView
         if (::webView.isInitialized) {
-            webView.evaluateJavascript("if(window.__videoControllerInterval) clearInterval(window.__videoControllerInterval);", null)
+            try {
+                webView.evaluateJavascript(
+                    "if(window.__videoControllerInterval) clearInterval(window.__videoControllerInterval);",
+                    null
+                )
+            } catch (e: Exception) { /* ignore — WebView may already be paused */ }
         }
-        
+
         cursorHideHandler.removeCallbacks(cursorHideRunnable)
         topBarHideHandler.removeCallbacks(topBarHideRunnable)
 
@@ -777,13 +997,14 @@ class SchedulePlayerActivity : ComponentActivity() {
     }
 
     private fun isDpadKey(event: KeyEvent): Boolean {
-        return event.source and android.view.InputDevice.SOURCE_DPAD == android.view.InputDevice.SOURCE_DPAD ||
+        return event.source and android.view.InputDevice.SOURCE_DPAD ==
+                android.view.InputDevice.SOURCE_DPAD ||
                 event.keyCode in listOf(
-            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
-            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
-            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
-            KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS
-        )
+                    KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+                    KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+                    KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
+                    KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS
+                )
     }
 
     private fun isDpadKeyCode(keyCode: Int): Boolean {
@@ -807,8 +1028,14 @@ class SchedulePlayerActivity : ComponentActivity() {
         val downTime = android.os.SystemClock.uptimeMillis()
         val eventTime = android.os.SystemClock.uptimeMillis()
 
-        val downEvent = android.view.MotionEvent.obtain(downTime, eventTime, android.view.MotionEvent.ACTION_DOWN, x, y, 0)
-        val upEvent = android.view.MotionEvent.obtain(downTime, eventTime + 100, android.view.MotionEvent.ACTION_UP, x, y, 0)
+        val downEvent = android.view.MotionEvent.obtain(
+            downTime, eventTime,
+            android.view.MotionEvent.ACTION_DOWN, x, y, 0
+        )
+        val upEvent = android.view.MotionEvent.obtain(
+            downTime, eventTime + 100,
+            android.view.MotionEvent.ACTION_UP, x, y, 0
+        )
 
         downEvent.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
         upEvent.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
@@ -823,6 +1050,7 @@ class SchedulePlayerActivity : ComponentActivity() {
     private fun showCursorAndResetTimer() {
         isTopBarVisible.value = true
         topBarHideHandler.removeCallbacks(topBarHideRunnable)
+        topBarHideHandler.postDelayed(topBarHideRunnable, TOPBAR_HIDE_DELAY_MS)
 
         if (isCursorDisabled) {
             cursorHideHandler.removeCallbacks(cursorHideRunnable)
@@ -933,7 +1161,7 @@ private fun BackButton(
     onBackPressed: () -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
-    
+
     Surface(
         modifier = Modifier
             .focusable()
@@ -947,7 +1175,9 @@ private fun BackButton(
             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
             contentDescription = "Back",
             tint = if (isFocused) Color(0xFF448AFF) else Color.White,
-            modifier = Modifier.padding(8.dp).size(24.dp)
+            modifier = Modifier
+                .padding(8.dp)
+                .size(24.dp)
         )
     }
 }
@@ -962,20 +1192,20 @@ private fun PlayerOptionButton(
 
     val backgroundColor = when {
         isSelected -> Color(0xFF2196F3)
-        isFocused -> Color(0xFF2D2D2D)
-        else -> Color(0xFF1A1A1A)
+        isFocused  -> Color(0xFF2D2D2D)
+        else       -> Color(0xFF1A1A1A)
     }
 
     val textColor = when {
         isSelected -> Color.White
-        isFocused -> Color(0xFF448AFF)
-        else -> Color(0xFFE0E0E0)
+        isFocused  -> Color(0xFF448AFF)
+        else       -> Color(0xFFE0E0E0)
     }
 
     val borderColor = when {
         isSelected -> Color(0xFFFF1744)
-        isFocused -> Color(0xFF448AFF)
-        else -> Color(0xFF404040)
+        isFocused  -> Color(0xFF448AFF)
+        else       -> Color(0xFF404040)
     }
 
     Surface(
