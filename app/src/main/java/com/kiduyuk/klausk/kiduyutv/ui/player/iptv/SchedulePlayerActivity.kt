@@ -74,6 +74,10 @@ class SchedulePlayerActivity : ComponentActivity() {
     private var selectedPlayerIndex: Int = 0
     private var channelWatchPage: ChannelWatchPage? = null
 
+    // Direct iframe URLs passed from scraped channels
+    private var iframeUrls: List<String> = emptyList()
+    private var hasDirectIframeUrls: Boolean = false
+
     // UI State
     private var isTopBarVisible = true
 
@@ -85,15 +89,17 @@ class SchedulePlayerActivity : ComponentActivity() {
         const val EXTRA_CHANNEL_NAME = "CHANNEL_NAME"
         const val EXTRA_EVENT_TITLE = "EVENT_TITLE"
         const val EXTRA_SELECTED_PLAYER = "SELECTED_PLAYER"
+        const val EXTRA_IFRAME_URLS = "IFRAME_URLS"
 
         /**
          * Creates an intent to launch the SchedulePlayerActivity
-         * Uses ChannelWatchPage for handling multiple streams
+         * Uses iframeUrls list for playing multiple stream options
          *
          * @param context Application context
-         * @param channelId The channel ID to fetch watch page
+         * @param channelId The channel ID (for reference)
          * @param channelName Display name for the channel
          * @param eventTitle Display name for the current event
+         * @param iframeUrls List of iframe URLs for different stream players
          * @param selectedPlayerIndex Initial player index to select
          */
         fun createIntent(
@@ -101,12 +107,14 @@ class SchedulePlayerActivity : ComponentActivity() {
             channelId: String,
             channelName: String,
             eventTitle: String,
+            iframeUrls: List<String> = emptyList(),
             selectedPlayerIndex: Int = 0
         ) = android.content.Intent(context, SchedulePlayerActivity::class.java).apply {
             putExtra(EXTRA_CHANNEL_ID, channelId)
             putExtra(EXTRA_CHANNEL_NAME, channelName)
             putExtra(EXTRA_EVENT_TITLE, eventTitle)
             putExtra(EXTRA_SELECTED_PLAYER, selectedPlayerIndex)
+            putStringArrayListExtra(EXTRA_IFRAME_URLS, ArrayList(iframeUrls))
         }
     }
 
@@ -139,14 +147,29 @@ class SchedulePlayerActivity : ComponentActivity() {
         eventTitle = intent.getStringExtra(EXTRA_EVENT_TITLE) ?: "Event"
         selectedPlayerIndex = intent.getIntExtra(EXTRA_SELECTED_PLAYER, 0)
 
-        if (channelId.isEmpty()) {
-            Toast.makeText(this, "No channel ID provided", Toast.LENGTH_LONG).show()
+        // Get iframe URLs passed directly from scraped channels
+        val passedIframeUrls = intent.getStringArrayListExtra(EXTRA_IFRAME_URLS)
+        if (!passedIframeUrls.isNullOrEmpty()) {
+            iframeUrls = passedIframeUrls
+            hasDirectIframeUrls = true
+            android.util.Log.i(TAG, "Received ${iframeUrls.size} iframe URLs from intent")
+        }
+
+        if (channelId.isEmpty() && iframeUrls.isEmpty()) {
+            Toast.makeText(this, "No channel ID or stream URLs provided", Toast.LENGTH_LONG).show()
             finish()
             return
         }
 
         // Detect device type
         detectDeviceType()
+
+        // Handle back press
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                showExitConfirmationDialog()
+            }
+        })
 
         // Setup layout with Compose top bar
         setupLayout()
@@ -158,8 +181,14 @@ class SchedulePlayerActivity : ComponentActivity() {
             }
         })
 
-        // Fetch ChannelWatchPage with player options
-        fetchChannelWatchPage(channelId)
+        // Use direct iframe URLs if available, otherwise fetch from channel page
+        if (hasDirectIframeUrls) {
+            // Use the passed iframe URLs directly
+            setupWithDirectIframeUrls()
+        } else {
+            // Fetch ChannelWatchPage with player options
+            fetchChannelWatchPage(channelId)
+        }
     }
 
     /**
@@ -209,6 +238,90 @@ class SchedulePlayerActivity : ComponentActivity() {
                 }
             )
         }
+    }
+
+    /**
+     * Loads the current stream into WebView
+     */
+    private fun loadCurrentStream() {
+        currentIframeHtml?.let { html ->
+            if (::webView.isInitialized) {
+                webView.loadDataWithBaseURL(
+                    "https://dlhd.pk",
+                    html,
+                    "text/html",
+                    "UTF-8",
+                    null
+                )
+            }
+        }
+    }
+
+    /**
+     * Sets up the player with direct iframe URLs passed from scraped channels
+     * Shows toast with total number of iframes and loads the first one
+     */
+    private fun setupWithDirectIframeUrls() {
+        if (iframeUrls.isEmpty()) {
+            Toast.makeText(this, "No stream URLs available", Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
+
+        // Show toast with total number of iframes
+        val totalIframes = iframeUrls.size
+        Toast.makeText(
+            this,
+            "$totalIframes stream option(s) available for $channelName",
+            Toast.LENGTH_LONG
+        ).show()
+
+        android.util.Log.i(TAG, "Setting up with $totalIframes direct iframe URLs")
+
+        // Convert iframe URLs to PlayerOptions
+        playerOptions = iframeUrls.mapIndexed { index, url ->
+            PlayerOption(
+                playerNumber = index + 1,
+                url = url,
+                isActive = index == selectedPlayerIndex
+            )
+        }
+
+        // Ensure selected index is valid
+        if (selectedPlayerIndex >= playerOptions.size) {
+            selectedPlayerIndex = 0
+        }
+
+        // Load the first iframe
+        if (iframeUrls.isNotEmpty()) {
+            currentIframeHtml = generateIframeHtml(iframeUrls[selectedPlayerIndex])
+            loadCurrentStream()
+        }
+
+        // Update top bar with player options
+        updateTopBar()
+    }
+
+    /**
+     * Generates iframe HTML for the given stream URL
+     */
+    private fun generateIframeHtml(streamUrl: String): String {
+        return """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
+                    iframe { width: 100%; height: 100%; border: 0; }
+                </style>
+            </head>
+            <body>
+                <iframe src="$streamUrl" allowfullscreen frameborder="0"></iframe>
+            </body>
+            </html>
+        """.trimIndent()
     }
 
     /**
@@ -307,8 +420,12 @@ class SchedulePlayerActivity : ComponentActivity() {
                     super.onReceivedError(view, request, error)
                     if (request?.isForMainFrame == true) {
                         android.util.Log.e(TAG, "[WebView] Error: ${error?.description}")
-                        // Try next player if current fails
-                        tryNextPlayer()
+                        // Try next player/stream if current fails
+                        if (hasDirectIframeUrls) {
+                            tryNextStreamUrl()
+                        } else {
+                            tryNextPlayer()
+                        }
                     }
                 }
             }
@@ -398,8 +515,7 @@ class SchedulePlayerActivity : ComponentActivity() {
         if (index in playerOptions.indices) {
             selectedPlayerIndex = index
             val player = playerOptions[index]
-            currentIframeHtml = ScheduleRepository.getInstance()
-                .generateIframeHtml(player.url)
+            currentIframeHtml = generateIframeHtml(player.url)
             loadCurrentStream()
             Toast.makeText(
                 this,
@@ -421,6 +537,23 @@ class SchedulePlayerActivity : ComponentActivity() {
                 Toast.LENGTH_SHORT
             ).show()
             switchToPlayer(nextIndex)
+        }
+    }
+
+    /**
+     * Tries to load the next available stream URL (for direct iframe URLs)
+     */
+    private fun tryNextStreamUrl() {
+        if (iframeUrls.size > 1) {
+            val nextIndex = (selectedPlayerIndex + 1) % iframeUrls.size
+            Toast.makeText(
+                this,
+                "Stream failed. Trying: Player ${nextIndex + 1}",
+                Toast.LENGTH_SHORT
+            ).show()
+            selectedPlayerIndex = nextIndex
+            currentIframeHtml = generateIframeHtml(iframeUrls[nextIndex])
+            loadCurrentStream()
         }
     }
 
