@@ -13,6 +13,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -21,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -796,15 +798,16 @@ private fun BackButton(
             .focusable(interactionSource = interactionSource)
             .clickable(
                 interactionSource = interactionSource,
-                indication = null,
-                onClick = onBackPressed
-            ),
+                indication = null
+            ) {
+                onBackPressed()
+            },
         shape = RoundedCornerShape(8.dp),
         color = if (isFocused) Color(0xFF424242) else Color.Transparent,
         border = if (isFocused) androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF448AFF)) else null
     ) {
         Icon(
-            imageVector = Icons.Default.ArrowBack,
+            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
             contentDescription = "Back",
             tint = if (isFocused) Color(0xFF448AFF) else Color.White,
             modifier = Modifier
@@ -858,14 +861,14 @@ private fun PlayerOptionButton(
                 }
             )
             .focusable(
-                interactionSource = interactionSource,
-                indication = null
+                interactionSource = interactionSource
             )
             .clickable(
                 interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick
-            ),
+                indication = null
+            ) {
+                onClick()
+            },
         shape = RoundedCornerShape(8.dp),
         color = backgroundColor,
         border = androidx.compose.foundation.BorderStroke(2.dp, borderColor)
