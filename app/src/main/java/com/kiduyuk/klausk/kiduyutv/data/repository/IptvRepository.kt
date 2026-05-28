@@ -28,9 +28,9 @@ class IptvRepository(
     companion object {
         // ============================================================
         // PLAYLIST_URL: M3U format IPTV playlist containing channel list
-        // Source: JulioCesarXY/EPG-LG-Channels (US TV channels)
+        // Source: abusaeeidx/IPTV-Scraper-Zilla (Combined IPTV Playlist)
         // ============================================================
-        const val PLAYLIST_URL = "https://raw.githubusercontent.com/JulioCesarXY/EPG-LG-Channels/refs/heads/main/lg_channels_us.m3u"
+        const val PLAYLIST_URL = "https://raw.githubusercontent.com/abusaeeidx/IPTV-Scraper-Zilla/main/combined-playlist.m3u"
 
         // ============================================================
         // PLAYLIST_EPG_URL: XMLTV format guide data for channel programs
