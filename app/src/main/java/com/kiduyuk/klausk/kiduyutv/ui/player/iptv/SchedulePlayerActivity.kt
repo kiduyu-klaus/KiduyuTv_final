@@ -23,6 +23,7 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -81,7 +82,7 @@ class SchedulePlayerActivity : ComponentActivity() {
     private var iframeUrls: List<String> = emptyList()
     private var hasDirectIframeUrls: Boolean = false
 
-    // UI State — backed by Compose state so the UI reacts to changes
+    // UI State â€” backed by Compose state so the UI reacts to changes
     private val isTopBarVisible = mutableStateOf(true)
 
     companion object {
@@ -121,7 +122,7 @@ class SchedulePlayerActivity : ComponentActivity() {
         }
     }
 
-    // Unified idle timer — hides both cursor and top bar
+    // Unified idle timer â€” hides both cursor and top bar
     private val cursorHideHandler = Handler(Looper.getMainLooper())
     private val cursorHideRunnable = Runnable {
         if (!isCursorDisabled && isCursorVisible) {
@@ -403,7 +404,7 @@ class SchedulePlayerActivity : ComponentActivity() {
                                             v.muted = false;
                                             if (v.paused) {
                                                 v.play().catch(function(e) {
-                                                    // Autoplay blocked — try muted first then unmute
+                                                    // Autoplay blocked â€” try muted first then unmute
                                                     v.muted = true;
                                                     v.play().then(function() {
                                                         v.muted = false;
@@ -626,7 +627,7 @@ class SchedulePlayerActivity : ComponentActivity() {
         ).show()
     }
 
-    // ── Top bar visibility ────────────────────────────────────────────────────
+    // â”€â”€ Top bar visibility â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     private fun showTopBar() {
         isTopBarVisible.value = true
@@ -648,7 +649,7 @@ class SchedulePlayerActivity : ComponentActivity() {
         topBarHideHandler.postDelayed(topBarHideRunnable, TOPBAR_HIDE_DELAY_MS)
     }
 
-    // ── Lifecycle ─────────────────────────────────────────────────────────────
+    // â”€â”€ Lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     override fun onResume() {
         super.onResume()
@@ -692,10 +693,10 @@ class SchedulePlayerActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    // ── D-pad input ───────────────────────────────────────────────────────────
+    // â”€â”€ D-pad input â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
-        // Track dpad navigation activity — unified into showCursorAndResetTimer
+        // Track dpad navigation activity â€” unified into showCursorAndResetTimer
         if (isDpadKey(event)) {
             isDpadNavigating = true
             showCursorAndResetTimer()
@@ -785,7 +786,7 @@ class SchedulePlayerActivity : ComponentActivity() {
         )
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     private fun updateCursorPosition() {
         if (isCursorDisabled) return
@@ -813,7 +814,7 @@ class SchedulePlayerActivity : ComponentActivity() {
     }
 
     /**
-     * Unified idle timer reset — shows both cursor and top bar, then hides both after 5 seconds.
+     * Unified idle timer reset â€” shows both cursor and top bar, then hides both after 5 seconds.
      * Works on TV (cursor + top bar) and non-TV (top bar only) devices.
      */
     private fun showCursorAndResetTimer() {
@@ -838,7 +839,7 @@ class SchedulePlayerActivity : ComponentActivity() {
 }
 
 // ============================================================================
-// COMPOSE — Player Source Selection Top Bar
+// COMPOSE â€” Player Source Selection Top Bar
 // ============================================================================
 
 /**
@@ -964,7 +965,7 @@ private fun BackButton(
             .clickable { onBackPressed() },
         shape = RoundedCornerShape(8.dp),
         color = if (isFocused) Color(0xFF424242) else Color.Transparent,
-        border = if (isFocused) border(1.dp, Color(0xFF448AFF), RoundedCornerShape(8.dp)) else null
+        border = if (isFocused) BorderStroke(1.dp, Color(0xFF448AFF)) else null
     ) {
         Icon(
             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -1018,7 +1019,7 @@ private fun PlayerOptionButton(
             .clickable { onClick() },
         shape = RoundedCornerShape(8.dp),
         color = backgroundColor,
-        border = border(2.dp, borderColor, RoundedCornerShape(8.dp))
+        border = BorderStroke(2.dp, borderColor)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
