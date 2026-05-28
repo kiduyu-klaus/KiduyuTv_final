@@ -61,6 +61,19 @@
         </LinearLayout>
 
         <ImageButton
+            android:id="@+id/btnPlaylist"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="8dp"
+            android:background="@drawable/selector_button_tv"
+            android:contentDescription="EPG / Program guide"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:nextFocusDown="@id/btnFill"
+            android:src="@drawable/ic_menu"
+            app:tint="#FFFFFF" />
+
+        <ImageButton
             android:id="@+id/btnInfo"
             android:layout_width="40dp"
             android:layout_height="40dp"
@@ -146,20 +159,6 @@
                 android:focusable="true"
                 android:focusableInTouchMode="true"
                 android:src="@drawable/ic_chevron_right"
-                app:tint="#FFFFFF" />
-
-            <!-- Channel List – below next button -->
-            <ImageButton
-                android:id="@+id/btnPlaylist"
-                android:layout_width="60dp"
-                android:layout_height="60dp"
-                android:layout_gravity="center"
-                android:layout_marginTop="80dp"
-                android:background="@drawable/selector_button_tv"
-                android:contentDescription="Channel list"
-                android:focusable="true"
-                android:focusableInTouchMode="true"
-                android:src="@drawable/ic_menu"
                 app:tint="#FFFFFF" />
 
             <!-- ── BOTTOM STRIP inside video ── -->
@@ -305,3 +304,4 @@
     </FrameLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
+

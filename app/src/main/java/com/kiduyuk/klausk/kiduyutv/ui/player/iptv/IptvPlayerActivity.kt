@@ -56,6 +56,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import androidx.media3.ui.SubtitleView
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.data.model.ChannelProgramInfo
 import com.kiduyuk.klausk.kiduyutv.data.model.IptvChannel
@@ -169,6 +170,9 @@ class IptvPlayerActivity : AppCompatActivity() {
     private var isFillMode       = true
     private var isMuted = false
 
+    // D-pad navigation tracking for keeping controls visible
+    private var isDpadNavigating = false
+
     // Compose dialog overlay (track selector or any other sheet)
     private var composeDialogView: ComposeView? = null
 
@@ -191,6 +195,14 @@ class IptvPlayerActivity : AppCompatActivity() {
             programUpdateHandler.postDelayed(this, PROGRAM_UPDATE_MS)
         }
     }
+
+    // D-pad navigation tracking
+    private var isDpadNavigating = false
+    private val dpadTimeoutHandler = Handler(Looper.getMainLooper())
+    private val dpadTimeoutRunnable = Runnable {
+        isDpadNavigating = false
+    }
+    private val DPAD_TIMEOUT_MS = 3000L // Reset dpad state after 3 seconds of inactivity
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
 
@@ -272,6 +284,21 @@ class IptvPlayerActivity : AppCompatActivity() {
     // ── Hardware key routing ─────────────────────────────────────────────────
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // Track dpad navigation activity
+        if (isDpadKey(event)) {
+            isDpadNavigating = true
+            // Cancel any pending hide and show overlay
+            hideHandler.removeCallbacks(hideRunnable)
+            if (!isOverlayVisible) {
+                showOverlay()
+            }
+            // Reset the timeout
+            dpadTimeoutHandler.removeCallbacks(dpadTimeoutRunnable)
+            dpadTimeoutHandler.postDelayed(dpadTimeoutRunnable, DPAD_TIMEOUT_MS)
+            // Reset hide timer to 5 seconds
+            scheduleHideOverlay()
+        }
+
         if (event.action == KeyEvent.ACTION_DOWN) {
             when (event.keyCode) {
                 KeyEvent.KEYCODE_MENU,
@@ -288,8 +315,40 @@ class IptvPlayerActivity : AppCompatActivity() {
         return super.dispatchKeyEvent(event)
     }
 
+    /**
+     * Checks if the key event is from a d-pad button.
+     */
+    private fun isDpadKey(event: KeyEvent): Boolean {
+        return event.source and android.view.InputDevice.SOURCE_DPAD == android.view.InputDevice.SOURCE_DPAD ||
+                event.keyCode in listOf(
+                    KeyEvent.KEYCODE_DPAD_UP,
+                    KeyEvent.KEYCODE_DPAD_DOWN,
+                    KeyEvent.KEYCODE_DPAD_LEFT,
+                    KeyEvent.KEYCODE_DPAD_RIGHT,
+                    KeyEvent.KEYCODE_DPAD_CENTER,
+                    KeyEvent.KEYCODE_ENTER,
+                    KeyEvent.KEYCODE_MENU,
+                    KeyEvent.KEYCODE_SETTINGS
+                )
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (event == null) return super.onKeyDown(keyCode, event)
+
+        // Track dpad navigation and show controls
+        if (isDpadKeyCode(keyCode)) {
+            isDpadNavigating = true
+            // Cancel any pending hide and show overlay
+            hideHandler.removeCallbacks(hideRunnable)
+            if (!isOverlayVisible) {
+                showOverlay()
+            }
+            // Reset the timeout
+            dpadTimeoutHandler.removeCallbacks(dpadTimeoutRunnable)
+            dpadTimeoutHandler.postDelayed(dpadTimeoutRunnable, DPAD_TIMEOUT_MS)
+            // Reset hide timer to 5 seconds
+            scheduleHideOverlay()
+        }
 
         when (keyCode) {
             // ── Show/Hide Controls ──────────────────────────────────────────────
@@ -333,6 +392,22 @@ class IptvPlayerActivity : AppCompatActivity() {
         }
 
         return super.onKeyDown(keyCode, event)
+    }
+
+    /**
+     * Checks if the key code is from a d-pad button.
+     */
+    private fun isDpadKeyCode(keyCode: Int): Boolean {
+        return keyCode in listOf(
+            KeyEvent.KEYCODE_DPAD_UP,
+            KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_DPAD_CENTER,
+            KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_MENU,
+            KeyEvent.KEYCODE_SETTINGS
+        )
     }
 
     /**
@@ -557,6 +632,14 @@ class IptvPlayerActivity : AppCompatActivity() {
             overlayControls.alpha = 1f
             return
         }
+
+        // Don't hide overlay if user is navigating with dpad
+        if (isDpadNavigating) {
+            // Just reset the hide timer
+            scheduleHideOverlay()
+            return
+        }
+
         isOverlayVisible = false
 
         // Hide top bar
@@ -574,7 +657,9 @@ class IptvPlayerActivity : AppCompatActivity() {
 
     private fun scheduleHideOverlay() {
         hideHandler.removeCallbacks(hideRunnable)
-        hideHandler.postDelayed(hideRunnable, OVERLAY_HIDE_DELAY_MS)
+        // When dpad navigating, use longer timeout (5 seconds as per user request)
+        val delay = if (isDpadNavigating) OVERLAY_HIDE_DELAY_MS else OVERLAY_HIDE_DELAY_MS
+        hideHandler.postDelayed(hideRunnable, delay)
     }
 
     private fun setOverlayChildrenVisibility(visibility: Int) {
@@ -756,6 +841,9 @@ class IptvPlayerActivity : AppCompatActivity() {
                 playerView.setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
                 playerView.resizeMode  = AspectRatioFrameLayout.RESIZE_MODE_FILL
 
+                // Configure subtitle styling (transparent background, center bottom, black text)
+                configureSubtitleStyling()
+
                 exo.setMediaItem(MediaItem.fromUri(Uri.parse(streamUrl)))
                 exo.playWhenReady = true
                 exo.addListener(playerListener)
@@ -789,6 +877,25 @@ class IptvPlayerActivity : AppCompatActivity() {
         player?.removeListener(playerListener)
         player?.release()
         player = null
+    }
+
+    /**
+     * Configures the subtitle view styling with:
+     * - Clear (transparent) background
+     * - Centered at bottom of video
+     * - Black text color
+     */
+    private fun configureSubtitleStyling() {
+        playerView.subtitleView?.apply {
+            // Set text size as fraction of video height (4%)
+            setFractionalTextSize(0.04f)
+            // Add padding from bottom (2% of video height)
+            setBottomPaddingFraction(0.02f)
+            // Set text color to black
+            setTextColor(android.graphics.Color.BLACK)
+            // Set text size in sp (16sp)
+            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 16f)
+        }
     }
 
     // ── Exit dialog ──────────────────────────────────────────────────────────
