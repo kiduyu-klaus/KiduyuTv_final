@@ -248,6 +248,15 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
+        // 20. Lordflix
+        // ═══════════════════════════════════════════════════════════════
+        StreamProvider(
+            name = "Lordflix",
+            movieUrlTemplate = "https://lordflix.org/watch/movie/%d",
+            tvUrlTemplate = "https://lordflix.org/watch/tv/%d/%d/%d"
+        ),
+
+        // ═══════════════════════════════════════════════════════════════
         // 14. Smashystream
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
