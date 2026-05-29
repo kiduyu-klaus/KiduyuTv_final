@@ -58,15 +58,6 @@ import kotlinx.coroutines.withContext
  * Takes an iframe HTML as intent extra and plays the scheduled channel in WebView
  * Includes a focusable row of player source options at the top for easy stream switching
  * Uses ChannelWatchPage and playerOptions for handling multiple streams
- *
- * Fixes applied:
- * - playerOptions and selectedPlayerIndex are now mutableStateOf so Compose reacts to changes
- * - lifecycleScope used instead of raw CoroutineScope to prevent coroutine leaks
- * - isDpadNavigating is reset to false after the auto-hide timer fires
- * - generateIframeHtml is consolidated (no more duplicate)
- * - PlayerOption.isActive flag is kept in sync when switching players
- * - Autoplay/unmute works via shouldInterceptRequest HTML injection into every iframe frame,
- *   bypassing cross-origin restrictions that defeat JS injection into the top frame
  */
 class SchedulePlayerActivity : ComponentActivity() {
 
@@ -83,9 +74,6 @@ class SchedulePlayerActivity : ComponentActivity() {
     private var currentIframeHtml: String? = null
     private var channelName: String = "Channel"
     private var eventTitle: String = "Channel"
-
-    // Prevent multiple activity launches when a stream is sniffed
-    private var isStreamSniffed = false
 
     // FIX: playerOptions and selectedPlayerIndex backed by mutableStateOf so
     // the Compose top bar recomposes automatically when these change.
@@ -186,38 +174,6 @@ class SchedulePlayerActivity : ComponentActivity() {
             setupWithDirectIframeUrls()
         } else {
             fetchChannelWatchPage(channelId)
-        }
-    }
-
-    /**
-     * Unified handler for successfully sniffing a stream.
-     * Routes the extracted URL to the native ExoPlayer and tears down the WebView.
-     */
-    private fun handleSniffedStream(streamUrl: String) {
-        if (isStreamSniffed) return
-        isStreamSniffed = true
-
-        android.util.Log.i(TAG, "[StreamSniffer] SUCCESS! Routing to native player: $streamUrl")
-
-        runOnUiThread {
-            Toast.makeText(this, "Stream detected! Launching native player...", Toast.LENGTH_SHORT).show()
-
-            val intent = IptvPlayerActivity.createIntent(
-                context = this@SchedulePlayerActivity,
-                channelName = channelName,
-                streamUrl = streamUrl,
-                channelLogo = null,
-                tvgId = intent.getStringExtra(EXTRA_CHANNEL_ID),
-                tvgName = eventTitle,
-                group = "Scheduled Events"
-            )
-
-            startActivity(intent)
-
-            if (::webView.isInitialized) {
-                webView.loadUrl("about:blank")
-            }
-            finish()
         }
     }
 
@@ -588,34 +544,8 @@ class SchedulePlayerActivity : ComponentActivity() {
                         ?: return super.shouldInterceptRequest(view, request)
                     val headers = request.requestHeaders
 
-                    // ── Stream Sniffer ────────────────────────────────────────────
-                    if (!isStreamSniffed) {
-                        val isKnownExtension = url.contains(".m3u8") ||
-                                url.contains(".mpd") ||
-                                url.contains("master.m3u8") ||
-                                url.contains("playlist.m3u8")
-
-                        val isMediaChunk = url.contains("chunk") &&
-                                !url.endsWith(".js") &&
-                                !url.endsWith(".css")
-
-                        val acceptHeader = headers?.get("Accept") ?: ""
-                        val isVideoRequest = acceptHeader.contains("video/") ||
-                                acceptHeader.contains("application/x-mpegURL") ||
-                                acceptHeader.contains("application/dash+xml")
-
-                        if (isKnownExtension || isMediaChunk || isVideoRequest) {
-                            handleSniffedStream(url)
-                            // Return null so the WebView still loads the resource normally
-                            // while ExoPlayer takes over — avoids a blank screen flash
-                            return null
-                        }
-                    }
-
-                    // ── Autoplay Injection ────────────────────────────────────────
-                    // FIX: intercept every HTML response and inject the autoplay script
-                    // directly into that frame's DOM — the only reliable way to reach
-                    // videos inside cross-origin nested iframes.
+                    // Inject autoplay/unmute script into every HTML frame response,
+                    // including cross-origin nested iframes.
                     val acceptHeader = headers?.get("Accept") ?: ""
                     if (acceptHeader.contains("text/html")) {
                         val injected = tryInjectAutoplayScript(url, headers)
@@ -640,36 +570,6 @@ class SchedulePlayerActivity : ComponentActivity() {
 
                     // Top-frame JS injection as a complementary fallback
                     injectVideoVolumeController()
-
-                    // Fetch/XHR interceptor for blob/dynamic streams
-                    val blobSnifferJs = """
-                        (function() {
-                            console.log('[StreamSniffer] Injecting Fetch/XHR interceptors...');
-
-                            const originalFetch = window.fetch;
-                            window.fetch = async function(...args) {
-                                const reqUrl = typeof args[0] === 'string' ? args[0] : args[0]?.url;
-                                if (reqUrl && (reqUrl.includes('.m3u8') || reqUrl.includes('.mpd'))) {
-                                    if (window.Android && window.Android.onStreamSniffed) {
-                                        window.Android.onStreamSniffed(reqUrl);
-                                    }
-                                }
-                                return originalFetch.apply(this, args);
-                            };
-
-                            const originalOpen = XMLHttpRequest.prototype.open;
-                            XMLHttpRequest.prototype.open = function(method, reqUrl) {
-                                if (reqUrl && (reqUrl.includes('.m3u8') || reqUrl.includes('.mpd'))) {
-                                    if (window.Android && window.Android.onStreamSniffed) {
-                                        window.Android.onStreamSniffed(reqUrl);
-                                    }
-                                }
-                                originalOpen.apply(this, arguments);
-                            };
-                        })();
-                    """.trimIndent()
-
-                    view?.evaluateJavascript(blobSnifferJs, null)
                 }
 
                 override fun onReceivedError(
@@ -699,18 +599,13 @@ class SchedulePlayerActivity : ComponentActivity() {
             }
         }
 
-        // JavaScript interface for toast messages and blob stream sniffing
+        // JavaScript interface for toast messages
         webView.addJavascriptInterface(object {
             @JavascriptInterface
             fun showToast(message: String) {
                 runOnUiThread {
                     Toast.makeText(this@SchedulePlayerActivity, message, Toast.LENGTH_LONG).show()
                 }
-            }
-
-            @JavascriptInterface
-            fun onStreamSniffed(url: String) {
-                handleSniffedStream(url)
             }
         }, "Android")
 
@@ -790,7 +685,6 @@ class SchedulePlayerActivity : ComponentActivity() {
      */
     private fun switchToPlayer(index: Int) {
         if (index in playerOptions.indices) {
-            isStreamSniffed = false
             selectedPlayerIndex = index
             // FIX: rebuild the list with the correct isActive flags
             playerOptions = playerOptions.mapIndexed { i, option ->
@@ -801,7 +695,7 @@ class SchedulePlayerActivity : ComponentActivity() {
             loadCurrentStream()
             Toast.makeText(
                 this,
-                "Switched to: Player ${player.playerNumber}",
+                "Switched to: Server ${player.playerNumber}",
                 Toast.LENGTH_SHORT
             ).show()
         }
@@ -812,7 +706,7 @@ class SchedulePlayerActivity : ComponentActivity() {
             val nextIndex = (selectedPlayerIndex + 1) % playerOptions.size
             Toast.makeText(
                 this,
-                "Stream failed. Trying: Player ${playerOptions[nextIndex].playerNumber}",
+                "Stream failed. Trying: Server ${playerOptions[nextIndex].playerNumber}",
                 Toast.LENGTH_SHORT
             ).show()
             switchToPlayer(nextIndex)
@@ -821,11 +715,10 @@ class SchedulePlayerActivity : ComponentActivity() {
 
     private fun tryNextStreamUrl() {
         if (iframeUrls.size > 1) {
-            isStreamSniffed = false
             val nextIndex = (selectedPlayerIndex + 1) % iframeUrls.size
             Toast.makeText(
                 this,
-                "Stream failed. Trying: Player ${nextIndex + 1}",
+                "Stream failed. Trying: Server ${nextIndex + 1}",
                 Toast.LENGTH_SHORT
             ).show()
             selectedPlayerIndex = nextIndex
@@ -1112,7 +1005,7 @@ fun PlayerSourceTopBar(
 
             if (playerOptions.isNotEmpty()) {
                 Text(
-                    text = "${playerOptions.size} Players",
+                    text = "${playerOptions.size} Servers",
                     color = Color(0xFF888888),
                     fontSize = 14.sp,
                     modifier = Modifier.padding(end = 8.dp)
@@ -1128,7 +1021,7 @@ fun PlayerSourceTopBar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Sources:",
+                    text = "Servers:",
                     color = Color(0xFF666666),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
@@ -1223,7 +1116,7 @@ private fun PlayerOptionButton(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = "P$playerNumber",
+                text = "Server $playerNumber",
                 color = textColor,
                 fontSize = 14.sp,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
