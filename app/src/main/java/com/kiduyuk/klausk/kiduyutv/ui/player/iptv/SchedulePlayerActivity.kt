@@ -89,6 +89,12 @@ class SchedulePlayerActivity : ComponentActivity() {
     // UI State — backed by Compose state so the UI reacts to changes
     private val isTopBarVisible = mutableStateOf(true)
 
+    // Stop re-injecting once autoplay/unmute has succeeded for the current stream.
+    // Both flags reset in switchToPlayer/tryNextStreamUrl so each new server gets
+    // a fresh injection pass.
+    private var isAutoplayInjected = false
+    private var isVolumeControllerInjected = false
+
     companion object {
         private const val TAG = "SchedulePlayer"
 
@@ -586,10 +592,15 @@ class SchedulePlayerActivity : ComponentActivity() {
                     // ── Autoplay Injection ────────────────────────────────────────
                     // Inject autoplay/unmute script into every HTML frame response,
                     // including cross-origin nested iframes.
+                    // Skip once injection has already succeeded for this stream.
                     val acceptHeader = headers?.get("Accept") ?: ""
-                    if (acceptHeader.contains("text/html")) {
+                    if (!isAutoplayInjected && acceptHeader.contains("text/html")) {
                         val injected = tryInjectAutoplayScript(url, headers)
-                        if (injected != null) return injected
+                        if (injected != null) {
+                            isAutoplayInjected = true
+                            android.util.Log.d(TAG, "[AutoplayInject] Injected and stopped for: $url")
+                            return injected
+                        }
                     }
 
                     return super.shouldInterceptRequest(view, request)
@@ -644,8 +655,12 @@ class SchedulePlayerActivity : ComponentActivity() {
                         })();
                     """.trimIndent(), null)
 
-                    // Top-frame JS injection as a complementary fallback
-                    injectVideoVolumeController()
+                    // Top-frame JS injection as a complementary fallback.
+                    // Skip once it has already run for this stream.
+                    if (!isVolumeControllerInjected) {
+                        isVolumeControllerInjected = true
+                        injectVideoVolumeController()
+                    }
                 }
 
                 override fun onReceivedError(
@@ -762,6 +777,9 @@ class SchedulePlayerActivity : ComponentActivity() {
     private fun switchToPlayer(index: Int) {
         if (index in playerOptions.indices) {
             selectedPlayerIndex = index
+            // Reset so the new server gets a fresh autoplay/unmute injection pass
+            isAutoplayInjected = false
+            isVolumeControllerInjected = false
             // FIX: rebuild the list with the correct isActive flags
             playerOptions = playerOptions.mapIndexed { i, option ->
                 option.copy(isActive = i == index)
@@ -792,6 +810,9 @@ class SchedulePlayerActivity : ComponentActivity() {
     private fun tryNextStreamUrl() {
         if (iframeUrls.size > 1) {
             val nextIndex = (selectedPlayerIndex + 1) % iframeUrls.size
+            // Reset so the new stream URL gets a fresh autoplay/unmute injection pass
+            isAutoplayInjected = false
+            isVolumeControllerInjected = false
             Toast.makeText(
                 this,
                 "Stream failed. Trying: Server ${nextIndex + 1}",
