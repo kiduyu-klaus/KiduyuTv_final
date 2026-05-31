@@ -152,6 +152,7 @@ class IptvPlayerActivity : AppCompatActivity() {
     private lateinit var seekBar: SeekBar
     private lateinit var btnFill: TextView
     private lateinit var btnCC: ImageButton
+    private lateinit var tvSubtitleTracks: TextView
     private lateinit var btnSettings: ImageButton
     private lateinit var btnVolume: ImageButton
     private lateinit var btnCast: ImageButton
@@ -492,6 +493,7 @@ class IptvPlayerActivity : AppCompatActivity() {
         seekBar         = findViewById(R.id.seekBar)
         btnFill         = findViewById(R.id.btnFill)
         btnCC           = findViewById(R.id.btnCC)
+        tvSubtitleTracks = findViewById(R.id.tvSubtitleTracks)
         btnSettings     = findViewById(R.id.btnSettings)
         btnVolume       = findViewById(R.id.btnVolume)
         btnCast         = findViewById(R.id.btnCast)
@@ -956,7 +958,10 @@ class IptvPlayerActivity : AppCompatActivity() {
 
     private fun selectDefaultSubtitleTrack(tracks: Tracks) {
         val subtitleGroups = tracks.groups.filter { it.type == C.TRACK_TYPE_TEXT }
-        if (subtitleGroups.isEmpty()) return
+        if (subtitleGroups.isEmpty()) {
+            runOnUiThread { tvSubtitleTracks.visibility = View.GONE }
+            return
+        }
 
         val englishSubtitle = subtitleGroups.asSequence()
             .flatMap { group ->
@@ -978,6 +983,20 @@ class IptvPlayerActivity : AppCompatActivity() {
                 .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
                 .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, index))
                 .build()
+
+            // Update subtitle tracks indicator with available languages
+            val availableLanguages = subtitleGroups.flatMap { g ->
+                (0 until g.length).map { i -> g.getTrackFormat(i).language ?: "und" }
+            }.distinct()
+
+            runOnUiThread {
+                if (availableLanguages.isNotEmpty()) {
+                    tvSubtitleTracks.text = "Subtitles: ${availableLanguages.joinToString(", ")}" 
+                    tvSubtitleTracks.visibility = View.VISIBLE
+                } else {
+                    tvSubtitleTracks.visibility = View.GONE
+                }
+            }
         }
     }
 
@@ -1050,30 +1069,30 @@ class IptvPlayerActivity : AppCompatActivity() {
 
     /**
      * Configures the subtitle view styling with:
-     * - Clear (transparent) background
+     * - Semi-transparent black background (50% opacity)
      * - Centered at bottom of video
-     * - Black text color
+     * - White text color, normal style, 21sp
      */
     private fun configureSubtitleStyling() {
         playerView.subtitleView?.apply {
-            // Set text size as fraction of video height (4%)
+            // Optional fractional sizing/padding (kept minimal)
             setFractionalTextSize(0.04f)
-            // Add padding from bottom (2% of video height)
             setBottomPaddingFraction(0.02f)
 
-            // Configure custom style (Black text on transparent background)
+            // Configure custom style: white text, semi-transparent black background
+            val semiTransparentBlack = 0x80000000.toInt() // 50% alpha black
             val customStyle = CaptionStyleCompat(
-                android.graphics.Color.BLACK,
-                android.graphics.Color.TRANSPARENT,
+                android.graphics.Color.WHITE,
+                semiTransparentBlack,
                 android.graphics.Color.TRANSPARENT,
                 CaptionStyleCompat.EDGE_TYPE_NONE,
                 android.graphics.Color.BLACK,
-                null
+                android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.NORMAL)
             )
             setStyle(customStyle)
 
-            // Set fixed text size (16sp)
-            setFixedTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 26f)
+            // Set fixed text size to 21sp
+            setFixedTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 21f)
         }
     }
 

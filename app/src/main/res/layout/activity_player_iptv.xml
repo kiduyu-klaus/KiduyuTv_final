@@ -162,6 +162,24 @@
                 app:tint="#FFFFFF" />
 
             <!-- ── BOTTOM STRIP inside video ── -->
+            
+            <!-- Subtitle tracks indicator (hidden by default) -->
+            <TextView
+                android:id="@+id/tvSubtitleTracks"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|center"
+                android:layout_marginBottom="100dp"
+                android:background="#66000000"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:visibility="gone"
+                android:text="Subtitles" />
+
             <LinearLayout
                 android:id="@+id/videoBottomStrip"
                 android:layout_width="match_parent"
