@@ -1,58 +1,75 @@
 package com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile
 
 import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.runtime.*
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import coil.compose.AsyncImage
+import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
 import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
-import com.kiduyuk.klausk.kiduyutv.ui.components.*
-import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
-import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
-import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeViewModel
-import android.net.Uri
-import androidx.compose.material.icons.Icons
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import coil.compose.AsyncImage
-import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
+import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
+import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileBottomNavigation
-import com.kiduyuk.klausk.kiduyutv.ui.components.BannerAdView
-import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileMovieCard
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileNetworkCard
+import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileSearchTopBar
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileTvShowCard
+import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
+import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.CardDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
-import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
-import com.kiduyuk.klausk.kiduyutv.viewmodel.MyListItem
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
+import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeViewModel
+import com.kiduyuk.klausk.kiduyutv.viewmodel.MyListItem
 import com.kiduyuk.klausk.kiduyutv.viewmodel.NetworkItem
 import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamLinksViewModel
 
@@ -132,7 +149,26 @@ fun MobileHomeScreen(
     }
     val isSelectedItemInMyList = myList.any { item -> item.id == selectedItemId && item.type == selectedItemType }
 
+    // Search state
+    var searchQuery by remember { mutableStateOf("") }
+    var isSearchExpanded by remember { mutableStateOf(false) }
+
     Scaffold(
+        topBar = {
+            MobileSearchTopBar(
+                searchQuery = searchQuery,
+                onSearchQueryChange = { searchQuery = it },
+                isExpanded = isSearchExpanded,
+                onExpandToggle = { isSearchExpanded = !isSearchExpanded },
+                onSearch = {
+                    if (searchQuery.isNotBlank()) {
+                        onNavigate(Screen.Search.route + "?query=${Uri.encode(searchQuery)}")
+                    }
+                },
+                onSettingsClick = { onNavigate(Screen.Settings.route) },
+                title = "KiduyuTV"
+            )
+        },
         bottomBar = { MobileBottomNavigation(navController, currentRoute) }
     ) { innerPadding ->
         Box(
@@ -619,4 +655,5 @@ private fun LoadingContent() {
         LottieLoadingView(size = 200.dp)
     }
 }
+
 

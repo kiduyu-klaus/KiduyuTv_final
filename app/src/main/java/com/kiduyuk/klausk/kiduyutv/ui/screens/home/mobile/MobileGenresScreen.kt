@@ -7,19 +7,33 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
+import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileSearchTopBar
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.CardDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
+import com.kiduyuk.klausk.kiduyutv.ui.theme.TextSecondary
+import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
+import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
+import android.net.Uri
 import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.net.URLEncoder
@@ -37,11 +51,16 @@ import java.net.URLEncoder
 fun MobileGenresScreen(
     mediaType: String,
     onBackClick: () -> Unit,
+    onNavigate: (String) -> Unit = {},
     onGenreClick: (Int, String) -> Unit,
     viewModel: HomeViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var isLoading by remember { mutableStateOf(true) }
+
+    // Search state
+    var searchQuery by remember { mutableStateOf("") }
+    var isSearchExpanded by remember { mutableStateOf(false) }
 
     // Movie genres
     val movieGenres = listOf(
@@ -97,27 +116,19 @@ fun MobileGenresScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = title,
-                        color = TextPrimary,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = TextPrimary
-                        )
+            MobileSearchTopBar(
+                searchQuery = searchQuery,
+                onSearchQueryChange = { searchQuery = it },
+                isExpanded = isSearchExpanded,
+                onExpandToggle = { isSearchExpanded = !isSearchExpanded },
+                onSearch = {
+                    if (searchQuery.isNotBlank()) {
+                        onNavigate(Screen.Search.route + "?query=${Uri.encode(searchQuery)}")
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = BackgroundDark
-                )
+                onSettingsClick = { onNavigate(Screen.Settings.route) },
+                title = title,
+                onBackClick = onBackClick
             )
         }
     ) { innerPadding ->

@@ -10,26 +10,50 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.*
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileMovieCard
+import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileSearchTopBar
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileTvShowCard
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
+import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
+import android.net.Uri
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,12 +61,17 @@ fun MobileMyListScreen(
     navController: NavController,
     onMovieClick: (Int) -> Unit,
     onTvShowClick: (Int) -> Unit,
+    onNavigate: (String) -> Unit = {},
     onCompanyClick: (Int, String) -> Unit = { _, _ -> },
     onNetworkClick: (Int, String) -> Unit = { _, _ -> },
     onCastClick: (Int, String, String?, String?, String?) -> Unit = { _, _, _, _, _ -> }
 ) {
     val myList by MyListManager.myList.collectAsState()
     val context = LocalContext.current
+
+    // Search state
+    var searchQuery by remember { mutableStateOf("") }
+    var isSearchExpanded by remember { mutableStateOf(false) }
 
     // Categorize items
     val movies = myList.filter { it.type == "movie" }
@@ -57,24 +86,22 @@ fun MobileMyListScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "My List",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
-                        )
-                    )
+            MobileSearchTopBar(
+                searchQuery = searchQuery,
+                onSearchQueryChange = { searchQuery = it },
+                isExpanded = isSearchExpanded,
+                onExpandToggle = { isSearchExpanded = !isSearchExpanded },
+                onSearch = {
+                    if (searchQuery.isNotBlank()) {
+                        onNavigate(Screen.Search.route + "?query=${Uri.encode(searchQuery)}")
+                    }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = BackgroundDark,
-                    titleContentColor = TextPrimary
-                ),
-                actions = {
+                onSettingsClick = { onNavigate(Screen.Settings.route) },
+                title = "My List",
+                extraAction = {
                     if (myList.isNotEmpty()) {
                         IconButton(onClick = { MyListManager.clearAll(context) }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Clear All", tint = PrimaryRed)
+                            Icon(Icons.Default.Delete, contentDescription = "Clear All", tint = TextSecondary)
                         }
                     }
                 }

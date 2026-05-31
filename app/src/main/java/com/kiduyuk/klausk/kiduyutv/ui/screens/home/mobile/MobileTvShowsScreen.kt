@@ -5,39 +5,78 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
 import com.kiduyuk.klausk.kiduyutv.ui.components.*
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileBottomNavigation
+import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileSearchTopBar
 import com.kiduyuk.klausk.kiduyutv.ui.components.BannerAdView
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileTvShowCard
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
+import com.kiduyuk.klausk.kiduyutv.ui.theme.CardDark
+import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
+import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
+import com.kiduyuk.klausk.kiduyutv.ui.theme.TextSecondary
+import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
+import android.net.Uri
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.platform.LocalContext
 import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeViewModel
 
 @Composable
 fun MobileTvShowsScreen(
     navController: NavController,
     onTvShowClick: (Int) -> Unit,
+    onNavigate: (String) -> Unit = {},
     viewModel: HomeViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
 
+    // Search state
+    var searchQuery by remember { mutableStateOf("") }
+    var isSearchExpanded by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
         viewModel.loadHomeContent(context)
     }
 
     Scaffold(
+        topBar = {
+            MobileSearchTopBar(
+                searchQuery = searchQuery,
+                onSearchQueryChange = { newQuery -> searchQuery = newQuery },
+                isExpanded = isSearchExpanded,
+                onExpandToggle = { isSearchExpanded = !isSearchExpanded },
+                onSearch = {
+                    if (searchQuery.isNotBlank()) {
+                        onNavigate(Screen.Search.route + "?query=${Uri.encode(searchQuery)}")
+                    }
+                },
+                onSettingsClick = { onNavigate(Screen.Settings.route) },
+                title = "TV Shows"
+            )
+        },
         bottomBar = { MobileBottomNavigation(navController, currentRoute) }
     ) { innerPadding ->
         Box(
