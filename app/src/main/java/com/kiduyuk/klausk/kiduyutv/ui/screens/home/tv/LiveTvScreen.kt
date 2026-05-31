@@ -46,10 +46,12 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.kiduyuk.klausk.kiduyutv.data.model.*
-import com.kiduyuk.klausk.kiduyutv.data.model.ScrapedChannel
-import com.kiduyuk.klausk.kiduyutv.data.repository.ChannelScraper
-import com.kiduyuk.klausk.kiduyutv.util.ScrapedChannelsCache
+import com.kiduyuk.klausk.kiduyutv.data.model.CsvChannel
+import com.kiduyuk.klausk.kiduyutv.data.model.IptvChannel
+import com.kiduyuk.klausk.kiduyutv.data.model.ScheduleChannel
+import com.kiduyuk.klausk.kiduyutv.data.model.ScheduleCategory
+import com.kiduyuk.klausk.kiduyutv.data.model.ScheduleDay
+import com.kiduyuk.klausk.kiduyutv.data.model.ScheduleEvent
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.TopBar
 import com.kiduyuk.klausk.kiduyutv.ui.player.iptv.SchedulePlayerActivity
@@ -112,20 +114,20 @@ fun LiveTvScreen(
 
     // Track selected tab
     var selectedTabIndex by remember { mutableIntStateOf(initialTab) }
-    // State for Channels tab
-    var scrapedChannels by remember { mutableStateOf<List<ScrapedChannel>>(emptyList()) }
+    // State for Channels tab (loaded from CSV)
+    var csvChannels by remember { mutableStateOf<List<CsvChannel>>(emptyList()) }
     var isLoadingChannels by remember { mutableStateOf(false) }
     var channelsError by remember { mutableStateOf<String?>(null) }
     var channelsSearchQuery by remember { mutableStateOf("") }
 
-    // Load channels when tab is selected
+    // Load channels from CSV when tab is selected
     LaunchedEffect(selectedTabIndex) {
-        if (selectedTabIndex == 2 && scrapedChannels.isEmpty() && !isLoadingChannels) {
-            loadScrapedChannels(
+        if (selectedTabIndex == 2 && csvChannels.isEmpty() && !isLoadingChannels) {
+            loadCsvChannels(
                 context = context,
                 onLoading = { isLoadingChannels = true },
                 onSuccess = { channels ->
-                    scrapedChannels = channels
+                    csvChannels = channels
                     isLoadingChannels = false
                     channelsError = null
                 },
@@ -190,39 +192,37 @@ fun LiveTvScreen(
                         }
                     )
                 }
-                2 -> { // Channels Tab (Scraped from dlhd.pk)
+                2 -> { // Channels Tab (loaded from enriched_channels.csv)
                     ChannelsTabContent(
-                        channels = scrapedChannels,
+                        channels = csvChannels,
                         isLoading = isLoadingChannels,
                         error = channelsError,
                         searchQuery = channelsSearchQuery,
                         onSearchQueryChange = { channelsSearchQuery = it },
                         onChannelClick = { channel ->
-                            // Launch SchedulePlayerActivity with scraped channel
-                            // Pass all iframe URLs from the channel
+                            // Launch SchedulePlayerActivity with stream_url as iframe
                             val intent = SchedulePlayerActivity.createIntent(
                                 context = context,
                                 channelId = channel.id,
                                 channelName = channel.name,
                                 eventTitle = "Live Channel",
-                                iframeUrls = channel.iframeUrls
+                                iframeUrls = listOf(channel.streamUrl)
                             )
                             context.startActivity(intent)
                         },
                         onRetry = {
-                            loadScrapedChannels(
+                            loadCsvChannels(
                                 context = context,
                                 onLoading = { isLoadingChannels = true },
                                 onSuccess = { channels ->
-                                    scrapedChannels = channels
+                                    csvChannels = channels
                                     isLoadingChannels = false
                                     channelsError = null
                                 },
                                 onError = { error ->
                                     channelsError = error
                                     isLoadingChannels = false
-                                },
-                                forceRefresh = true
+                                }
                             )
                         }
                     )
@@ -409,68 +409,142 @@ private data class TabItem(
 // --- Channels Tab Components ---
 
 /**
- * Helper function to load scraped channels
- * First tries to load from cache, then fetches from network and saves to cache
+ * Parses the enriched_channels.csv file from the assets/lists directory.
+ * CSV columns: channel_name, channel_id, stream_url, logo_url, categories, country, is_live
  */
-private fun loadScrapedChannels(
-    context: Context,
-    onLoading: () -> Unit,
-    onSuccess: (List<ScrapedChannel>) -> Unit,
-    onError: (String) -> Unit,
-    forceRefresh: Boolean = false
-) {
-    onLoading()
-    CoroutineScope(Dispatchers.Main).launch {
-        // First try to load from cache (unless force refresh)
-        if (!forceRefresh) {
-            val cachedChannels = withContext(Dispatchers.IO) {
-                ScrapedChannelsCache.loadChannels(context)
-            }
-            if (cachedChannels.isNotEmpty()) {
-                android.util.Log.i("LiveTvScreen", "Loaded ${cachedChannels.size} channels from cache")
-                onSuccess(cachedChannels)
-                return@launch
-            }
-        }
+private fun parseCsvChannels(csvContent: String): List<CsvChannel> {
+    val lines = csvContent.lines().filter { it.isNotBlank() }
+    if (lines.size < 2) return emptyList()
 
-        // Fetch from network
-        val result = withContext(Dispatchers.IO) {
-            ChannelScraper.fetchChannels(fetchStreamUrls = true)
+    val header = lines.first().split(",").map { it.trim().lowercase() }
+    val nameIdx = header.indexOfFirst { it == "channel_name" }
+    val idIdx = header.indexOfFirst { it == "channel_id" }
+    val streamIdx = header.indexOfFirst { it == "stream_url" }
+    val logoIdx = header.indexOfFirst { it == "logo_url" }
+    val catIdx = header.indexOfFirst { it == "categories" }
+    val countryIdx = header.indexOfFirst { it == "country" }
+    val liveIdx = header.indexOfFirst { it == "is_live" }
+
+    if (nameIdx < 0 || idIdx < 0 || streamIdx < 0) {
+        android.util.Log.e("LiveTvScreen", "CSV missing required columns: name/id/stream_url")
+        return emptyList()
+    }
+
+    return lines.drop(1).mapNotNull { line ->
+        try {
+            val cols = parseCsvLine(line)
+            CsvChannel(
+                name = cols.getOrNull(nameIdx)?.trim() ?: "",
+                id = cols.getOrNull(idIdx)?.trim() ?: "",
+                streamUrl = cols.getOrNull(streamIdx)?.trim() ?: "",
+                logoUrl = cols.getOrNull(logoIdx)?.trim()?.takeIf { it.isNotBlank() && it != "Logo Not Found" },
+                categories = cols.getOrNull(catIdx)?.trim()?.takeIf { it.isNotBlank() },
+                country = cols.getOrNull(countryIdx)?.trim()?.takeIf { it.isNotBlank() },
+                isLive = cols.getOrNull(liveIdx)?.trim()?.lowercase() == "true"
+            )
+        } catch (e: Exception) {
+            android.util.Log.w("LiveTvScreen", "Failed to parse CSV line: ${e.message}")
+            null
         }
-        result.fold(
-            onSuccess = { channels ->
-                // Save to cache
-                kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
-                    ScrapedChannelsCache.saveChannels(context, channels)
-                }
-                onSuccess(channels)
-            },
-            onFailure = { error ->
-                // Try cache as fallback
-                val cachedChannels = withContext(Dispatchers.IO) {
-                    ScrapedChannelsCache.loadChannels(context)
-                }
-                if (cachedChannels.isNotEmpty()) {
-                    onSuccess(cachedChannels)
-                } else {
-                    onError(error.message ?: "Failed to load channels")
-                }
-            }
-        )
     }
 }
 
 /**
- * Channels tab content - shows scraped channels from dlhd.pk in a grid
+ * Simple CSV line parser that handles quoted fields containing commas.
+ */
+private fun parseCsvLine(line: String): List<String> {
+    val result = mutableListOf<String>()
+    var current = StringBuilder()
+    var inQuotes = false
+    var i = 0
+    while (i < line.length) {
+        val c = line[i]
+        when {
+            c == '"' -> {
+                if (inQuotes && i + 1 < line.length && line[i + 1] == '"') {
+                    current.append('"')
+                    i++
+                } else {
+                    inQuotes = !inQuotes
+                }
+            }
+            c == ',' && !inQuotes -> {
+                result.add(current.toString())
+                current = StringBuilder()
+            }
+            else -> current.append(c)
+        }
+        i++
+    }
+    result.add(current.toString())
+    return result
+}
+
+/**
+ * Helper function to load channels from the local enriched_channels.csv
+ */
+private fun loadCsvChannels(
+    context: Context,
+    onLoading: () -> Unit,
+    onSuccess: (List<CsvChannel>) -> Unit,
+    onError: (String) -> Unit
+) {
+    onLoading()
+    CoroutineScope(Dispatchers.Main).launch {
+        val channels = withContext(Dispatchers.IO) {
+            try {
+                // Try to load from assets first (app bundled)
+                val assetPath = "lists/enriched_channels.csv"
+                val inputStream = context.assets.open(assetPath)
+                val content = inputStream.bufferedReader().use { it.readText() }
+                val parsed = parseCsvChannels(content)
+                android.util.Log.i("LiveTvScreen", "Loaded ${parsed.size} channels from bundled CSV")
+                parsed
+            } catch (e: Exception) {
+                android.util.Log.w("LiveTvScreen", "Failed to load bundled CSV: ${e.message}, falling back to raw GitHub URL")
+                // Fallback: fetch from GitHub raw URL
+                try {
+                    val url = java.net.URL("https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/enriched_channels.csv")
+                    val connection = url.openConnection() as java.net.HttpURLConnection
+                    connection.connectTimeout = 15000
+                    connection.readTimeout = 15000
+                    connection.requestMethod = "GET"
+                    val responseCode = connection.responseCode
+                    if (responseCode == 200) {
+                        val content = connection.inputStream.bufferedReader().use { it.readText() }
+                        val parsed = parseCsvChannels(content)
+                        android.util.Log.i("LiveTvScreen", "Loaded ${parsed.size} channels from GitHub CSV")
+                        parsed
+                    } else {
+                        android.util.Log.e("LiveTvScreen", "GitHub CSV fetch failed with code: $responseCode")
+                        emptyList()
+                    }
+                } catch (fallbackError: Exception) {
+                    android.util.Log.e("LiveTvScreen", "GitHub CSV fetch failed: ${fallbackError.message}")
+                    emptyList()
+                }
+            }
+        }
+
+        if (channels.isNotEmpty()) {
+            onSuccess(channels)
+        } else {
+            onError("Failed to load channels from CSV")
+        }
+    }
+}
+
+/**
+ * Channels tab content - shows channels from enriched_channels.csv in a grid
  */
 @Composable
 private fun ChannelsTabContent(
-    channels: List<ScrapedChannel>,
+    channels: List<CsvChannel>,
     isLoading: Boolean,
     error: String?,
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
-    onChannelClick: (ScrapedChannel) -> Unit,
+    onChannelClick: (CsvChannel) -> Unit,
     onRetry: () -> Unit
 ) {
     // Filter out channels starting with "18+" and apply search filter
@@ -480,7 +554,7 @@ private fun ChannelsTabContent(
             .filter { channel ->
                 if (searchQuery.isBlank()) true
                 else channel.name.contains(searchQuery, ignoreCase = true) ||
-                    channel.category?.contains(searchQuery, ignoreCase = true) == true
+                    channel.categories?.contains(searchQuery, ignoreCase = true) == true
             }
     }
 
@@ -519,7 +593,7 @@ private fun ChannelsTabContent(
                             onClearSearch = { onSearchQueryChange("") }
                         )
                     } else {
-                        ScrapedChannelsGrid(
+                        CsvChannelsGrid(
                             channels = filteredChannels,
                             onChannelClick = onChannelClick
                         )
@@ -664,12 +738,12 @@ private fun ChannelsSearchField(
 }
 
 /**
- * Grid displaying scraped channels
+ * Grid displaying CSV channels
  */
 @Composable
-private fun ScrapedChannelsGrid(
-    channels: List<ScrapedChannel>,
-    onChannelClick: (ScrapedChannel) -> Unit
+private fun CsvChannelsGrid(
+    channels: List<CsvChannel>,
+    onChannelClick: (CsvChannel) -> Unit
 ) {
     val firstFocusRequester = remember { FocusRequester() }
     val gridState = rememberLazyGridState()
@@ -695,7 +769,7 @@ private fun ScrapedChannelsGrid(
             } else {
                 Modifier
             }
-            ScrapedChannelCard(
+            CsvChannelCard(
                 channel = channel,
                 modifier = modifier,
                 onClick = { onChannelClick(channel) }
@@ -705,11 +779,11 @@ private fun ScrapedChannelsGrid(
 }
 
 /**
- * Card component for displaying a scraped channel
+ * Card component for displaying a CSV channel
  */
 @Composable
-private fun ScrapedChannelCard(
-    channel: ScrapedChannel,
+private fun CsvChannelCard(
+    channel: CsvChannel,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
@@ -741,10 +815,10 @@ private fun ScrapedChannelCard(
             verticalArrangement = Arrangement.Center
         ) {
             // Channel thumbnail or placeholder
-            if (!channel.thumbnailUrl.isNullOrBlank()) {
+            if (!channel.logoUrl.isNullOrBlank()) {
                 AsyncImage(
                     model = ImageRequest.Builder(context)
-                        .data(channel.thumbnailUrl)
+                        .data(channel.logoUrl)
                         .crossfade(true)
                         .build(),
                     contentDescription = channel.name,
