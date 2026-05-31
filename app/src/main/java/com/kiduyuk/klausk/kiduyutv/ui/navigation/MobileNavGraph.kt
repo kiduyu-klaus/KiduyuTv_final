@@ -24,6 +24,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileGenreContentScre
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileGenresScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileHomeScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileMoviesScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileLiveTvScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileMyListScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileTvShowsScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.SeeAllScreen
@@ -69,6 +70,13 @@ fun MobileNavGraph(navController: NavHostController) {
             )
         }
 
+        composable(Screen.LiveTv.route) {
+            MobileLiveTvScreen(
+                navController = navController,
+                onNavigate = { route -> navController.navigate(route) }
+            )
+        }
+
         composable(Screen.TvShows.route) {
             MobileTvShowsScreen(
                 navController = navController,
@@ -79,6 +87,8 @@ fun MobileNavGraph(navController: NavHostController) {
                         )
                     )
                 }
+                ,
+                onNavigate = { route -> navController.navigate(route) }
             )
         }
 
@@ -143,6 +153,8 @@ fun MobileNavGraph(navController: NavHostController) {
                         )
                     )
                 }
+                ,
+                onNavigate = { route -> navController.navigate(route) }
             )
         }
 
@@ -184,6 +196,8 @@ fun MobileNavGraph(navController: NavHostController) {
                 onGenreClick = { genreId, genreName ->
                     navController.navigate("genre_content/$mediaType/$genreId/$genreName")
                 }
+                ,
+                onNavigate = { route -> navController.navigate(route) }
             )
         }
 

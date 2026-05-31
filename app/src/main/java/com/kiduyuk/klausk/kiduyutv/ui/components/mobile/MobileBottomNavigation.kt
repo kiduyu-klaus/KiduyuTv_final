@@ -31,6 +31,7 @@ fun MobileBottomNavigation(
     val items = listOf(
         BottomNavItem(Screen.Home.route, Icons.Default.Home, "Home"),
         BottomNavItem(Screen.Movies.route, Icons.Default.Movie, "Movies"),
+        BottomNavItem(Screen.LiveTv.route, Icons.Default.Tv, "Live"),
         BottomNavItem(Screen.TvShows.route, Icons.Default.Tv, "TV Shows"),
         BottomNavItem(Screen.Settings.route, Icons.Default.Settings, "Settings")
     )
