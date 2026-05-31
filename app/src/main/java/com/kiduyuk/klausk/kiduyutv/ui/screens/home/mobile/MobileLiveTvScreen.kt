@@ -1,52 +1,140 @@
 package com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile
 
 import android.content.Intent
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import coil.compose.AsyncImage
+import com.kiduyuk.klausk.kiduyutv.data.model.IptvChannel
+import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileBottomNavigation
+import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileSearchTopBar
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.player.iptv.IptvPlayerActivity
-import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.LiveTvScreen
+import com.kiduyuk.klausk.kiduyutv.viewmodel.LiveTvViewModel
 
 @Composable
 fun MobileLiveTvScreen(
     navController: NavController,
     onNavigate: (String) -> Unit = {},
+    viewModel: LiveTvViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+    val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.initialize(context)
+        viewModel.loadPlaylist()
+    }
 
     Scaffold(
+        topBar = {
+            MobileSearchTopBar(
+                onSearchClick = { onNavigate(Screen.Search.route) },
+                onSettingsClick = { onNavigate(Screen.Settings.route) },
+                title = "Live TV"
+            )
+        },
         bottomBar = { MobileBottomNavigation(navController, currentRoute) }
     ) { innerPadding ->
         Box(modifier = Modifier
             .fillMaxSize()
-            .padding(innerPadding)
-        ) {
-            LiveTvScreen(
-                onChannelPlay = { channel ->
-                    val intent = IptvPlayerActivity.createIntent(
-                        context,
-                        channel.name,
-                        channel.url,
-                        channel.logo,
-                        channel.tvgId,
-                        channel.tvgName,
-                        channel.group
-                    )
-                    context.startActivity(intent)
-                },
-                onNavigate = { route -> navController.navigate(route) },
-                onSearchClick = { navController.navigate(Screen.Search.route) },
-                onSettingsClick = { navController.navigate(Screen.Settings.route) }
-            )
+            .padding(innerPadding)) {
+
+            if (uiState.isLoading) {
+                Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                    LottieLoadingView(size = 200.dp)
+                }
+                return@Box
+            }
+
+            if (uiState.error != null) {
+                Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                    Text(text = "${uiState.error}")
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(onClick = { viewModel.loadPlaylist(forceRefresh = true) }) {
+                        Text("Retry")
+                    }
+                }
+                return@Box
+            }
+
+            // Categories view
+            if (uiState.selectedCategory == null) {
+                LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp)) {
+                    items(uiState.categories) { category ->
+                        CategoryRow(category.name, category.channelCount) {
+                            viewModel.selectCategory(category.name)
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
+            } else {
+                // Channels list for selected category
+                LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp)) {
+                    items(uiState.channels) { channel ->
+                        ChannelRow(channel) { selected ->
+                            onNavigate("") // keep nav callback available
+                            // Launch player activity
+                            val intent = IptvPlayerActivity.createIntent(
+                                context,
+                                selected.name,
+                                selected.url,
+                                selected.logo,
+                                selected.tvgId,
+                                selected.tvgName,
+                                selected.group
+                            )
+                            context.startActivity(intent)
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun CategoryRow(name: String, count: Int, onClick: () -> Unit) {
+    Row(modifier = Modifier
+        .fillMaxWidth()
+        .clickable { onClick() }
+        .padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(text = name, modifier = Modifier.weight(1f))
+        Text(text = "${count} channels")
+    }
+}
+
+@Composable
+private fun ChannelRow(channel: IptvChannel, onPlay: (IptvChannel) -> Unit) {
+    Row(modifier = Modifier
+        .fillMaxWidth()
+        .clickable { onPlay(channel) }
+        .padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        AsyncImage(model = channel.logo, contentDescription = null, modifier = Modifier.size(64.dp))
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = channel.name)
+            Text(text = channel.group ?: "", modifier = Modifier.padding(top = 4.dp))
+        }
+        Button(onClick = { onPlay(channel) }) { Text("Play") }
     }
 }

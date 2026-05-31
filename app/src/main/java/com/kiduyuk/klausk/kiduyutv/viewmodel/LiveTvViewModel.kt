@@ -1,6 +1,10 @@
 package com.kiduyuk.klausk.kiduyutv.viewmodel
 
 import android.content.Context
+import android.content.SharedPreferences
+import android.util.Base64
+import org.json.JSONArray
+import org.json.JSONObject
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kiduyuk.klausk.kiduyutv.data.model.ChannelProgramInfo
@@ -67,6 +71,9 @@ class LiveTvViewModel : ViewModel() {
     
     private var cachedPlaylist: IptvPlaylist? = null
     private var appContext: Context? = null
+    private var prefs: SharedPreferences? = null
+    private val PREFS_NAME = "live_tv_prefs"
+    private val FAVORITES_KEY = "favorite_channels"
     
     /**
      * Initializes the ViewModel with application context for caching.
@@ -76,6 +83,84 @@ class LiveTvViewModel : ViewModel() {
      */
     fun initialize(context: Context) {
         appContext = context.applicationContext
+        prefs = appContext?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
+
+    /**
+     * Get favorite channels saved locally (SharedPreferences JSON array).
+     */
+    fun getFavoriteChannels(): List<IptvChannel> {
+        val json = prefs?.getString(FAVORITES_KEY, null) ?: return emptyList()
+        return try {
+            val arr = JSONArray(json)
+            val list = mutableListOf<IptvChannel>()
+            for (i in 0 until arr.length()) {
+                val obj = arr.optJSONObject(i) ?: continue
+                val name = obj.optString("name")
+                val logo = obj.optString("logo", null)
+                val url = obj.optString("url")
+                val group = obj.optString("group", null)
+                list.add(IptvChannel(name = name, logo = if (logo.isNullOrBlank()) null else logo, url = url, group = if (group.isNullOrBlank()) null else group))
+            }
+            list
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun saveFavoriteChannels(channels: List<IptvChannel>) {
+        val arr = JSONArray()
+        channels.forEach { ch ->
+            val obj = JSONObject()
+            obj.put("name", ch.name)
+            obj.put("logo", ch.logo)
+            obj.put("url", ch.url)
+            obj.put("group", ch.group)
+            arr.put(obj)
+        }
+        prefs?.edit()?.putString(FAVORITES_KEY, arr.toString())?.apply()
+    }
+
+    /**
+     * Adds channel to favorites if not already present and syncs to Firebase.
+     */
+    fun addFavorite(channel: IptvChannel) {
+        val current = getFavoriteChannels().toMutableList()
+        if (current.any { it.url == channel.url }) return
+        current.add(0, channel)
+        saveFavoriteChannels(current)
+
+        // Sync to Firebase savedChannels node if FirebaseManager initialized
+        try {
+            val key = Base64.encodeToString(channel.url.toByteArray(), Base64.NO_WRAP)
+            com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.saveChannel(
+                key = key,
+                name = channel.name,
+                logo = channel.logo,
+                url = channel.url,
+                group = channel.group
+            )
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    /**
+     * Removes a channel from favorites locally and from Firebase.
+     */
+    fun removeFavorite(channel: IptvChannel) {
+        val current = getFavoriteChannels().filter { it.url != channel.url }
+        saveFavoriteChannels(current)
+        try {
+            val key = Base64.encodeToString(channel.url.toByteArray(), Base64.NO_WRAP)
+            com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.removeSavedChannel(key)
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    fun isFavorite(channel: IptvChannel): Boolean {
+        return getFavoriteChannels().any { it.url == channel.url }
     }
     
     /**

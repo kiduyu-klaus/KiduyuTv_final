@@ -557,6 +557,62 @@ object FirebaseManager {
         ref.addValueEventListener(listener)
         awaitClose { ref.removeEventListener(listener) }
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // SAVED CHANNELS (FAVORITES) OPERATIONS
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Save a channel to the user's savedChannels list.
+     */
+    fun saveChannel(
+        key: String,
+        name: String,
+        logo: String?,
+        url: String,
+        group: String?
+    ) {
+        val ref = database.getReference("${getCurrentUserPath()}/savedChannels/$key")
+
+        val channel = mapOf(
+            "key" to key,
+            "name" to name,
+            "logo" to logo,
+            "url" to url,
+            "group" to group,
+            "savedAt" to System.currentTimeMillis()
+        )
+
+        ref.setValue(channel)
+    }
+
+    /**
+     * Remove a saved channel.
+     */
+    fun removeSavedChannel(key: String) {
+        database.getReference("${getCurrentUserPath()}/savedChannels/$key").removeValue()
+    }
+
+    /**
+     * Get saved channels flow for reactive updates.
+     */
+    fun getSavedChannelsFlow(): Flow<Map<String, Any>?> = callbackFlow {
+        val ref = database.getReference("${getCurrentUserPath()}/savedChannels")
+
+        val listener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val data = snapshot.value as? Map<String, Any>
+                trySend(data)
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                close(error.toException())
+            }
+        }
+
+        ref.addValueEventListener(listener)
+        awaitClose { ref.removeEventListener(listener) }
+    }
     
     // ─────────────────────────────────────────────────────────────────────────────
     // DEFAULT PROVIDER SYNC

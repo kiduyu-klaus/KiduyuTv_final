@@ -68,6 +68,7 @@ import com.kiduyuk.klausk.kiduyutv.data.model.IptvChannel
 import com.kiduyuk.klausk.kiduyutv.data.repository.IptvRepository
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import kotlinx.coroutines.CoroutineScope
+import android.content.pm.PackageManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -913,15 +914,21 @@ class IptvPlayerActivity : AppCompatActivity() {
                 }
             }
 
-            showPlaybackErrorDialog(fullDetailedMessage)
+            showPlaybackErrorDialog(fullDetailedMessage, causeMessage)
         }
     }
 
-    private fun showPlaybackErrorDialog(message: String) {
+    private fun showPlaybackErrorDialog(fullMessage: String, shortMessage: String?) {
+        // Use UiModeManager to detect television vs phone
+        val uiModeManager = getSystemService(Context.UI_MODE_SERVICE) as? android.app.UiModeManager
+        val isPhone = uiModeManager?.currentModeType != Configuration.UI_MODE_TYPE_TELEVISION
+
+        val messageToShow = if (isPhone) (shortMessage ?: fullMessage) else fullMessage
+
         QuitDialog(
             context             = this,
             title               = "Playback Error",
-            message             = message,
+            message             = messageToShow,
             positiveButtonText  = "Retry",
             negativeButtonText  = "Exit",
             lottieAnimRes       = R.raw.exit,

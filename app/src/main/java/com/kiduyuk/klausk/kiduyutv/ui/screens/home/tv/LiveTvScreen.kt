@@ -7,6 +7,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -140,7 +141,7 @@ fun LiveTvScreen(
     val tabs = listOf(
         TabItem("Live TV", Icons.Default.Tv),
         TabItem("Schedule", Icons.Default.CalendarToday),
-        TabItem("Channels", Icons.Default.List)
+        TabItem("My Channels", Icons.Default.List)
     )
 
     Box(
@@ -202,41 +203,10 @@ fun LiveTvScreen(
                         )
                     }
                 }
-                2 -> { // Channels Tab (Scraped from dlhd.pk)
-                    ChannelsTabContent(
-                        channels = scrapedChannels,
-                        isLoading = isLoadingChannels,
-                        error = channelsError,
-                        searchQuery = channelsSearchQuery,
-                        onSearchQueryChange = { channelsSearchQuery = it },
-                        onChannelClick = { channel ->
-                            // Launch SchedulePlayerActivity with scraped channel
-                            // Pass all iframe URLs from the channel
-                            val intent = SchedulePlayerActivity.createIntent(
-                                context = context,
-                                channelId = channel.id,
-                                channelName = channel.name,
-                                eventTitle = "Live Channel",
-                                iframeUrls = channel.iframeUrls
-                            )
-                            context.startActivity(intent)
-                        },
-                        onRetry = {
-                            loadScrapedChannels(
-                                context = context,
-                                onLoading = { isLoadingChannels = true },
-                                onSuccess = { channels ->
-                                    scrapedChannels = channels
-                                    isLoadingChannels = false
-                                    channelsError = null
-                                },
-                                onError = { error ->
-                                    channelsError = error
-                                    isLoadingChannels = false
-                                },
-                                forceRefresh = true
-                            )
-                        }
+                2 -> { // My Channels (favorited)
+                    FavoriteChannelsTabContent(
+                        favorites = viewModel.getFavoriteChannels(),
+                        onChannelClick = { channel -> viewModel.selectChannel(channel) }
                     )
                 }
             }
@@ -403,7 +373,8 @@ private fun LiveTvTabContent(
                     onChannelClick = { channel ->
                         viewModel.selectChannel(channel)
                     },
-                    onBackClick = { viewModel.clearCategorySelection() }
+                    onBackClick = { viewModel.clearCategorySelection() },
+                    onChannelLongPress = { channel -> viewModel.addFavorite(channel) }
                 )
             }
         }
@@ -536,6 +507,50 @@ private fun ChannelsTabContent(
                             onChannelClick = onChannelClick
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Favorites tab showing user's saved IPTV channels.
+ */
+@Composable
+private fun FavoriteChannelsTabContent(
+    favorites: List<com.kiduyuk.klausk.kiduyutv.data.model.IptvChannel>,
+    onChannelClick: (com.kiduyuk.klausk.kiduyutv.data.model.IptvChannel) -> Unit
+) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (favorites.isEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(Icons.Default.List, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(64.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(text = "No favorite channels yet", color = TextPrimary)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = "Long-press a channel in a category to add it to favorites.", color = TextSecondary)
+            }
+        } else {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(4),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                itemsIndexed(favorites) { index, channel ->
+                    ChannelCard(
+                        channel = channel,
+                        modifier = if (index == 0) Modifier else Modifier,
+                        onClick = { onChannelClick(channel) }
+                    )
                 }
             }
         }
@@ -1784,7 +1799,8 @@ private fun ChannelsContent(
     categoryName: String,
     channels: List<IptvChannel>,
     onChannelClick: (IptvChannel) -> Unit,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onChannelLongPress: (IptvChannel) -> Unit = {}
 ) {
     // Focus requesters for D-pad navigation
     val backFocusRequester = remember { FocusRequester() }
@@ -1889,7 +1905,8 @@ private fun ChannelsContent(
                     ChannelCard(
                         channel = channel,
                         modifier = modifier,
-                        onClick = { onChannelClick(channel) }
+                        onClick = { onChannelClick(channel) },
+                        onLongClick = { onChannelLongPress(channel) }
                     )
                 }
             }
@@ -1904,7 +1921,8 @@ private fun ChannelsContent(
 private fun ChannelCard(
     channel: IptvChannel,
     modifier: Modifier = Modifier,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
@@ -1921,10 +1939,11 @@ private fun ChannelCard(
                 color = if (isFocused) Color.White else Color.Transparent,
                 shape = RoundedCornerShape(12.dp)
             )
-            .clickable(
+            .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
-                onClick = onClick
+                onClick = onClick,
+                onLongClick = onLongClick
             )
             .padding(12.dp),
         contentAlignment = Alignment.Center
