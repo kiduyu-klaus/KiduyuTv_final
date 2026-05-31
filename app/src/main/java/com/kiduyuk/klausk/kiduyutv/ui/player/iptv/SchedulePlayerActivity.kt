@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
@@ -23,7 +24,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -131,7 +132,7 @@ class SchedulePlayerActivity : ComponentActivity() {
         if (!passedIframeUrls.isNullOrEmpty()) {
             iframeUrls = passedIframeUrls
             hasDirectIframeUrls = true
-            android.util.Log.i(TAG, "Received ${iframeUrls.size} iframe URLs from intent")
+            Log.i(TAG, "Received ${iframeUrls.size} iframe URLs from intent")
         }
 
         if (channelId.isEmpty() && iframeUrls.isEmpty()) {
@@ -183,7 +184,7 @@ class SchedulePlayerActivity : ComponentActivity() {
                     updateTopBar()
                 },
                 onFailure = { error ->
-                    android.util.Log.e(TAG, "Failed to fetch watch page: ${error.message}")
+                   Log.e(TAG, "Failed to fetch watch page: ${error.message}")
                     currentIframeHtml = generateIframeHtml(
                         "https://dlhd.pk/player/stream-$channelId.php"
                     )
@@ -354,7 +355,9 @@ class SchedulePlayerActivity : ComponentActivity() {
             connection.connectTimeout = 5000
             connection.readTimeout = 8000
             headers?.forEach { (k, v) ->
-                try { connection.setRequestProperty(k, v) } catch (e: Exception) { }
+                try { connection.setRequestProperty(k, v) } catch (e: Exception) {
+                    Log.i(TAG, "Failed to set header $k: ${e.message}")
+                }
             }
             connection.connect()
 
@@ -420,7 +423,7 @@ class SchedulePlayerActivity : ComponentActivity() {
                 injected.byteInputStream(charset(charset))
             )
         } catch (e: Exception) {
-            android.util.Log.w(TAG, "[AutoplayInject] Failed for $url: ${e.message}")
+            Log.w(TAG, "[AutoplayInject] Failed for $url: ${e.message}")
             null
         }
     }
@@ -454,7 +457,7 @@ class SchedulePlayerActivity : ComponentActivity() {
             )
         }
 
-        webView = android.webkit.WebView(this).apply {
+        webView = createWebView(this).apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
@@ -496,7 +499,7 @@ class SchedulePlayerActivity : ComponentActivity() {
                     val headers = request.requestHeaders
 
                     if (isAdRequest(url)) {
-                        android.util.Log.d(TAG, "[AdBlock] Blocked: $url")
+                       Log.d(TAG, "[AdBlock] Blocked: $url")
                         return emptyResponse()
                     }
 
@@ -511,7 +514,7 @@ class SchedulePlayerActivity : ComponentActivity() {
 
                 override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
                     super.onPageFinished(view, url)
-                    android.util.Log.i(TAG, "[WebView] Page finished: $url")
+                    Log.i(TAG, "[WebView] Page finished: $url")
 
                     view?.evaluateJavascript("""
                         (function() {
@@ -564,8 +567,16 @@ class SchedulePlayerActivity : ComponentActivity() {
                     error: android.webkit.WebResourceError?
                 ) {
                     super.onReceivedError(view, request, error)
-                    if (request?.isForMainFrame == true) {
-                        android.util.Log.e(TAG, "[WebView] Error: ${error?.description}")
+                    val url = request?.url?.toString() ?: return
+                   Log.e(TAG, "[WebView] Error on $url: ${error?.description}")
+
+                    // Trigger fallback for the main wrapper page OR for any sub-frame
+                    // whose URL matches one of our known stream URLs — this covers the
+                    // case where the outer HTML loads fine but the embedded stream iframe fails.
+                    val isStreamFrame = iframeUrls.any { url.contains(it, ignoreCase = true) }
+                            || playerOptions.any { url.contains(it.url, ignoreCase = true) }
+
+                    if (request.isForMainFrame || isStreamFrame) {
                         if (hasDirectIframeUrls) {
                             tryNextStreamUrl()
                         } else {
@@ -601,6 +612,8 @@ class SchedulePlayerActivity : ComponentActivity() {
             ).apply {
                 topMargin = 0
             }
+            isFocusable = true
+            isFocusableInTouchMode = true
             setContent {
                 val topBarVisible by isTopBarVisible
                 MaterialTheme {
@@ -633,7 +646,6 @@ class SchedulePlayerActivity : ComponentActivity() {
 
         rootLayout.isFocusable = true
         rootLayout.isFocusableInTouchMode = true
-        rootLayout.requestFocus()
 
         scheduleTopBarHide()
     }
@@ -656,32 +668,36 @@ class SchedulePlayerActivity : ComponentActivity() {
     }
 
     private fun tryNextPlayer() {
-        if (playerOptions.size > 1) {
-            val nextIndex = (selectedPlayerIndex + 1) % playerOptions.size
-            Toast.makeText(
-                this,
-                "Stream failed. Trying: Server ${playerOptions[nextIndex].playerNumber}",
-                Toast.LENGTH_SHORT
-            ).show()
-            switchToPlayer(nextIndex)
+        if (playerOptions.size <= 1) {
+            Toast.makeText(this, "Stream unavailable. No other servers to try.", Toast.LENGTH_LONG).show()
+            return
         }
+        val nextIndex = (selectedPlayerIndex + 1) % playerOptions.size
+        Toast.makeText(
+            this,
+            "Stream failed. Trying: Server ${playerOptions[nextIndex].playerNumber}",
+            Toast.LENGTH_SHORT
+        ).show()
+        switchToPlayer(nextIndex)
     }
 
     private fun tryNextStreamUrl() {
-        if (iframeUrls.size > 1) {
-            val nextIndex = (selectedPlayerIndex + 1) % iframeUrls.size
-            Toast.makeText(
-                this,
-                "Stream failed. Trying: Server ${nextIndex + 1}",
-                Toast.LENGTH_SHORT
-            ).show()
-            selectedPlayerIndex = nextIndex
-            playerOptions = playerOptions.mapIndexed { i, option ->
-                option.copy(isActive = i == nextIndex)
-            }
-            currentIframeHtml = generateIframeHtml(iframeUrls[nextIndex])
-            loadCurrentStream()
+        if (iframeUrls.size <= 1) {
+            Toast.makeText(this, "Stream unavailable. No other servers to try.", Toast.LENGTH_LONG).show()
+            return
         }
+        val nextIndex = (selectedPlayerIndex + 1) % iframeUrls.size
+        Toast.makeText(
+            this,
+            "Stream failed. Trying: Server ${nextIndex + 1}",
+            Toast.LENGTH_SHORT
+        ).show()
+        selectedPlayerIndex = nextIndex
+        playerOptions = playerOptions.mapIndexed { i, option ->
+            option.copy(isActive = i == nextIndex)
+        }
+        currentIframeHtml = generateIframeHtml(iframeUrls[nextIndex])
+        loadCurrentStream()
     }
 
     private fun showExitConfirmationDialog() {
@@ -730,7 +746,9 @@ class SchedulePlayerActivity : ComponentActivity() {
                     "if(window.__videoControllerInterval) clearInterval(window.__videoControllerInterval);",
                     null
                 )
-            } catch (e: Exception) { }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error during video controller cleanup: ${e.message}")
+            }
         }
 
         topBarHideHandler.removeCallbacks(topBarHideRunnable)
@@ -750,7 +768,7 @@ class SchedulePlayerActivity : ComponentActivity() {
                     destroy()
                 }
             } catch (e: Exception) {
-                android.util.Log.e(TAG, "Error during WebView cleanup: ${e.message}")
+               Log.e(TAG, "Error during WebView cleanup: ${e.message}")
             }
         }
         super.onDestroy()
@@ -767,7 +785,7 @@ class SchedulePlayerActivity : ComponentActivity() {
     private fun installWindowKeyInterceptor() {
         val original = window.callback
         window.callback = object : android.view.Window.Callback by original {
-            override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+            override fun dispatchKeyEvent(event: KeyEvent): Boolean {
                 if (event.action == KeyEvent.ACTION_DOWN &&
                     (event.keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
                             event.keyCode == KeyEvent.KEYCODE_ENTER)
@@ -784,8 +802,6 @@ class SchedulePlayerActivity : ComponentActivity() {
         when (keyCode) {
             KeyEvent.KEYCODE_DPAD_UP,
             KeyEvent.KEYCODE_DPAD_DOWN,
-            KeyEvent.KEYCODE_DPAD_LEFT,
-            KeyEvent.KEYCODE_DPAD_RIGHT,
             KeyEvent.KEYCODE_MENU,
             KeyEvent.KEYCODE_SETTINGS -> {
                 isDpadNavigating = true
@@ -809,7 +825,25 @@ class SchedulePlayerActivity : ComponentActivity() {
         }
     }
 
+    private fun detectDeviceType() {
+        val uiModeManager =
+            getSystemService(android.content.Context.UI_MODE_SERVICE) as android.app.UiModeManager
 
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun createWebView(context: android.content.Context): android.webkit.WebView {
+        val webView = android.webkit.WebView(context)
+        val isHardwareAccelerated =
+            context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_HARDWARE_ACCELERATED != 0
+
+        if (isHardwareAccelerated) {
+            webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+        } else {
+            webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+        }
+        return webView
+    }
 
     private fun showTopBarAndResetTimer() {
         isTopBarVisible.value = true
@@ -892,7 +926,8 @@ fun PlayerSourceTopBar(
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                    .focusGroup(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(horizontal = 0.dp)
             ) {
@@ -916,9 +951,8 @@ private fun BackButton(
 
     Surface(
         modifier = Modifier
-            .clickable { onBackPressed() }
             .onFocusChanged { isFocused = it.isFocused }
-            .focusable(),
+            .clickable { onBackPressed() },
         shape = RoundedCornerShape(8.dp),
         color = if (isFocused) Color(0xFF424242) else Color.Transparent,
         border = if (isFocused) BorderStroke(1.dp, Color(0xFF448AFF)) else null
@@ -962,16 +996,14 @@ private fun PlayerOptionButton(
 
     Surface(
         modifier = Modifier
-            // clickable must come first — it creates the single focus node.
-            // onFocusChanged placed after observes that same node correctly.
-            // A bare focusable() after clickable() is a no-op but kept for
-            // explicitness so the TV focus system never skips this node.
+            // onFocusChanged must wrap clickable's node from the outside so it
+            // observes the correct (single) focus node that clickable creates.
+            // No bare .focusable() needed — clickable already marks the node focusable.
+            .onFocusChanged { isFocused = it.isFocused }
             .clickable(
                 onClick = onClick,
                 onClickLabel = "Select Server $playerNumber"
-            )
-            .onFocusChanged { isFocused = it.isFocused }
-            .focusable(),
+            ),
         shape = RoundedCornerShape(8.dp),
         color = backgroundColor,
         border = BorderStroke(2.dp, borderColor)
