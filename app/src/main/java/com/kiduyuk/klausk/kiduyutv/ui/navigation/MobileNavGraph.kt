@@ -66,7 +66,8 @@ fun MobileNavGraph(navController: NavHostController) {
                             movieId
                         )
                     )
-                }
+                },
+                onNavigate = { route -> navController.navigate(route) }  // Add this line
             )
         }
 
