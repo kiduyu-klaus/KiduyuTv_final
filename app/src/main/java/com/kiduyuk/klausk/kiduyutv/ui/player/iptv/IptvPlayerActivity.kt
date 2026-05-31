@@ -124,6 +124,7 @@ class IptvPlayerActivity : AppCompatActivity() {
 
     private var player: ExoPlayer? = null
     private lateinit var trackSelector: DefaultTrackSelector
+    private var trackSelectionInitialized = false
 
     // ── View references ──────────────────────────────────────────────────────
 
@@ -829,6 +830,8 @@ class IptvPlayerActivity : AppCompatActivity() {
                 buildUponParameters()
                     .clearVideoSizeConstraints()
                     .setForceLowestBitrate(false)
+                    .setExceedVideoConstraintsIfNecessary(true) // set
+                    .setExceedRendererCapabilitiesIfNecessary(true)
             )
         }
         val customLoadControl = DefaultLoadControl.Builder()
@@ -878,6 +881,14 @@ class IptvPlayerActivity : AppCompatActivity() {
     }
 
     private val playerListener = object : Player.Listener {
+        override fun onTracksChanged(tracks: Tracks) {
+            if (!trackSelectionInitialized) {
+                trackSelectionInitialized = true
+                selectHighestQualityVideoTrack(tracks)
+                selectDefaultSubtitleTrack(tracks)
+            }
+        }
+
         override fun onPlayerError(error: PlaybackException) {
             // Extract the underlying system cause if it exists
             val cause = error.cause
@@ -918,6 +929,56 @@ class IptvPlayerActivity : AppCompatActivity() {
                 player?.play()
             }
         ).show()
+    }
+
+    private fun selectHighestQualityVideoTrack(tracks: Tracks) {
+        val bestTrack = tracks.groups
+            .filter { it.type == C.TRACK_TYPE_VIDEO }
+            .flatMap { group ->
+                (0 until group.length).map { index ->
+                    val format = group.getTrackFormat(index)
+                    val qualityScore = when {
+                        format.width > 0 && format.height > 0 -> format.width.toLong() * format.height + format.bitrate
+                        format.bitrate > 0 -> format.bitrate.toLong()
+                        else -> 0L
+                    }
+                    Triple(group, index, qualityScore)
+                }
+            }
+            .maxByOrNull { it.third }
+
+        bestTrack?.let { (group, index, _) ->
+            trackSelector.parameters = trackSelector.buildUponParameters()
+                .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, index))
+                .build()
+        }
+    }
+
+    private fun selectDefaultSubtitleTrack(tracks: Tracks) {
+        val subtitleGroups = tracks.groups.filter { it.type == C.TRACK_TYPE_TEXT }
+        if (subtitleGroups.isEmpty()) return
+
+        val englishSubtitle = subtitleGroups.asSequence()
+            .flatMap { group ->
+                (0 until group.length).map { index -> Pair(group, index) }
+            }
+            .firstOrNull { (group, index) ->
+                val language = group.getTrackFormat(index).language?.lowercase()
+                language == "en" || language == "eng"
+            }
+
+        val selectedSubtitle = englishSubtitle ?: subtitleGroups.asSequence()
+            .flatMap { group ->
+                (0 until group.length).map { index -> Pair(group, index) }
+            }
+            .firstOrNull()
+
+        selectedSubtitle?.let { (group, index) ->
+            trackSelector.parameters = trackSelector.buildUponParameters()
+                .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                .setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, index))
+                .build()
+        }
     }
 
     /**
