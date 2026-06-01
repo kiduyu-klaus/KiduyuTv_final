@@ -711,12 +711,18 @@ class IptvPlayerActivity : AppCompatActivity() {
 
     private fun confirmAddFavorite(channel: IptvChannel) {
         if (liveTvViewModel.isFavorite(channel)) {
-            btnFavorite.setImageResource(android.R.drawable.star_big_on)
-            btnFavorite.setColorFilter(
-                android.graphics.Color.RED,
-                android.graphics.PorterDuff.Mode.SRC_IN
-            )
-            Toast.makeText(this, "Channel already in favorites", Toast.LENGTH_SHORT).show()
+            // Show dialog to confirm removal
+            androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Remove from favorites")
+                .setMessage("Remove $channelName from your favorites?")
+                .setPositiveButton("Remove") { _, _ ->
+                    liveTvViewModel.removeFavorite(channel)
+                    btnFavorite.setImageResource(android.R.drawable.star_big_off)
+                    btnFavorite.clearColorFilter()
+                    Toast.makeText(this, "Removed from favorites", Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
             return
         }
 
