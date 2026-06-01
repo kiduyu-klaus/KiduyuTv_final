@@ -102,19 +102,21 @@ class PlayerActivity : AppCompatActivity() {
             val deviceType = if (uiModeManager.currentModeType == Configuration.UI_MODE_TYPE_NORMAL) "Mobile" else "Tablet"
             Log.i(TAG, "[Device] $deviceType detected (${deviceBrand} $deviceModel), disabling cursor")
 
-            val toastMessage = "Device: $deviceType | Brand: $deviceBrand | Model: $deviceModel"
-            Handler(Looper.getMainLooper()).post {
-                Toast.makeText(this@PlayerActivity, toastMessage, Toast.LENGTH_LONG).show()
-            }
+            Toast.makeText(
+                this@PlayerActivity,
+                "Device: $deviceType | Brand: $deviceBrand | Model: $deviceModel",
+                Toast.LENGTH_LONG
+            ).show()
         } else {
             isFireTV = isFireTVDevice(this)
             Log.i(TAG, "[Device] TV detected (${deviceBrand} $deviceModel), cursor enabled, isFireTV=$isFireTV")
 
             val deviceLabel = if (isFireTV) "Fire TV (Amazon WebView)" else "Android TV (WebView)"
-            val toastMessage = "Device: $deviceLabel | Brand: $deviceBrand | Model: $deviceModel"
-            Handler(Looper.getMainLooper()).post {
-                Toast.makeText(this@PlayerActivity, toastMessage, Toast.LENGTH_LONG).show()
-            }
+            Toast.makeText(
+                this@PlayerActivity,
+                "Device: $deviceLabel | Brand: $deviceBrand | Model: $deviceModel",
+                Toast.LENGTH_LONG
+            ).show()
         }
 
         val url = intent.getStringExtra("STREAM_URL") ?: if (isTv) {
@@ -169,12 +171,6 @@ class PlayerActivity : AppCompatActivity() {
             isVerticalScrollBarEnabled = false
             setScrollBarStyle(View.SCROLLBARS_OUTSIDE_OVERLAY)
             overScrollMode = View.OVER_SCROLL_NEVER
-
-            if (isCursorDisabled) {
-                setLayerType(View.LAYER_TYPE_HARDWARE, null)
-            } else {
-                setLayerType(View.LAYER_TYPE_NONE, null)
-            }
 
             webViewClient = AdBlockerWebViewClient(
                 onPageFinished = {
@@ -370,20 +366,19 @@ class PlayerActivity : AppCompatActivity() {
      * For Fire TV, software rendering is forced to prevent black screen on certain streams.
      */
     private fun createWebView(context: Context): WebView {
-        var webView: WebView
+        val webView: WebView
 
         val isHardwareAccelerated =
             context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_HARDWARE_ACCELERATED != 0
 
         if (isFireTV) {
-            try {
+            webView = try {
                 val clazz = Class.forName("com.amazon.android.webkit.AmazonWebView")
                 val constructor = clazz.getConstructor(Context::class.java)
-                val instance = constructor.newInstance(context) as WebView
-                webView = instance
+                constructor.newInstance(context) as WebView
             } catch (e: Exception) {
                 Log.w(TAG, "[WebView] AmazonWebView unavailable, falling back to standard WebView: ${e.message}")
-                webView = WebView(context)
+                WebView(context)
             }
 
             // Fire TV: always use software rendering regardless of the hardware acceleration flag.
@@ -471,14 +466,8 @@ class PlayerActivity : AppCompatActivity() {
 /**
  * AdBlockerWebViewClient - Handles ad blocking and page lifecycle events.
  *
- * Blocks ads at three layers:
- *   1. Network layer (shouldInterceptRequest) — prevents the request from ever being made,
- *      saving bandwidth and stopping tracking pixels early.
- *   2. Early JS override (onPageStarted) — overrides vastAdsEnabled and showAdPlayer()
- *      before any page scripts execute, beating the 1-second setTimeout on vidplus pages.
- *   3. DOM layer (onPageFinished JS injection) — removes any ad elements that were already
- *      embedded in the HTML before the network layer could intercept them, including
- *      <video id="ad-video"> overlay ads injected by the page itself.
+ * Blocks ads at the network layer (shouldInterceptRequest) — prevents requests from
+ * ever being made, saving bandwidth and stopping tracking pixels early.
  */
 private class AdBlockerWebViewClient(
     private val onPageFinished: () -> Unit,
@@ -499,32 +488,12 @@ private class AdBlockerWebViewClient(
         "adtechtraffic.com", "bet365.com", "1xbet.com", "cloud.mail.ru"
     )
 
-    /**
-     * Known ad video URL path segments. These are matched against the full request URL
-     * so that ad videos hosted on otherwise-legitimate CDNs (e.g. raw.githubusercontent.com)
-     * are still blocked without having to blanket-block the entire domain.
-     *
-     * Add new entries here whenever a new ad video source is discovered — one entry per
-     * distinct path prefix or filename pattern is sufficient.
-     */
-    private val adVideoUrlPatterns = setOf(
-        // The specific ad video observed in the wild:
-        // <video id="ad-video" src="https://raw.githubusercontent.com/michel8899/test/refs/heads/main/two.mp4">
-        "raw.githubusercontent.com/michel8899"
-    )
-
     // ── Network interception ──────────────────────────────────────────────────
 
     override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
         val url = request?.url?.toString()?.lowercase() ?: return null
 
-        // Block known ad domains
         if (adDomains.any { url.contains(it) }) {
-            return emptyResponse()
-        }
-
-        // Block known ad video URL patterns
-        if (adVideoUrlPatterns.any { url.contains(it) }) {
             return emptyResponse()
         }
 
@@ -535,147 +504,19 @@ private class AdBlockerWebViewClient(
     private fun emptyResponse(): WebResourceResponse =
         WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream("".toByteArray()))
 
-    // ── Early JS override (runs before page scripts execute) ─────────────────
-
-    /**
-     * onPageStarted fires as soon as the WebView begins parsing the page — before
-     * any <script> tags run. Injecting here beats the setTimeout(..., 1000) that
-     * vidplus uses to auto-trigger showAdPlayer(), so our no-ops land in the JS
-     * runtime first and the page's own ad logic calls them instead of the real ones.
-     */
-    override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
-        super.onPageStarted(view, url, favicon)
-
-        val host = url?.lowercase() ?: ""
-        if (host.contains("vidplus")) {
-            Log.i("AdBlocker", "[Vidplus] onPageStarted — injecting early ad override")
-            view?.evaluateJavascript(
-                """
-                (function() {
-                    try {
-                        // Disable the VAST ad flag before any page script reads it
-                        window.vastAdsEnabled = false;
-
-                        // Replace showAdPlayer with a no-op so the setTimeout callback
-                        // does nothing even if it fires before our onPageFinished cleanup
-                        window.showAdPlayer = function() {
-                            console.log('[AdBlocker] showAdPlayer suppressed');
-                        };
-
-                        // Override playVideo to skip straight to the embed
-                        window.playVideo = function() {
-                            console.log('[AdBlocker] playVideo → loadEmbedVideo (ad skipped)');
-                            if (typeof loadEmbedVideo === 'function') loadEmbedVideo();
-                        };
-                    } catch(e) {
-                        console.warn('[AdBlocker] onPageStarted injection error:', e);
-                    }
-                })();
-                """.trimIndent(),
-                null
-            )
-        }
-    }
-
     // ── DOM-level cleanup (runs after page load) ──────────────────────────────
 
     override fun onPageFinished(view: WebView?, url: String?) {
         super.onPageFinished(view, url)
         onPageFinished()
 
-        // ── Vidplus: full DOM cleanup + safety re-override ───────────────────
-        // onPageStarted handles the race, but onPageFinished gives us a second
-        // pass to remove any ad DOM nodes that were already present in the HTML,
-        // re-assert the JS overrides in case the page re-declared them, and
-        // set up a MutationObserver to catch any dynamically re-injected elements.
-        val host = url?.lowercase() ?: ""
-        if (host.contains("vidplus")) {
-            Log.i("AdBlocker", "[Vidplus] onPageFinished — DOM cleanup + safety re-override")
-            view?.evaluateJavascript(
-                """
-                (function() {
-                    try {
-                        // Re-assert overrides (page scripts may have re-declared these)
-                        window.vastAdsEnabled = false;
-                        window.showAdPlayer = function() {
-                            console.log('[AdBlocker] showAdPlayer suppressed (onPageFinished)');
-                        };
-                        window.playVideo = function() {
-                            console.log('[AdBlocker] playVideo → loadEmbedVideo (onPageFinished)');
-                            if (typeof loadEmbedVideo === 'function') loadEmbedVideo();
-                        };
-
-                        // Remove ad overlay container
-                        var adContainer = document.getElementById('ad-player-container');
-                        if (adContainer) {
-                            adContainer.remove();
-                            console.log('[AdBlocker] #ad-player-container removed');
-                        }
-
-                        // Stop and remove the ad video element
-                        var adVideo = document.getElementById('ad-video');
-                        if (adVideo) {
-                            adVideo.pause();
-                            adVideo.removeAttribute('src');
-                            adVideo.load();
-                            adVideo.remove();
-                            console.log('[AdBlocker] #ad-video removed');
-                        }
-
-                        // MutationObserver: catch re-injected ad nodes
-                        if (!window.__vidplusAdObserverActive) {
-                            window.__vidplusAdObserverActive = true;
-                            new MutationObserver(function(mutations) {
-                                mutations.forEach(function(m) {
-                                    m.addedNodes.forEach(function(node) {
-                                        // Direct match
-                                        if (node.id === 'ad-player-container' || node.id === 'ad-video') {
-                                            if (node.pause) node.pause();
-                                            node.remove();
-                                            console.log('[AdBlocker] MutationObserver removed re-injected ad node:', node.id);
-                                            return;
-                                        }
-                                        // Descendant match
-                                        if (node.querySelectorAll) {
-                                            node.querySelectorAll('#ad-player-container, #ad-video').forEach(function(el) {
-                                                if (el.pause) el.pause();
-                                                el.remove();
-                                                console.log('[AdBlocker] MutationObserver removed descendant ad node:', el.id);
-                                            });
-                                        }
-                                    });
-                                });
-                            }).observe(document.documentElement, { childList: true, subtree: true });
-                            console.log('[AdBlocker] MutationObserver active for vidplus');
-                        }
-
-                        // Trigger embed load directly now that the ad path is cleared
-                        if (typeof loadEmbedVideo === 'function') {
-                            console.log('[AdBlocker] Calling loadEmbedVideo() directly');
-                            loadEmbedVideo();
-                        }
-                    } catch(e) {
-                        console.warn('[AdBlocker] onPageFinished injection error:', e);
-                    }
-                })();
-                """.trimIndent(),
-                null
-            )
-        }
-
-        // ── Generic ad cleanup (all pages) ───────────────────────────────────
         view?.evaluateJavascript(
             """
             (function() {
                 // ── Inject CSS to hide common ad containers ──────────────────
                 var style = document.createElement('style');
-                style.innerHTML = [
-                    'div[id^="ad"], div[class^="ad"], .popup, .overlay { display: none !important; }',
-                    // Hide the ad-video element by id and also by common wrapper patterns
-                    '#ad-video, [id*="ad-video"], [class*="ad-video"] { display: none !important; }',
-                    // Hide any full-cover overlay containers that wrap ad videos
-                    'div[style*="position: fixed"], div[style*="position:fixed"] { pointer-events: none; }'
-                ].join(' ');
+                style.innerHTML =
+                    'div[id^="ad"], div[class^="ad"], .popup, .overlay { display: none !important; }';
                 document.head.appendChild(style);
 
                 // ── Remove ad DOM nodes immediately ──────────────────────────
@@ -683,58 +524,21 @@ private class AdBlockerWebViewClient(
                     'div[id^="ad"]',
                     'div[class^="ad"]',
                     'iframe[src*="doubleclick"]',
-                    'iframe[src*="google"]',
-                    '#ad-video',
-                    '[id*="ad-video"]',
-                    '[class*="ad-video"]'
+                    'iframe[src*="google"]'
                 ];
                 document.querySelectorAll(selectors.join(',')).forEach(function(el) {
                     el.remove();
                 });
 
-                // ── Remove any <video> whose src matches known ad patterns ───
-                var adVideoPatterns = [
-                    'raw.githubusercontent.com/michel8899'
-                ];
-                document.querySelectorAll('video').forEach(function(v) {
-                    var src = (v.src || v.getAttribute('src') || '').toLowerCase();
-                    var isAd = adVideoPatterns.some(function(p) { return src.indexOf(p) !== -1; });
-                    // Also treat any video with id="ad-video" as an ad regardless of src
-                    if (isAd || v.id === 'ad-video') {
-                        v.pause();
-                        v.remove();
-                    }
-                });
-
-                // ── MutationObserver: catch dynamically injected ad videos ───
-                // Some pages inject the ad-video element after the initial DOM is built.
-                // The observer watches for new nodes and removes them before they play.
+                // ── MutationObserver: catch dynamically injected ad containers ─
                 if (!window.__adObserverActive) {
                     window.__adObserverActive = true;
                     var observer = new MutationObserver(function(mutations) {
                         mutations.forEach(function(mutation) {
                             mutation.addedNodes.forEach(function(node) {
                                 if (!node.querySelectorAll) return;
-
-                                // Check the node itself
-                                if (node.nodeName === 'VIDEO') {
-                                    var src = (node.src || node.getAttribute('src') || '').toLowerCase();
-                                    var isAd = adVideoPatterns.some(function(p) { return src.indexOf(p) !== -1; });
-                                    if (isAd || node.id === 'ad-video') {
-                                        node.pause();
-                                        node.remove();
-                                        return;
-                                    }
-                                }
-
-                                // Check descendants
-                                node.querySelectorAll('video, #ad-video, [id*="ad-video"]').forEach(function(v) {
-                                    var src = (v.src || v.getAttribute('src') || '').toLowerCase();
-                                    var isAd = adVideoPatterns.some(function(p) { return src.indexOf(p) !== -1; });
-                                    if (isAd || v.id === 'ad-video') {
-                                        v.pause();
-                                        v.remove();
-                                    }
+                                node.querySelectorAll('div[id^="ad"], div[class^="ad"]').forEach(function(el) {
+                                    el.remove();
                                 });
                             });
                         });
