@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -78,6 +79,7 @@ import kotlinx.coroutines.withContext
  * @param scheduleViewModel The [ScheduleViewModel] instance
  */
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 fun LiveTvScreen(
     onChannelPlay: (IptvChannel) -> Unit,
     onNavigate: (String) -> Unit = {},
