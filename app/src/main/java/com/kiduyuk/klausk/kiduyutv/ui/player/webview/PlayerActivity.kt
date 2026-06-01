@@ -471,10 +471,12 @@ class PlayerActivity : AppCompatActivity() {
 /**
  * AdBlockerWebViewClient - Handles ad blocking and page lifecycle events.
  *
- * Blocks ads at two layers:
+ * Blocks ads at three layers:
  *   1. Network layer (shouldInterceptRequest) — prevents the request from ever being made,
  *      saving bandwidth and stopping tracking pixels early.
- *   2. DOM layer (onPageFinished JS injection) — removes any ad elements that were already
+ *   2. Early JS override (onPageStarted) — overrides vastAdsEnabled and showAdPlayer()
+ *      before any page scripts execute, beating the 1-second setTimeout on vidplus pages.
+ *   3. DOM layer (onPageFinished JS injection) — removes any ad elements that were already
  *      embedded in the HTML before the network layer could intercept them, including
  *      <video id="ad-video"> overlay ads injected by the page itself.
  */
@@ -533,12 +535,135 @@ private class AdBlockerWebViewClient(
     private fun emptyResponse(): WebResourceResponse =
         WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream("".toByteArray()))
 
+    // ── Early JS override (runs before page scripts execute) ─────────────────
+
+    /**
+     * onPageStarted fires as soon as the WebView begins parsing the page — before
+     * any <script> tags run. Injecting here beats the setTimeout(..., 1000) that
+     * vidplus uses to auto-trigger showAdPlayer(), so our no-ops land in the JS
+     * runtime first and the page's own ad logic calls them instead of the real ones.
+     */
+    override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+        super.onPageStarted(view, url, favicon)
+
+        val host = url?.lowercase() ?: ""
+        if (host.contains("vidplus")) {
+            Log.i("AdBlocker", "[Vidplus] onPageStarted — injecting early ad override")
+            view?.evaluateJavascript(
+                """
+                (function() {
+                    try {
+                        // Disable the VAST ad flag before any page script reads it
+                        window.vastAdsEnabled = false;
+
+                        // Replace showAdPlayer with a no-op so the setTimeout callback
+                        // does nothing even if it fires before our onPageFinished cleanup
+                        window.showAdPlayer = function() {
+                            console.log('[AdBlocker] showAdPlayer suppressed');
+                        };
+
+                        // Override playVideo to skip straight to the embed
+                        window.playVideo = function() {
+                            console.log('[AdBlocker] playVideo → loadEmbedVideo (ad skipped)');
+                            if (typeof loadEmbedVideo === 'function') loadEmbedVideo();
+                        };
+                    } catch(e) {
+                        console.warn('[AdBlocker] onPageStarted injection error:', e);
+                    }
+                })();
+                """.trimIndent(),
+                null
+            )
+        }
+    }
+
     // ── DOM-level cleanup (runs after page load) ──────────────────────────────
 
     override fun onPageFinished(view: WebView?, url: String?) {
         super.onPageFinished(view, url)
         onPageFinished()
 
+        // ── Vidplus: full DOM cleanup + safety re-override ───────────────────
+        // onPageStarted handles the race, but onPageFinished gives us a second
+        // pass to remove any ad DOM nodes that were already present in the HTML,
+        // re-assert the JS overrides in case the page re-declared them, and
+        // set up a MutationObserver to catch any dynamically re-injected elements.
+        val host = url?.lowercase() ?: ""
+        if (host.contains("vidplus")) {
+            Log.i("AdBlocker", "[Vidplus] onPageFinished — DOM cleanup + safety re-override")
+            view?.evaluateJavascript(
+                """
+                (function() {
+                    try {
+                        // Re-assert overrides (page scripts may have re-declared these)
+                        window.vastAdsEnabled = false;
+                        window.showAdPlayer = function() {
+                            console.log('[AdBlocker] showAdPlayer suppressed (onPageFinished)');
+                        };
+                        window.playVideo = function() {
+                            console.log('[AdBlocker] playVideo → loadEmbedVideo (onPageFinished)');
+                            if (typeof loadEmbedVideo === 'function') loadEmbedVideo();
+                        };
+
+                        // Remove ad overlay container
+                        var adContainer = document.getElementById('ad-player-container');
+                        if (adContainer) {
+                            adContainer.remove();
+                            console.log('[AdBlocker] #ad-player-container removed');
+                        }
+
+                        // Stop and remove the ad video element
+                        var adVideo = document.getElementById('ad-video');
+                        if (adVideo) {
+                            adVideo.pause();
+                            adVideo.removeAttribute('src');
+                            adVideo.load();
+                            adVideo.remove();
+                            console.log('[AdBlocker] #ad-video removed');
+                        }
+
+                        // MutationObserver: catch re-injected ad nodes
+                        if (!window.__vidplusAdObserverActive) {
+                            window.__vidplusAdObserverActive = true;
+                            new MutationObserver(function(mutations) {
+                                mutations.forEach(function(m) {
+                                    m.addedNodes.forEach(function(node) {
+                                        // Direct match
+                                        if (node.id === 'ad-player-container' || node.id === 'ad-video') {
+                                            if (node.pause) node.pause();
+                                            node.remove();
+                                            console.log('[AdBlocker] MutationObserver removed re-injected ad node:', node.id);
+                                            return;
+                                        }
+                                        // Descendant match
+                                        if (node.querySelectorAll) {
+                                            node.querySelectorAll('#ad-player-container, #ad-video').forEach(function(el) {
+                                                if (el.pause) el.pause();
+                                                el.remove();
+                                                console.log('[AdBlocker] MutationObserver removed descendant ad node:', el.id);
+                                            });
+                                        }
+                                    });
+                                });
+                            }).observe(document.documentElement, { childList: true, subtree: true });
+                            console.log('[AdBlocker] MutationObserver active for vidplus');
+                        }
+
+                        // Trigger embed load directly now that the ad path is cleared
+                        if (typeof loadEmbedVideo === 'function') {
+                            console.log('[AdBlocker] Calling loadEmbedVideo() directly');
+                            loadEmbedVideo();
+                        }
+                    } catch(e) {
+                        console.warn('[AdBlocker] onPageFinished injection error:', e);
+                    }
+                })();
+                """.trimIndent(),
+                null
+            )
+        }
+
+        // ── Generic ad cleanup (all pages) ───────────────────────────────────
         view?.evaluateJavascript(
             """
             (function() {
@@ -629,4 +754,3 @@ private class AdBlockerWebViewClient(
         }
     }
 }
-
