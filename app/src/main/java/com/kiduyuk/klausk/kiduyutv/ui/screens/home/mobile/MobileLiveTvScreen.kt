@@ -92,7 +92,12 @@ fun MobileLiveTvScreen(
                     Tab(
                         selected = selectedTab == 1,
                         onClick = { selectedTab = 1 },
-                        text = { Text("My Channels") }
+                        text = {
+                            val favCount = viewModel.getFavoriteChannels().size
+                            Text(
+                                text = if (favCount > 0) "My Channels ($favCount)" else "My Channels"
+                            )
+                        }
                     )
                 }
 

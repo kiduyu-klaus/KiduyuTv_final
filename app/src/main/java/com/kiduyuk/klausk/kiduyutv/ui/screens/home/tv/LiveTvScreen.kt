@@ -156,7 +156,7 @@ fun LiveTvScreen(
     val tabs = listOf(
         TabItem("Live TV", Icons.Default.Tv),
         TabItem("Schedule", Icons.Default.CalendarToday),
-        TabItem("My Channels", Icons.Default.List)
+        TabItem("My Channels (${viewModel.getFavoriteChannels().size})", Icons.Default.List)
     )
 
     Box(
