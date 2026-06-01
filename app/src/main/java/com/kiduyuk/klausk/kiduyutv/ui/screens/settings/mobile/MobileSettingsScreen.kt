@@ -704,7 +704,7 @@ fun MobileSettingsScreen(
         }
     }
 
-    // ── Default Provider Picker Dialog ────────────────────────────────────────
+    // ── Default PROVIDERSPicker Dialog ────────────────────────────────────────
     if (showProviderPicker) {
         val options = listOf(SettingsManager.AUTO) + SettingsManager.PROVIDERS
         AlertDialog(

@@ -3,6 +3,7 @@ package com.kiduyuk.klausk.kiduyutv.util
 import android.content.Context
 import android.content.SharedPreferences
 import android.provider.Settings
+import com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager
 import java.util.UUID
 
 class SettingsManager(context: Context) {
@@ -70,7 +71,10 @@ class SettingsManager(context: Context) {
         /** Sentinel value meaning "ask me each time" — no automatic selection. */
         const val AUTO = "Auto"
 
-        /** All active providers in display order. */
-        val PROVIDERS = listOf("Videasy", "VidLink", "VidFast", "VidKing", "Flixer")
+        /**
+         * All active providers in display order.
+         * Uses the first 10 providers from StreamProviderManager for consistency.
+         */
+        val PROVIDERS: List<String> = StreamProviderManager.providers.take(10).map { it.name }
     }
 }

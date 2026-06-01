@@ -1269,73 +1269,95 @@ private fun PlaybackContent(
                     color = TextSecondary,
                     fontSize = 14.sp,
                     lineHeight = 20.sp,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    modifier = Modifier.padding(bottom = 16.dp)
                 )
 
-                options.forEach { option ->
-                    val isSelected = option == defaultProvider
-                    val interactionSource = remember { MutableInteractionSource() }
-                    val isFocused by interactionSource.collectIsFocusedAsState()
-
+                // Display providers in 2 columns for TV
+                val rows = options.chunked(2)
+                rows.forEach { rowOptions ->
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                when {
-                                    isSelected -> PrimaryRed.copy(alpha = 0.12f)
-                                    isFocused -> SurfaceDark
-                                    else -> Color.Transparent
-                                }
-                            )
-                            .border(
-                                width = if (isSelected || isFocused) 2.dp else 1.dp,
-                                color = when {
-                                    isSelected -> PrimaryRed
-                                    isFocused -> DarkRed.copy(alpha = 0.6f)
-                                    else -> TextTertiary.copy(alpha = 0.2f)
-                                },
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                            .clickable(
-                                interactionSource = interactionSource,
-                                indication = null,
-                                onClick = { onProviderSelect(option) }
-                            )
-                            .focusable(interactionSource = interactionSource)
-                            .padding(horizontal = 20.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.PlayCircle,
-                                contentDescription = null,
-                                tint = if (isSelected) PrimaryRed else TextSecondary,
-                                modifier = Modifier.size(20.dp)
+                        rowOptions.forEach { option ->
+                            ProviderOptionItem(
+                                option = option,
+                                isSelected = option == defaultProvider,
+                                onClick = { onProviderSelect(option) },
+                                modifier = Modifier.weight(1f)
                             )
-                            Column {
-                                Text(
-                                    text = option,
-                                    color = if (isSelected || isFocused) TextPrimary else TextSecondary,
-                                    fontSize = 16.sp,
-                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
-                                )
-                                if (option == SettingsManager.AUTO) {
-                                    Text(
-                                        text = "Show provider list each time",
-                                        color = TextSecondary,
-                                        fontSize = 12.sp
-                                    )
-                                }
-                            }
+                        }
+                        // Add empty spacer if odd number of items
+                        if (rowOptions.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ProviderOptionItem(
+    option: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                when {
+                    isSelected -> PrimaryRed.copy(alpha = 0.12f)
+                    isFocused -> SurfaceDark
+                    else -> Color.Transparent
+                }
+            )
+            .border(
+                width = if (isSelected || isFocused) 2.dp else 1.dp,
+                color = when {
+                    isSelected -> PrimaryRed
+                    isFocused -> DarkRed.copy(alpha = 0.6f)
+                    else -> TextTertiary.copy(alpha = 0.2f)
+                },
+                shape = RoundedCornerShape(12.dp)
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+            .focusable(interactionSource = interactionSource)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.PlayCircle,
+            contentDescription = null,
+            tint = if (isSelected) PrimaryRed else TextSecondary,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = option,
+            color = if (isSelected || isFocused) TextPrimary else TextSecondary,
+            fontSize = 14.sp,
+            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+            textAlign = TextAlign.Center
+        )
+        if (option == SettingsManager.AUTO) {
+            Text(
+                text = "Ask each time",
+                color = TextSecondary,
+                fontSize = 11.sp,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }

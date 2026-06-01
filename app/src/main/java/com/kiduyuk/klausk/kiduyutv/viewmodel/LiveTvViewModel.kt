@@ -123,39 +123,140 @@ class LiveTvViewModel : ViewModel() {
 
     /**
      * Adds channel to favorites if not already present and syncs to Firebase.
+     * Performs bidirectional sync to ensure both SharedPreferences and Firebase have the same channels.
      */
     fun addFavorite(channel: IptvChannel) {
-        val current = getFavoriteChannels().toMutableList()
-        if (current.any { it.url == channel.url }) return
-        current.add(0, channel)
-        saveFavoriteChannels(current)
-
-        // Sync to Firebase savedChannels node if FirebaseManager initialized
-        try {
-            val key = Base64.encodeToString(channel.url.toByteArray(), Base64.NO_WRAP)
-            com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.saveChannel(
-                key = key,
-                name = channel.name,
-                logo = channel.logo,
-                url = channel.url,
-                group = channel.group
-            )
-        } catch (e: Exception) {
-            // ignore
+        viewModelScope.launch {
+            try {
+                // Get current local favorites
+                val localFavorites = getFavoriteChannels().toMutableList()
+                
+                // Check if already exists locally
+                if (localFavorites.any { it.url == channel.url }) {
+                    return@launch
+                }
+                
+                // Add to local list (at the beginning)
+                localFavorites.add(0, channel)
+                
+                // Save to SharedPreferences
+                saveFavoriteChannels(localFavorites)
+                
+                // Get Firebase favorites
+                val firebaseFavorites = com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.getSavedChannelsOnce()
+                val firebaseUrls = firebaseFavorites?.values?.mapNotNull { it as? Map<*, *> }?.map { it["url"] as? String }?.toSet() ?: emptySet()
+                
+                // Perform bidirectional sync
+                // 1. Add missing channels from SharedPreferences to Firebase
+                val key = Base64.encodeToString(channel.url.toByteArray(), Base64.NO_WRAP)
+                com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.saveChannel(
+                    key = key,
+                    name = channel.name,
+                    logo = channel.logo,
+                    url = channel.url,
+                    group = channel.group
+                )
+                
+                // 2. Add missing channels from Firebase to SharedPreferences
+                if (firebaseFavorites != null) {
+                    val localUrls = localFavorites.map { it.url }.toSet()
+                    val newLocalFavorites = localFavorites.toMutableList()
+                    
+                    firebaseFavorites.values.forEach { value ->
+                        if (value is Map<*, *>) {
+                            val fbUrl = value["url"] as? String
+                            if (fbUrl != null && !localUrls.contains(fbUrl)) {
+                                // Channel exists in Firebase but not in SharedPreferences
+                                val existingChannel = localFavorites.find { it.url == fbUrl }
+                                if (existingChannel == null) {
+                                    // Add the missing channel to SharedPreferences
+                                    newLocalFavorites.add(IptvChannel(
+                                        name = value["name"] as? String ?: "",
+                                        logo = value["logo"] as? String,
+                                        url = fbUrl,
+                                        group = value["group"] as? String
+                                    ))
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Only update if we added new channels
+                    if (newLocalFavorites.size > localFavorites.size) {
+                        saveFavoriteChannels(newLocalFavorites)
+                    }
+                }
+            } catch (e: Exception) {
+                // Log error but don't crash
+                android.util.Log.e("LiveTvViewModel", "Error adding favorite", e)
+            }
         }
     }
 
     /**
      * Removes a channel from favorites locally and from Firebase.
+     * Performs bidirectional sync to ensure both SharedPreferences and Firebase have the same channels.
      */
     fun removeFavorite(channel: IptvChannel) {
-        val current = getFavoriteChannels().filter { it.url != channel.url }
-        saveFavoriteChannels(current)
-        try {
-            val key = Base64.encodeToString(channel.url.toByteArray(), Base64.NO_WRAP)
-            com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.removeSavedChannel(key)
-        } catch (e: Exception) {
-            // ignore
+        viewModelScope.launch {
+            try {
+                // Get current local favorites
+                val localFavorites = getFavoriteChannels().toMutableList()
+                
+                // Remove from local list
+                localFavorites.removeAll { it.url == channel.url }
+                
+                // Save updated list to SharedPreferences
+                saveFavoriteChannels(localFavorites)
+                
+                // Remove from Firebase
+                val key = Base64.encodeToString(channel.url.toByteArray(), Base64.NO_WRAP)
+                com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.removeSavedChannel(key)
+                
+                // Perform bidirectional sync
+                // Get Firebase favorites and add any channels that are in Firebase but not in SharedPreferences
+                val firebaseFavorites = com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.getSavedChannelsOnce()
+                if (firebaseFavorites != null) {
+                    val localUrls = localFavorites.map { it.url }.toSet()
+                    val updatedLocalFavorites = localFavorites.toMutableList()
+                    var hasNewChannels = false
+                    
+                    firebaseFavorites.values.forEach { value ->
+                        if (value is Map<*, *>) {
+                            val fbUrl = value["url"] as? String
+                            if (fbUrl != null && !localUrls.contains(fbUrl) && fbUrl != channel.url) {
+                                // Channel exists in Firebase but not in SharedPreferences (and it's not the one we just removed)
+                                val newChannel = IptvChannel(
+                                    name = value["name"] as? String ?: "",
+                                    logo = value["logo"] as? String,
+                                    url = fbUrl,
+                                    group = value["group"] as? String
+                                )
+                                updatedLocalFavorites.add(newChannel)
+                                hasNewChannels = true
+                                
+                                // Add to Firebase (in case it was somehow missing)
+                                val fbKey = Base64.encodeToString(fbUrl.toByteArray(), Base64.NO_WRAP)
+                                com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.saveChannel(
+                                    key = fbKey,
+                                    name = newChannel.name,
+                                    logo = newChannel.logo,
+                                    url = newChannel.url,
+                                    group = newChannel.group
+                                )
+                            }
+                        }
+                    }
+                    
+                    // Only update if we found new channels from Firebase
+                    if (hasNewChannels) {
+                        saveFavoriteChannels(updatedLocalFavorites)
+                    }
+                }
+            } catch (e: Exception) {
+                // Log error but don't crash
+                android.util.Log.e("LiveTvViewModel", "Error removing favorite", e)
+            }
         }
     }
 
