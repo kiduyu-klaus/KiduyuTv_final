@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlin.io.encoding.ExperimentalEncodingApi
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -560,7 +559,6 @@ object FirebaseSyncManager {
      * they get uploaded so other devices can see them.
      * Merges cloud favorites with local favorites, giving priority to cloud data.
      */
-
     private suspend fun syncFavoriteChannels(forceRefresh: Boolean) {
         try {
             val context = applicationContext ?: return
@@ -658,7 +656,8 @@ object FirebaseSyncManager {
                 mergedJsonArray.put(jsonObj)
             }
 
-            prefs.edit().putString("favorites", mergedJsonArray.toString()).apply()
+            // FIXED: Use consistent key "favorite_channels" (was "favorites" before)
+            prefs.edit().putString("favorite_channels", mergedJsonArray.toString()).apply()
             Log.i(TAG, "Saved ${mergedFavorites.size} merged favorites to local storage")
 
             // ── STEP 5: Upload merged list BACK to Firebase (TWO-WAY SYNC) ──
@@ -668,7 +667,6 @@ object FirebaseSyncManager {
             Log.e(TAG, "Error syncing Favorite Channels", e)
         }
     }
-
     
     /**
      * Upload the merged favorites list to Firebase.
@@ -676,7 +674,6 @@ object FirebaseSyncManager {
      * 1. Local favorites not in Firebase get uploaded
      * 2. Remote devices will receive the complete list on their next sync
      */
-    @OptIn(ExperimentalEncodingApi::class)
     private suspend fun uploadMergedFavoritesToFirebase(favorites: List<IptvChannel>) {
         try {
             // Clear current savedChannels node first
@@ -848,6 +845,13 @@ object FirebaseSyncManager {
                 DatabaseManager.clearMyList()
                 DatabaseManager.clearWatchHistory()
                 
+                // Clear favorite channels from SharedPreferences
+                val context = applicationContext
+                if (context != null) {
+                    val prefs = context.getSharedPreferences("live_tv_prefs", Context.MODE_PRIVATE)
+                    prefs.edit().remove("favorite_channels").apply()
+                }
+                
                 // Don't clear Firebase - user data persists
                 Log.i(TAG, "Local data cleared successfully")
                 onComplete?.invoke()
@@ -874,4 +878,3 @@ object FirebaseSyncManager {
         return _syncState.value is SyncState.Syncing
     }
 }
-
