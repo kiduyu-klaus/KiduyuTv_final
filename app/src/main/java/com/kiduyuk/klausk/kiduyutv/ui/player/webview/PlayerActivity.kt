@@ -177,9 +177,10 @@ class PlayerActivity : AppCompatActivity() {
             }
         }
 
-        if (iframeHtml != null) {
+        val html = iframeHtml
+        if (html != null) {
             val baseUrl = streamUrl.toBaseUrl()
-            webView.loadDataWithBaseURL(baseUrl, iframeHtml, "text/html", "UTF-8", null)
+            webView.loadDataWithBaseURL(baseUrl, html, "text/html", "UTF-8", null)
         } else {
             webView.loadUrl(streamUrl)
         }
