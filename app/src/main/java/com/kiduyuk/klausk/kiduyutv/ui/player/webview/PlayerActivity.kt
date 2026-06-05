@@ -61,6 +61,7 @@ class PlayerActivity : AppCompatActivity() {
         if (tmdbId == -1) { finish(); return }
 
         buildLayout()
+        hideSystemUi()
         configureWebView()
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -142,7 +143,6 @@ class PlayerActivity : AppCompatActivity() {
         webView.isHorizontalScrollBarEnabled = false
         webView.isVerticalScrollBarEnabled   = false
         webView.overScrollMode               = View.OVER_SCROLL_NEVER
-        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
 
         webView.webViewClient = AdBlockerWebViewClient()
 
@@ -193,6 +193,7 @@ class PlayerActivity : AppCompatActivity() {
         fullscreenView = null
         fullscreenCallback?.onCustomViewHidden()
         fullscreenCallback = null
+        webView.bringToFront()
         showSystemUi()
         Log.i(TAG, "[Fullscreen] exited")
     }
