@@ -407,49 +407,167 @@ class PlayerActivity : AppCompatActivity() {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /**
-     * Returns AmazonWebView on Fire TV devices, standard WebView everywhere else.
-     * AmazonWebView is a system class on Fire OS — accessed via reflection so the
-     * app compiles and runs normally on non-Amazon devices.
+     * Creates and configures a WebView instance optimized for the current device.
      *
-     * For Fire TV, software rendering is forced to prevent black screen on certain streams.
+     * For Fire TV devices:
+     * - Detects if Amazon Chromium WebView (com.amazon.webview.chromium) is available
+     * - Applies hardware or software rendering based on device capabilities
+     *
+     * For non-Fire TV devices:
+     * - Uses standard WebView with hardware acceleration when available
      */
     private fun createWebView(context: Context): WebView {
-        var webView: WebView
+        val webView = WebView(context)
 
+        // Check if hardware acceleration is available
         val isHardwareAccelerated =
             context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_HARDWARE_ACCELERATED != 0
 
         if (isFireTV) {
-            try {
-                val clazz = Class.forName("com.amazon.android.webkit.AmazonWebView")
-                val constructor = clazz.getConstructor(Context::class.java)
-                val instance = constructor.newInstance(context) as WebView
-                webView = instance
-            } catch (e: Exception) {
-                Log.w(TAG, "[WebView] AmazonWebView unavailable, falling back to standard WebView: ${e.message}")
-                webView = WebView(context)
+            val isAmazonChromium = isAmazonChromiumAvailable()
+
+            Log.i(TAG, "[WebView] Fire TV detected")
+            Log.i(TAG, "[WebView] Amazon Chromium WebView: $isAmazonChromium")
+            Log.i(TAG, "[WebView] Hardware acceleration available: $isHardwareAccelerated")
+
+            if (isHardwareAccelerated) {
+                webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+                Log.i(TAG, "[WebView] Fire TV: hardware acceleration enabled")
+            } else {
+                webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+                Log.w(TAG, "[WebView] Fire TV: hardware acceleration unavailable, using software rendering")
             }
 
-            // Fire TV: always use software rendering regardless of the hardware acceleration flag.
-            // With LAYER_TYPE_HARDWARE the video surface (SurfaceView) renders on a separate
-            // hardware overlay that does not composite with the WebView GPU layer, producing a
-            // black screen on certain streams. Software rendering composites everything onto one
-            // canvas and eliminates the issue.
-            webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
-            Log.i(TAG, "[WebView] Fire TV: software rendering forced to prevent black screen")
+            if (isAmazonChromium) {
+                Log.i(TAG, "[WebView] ✅ Running on Amazon Chromium WebView (com.amazon.webview.chromium)")
+            } else {
+                Log.w(TAG, "[WebView] ⚠️ Amazon Chromium WebView not available, using fallback WebView")
+            }
         } else {
-            webView = WebView(context)
+            Log.i(TAG, "[WebView] Non-Fire TV device")
+            Log.i(TAG, "[WebView] Hardware acceleration available: $isHardwareAccelerated")
 
             if (isHardwareAccelerated) {
                 webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
                 Log.i(TAG, "[WebView] Hardware acceleration enabled")
             } else {
                 webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
-                Log.w(TAG, "[WebView] Hardware acceleration unavailable, falling back to software rendering")
+                Log.w(TAG, "[WebView] Hardware acceleration unavailable, using software rendering")
             }
         }
 
+        // Log detailed WebView implementation info for debugging
+        logWebViewInfo(webView)
+
         return webView
+    }
+
+    /**
+     * Checks if Amazon's Chromium-based WebView is available on this device.
+     *
+     * Amazon's WebView (com.amazon.webview.chromium) is the optimized WebView
+     * implementation that ships with Fire TV and Fire tablet devices. It provides
+     * better performance and hardware integration compared to the standard AOSP WebView.
+     *
+     * Uses the official Android API WebView.getCurrentWebViewPackage() which is
+     * available from API 26 (Android 8.0) onwards.
+     *
+     * @return true if Amazon Chromium WebView is the current WebView provider
+     */
+    private fun isAmazonChromiumAvailable(): Boolean {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            return try {
+                val webViewPackage = WebView.getCurrentWebViewPackage()
+                val isAmazon = webViewPackage?.packageName == "com.amazon.webview.chromium"
+
+                if (isAmazon) {
+                    Log.d(TAG, "[WebView] Amazon Chromium WebView package detected")
+                } else {
+                    Log.d(TAG, "[WebView] Current WebView package: ${webViewPackage?.packageName ?: "unknown"}")
+                }
+
+                isAmazon
+            } catch (e: Exception) {
+                Log.w(TAG, "[WebView] Error checking WebView package: ${e.message}")
+                false
+            }
+        } else {
+            Log.w(TAG, "[WebView] SDK version ${android.os.Build.VERSION.SDK_INT} < 26, cannot detect WebView package")
+            return false
+        }
+    }
+
+    /**
+     * Logs comprehensive information about the current WebView implementation.
+     *
+     * This is useful for debugging WebView-related issues and verifying which
+     * WebView engine is actually being used at runtime. It logs:
+     * - Implementation class name
+     * - Package name
+     * - Version information
+     * - First install and last update timestamps
+     * - Whether it's Amazon's Chromium WebView or another provider
+     *
+     * Note: Detailed package info requires API 26+. On older versions,
+     * only the implementation class name is logged.
+     */
+    private fun logWebViewInfo(webView: WebView) {
+        try {
+            val webViewClass = webView.javaClass.name
+            Log.i(TAG, "[WebView] Implementation class: $webViewClass")
+
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                val webViewPackage = WebView.getCurrentWebViewPackage()
+
+                if (webViewPackage != null) {
+                    val packageName = webViewPackage.packageName
+                    val versionName = webViewPackage.versionName ?: "unknown"
+                    val versionCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                        webViewPackage.longVersionCode.toString()
+                    } else {
+                        @Suppress("DEPRECATION")
+                        webViewPackage.versionCode.toString()
+                    }
+
+                    Log.i(TAG, "[WebView] Package: $packageName")
+                    Log.i(TAG, "[WebView] Version: $versionName (code: $versionCode)")
+                    Log.i(TAG, "[WebView] First installed: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date(webViewPackage.firstInstallTime))}")
+                    Log.i(TAG, "[WebView] Last updated: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date(webViewPackage.lastUpdateTime))}")
+
+                    // Identify the WebView provider
+                    when {
+                        packageName == "com.amazon.webview.chromium" -> {
+                            Log.i(TAG, "[WebView] ✅ Amazon Chromium WebView - optimized for Fire TV/Fire tablets")
+                            Log.i(TAG, "[WebView] → Hardware-accelerated video playback supported")
+                            Log.i(TAG, "[WebView] → Amazon-specific optimizations active")
+                        }
+                        packageName == "com.google.android.webview" -> {
+                            Log.i(TAG, "[WebView] ℹ️ Google WebView - standard AOSP implementation")
+                        }
+                        packageName == "com.android.chrome" -> {
+                            Log.i(TAG, "[WebView] ℹ️ Chrome WebView - using Chrome as WebView provider")
+                        }
+                        packageName.contains("google") -> {
+                            Log.i(TAG, "[WebView] ℹ️ Google-based WebView: $packageName")
+                        }
+                        packageName.contains("android") -> {
+                            Log.i(TAG, "[WebView] ℹ️ AOSP-based WebView: $packageName")
+                        }
+                        else -> {
+                            Log.i(TAG, "[WebView] ℹ️ Custom/Unknown WebView provider: $packageName")
+                        }
+                    }
+                } else {
+                    Log.w(TAG, "[WebView] Could not determine WebView package (getCurrentWebViewPackage returned null)")
+                    Log.w(TAG, "[WebView] This may indicate a custom ROM or modified Android system")
+                }
+            } else {
+                Log.w(TAG, "[WebView] SDK version ${android.os.Build.VERSION.SDK_INT} < 26, limited WebView info available")
+                Log.i(TAG, "[WebView] Implementation class: $webViewClass")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "[WebView] Error logging WebView implementation details: ${e.message}", e)
+        }
     }
 
     private fun detectProviderFromUrl(url: String): String {
