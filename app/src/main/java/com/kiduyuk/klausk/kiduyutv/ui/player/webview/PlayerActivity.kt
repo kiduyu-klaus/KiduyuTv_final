@@ -695,6 +695,8 @@ class PlayerActivity : AppCompatActivity() {
         if (isCursorDisabled) return
         cursorView.x = cursorX
         cursorView.y = cursorY
+        // In updateCursorPosition(), add this:
+        cursorView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
         cursorView.bringToFront()
         cursorView.invalidate()
     }
