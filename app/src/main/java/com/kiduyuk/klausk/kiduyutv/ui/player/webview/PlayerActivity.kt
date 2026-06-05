@@ -21,7 +21,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private var fullscreenView: View? = null
     private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
-    private var isStartFullscreen = true
+    private var isManualFullscreen = false
 
     companion object {
         private const val TAG = "PlayerActivity"
@@ -53,6 +53,8 @@ class PlayerActivity : AppCompatActivity() {
     private var contentVoteAverage  = 0.0
     private var contentReleaseDate: String?  = null
 
+    private val isStartFullscreen = true
+
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -65,16 +67,16 @@ class PlayerActivity : AppCompatActivity() {
         hideSystemUi()
         configureWebView()
 
-        // ADD: Enter fullscreen after brief delay to ensure WebView is ready
+        // Enter fullscreen after brief delay to ensure WebView is ready
         webView.postDelayed({
-            if (isStartFullscreen && fullscreenView == null) {
+            if (isStartFullscreen && !isManualFullscreen) {
                 enterFullscreen()
             }
         }, 500)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (fullscreenView != null) exitFullscreen() else showExitDialog()
+                if (fullscreenView != null || isManualFullscreen) exitFullscreen() else showExitDialog()
             }
         })
     }
@@ -153,25 +155,70 @@ class PlayerActivity : AppCompatActivity() {
         webView.isVerticalScrollBarEnabled   = false
         webView.overScrollMode               = View.OVER_SCROLL_NEVER
 
-        // ADD: Trigger JavaScript fullscreen on video element after page loads
-        webView.webViewClient = object : AdBlockerWebViewClient() {
+        // Create WebViewClient with both ad blocking AND page finished callback
+        webView.webViewClient = object : WebViewClient() {
+            
+            private val adDomains = setOf(
+                "doubleclick.net", "googlesyndication.com", "googleadservices.com",
+                "adnxs.com", "advertising.com", "adsystem.com", "adserver.com",
+                "rubiconproject.com", "openx.net", "pubmatic.com", "criteo.com",
+                "moatads.com", "taboola.com", "outbrain.com", "adroll.com",
+                "popads.net", "popcash.net", "propellerads.com", "ad-maven.com",
+                "onclickads.net", "adsterra.com", "exoclick.com",
+                "trafficjunky.net", "mc.yandex.ru", "creativecdn.com",
+                "serving-sys.com", "contextweb.com", "bet365.com", "1xbet.com"
+            )
+
             override fun onPageFinished(view: WebView?, url: String?) {
                 super.onPageFinished(view, url)
                 Log.i(TAG, "[WebView] page finished - triggering video fullscreen JS")
                 
-                view.postDelayed({
-                    view.evaluateJavascript(
+                view?.postDelayed({
+                    view?.evaluateJavascript(
                         "document.querySelector('video')?.requestFullscreen();", 
                         null
                     )
-                }, 1000) // Wait 1 second for video to load
+                }, 1000)
+            }
+
+            override fun shouldInterceptRequest(
+                view: WebView?, request: WebResourceRequest?
+            ): WebResourceResponse? {
+                val url = request?.url?.toString()?.lowercase() ?: return null
+                if (adDomains.any { url.contains(it) }) {
+                    return WebResourceResponse(
+                        "text/plain", "utf-8", ByteArrayInputStream("".toByteArray())
+                    )
+                }
+                return super.shouldInterceptRequest(view, request)
+            }
+
+            override fun onReceivedError(
+                view: WebView?, request: WebResourceRequest?, error: WebResourceError?
+            ) {
+                if (request?.isForMainFrame == true) {
+                    Log.e(TAG, "[WebView] main frame error: ${error?.description}")
+                }
             }
         }
 
         webView.webChromeClient = object : WebChromeClient() {
 
             override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
-                if (fullscreenView != null) { exitFullscreen(); return }
+                // Clear manual fullscreen state when website requests real fullscreen
+                if (isManualFullscreen) {
+                    Log.i(TAG, "[Fullscreen] clearing manual fullscreen for website fullscreen")
+                    isManualFullscreen = false
+                    fullscreenView = null
+                    fullscreenCallback = null
+                }
+                
+                if (fullscreenView != null) {
+                    // Don't exit, just hide the new request
+                    callback?.onCustomViewHidden()
+                    return
+                }
+                
                 fullscreenView     = view
                 fullscreenCallback = callback
                 rootLayout.addView(
@@ -183,7 +230,7 @@ class PlayerActivity : AppCompatActivity() {
                 )
                 fullscreenView?.bringToFront()
                 hideSystemUi()
-                Log.i(TAG, "[Fullscreen] entered (via onShowCustomView)")
+                Log.i(TAG, "[Fullscreen] entered (via onShowCustomView) with view: ${view?.javaClass?.simpleName}")
             }
 
             override fun onHideCustomView() {
@@ -214,34 +261,33 @@ class PlayerActivity : AppCompatActivity() {
 
     // ── Fullscreen ────────────────────────────────────────────────────────────
 
-    // Manually enter fullscreen with WebView as the custom view
+    // Enable immersive fullscreen mode (no custom view)
     private fun enterFullscreen() {
-        if (fullscreenView != null) return
-        
-        Log.i(TAG, "[Fullscreen] manually entering with WebView")
-        
-        // Create a wrapper view for WebView
-        fullscreenView = webView
-        fullscreenCallback = object : WebChromeClient.CustomViewCallback {
-            override fun onCustomViewHidden() {
-                Log.i(TAG, "[Fullscreen] callback: custom view hidden")
-            }
-        }
-        
-        // WebView is already in rootLayout, just bring to front
+        if (isManualFullscreen) return
+
+        isManualFullscreen = true
+
         webView.bringToFront()
-        webView.requestLayout()
+        webView.requestFocus()
+
         hideSystemUi()
+
+        Log.i(TAG, "[Fullscreen] immersive mode enabled")
     }
 
     private fun exitFullscreen() {
-        // Don't remove WebView from rootLayout (it's always there)
-        fullscreenCallback?.onCustomViewHidden()
-        fullscreenCallback = null
+        fullscreenView?.let {
+            rootLayout.removeView(it)
+        }
+
         fullscreenView = null
+        fullscreenCallback = null
+        isManualFullscreen = false
+
         webView.bringToFront()
         webView.requestFocus()
         showSystemUi()
+
         Log.i(TAG, "[Fullscreen] exited")
     }
 
@@ -267,8 +313,8 @@ class PlayerActivity : AppCompatActivity() {
         webView.bringToFront()
         webView.requestFocus()
         
-        // Re-enter fullscreen if we were in fullscreen mode
-        if (isStartFullscreen && fullscreenView == null) {
+        // Re-enter fullscreen if we were in manual fullscreen mode
+        if (isStartFullscreen && !isManualFullscreen && fullscreenView == null) {
             webView.postDelayed({ enterFullscreen() }, 300)
         }
         
@@ -324,40 +370,4 @@ private fun String.toBaseUrl(): String {
     val host   = uri.host   ?: return this
     val port   = if (uri.port != -1) ":${uri.port}" else ""
     return "$scheme://$host$port"
-}
-
-// ── Ad blocker ────────────────────────────────────────────────────────────────
-
-private class AdBlockerWebViewClient : WebViewClient() {
-
-    private val adDomains = setOf(
-        "doubleclick.net", "googlesyndication.com", "googleadservices.com",
-        "adnxs.com", "advertising.com", "adsystem.com", "adserver.com",
-        "rubiconproject.com", "openx.net", "pubmatic.com", "criteo.com",
-        "moatads.com", "taboola.com", "outbrain.com", "adroll.com",
-        "popads.net", "popcash.net", "propellerads.com", "ad-maven.com",
-        "onclickads.net", "adsterra.com", "exoclick.com",
-        "trafficjunky.net", "mc.yandex.ru", "creativecdn.com",
-        "serving-sys.com", "contextweb.com", "bet365.com", "1xbet.com"
-    )
-
-    override fun shouldInterceptRequest(
-        view: WebView?, request: WebResourceRequest?
-    ): WebResourceResponse? {
-        val url = request?.url?.toString()?.lowercase() ?: return null
-        if (adDomains.any { url.contains(it) }) {
-            return WebResourceResponse(
-                "text/plain", "utf-8", ByteArrayInputStream("".toByteArray())
-            )
-        }
-        return super.shouldInterceptRequest(view, request)
-    }
-
-    override fun onReceivedError(
-        view: WebView?, request: WebResourceRequest?, error: WebResourceError?
-    ) {
-        if (request?.isForMainFrame == true) {
-            Log.e("PlayerActivity", "[WebView] main frame error: ${error?.description}")
-        }
-    }
 }
