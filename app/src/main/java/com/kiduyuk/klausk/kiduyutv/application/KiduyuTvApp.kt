@@ -47,11 +47,14 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
         // Clean up expired cache on app start
         DatabaseManager.cleanExpiredCache()
 
+        // Initialize Firebase Realtime Database with persistence
+        // ⚠️ CRITICAL: This MUST be called before ANY other Firebase service accesses
+        // FirebaseDatabase, otherwise you get: "Calls to setPersistenceEnabled() must
+        // be made before any other usage of FirebaseDatabase instance"
+        FirebaseDatabase.getInstance().setPersistenceEnabled(true)
+
         // Initialize Firebase Analytics
         FirebaseAnalytics.getInstance(this)
-
-        // Initialize Firebase Realtime Database with persistence
-        FirebaseDatabase.getInstance().setPersistenceEnabled(true)
 
         // 1. Initialize AuthManager FIRST to restore persisted login from SharedPreferences
         // This ensures isSignedIn and currentUid are populated before Firebase services start
