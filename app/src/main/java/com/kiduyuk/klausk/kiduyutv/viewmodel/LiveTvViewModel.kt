@@ -12,10 +12,16 @@ import com.kiduyuk.klausk.kiduyutv.data.model.EpgProgram
 import com.kiduyuk.klausk.kiduyutv.data.model.IptvChannel
 import com.kiduyuk.klausk.kiduyutv.data.model.IptvPlaylist
 import com.kiduyuk.klausk.kiduyutv.data.repository.IptvRepository
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.withContext
 
 /**
  * UI State for the Live TV screen.
@@ -74,6 +80,10 @@ class LiveTvViewModel : ViewModel() {
     private var prefs: SharedPreferences? = null
     private val PREFS_NAME = "live_tv_prefs"
     private val FAVORITES_KEY = "favorite_channels"
+    
+    // Debounce search to prevent excessive recompositions and main thread work
+    private val searchQueryFlow = MutableStateFlow("")
+    private var searchJob: Job? = null
     
     /**
      * Initializes the ViewModel with application context for caching.
@@ -554,25 +564,45 @@ class LiveTvViewModel : ViewModel() {
     }
 
     /**
-     * Updates search query and filters channels.
+     * Updates search query with debouncing to prevent excessive recompositions.
+     * The actual filtering is done off the main thread using withContext(Dispatchers.Default).
      *
      * @param query The search query string
      */
     fun updateSearchQuery(query: String) {
-        val allChannels = cachedPlaylist?.allChannels ?: emptyList()
-        val results = if (query.isBlank()) {
-            emptyList()
-        } else {
-            allChannels.filter { channel ->
-                channel.name.contains(query, ignoreCase = true) ||
-                channel.group?.contains(query, ignoreCase = true) == true
-            }
+        // Update the query state immediately for responsive UI
+        _uiState.update { it.copy(searchQuery = query) }
+        
+        // Cancel any existing search job
+        searchJob?.cancel()
+        
+        // If query is blank, clear results immediately
+        if (query.isBlank()) {
+            _uiState.update { it.copy(searchResults = emptyList()) }
+            return
         }
-
-        _uiState.value = _uiState.value.copy(
-            searchQuery = query,
-            searchResults = results
-        )
+        
+        // Debounce and filter off the main thread
+        searchJob = viewModelScope.launch {
+            // Brief debounce to prevent excessive work while typing
+            kotlinx.coroutines.delay(150)
+            
+            // Filter channels off the main thread
+            val allChannels = cachedPlaylist?.allChannels ?: emptyList()
+            val results = withContext(Dispatchers.Default) {
+                if (query.isBlank()) {
+                    emptyList()
+                } else {
+                    allChannels.filter { channel ->
+                        channel.name.contains(query, ignoreCase = true) ||
+                        channel.group?.contains(query, ignoreCase = true) == true
+                    }
+                }
+            }
+            
+            // Update results (these are cheap - just StateFlow updates)
+            _uiState.update { it.copy(searchResults = results) }
+        }
     }
 
     /**
