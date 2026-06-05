@@ -391,7 +391,7 @@ class PlayerActivity : AppCompatActivity() {
             // hardware overlay that does not composite with the WebView GPU layer, producing a
             // black screen on certain streams. Software rendering composites everything onto one
             // canvas and eliminates the issue.
-            webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+           // webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
             Log.i(TAG, "[WebView] Fire TV: software rendering forced to prevent black screen")
         } else {
             webView = WebView(context)
