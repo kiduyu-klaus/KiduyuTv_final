@@ -558,6 +558,30 @@ class TmdbRepository {
         DatabaseManager.clearWatchHistory()
     }
 
+    /**
+     * Gets the playback position for a media item from watch history.
+     * This is a synchronous call using runBlocking.
+     *
+     * @param context Context for database operations
+     * @param id The TMDB ID of the media
+     * @param isTv Whether the media is a TV show
+     * @return The saved playback position in milliseconds, or 0 if not found
+     */
+    fun getPlaybackPosition(context: Context, id: Int, isTv: Boolean): Long {
+        DatabaseManager.init(context)
+
+        return try {
+            val dao = DatabaseManager.watchHistoryDao()
+            kotlinx.coroutines.runBlocking {
+                val entity = dao.getWatchHistoryItem(id, if (isTv) "tv" else "movie")
+                entity?.playbackPosition ?: 0L
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to get playback position", e)
+            0L
+        }
+    }
+
 // ========== GitHub Lists with Caching ==========
 
     /**

@@ -15,16 +15,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Singleton manager for the user's personal list (My List).
  * Now uses Room database for persistence with Flow-based reactive updates.
  *
- * This implementation provides:
- * - Type-safe database operations
- * - Reactive updates via StateFlow
- * - Automatic persistence
- * - Efficient queries with proper indexing
+ * Performance optimizations:
+ * - Batch sync to Firebase (multiple items in single operation)
+ * - Sync FROM Firebase on initialization (cross-device support)
+ * - Optimized coroutine handling
  *
  * Note: This class now delegates to DatabaseManager for Room operations
  * while maintaining backward compatibility with the existing API.
@@ -38,10 +38,11 @@ object MyListManager {
     val myList: StateFlow<List<MyListItem>> = _myList.asStateFlow()
 
     private var isInitialized = false
+    private var isSyncingFromFirebase = false
 
     /**
      * Initializes the manager by loading saved items from Room database.
-     * Sets up reactive updates from the database.
+     * Also syncs with Firebase for cross-device support.
      */
     fun init(context: Context) {
         if (isInitialized) return
@@ -66,7 +67,112 @@ object MyListManager {
             }
         }
 
+        // KEY CHANGES: Sync from Firebase on init for cross-device support
+        syncFromFirebaseIfNeeded()
+
         isInitialized = true
+    }
+
+    /**
+     * KEY CHANGES: Sync items FROM Firebase to local database.
+     * This ensures items added on other devices are available locally.
+     * Called during initialization and when resuming from background.
+     */
+    private fun syncFromFirebaseIfNeeded() {
+        if (isSyncingFromFirebase) return
+        isSyncingFromFirebase = true
+
+        applicationScope.launch {
+            try {
+                val firebaseData = FirebaseManager.getMyListOnce()
+                if (firebaseData != null) {
+                    val itemsToAdd = mutableListOf<SavedMediaEntity>()
+                    val currentLocalIds = _myList.value.map { "${it.id}_${it.type}" }.toSet()
+
+                    firebaseData.forEach { (tmdbIdStr, data) ->
+                        try {
+                            @Suppress("UNCHECKED_CAST")
+                            val itemData = data as? Map<String, Any> ?: return@forEach
+                            val id = tmdbIdStr.toIntOrNull() ?: return@forEach
+                            val isTv = itemData["isTv"] as? Boolean ?: false
+                            val type = if (isTv) "tv" else "movie"
+                            val compositeId = "${id}_$type"
+
+                            // Only add if not already present locally
+                            if (compositeId !in currentLocalIds) {
+                                itemsToAdd.add(
+                                    SavedMediaEntity(
+                                        id = id,
+                                        mediaType = type,
+                                        title = itemData["title"] as? String ?: "",
+                                        posterPath = itemData["posterPath"] as? String,
+                                        voteAverage = (itemData["voteAverage"] as? Number)?.toDouble() ?: 0.0,
+                                        savedTimestamp = (itemData["addedAt"] as? Number)?.toLong() ?: System.currentTimeMillis()
+                                    )
+                                )
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error parsing Firebase item: $tmdbIdStr", e)
+                        }
+                    }
+
+                    // Batch insert to local database
+                    if (itemsToAdd.isNotEmpty()) {
+                        withContext(Dispatchers.IO) {
+                            DatabaseManager.savedMediaDao().insertAllSavedMedia(itemsToAdd)
+                        }
+                        Log.i(TAG, "Synced ${itemsToAdd.size} items from Firebase to local database")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error syncing from Firebase", e)
+            } finally {
+                isSyncingFromFirebase = false
+            }
+        }
+    }
+
+    /**
+     * KEY CHANGES: Force refresh from Firebase.
+     * Call this when you want to ensure latest data from other devices.
+     */
+    fun forceRefreshFromFirebase() {
+        isSyncingFromFirebase = false // Reset to allow sync
+        syncFromFirebaseIfNeeded()
+    }
+
+    /**
+     * KEY CHANGES: Sync ALL local items to Firebase in a single batch operation.
+     * Use this for initial sync or when you need to ensure local data is in Firebase.
+     * Much faster than individual syncMyListItem calls.
+     */
+    fun syncAllToFirebase() {
+        applicationScope.launch {
+            try {
+                val items = _myList.value.filter { it.type == "movie" || it.type == "tv" }
+                if (items.isEmpty()) {
+                    Log.i(TAG, "No items to sync to Firebase")
+                    return@launch
+                }
+
+                val batchItems = items.map { item ->
+                    FirebaseManager.MyListItemData(
+                        tmdbId = item.id,
+                        isTv = item.type == "tv",
+                        title = item.title,
+                        posterPath = item.posterPath,
+                        backdropPath = null,
+                        voteAverage = item.voteAverage,
+                        addedAt = System.currentTimeMillis()
+                    )
+                }
+
+                FirebaseManager.syncMyListItemsBatch(batchItems)
+                Log.i(TAG, "Batch synced ${batchItems.size} items to Firebase")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error syncing all items to Firebase", e)
+            }
+        }
     }
 
     /**

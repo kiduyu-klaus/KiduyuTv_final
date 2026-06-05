@@ -118,6 +118,52 @@ object FirebaseManager {
     // MY LIST OPERATIONS
     // ─────────────────────────────────────────────────────────────────────────────
     
+    // ─────────────────────────────────────────────────────────────────────────────
+    // MY LIST OPERATIONS - BATCH SYNC (Performance Optimization)
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Sync multiple items to My List in a single batch operation.
+     * This is much faster than calling syncMyListItem() for each item individually.
+     *
+     * @param items List of MyListItemData to sync
+     */
+    fun syncMyListItemsBatch(items: List<MyListItemData>) {
+        if (items.isEmpty()) return
+
+        val ref = database.getReference("${getCurrentUserPath()}/${Nodes.MY_LIST}")
+        val updates = mutableMapOf<String, Any>()
+
+        items.forEach { item ->
+            updates["${item.tmdbId}"] = mapOf(
+                "tmdbId" to item.tmdbId,
+                "isTv" to item.isTv,
+                "title" to item.title,
+                "posterPath" to item.posterPath,
+                "backdropPath" to item.backdropPath,
+                "voteAverage" to item.voteAverage,
+                "addedAt" to item.addedAt,
+                "lastUpdated" to System.currentTimeMillis()
+            )
+        }
+
+        ref.updateChildren(updates)
+        Log.i(TAG, "Batch synced ${items.size} items to Firebase")
+    }
+
+    /**
+     * Data class for batch sync operations.
+     */
+    data class MyListItemData(
+        val tmdbId: Int,
+        val isTv: Boolean,
+        val title: String,
+        val posterPath: String?,
+        val backdropPath: String?,
+        val voteAverage: Double?,
+        val addedAt: Long = System.currentTimeMillis()
+    )
+
     /**
      * Add or update an item in the user's My List.
      * 
