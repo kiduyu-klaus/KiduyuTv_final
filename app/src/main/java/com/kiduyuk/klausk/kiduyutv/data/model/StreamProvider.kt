@@ -10,7 +10,8 @@ data class StreamProvider(
     val iframeAttributes: Map<String, String> = emptyMap(),
     val allowAttributes: String = "autoplay; encrypted-media; picture-in-picture",
     val movieParameters: (tmdbId: Int, timestamp: Long) -> Map<String, String> = { _, _ -> emptyMap() },
-    val tvParameters: (tmdbId: Int, season: Int, episode: Int, timestamp: Long) -> Map<String, String> = { _, _, _, _ -> emptyMap() }
+    val tvParameters: (tmdbId: Int, season: Int, episode: Int, timestamp: Long) -> Map<String, String> = { _, _, _, _ -> emptyMap() },
+    val iframeId: String? = null
 )
 
 /**
@@ -230,6 +231,12 @@ object StreamProviderManager {
             name = "VidAPI",
             movieUrlTemplate = "https://vaplayer.ru/embed/movie/%d",
             tvUrlTemplate = "https://vaplayer.ru/embed/tv/%d/%d/%d",
+            iframeId = "pf",
+            iframeAttributes = mapOf(
+                "allowfullscreen" to "",
+                "referrerpolicy" to "origin"
+            ),
+            allowAttributes = "autoplay;fullscreen;picture-in-picture;encrypted-media",
             movieParameters = { _, _ ->
                 mapOf(
                     "autoplay" to "1",
@@ -552,9 +559,17 @@ object StreamProviderManager {
             baseUrl
         }
 
+        // Get iframe ID: use provider's custom ID or default to "iframe"
+        val iframeId = provider.iframeId ?: "iframe"
+        
+        // Build iframe attributes
         val attributes = provider.iframeAttributes.toMutableMap()
-        if (!attributes.containsKey("allow")) attributes["allow"] = provider.allowAttributes
-
+        if (!attributes.containsKey("allow")) {
+            attributes["allow"] = provider.allowAttributes
+        }
+        // Add the id attribute
+        attributes["id"] = iframeId
+        
         val attrString = attributes.map { "${it.key}=\"${it.value}\"" }.joinToString(" ")
 
         return """
@@ -570,15 +585,20 @@ object StreamProviderManager {
             </head>
             <body>
                 <iframe 
-                    id="player-frame"
+                    id="$iframeId"
                     src="$finalUrl" 
                     $attrString>
                 </iframe>
                 <script>
-                    window.addEventListener('message', function(event) {
-                        if (window.VideasyInterface) {
-                            var data = typeof event.data === 'string' ? event.data : JSON.stringify(event.data);
-                            window.VideasyInterface.postMessage(data);
+                    document.addEventListener('DOMContentLoaded', function() {
+                        var playerFrame = document.getElementById('$iframeId');
+                        if (playerFrame) {
+                            window.addEventListener('message', function(event) {
+                                if (window.VideasyInterface) {
+                                    var data = typeof event.data === 'string' ? event.data : JSON.stringify(event.data);
+                                    window.VideasyInterface.postMessage(data);
+                                }
+                            });
                         }
                     });
                 </script>
@@ -619,6 +639,14 @@ object StreamProviderManager {
      */
     fun getAllProviderNames(): List<String> {
         return providers.map { it.name }
+    }
+
+    /**
+     * Get iframe ID for a provider
+     */
+    fun getIframeId(providerName: String): String {
+        val provider = providers.find { it.name.equals(providerName, ignoreCase = true) }
+        return provider?.iframeId ?: "iframe"
     }
 
     /**

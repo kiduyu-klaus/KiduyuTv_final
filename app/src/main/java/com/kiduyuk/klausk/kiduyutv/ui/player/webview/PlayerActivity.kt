@@ -21,6 +21,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private var fullscreenView: View? = null
     private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
+    private var isStartFullscreen = true
 
     companion object {
         private const val TAG = "PlayerActivity"
@@ -64,6 +65,13 @@ class PlayerActivity : AppCompatActivity() {
         hideSystemUi()
         configureWebView()
 
+        // ADD: Enter fullscreen after brief delay to ensure WebView is ready
+        webView.postDelayed({
+            if (isStartFullscreen && fullscreenView == null) {
+                enterFullscreen()
+            }
+        }, 500)
+
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 if (fullscreenView != null) exitFullscreen() else showExitDialog()
@@ -103,7 +111,6 @@ class PlayerActivity : AppCompatActivity() {
             setBackgroundColor(0xFF000000.toInt())
             isFocusable = true
             isFocusableInTouchMode = true
-            requestFocus()
         }
 
         webView = WebView(this).apply {
@@ -115,6 +122,8 @@ class PlayerActivity : AppCompatActivity() {
             isFocusable = true
             isFocusableInTouchMode = true
             requestFocus()
+            visibility = View.VISIBLE
+            keepScreenOn = true
         }
 
         rootLayout.addView(webView)
@@ -144,7 +153,20 @@ class PlayerActivity : AppCompatActivity() {
         webView.isVerticalScrollBarEnabled   = false
         webView.overScrollMode               = View.OVER_SCROLL_NEVER
 
-        webView.webViewClient = AdBlockerWebViewClient()
+        // ADD: Trigger JavaScript fullscreen on video element after page loads
+        webView.webViewClient = object : AdBlockerWebViewClient() {
+            override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
+                Log.i(TAG, "[WebView] page finished - triggering video fullscreen JS")
+                
+                view.postDelayed({
+                    view.evaluateJavascript(
+                        "document.querySelector('video')?.requestFullscreen();", 
+                        null
+                    )
+                }, 1000) // Wait 1 second for video to load
+            }
+        }
 
         webView.webChromeClient = object : WebChromeClient() {
 
@@ -161,7 +183,7 @@ class PlayerActivity : AppCompatActivity() {
                 )
                 fullscreenView?.bringToFront()
                 hideSystemUi()
-                Log.i(TAG, "[Fullscreen] entered")
+                Log.i(TAG, "[Fullscreen] entered (via onShowCustomView)")
             }
 
             override fun onHideCustomView() {
@@ -178,8 +200,12 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         val html = iframeHtml
-        if (html != null) {
-            val baseUrl = streamUrl.toBaseUrl()
+        val baseUrl = streamUrl.toBaseUrl()
+        val forceDirectLoad = baseUrl.contains("vidsrc.wtf") ||
+            baseUrl.contains("vaplayer.ru") ||
+            baseUrl.contains("autoembed.co")
+
+        if (html != null && !forceDirectLoad) {
             webView.loadDataWithBaseURL(baseUrl, html, "text/html", "UTF-8", null)
         } else {
             webView.loadUrl(streamUrl)
@@ -188,12 +214,33 @@ class PlayerActivity : AppCompatActivity() {
 
     // ── Fullscreen ────────────────────────────────────────────────────────────
 
+    // Manually enter fullscreen with WebView as the custom view
+    private fun enterFullscreen() {
+        if (fullscreenView != null) return
+        
+        Log.i(TAG, "[Fullscreen] manually entering with WebView")
+        
+        // Create a wrapper view for WebView
+        fullscreenView = webView
+        fullscreenCallback = object : WebChromeClient.CustomViewCallback {
+            override fun onCustomViewHidden() {
+                Log.i(TAG, "[Fullscreen] callback: custom view hidden")
+            }
+        }
+        
+        // WebView is already in rootLayout, just bring to front
+        webView.bringToFront()
+        webView.requestLayout()
+        hideSystemUi()
+    }
+
     private fun exitFullscreen() {
-        fullscreenView?.let { rootLayout.removeView(it) }
-        fullscreenView = null
+        // Don't remove WebView from rootLayout (it's always there)
         fullscreenCallback?.onCustomViewHidden()
         fullscreenCallback = null
+        fullscreenView = null
         webView.bringToFront()
+        webView.requestFocus()
         showSystemUi()
         Log.i(TAG, "[Fullscreen] exited")
     }
@@ -217,6 +264,15 @@ class PlayerActivity : AppCompatActivity() {
         super.onResume()
         webView.onResume()
         webView.resumeTimers()
+        webView.bringToFront()
+        webView.requestFocus()
+        
+        // Re-enter fullscreen if we were in fullscreen mode
+        if (isStartFullscreen && fullscreenView == null) {
+            webView.postDelayed({ enterFullscreen() }, 300)
+        }
+        
+        Log.i(TAG, "[Lifecycle] onResume - WebView brought to front")
     }
 
     override fun onPause() {
