@@ -25,6 +25,7 @@ import com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager
 import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
+import com.kiduyuk.klausk.kiduyutv.util.WatchProgressTracker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -60,30 +61,14 @@ class PlayerActivity : AppCompatActivity() {
     private var currentBackdropPath: String? = null
     private var currentVoteAverage: Double = 0.0
     private var currentReleaseDate: String? = null
-    private var currentPlaybackPosition: Long = 0L
+    private var storedPlaybackPosition: Long = 0L
     private var isMediaInWatchHistory: Boolean = false
 
-    // 15-second progress update handler
-    private val progressUpdateHandler = Handler(Looper.getMainLooper())
-    private val progressUpdateRunnable = Runnable {
-        updateWatchProgress()
-    }
     private val repository = TmdbRepository()
-
-    /**
-     * Check if the device is an Amazon Fire TV or Fire Stick.
-     * Uses two methods for maximum compatibility:
-     * 1. Checks for amazon.hardware.fire_tv system feature
-     * 2. Falls back to checking if Build.MODEL starts with "AFT"
-     */
-    private fun isFireTVDevice(context: Context): Boolean {
-        val isFireTvHardware = context.packageManager.hasSystemFeature("amazon.hardware.fire_tv")
-        val isFireTvModel = Build.MODEL != null && Build.MODEL.startsWith("AFT", ignoreCase = true)
-        return isFireTvHardware || isFireTvModel
-    }
 
     companion object {
         private const val TAG = "VideasyPlayer"
+        private const val JS_INTERFACE_NAME = "AndroidProgressCallback"
     }
 
     // ── Cursor hide timer ──────────────────────────────────────────────────────
@@ -110,6 +95,7 @@ class PlayerActivity : AppCompatActivity() {
         val contentBackdropPath = intent.getStringExtra("BACKDROP_PATH")
         val contentVoteAverage = intent.getDoubleExtra("VOTE_AVERAGE", 0.0)
         val contentReleaseDate = intent.getStringExtra("RELEASE_DATE")
+        val savedPosition = intent.getLongExtra("PLAYBACK_POSITION", 0L)
 
         if (tmdbId == -1) {
             finish()
@@ -125,12 +111,10 @@ class PlayerActivity : AppCompatActivity() {
         currentBackdropPath = contentBackdropPath
         currentVoteAverage = contentVoteAverage
         currentReleaseDate = contentReleaseDate
+        storedPlaybackPosition = savedPosition
 
         // Check if media is already in watch history and add if not
         checkAndAddToWatchHistory()
-
-        // Start 15-second progress update timer
-        startProgressUpdateTimer()
 
         // Detect device type and show appropriate toast with device information
         val uiModeManager = getSystemService(Context.UI_MODE_SERVICE) as UiModeManager
@@ -216,10 +200,15 @@ class PlayerActivity : AppCompatActivity() {
                 setLayerType(View.LAYER_TYPE_NONE, null)
             }
 
+            // Add JavaScript interface for receiving progress updates from the player
+            addJavascriptInterface(WebAppInterface(), JS_INTERFACE_NAME)
+
             webViewClient = AdBlockerWebViewClient(
                 onPageFinished = {
                     isPageLoading = false
                     Log.i(TAG, "[WebView] Page finished loading with AdBlocker")
+                    // Inject progress tracking script after page loads
+                    injectProgressTrackingScript()
                 },
                 onError = {
                     hasPageError = true
@@ -297,6 +286,137 @@ class PlayerActivity : AppCompatActivity() {
         })
     }
 
+    /**
+     * JavaScript interface for receiving progress updates from the WebView player.
+     * The injected JavaScript calls this method when progress data is available.
+     */
+    inner class WebAppInterface {
+        @android.webkit.JavascriptInterface
+        fun onProgressUpdate(jsonData: String) {
+            Log.d(TAG, "[JSInterface] Received progress update: $jsonData")
+
+            val progressData = WatchProgressTracker.parseProgressData(jsonData)
+            if (progressData != null) {
+                handleProgressUpdate(progressData)
+            }
+        }
+    }
+
+    /**
+     * Injects the unified progress tracking script into the WebView after page loads.
+     * This script listens to postMessage events from all supported streaming platforms.
+     */
+    private fun injectProgressTrackingScript() {
+        val script = WatchProgressTracker.generateUnifiedListenerScript()
+        webView.evaluateJavascript(script) { result ->
+            Log.i(TAG, "[ProgressTracker] Script injection result: $result")
+        }
+
+        // Start progress polling for current content after a short delay
+        Handler(Looper.getMainLooper()).postDelayed({
+            val startPollingScript = WatchProgressTracker.generateStartPollingScript(currentTmdbId, currentIsTv)
+            webView.evaluateJavascript(startPollingScript) { result ->
+                Log.i(TAG, "[ProgressTracker] Start polling result: $result")
+            }
+        }, 2000)
+    }
+
+    /**
+     * Handles progress updates received from the WebView player.
+     *
+     * For TV Shows:
+     * - Compares the received season/episode with current values
+     * - If season/episode match: only updates the playback position
+     * - If season/episode changed: updates both episode info AND playback position
+     *
+     * For Movies:
+     * - Just updates the playback position
+     */
+    private fun handleProgressUpdate(progressData: WatchProgressTracker.ProgressData) {
+        Log.d(TAG, "[Progress] Received update: pos=${progressData.currentPosition}ms, " +
+                "duration=${progressData.duration}ms, season=${progressData.season}, ep=${progressData.episode}")
+
+        if (currentTmdbId == -1) return
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                if (currentIsTv) {
+                    // TV Show handling with season/episode comparison
+                    val newSeason = progressData.season ?: currentSeason
+                    val newEpisode = progressData.episode ?: currentEpisode
+
+                    // Check if season/episode has changed
+                    if (newSeason != currentSeason || newEpisode != currentEpisode) {
+                        Log.i(TAG, "[Progress] Episode changed: S${currentSeason}E${currentEpisode} -> S${newSeason}E${newEpisode}")
+
+                        // Update stored season/episode
+                        currentSeason = newSeason
+                        currentEpisode = newEpisode
+
+                        // Update watch history with new episode info AND progress
+                        repository.updateEpisodeInfo(
+                            mediaId = currentTmdbId,
+                            mediaType = "tv",
+                            seasonNumber = currentSeason,
+                            episodeNumber = currentEpisode
+                        )
+                        repository.updatePlaybackPosition(
+                            mediaId = currentTmdbId,
+                            mediaType = "tv",
+                            position = progressData.currentPosition
+                        )
+
+                        Log.d(TAG, "[Progress] Updated episode info and progress for $currentTitle")
+                    } else {
+                        // Same episode - just update progress
+                        repository.updatePlaybackPosition(
+                            mediaId = currentTmdbId,
+                            mediaType = "tv",
+                            position = progressData.currentPosition
+                        )
+
+                        Log.d(TAG, "[Progress] Updated progress for S${currentSeason}E${currentEpisode}: ${progressData.currentPosition}ms")
+                    }
+                } else {
+                    // Movie handling - just update progress
+                    repository.updatePlaybackPosition(
+                        mediaId = currentTmdbId,
+                        mediaType = "movie",
+                        position = progressData.currentPosition
+                    )
+
+                    Log.d(TAG, "[Progress] Updated movie progress for $currentTitle: ${progressData.currentPosition}ms")
+                }
+
+                // Sync to Firebase for cross-device access
+                syncToFirebase(progressData.currentPosition)
+
+            } catch (e: Exception) {
+                Log.e(TAG, "[Progress] Error handling progress update: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Syncs watch progress to Firebase for cross-device access.
+     */
+    private fun syncToFirebase(position: Long) {
+        com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.syncWatchHistory(
+            tmdbId = currentTmdbId,
+            isTv = currentIsTv,
+            seasonNumber = if (currentIsTv) currentSeason else null,
+            episodeNumber = if (currentIsTv) currentEpisode else null,
+            playbackPosition = position,
+            duration = 0L,
+            title = currentTitle,
+            overview = currentOverview,
+            posterPath = currentPosterPath,
+            backdropPath = currentBackdropPath,
+            voteAverage = currentVoteAverage,
+            releaseDate = currentReleaseDate
+        )
+    }
+
     private fun showExitConfirmationDialog() {
         QuitDialog(
             context = this,
@@ -322,13 +442,9 @@ class PlayerActivity : AppCompatActivity() {
         super.onPause()
         webView.onPause()
         webView.pauseTimers()
-        // Stop progress updates when player is paused
-        stopProgressUpdateTimer()
     }
 
     override fun onDestroy() {
-        // Stop progress updates when player is destroyed
-        stopProgressUpdateTimer()
         cursorHideHandler.removeCallbacks(cursorHideRunnable)
 
         if (::webView.isInitialized) {
@@ -452,6 +568,18 @@ class PlayerActivity : AppCompatActivity() {
         return webView
     }
 
+    /**
+     * Check if the device is an Amazon Fire TV or Fire Stick.
+     * Uses two methods for maximum compatibility:
+     * 1. Checks for amazon.hardware.fire_tv system feature
+     * 2. Falls back to checking if Build.MODEL starts with "AFT"
+     */
+    private fun isFireTVDevice(context: Context): Boolean {
+        val isFireTvHardware = context.packageManager.hasSystemFeature("amazon.hardware.fire_tv")
+        val isFireTvModel = Build.MODEL != null && Build.MODEL.startsWith("AFT", ignoreCase = true)
+        return isFireTvHardware || isFireTvModel
+    }
+
     private fun detectProviderFromUrl(url: String): String {
         val urlHost = try {
             android.net.Uri.parse(url).host?.lowercase() ?: ""
@@ -541,7 +669,7 @@ class PlayerActivity : AppCompatActivity() {
                         seasonNumber = if (currentIsTv) currentSeason else null,
                         episodeNumber = if (currentIsTv) currentEpisode else null,
                         lastWatched = System.currentTimeMillis(),
-                        playbackPosition = 0L
+                        playbackPosition = storedPlaybackPosition
                     )
 
                     // Save to local Room database
@@ -555,7 +683,7 @@ class PlayerActivity : AppCompatActivity() {
                         isTv = currentIsTv,
                         seasonNumber = if (currentIsTv) currentSeason else null,
                         episodeNumber = if (currentIsTv) currentEpisode else null,
-                        playbackPosition = 0L,
+                        playbackPosition = storedPlaybackPosition,
                         duration = 0L,
                         title = currentTitle,
                         overview = currentOverview,
@@ -568,86 +696,22 @@ class PlayerActivity : AppCompatActivity() {
                     Log.i(TAG, "[WatchHistory] Synced to Firebase: $currentTitle (ID: $currentTmdbId)")
                 } else {
                     Log.i(TAG, "[WatchHistory] Media already in watch history: $currentTitle (ID: $currentTmdbId)")
+
+                    // Restore saved playback position from watch history
+                    val savedPosition = repository.getPlaybackPosition(
+                        this@PlayerActivity,
+                        currentTmdbId,
+                        currentIsTv
+                    )
+                    if (savedPosition > 0) {
+                        storedPlaybackPosition = savedPosition
+                        Log.i(TAG, "[WatchHistory] Restored position: $savedPosition ms")
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "[WatchHistory] Error checking/adding to watch history: ${e.message}")
             }
         }
-    }
-
-    /**
-     * Starts the 15-second periodic progress update timer.
-     * Updates watch progress in both local database and Firebase.
-     */
-    private fun startProgressUpdateTimer() {
-        progressUpdateHandler.removeCallbacks(progressUpdateRunnable)
-        progressUpdateHandler.postDelayed(progressUpdateRunnable, 15000) // 15 seconds
-    }
-
-    /**
-     * Updates the watch progress for the current media.
-     * Called every 15 seconds while playback is active.
-     * Updates both local Room database and Firebase for cross-device sync.
-     */
-    private fun updateWatchProgress() {
-        if (currentTmdbId == -1) return
-
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                // Increment playback position (simulated for WebView - in a real implementation,
-                // this would be obtained from the video player's actual position)
-                currentPlaybackPosition += 15000 // 15 seconds in milliseconds
-
-                // Update local Room database
-                repository.updatePlaybackPosition(
-                    mediaId = currentTmdbId,
-                    mediaType = if (currentIsTv) "tv" else "movie",
-                    position = currentPlaybackPosition
-                )
-
-                // If this is a TV show, also update episode info
-                if (currentIsTv) {
-                    repository.updateEpisodeInfo(
-                        mediaId = currentTmdbId,
-                        mediaType = "tv",
-                        seasonNumber = currentSeason,
-                        episodeNumber = currentEpisode
-                    )
-                }
-
-                Log.d(TAG, "[WatchHistory] Updated progress for $currentTitle: $currentPlaybackPosition ms")
-
-                // Sync to Firebase for cross-device access
-                com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.syncWatchHistory(
-                    tmdbId = currentTmdbId,
-                    isTv = currentIsTv,
-                    seasonNumber = if (currentIsTv) currentSeason else null,
-                    episodeNumber = if (currentIsTv) currentEpisode else null,
-                    playbackPosition = currentPlaybackPosition,
-                    duration = 0L, // Duration would need to be obtained from the player
-                    title = currentTitle,
-                    overview = currentOverview,
-                    posterPath = currentPosterPath,
-                    backdropPath = currentBackdropPath,
-                    voteAverage = currentVoteAverage,
-                    releaseDate = currentReleaseDate
-                )
-
-                Log.d(TAG, "[WatchHistory] Synced progress to Firebase for $currentTitle")
-            } catch (e: Exception) {
-                Log.e(TAG, "[WatchHistory] Error updating progress: ${e.message}")
-            }
-        }
-
-        // Schedule next update
-        progressUpdateHandler.postDelayed(progressUpdateRunnable, 15000)
-    }
-
-    /**
-     * Stops the progress update timer when leaving the player.
-     */
-    private fun stopProgressUpdateTimer() {
-        progressUpdateHandler.removeCallbacks(progressUpdateRunnable)
     }
 }
 

@@ -8,7 +8,7 @@ import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.ValueEventListener
 import com.kiduyuk.klausk.kiduyutv.data.local.database.DatabaseManager
 import com.kiduyuk.klausk.kiduyutv.data.model.IptvChannel
-import com.kiduyuk.klausk.kiduyutv.data.model.MyListItem
+import com.kiduyuk.klausk.kiduyutv.viewmodel.MyListItem
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
