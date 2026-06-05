@@ -263,16 +263,24 @@ object FirebaseSyncManager {
     }
     
     /**
-     * Sync My List items from Firebase to local database.
+     * Sync My List items from Firebase to local database and vice versa.
+     * Implements TRUE TWO-WAY sync:
+     * 1. Downloads items from Firebase and merges with local database
+     * 2. Uploads local items that are missing in Firebase
+     * 3. Ensures data and count match locally and on Firebase
      */
     private suspend fun syncMyList(forceRefresh: Boolean) {
         try {
+            val context = applicationContext ?: return
+            
+            // ── STEP 1: Download cloud data ──
             val firebaseData = FirebaseManager.getMyListOnce()
+            val cloudItems = mutableMapOf<Int, Pair<String, MyListItem>>() // id -> (mediaType, item)
+
             
             if (firebaseData != null && firebaseData.isNotEmpty()) {
                 Log.i(TAG, "Found ${firebaseData.size} items in Firebase My List")
                 
-                // Process each item from Firebase
                 firebaseData.forEach { (tmdbIdStr, itemData) ->
                     try {
                         val tmdbId = tmdbIdStr.toIntOrNull() ?: return@forEach
@@ -283,27 +291,95 @@ object FirebaseSyncManager {
                             val isTv = itemData["isTv"] as? Boolean ?: false
                             val mediaType = if (isTv) "tv" else "movie"
                             
-                            // Add to local database if not exists or force refresh
-                            if (forceRefresh || !MyListManager.isInList(tmdbId, mediaType)) {
-                                DatabaseManager.addToMyList(
-                                    id = tmdbId,
-                                    mediaType = mediaType,
-                                    title = title,
-                                    posterPath = posterPath,
-                                    voteAverage = voteAverage
-                                )
-                                Log.i(TAG, "Synced My List item: $title (ID: $tmdbId)")
-                            }
+                            val item = MyListItem(
+                                id = tmdbId,
+                                title = title,
+                                posterPath = posterPath,
+                                type = mediaType,
+                                voteAverage = voteAverage
+                            )
+                            cloudItems[tmdbId] = mediaType to item
                         }
                     } catch (e: Exception) {
-                        Log.e(TAG, "Error syncing My List item: $tmdbIdStr", e)
+                        Log.e(TAG, "Error parsing cloud My List item: $tmdbIdStr", e)
                     }
                 }
             } else {
                 Log.i(TAG, "No My List items found in Firebase")
             }
+            
+            // ── STEP 2: Get local data ──
+            val localItems = mutableMapOf<Int, Pair<String, MyListItem>>()
+            DatabaseManager.getMyList().collect { savedMediaEntities ->
+                savedMediaEntities.forEach { entity ->
+                    val item = DatabaseManager.entityToMyListItem(entity)
+                    localItems[entity.id] = entity.mediaType to item
+                }
+            }
+            
+            Log.i(TAG, "Local My List count: ${localItems.size}")
+            
+            // ── STEP 3: TWO-WAY MERGE ──
+            // Merge both sources, cloud data takes precedence for conflicts
+            val mergedItems = mutableMapOf<Int, Pair<String, MyListItem>>()
+            val seenIds = mutableSetOf<Int>()
+            
+            // First add all cloud items (these take precedence)
+            cloudItems.forEach { (id, data) ->
+                val (mediaType, item) = data
+                mergedItems[id] = mediaType to item
+                seenIds.add(id)
+            }
+            
+            // Then add local-only items (not in cloud)
+            localItems.forEach { (id, data) ->
+                val (mediaType, item) = data
+                if (!seenIds.contains(id)) {
+                    mergedItems[id] = mediaType to item
+                    Log.i(TAG, "Adding local-only My List item to merged list: ${item.title}")
+                }
+            }
+            
+            Log.i(TAG, "Merged My List count: ${mergedItems.size}")
+            
+            // ── STEP 4: Update local database ──
+            mergedItems.forEach { (id, data) ->
+                val (mediaType, item) = data
+                if (!MyListManager.isInList(id, mediaType)) {
+                    DatabaseManager.addToMyList(
+                        id = item.id,
+                        mediaType = item.type,
+                        title = item.title,
+                        posterPath = item.posterPath,
+                        voteAverage = item.voteAverage,
+                        character = item.character,
+                        knownForDepartment = item.knownForDepartment
+                    )
+                }
+            }
+            
+            // ── STEP 5: Upload merged list to Firebase ──
+            mergedItems.forEach { (id, data) ->
+                val (mediaType, item) = data
+                try {
+                    val isTv = mediaType == "tv"
+                    FirebaseManager.syncMyListItem(
+                        tmdbId = item.id,
+                        isTv = isTv,
+                        title = item.title,
+                        posterPath = item.posterPath,
+                        backdropPath = null,
+                        voteAverage = item.voteAverage
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error uploading My List item: ${item.title}", e)
+                }
+            }
+            
+            Log.i(TAG, "My List two-way sync completed: ${mergedItems.size} items")
+            
         } catch (e: Exception) {
-            Log.e(TAG, "Error fetching My List from Firebase", e)
+            Log.e(TAG, "Error in My List two-way sync", e)
         }
     }
     
