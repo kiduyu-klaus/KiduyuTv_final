@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="220dp"
+    android:height="220dp"
+    android:viewportWidth="220"
+    android:viewportHeight="220">
+    <!-- White background -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M0,0h220v220h-220z" />
+    <!-- QR code style pattern (stylized, not a real QR) -->
+    <!-- Top-left finder pattern -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M10,10h60v60h-60z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M20,20h40v40h-40z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M30,30h20v20h-20z" />
+    <!-- Top-right finder pattern -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M150,10h60v60h-60z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M160,20h40v40h-40z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M170,30h20v20h-20z" />
+    <!-- Bottom-left finder pattern -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M10,150h60v60h-60z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M20,160h40v40h-40z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M30,170h20v20h-20z" />
+    <!-- Random data modules -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M80,10h10v10h-10zM100,10h10v10h-10zM120,10h10v10h-10zM90,30h10v10h-10zM110,30h10v10h-10zM130,30h10v10h-10zM80,50h10v10h-10zM100,50h10v10h-10zM120,50h10v10h-10z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M10,80h10v10h-10zM30,80h10v10h-10zM50,80h10v10h-10zM70,80h10v10h-10zM90,80h10v10h-10zM110,80h10v10h-10zM130,80h10v10h-10zM150,80h10v10h-10zM170,80h10v10h-10zM190,80h10v10h-10z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M20,100h10v10h-10zM40,100h10v10h-10zM60,100h10v10h-10zM80,100h10v10h-10zM100,100h10v10h-10zM120,100h10v10h-10zM140,100h10v10h-10zM160,100h10v10h-10zM180,100h10v10h-10zM200,100h10v10h-10z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M10,120h10v10h-10zM30,120h10v10h-10zM50,120h10v10h-10zM70,120h10v10h-10zM90,120h10v10h-10zM110,120h10v10h-10zM130,120h10v10h-10zM150,120h10v10h-10zM170,120h10v10h-10zM190,120h10v10h-10z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M20,140h10v10h-10zM40,140h10v10h-10zM60,140h10v10h-10zM80,140h10v10h-10zM100,140h10v10h-10zM120,140h10v10h-10zM140,140h10v10h-10zM160,140h10v10h-10zM180,140h10v10h-10zM200,140h10v10h-10z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M80,160h10v10h-10zM100,160h10v10h-10zM120,160h10v10h-10zM90,180h10v10h-10zM110,180h10v10h-10zM130,180h10v10h-10zM80,200h10v10h-10zM100,200h10v10h-10zM120,200h10v10h-10z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M150,120h10v10h-10zM170,120h10v10h-10zM190,120h10v10h-10zM160,140h10v10h-10zM180,140h10v10h-10zM200,140h10v10h-10zM150,160h10v10h-10zM170,160h10v10h-10zM190,160h10v10h-10z" />
+    <path
+        android:fillColor="#000000"
+        android:pathData="M150,180h10v10h-10zM170,180h10v10h-10zM190,180h10v10h-10zM160,200h10v10h-10zM180,200h10v10h-10zM200,200h10v10h-10z" />
+    <!-- Trakt logo in the center -->
+    <path
+        android:fillColor="#9C41C1"
+        android:pathData="M85,85h50v50h-50z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M110,95 C106,95 103,98 103,102 C103,104 104,106 105,107 L102,113 L105,113 L104.5,115.5 L102,115.5 L102,117.5 L107,117.5 L107.5,115.5 L106.5,115.5 L107,113.5 L110,113.5 L110.5,115.5 L109.5,115.5 L110,117.5 L115,117.5 L115,115.5 L112.5,115.5 L112,113 L115,113 L112,107 C113,106 114,104 114,102 C114,98 112,95 110,95 Z" />
+</vector>

@@ -1,0 +1,354 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    TV layout for TraktAuthActivity.
+    Used when uiModeManager.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION.
+    Optimized for 10-foot UI (large fonts, generous spacing, D-pad focus friendly).
+-->
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/auth_background"
+    android:padding="48dp"
+    android:descendantFocusability="afterDescendants">
+
+    <!-- Top Bar: Back arrow + "Trakt" title -->
+    <ImageButton
+        android:id="@+id/btnBack"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:contentDescription="Back"
+        android:focusable="true"
+        android:padding="4dp"
+        android:src="@drawable/ic_arrow_back"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:tint="@color/auth_text_primary" />
+
+    <TextView
+        android:id="@+id/tvToolbarTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="24dp"
+        android:fontFamily="sans-serif-medium"
+        android:text="Trakt"
+        android:textColor="@color/auth_text_primary"
+        android:textSize="20sp"
+        app:layout_constraintBottom_toBottomOf="@id/btnBack"
+        app:layout_constraintStart_toEndOf="@id/btnBack"
+        app:layout_constraintTop_toTopOf="@id/btnBack" />
+
+    <!-- Loading State -->
+    <LinearLayout
+        android:id="@+id/loadingContainer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <ProgressBar
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:indeterminateTint="@color/trakt_red" />
+
+        <TextView
+            android:id="@+id/tvLoadingMessage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:gravity="center"
+            android:text="Connecting to Trakt.tv..."
+            android:textColor="@color/auth_text_secondary"
+            android:textSize="20sp" />
+
+    </LinearLayout>
+
+    <!-- Guideline to split the screen (approx 60/40 split) -->
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/guidelineCenter"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintGuide_percent="0.6" />
+
+    <!-- ============================ LEFT COLUMN ============================ -->
+    <TextView
+        android:id="@+id/tvMainTitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="48dp"
+        android:fontFamily="sans-serif-black"
+        android:text="Sign in with Trakt"
+        android:textColor="@color/auth_text_primary"
+        android:textSize="44sp"
+        app:layout_constraintEnd_toStartOf="@+id/guidelineCenter"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/btnBack" />
+
+    <TextView
+        android:id="@+id/tvSubInstruction"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Use one of the options below to connect your Trakt account:"
+        android:textColor="@color/auth_text_secondary"
+        android:textSize="18sp"
+        app:layout_constraintEnd_toStartOf="@+id/guidelineCenter"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvMainTitle" />
+
+    <!-- Option 1 -->
+    <TextView
+        android:id="@+id/tvOption1Title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="32dp"
+        android:fontFamily="sans-serif-medium"
+        android:text="Option 1 - Activate on Your Phone"
+        android:textColor="@color/auth_text_primary"
+        android:textSize="24sp"
+        app:layout_constraintEnd_toStartOf="@+id/guidelineCenter"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvSubInstruction" />
+
+    <TextView
+        android:id="@+id/tvOption1Body"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Go to trakt.tv/activate on your phone or computer and enter the code shown on this screen."
+        android:textColor="@color/auth_text_secondary"
+        android:textSize="16sp"
+        app:layout_constraintEnd_toStartOf="@+id/guidelineCenter"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvOption1Title" />
+
+    <!-- Option 2 -->
+    <TextView
+        android:id="@+id/tvOption2Title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:fontFamily="sans-serif-medium"
+        android:text="Option 2 - Scan to Sign In"
+        android:textColor="@color/auth_text_primary"
+        android:textSize="24sp"
+        app:layout_constraintEnd_toStartOf="@+id/guidelineCenter"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvOption1Body" />
+
+    <TextView
+        android:id="@+id/tvOption2Body"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Scan the QR code with your phone, sign in to Trakt, then scan again if prompted."
+        android:textColor="@color/auth_text_secondary"
+        android:textSize="16sp"
+        app:layout_constraintEnd_toStartOf="@+id/guidelineCenter"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvOption2Title" />
+
+    <!-- Activation Code Section -->
+    <LinearLayout
+        android:id="@+id/llCodeContainer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="40dp"
+        android:orientation="horizontal"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tvOption2Body">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
+            android:text="Activation Code: "
+            android:textColor="@color/auth_text_primary"
+            android:textSize="24sp" />
+
+        <TextView
+            android:id="@+id/tvActivationCode"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-black"
+            android:text="—"
+            android:textColor="@color/trakt_red"
+            android:textSize="24sp"
+            android:textIsSelectable="true" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvFooter"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="This screen will close automatically once your device is authorized."
+        android:textColor="@color/auth_text_secondary"
+        android:textSize="16sp"
+        app:layout_constraintEnd_toStartOf="@+id/guidelineCenter"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/llCodeContainer" />
+
+    <!-- ============================ RIGHT COLUMN ============================ -->
+
+    <!-- QR Code (right column) -->
+    <ImageView
+        android:id="@+id/ivQrCode"
+        android:layout_width="240dp"
+        android:layout_height="240dp"
+        android:background="#FFFFFF"
+        android:contentDescription="Trakt QR code"
+        android:padding="12dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_trakt_qr_placeholder"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/guidelineCenter"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="0.4" />
+
+    <TextView
+        android:id="@+id/tvUrlLink"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:fontFamily="sans-serif-medium"
+        android:gravity="center"
+        android:padding="8dp"
+        android:text="https://trakt.tv/activate"
+        android:textColor="@color/auth_text_primary"
+        android:textSize="18sp"
+        android:textStyle="italic"
+        app:layout_constraintEnd_toEndOf="@id/ivQrCode"
+        app:layout_constraintStart_toStartOf="@id/ivQrCode"
+        app:layout_constraintTop_toBottomOf="@id/ivQrCode" />
+
+    <!-- ============================ ACTION ROW (bottom) ============================ -->
+
+    <!-- Verification URL (hidden on TV but kept for compatibility with Kotlin) -->
+    <TextView
+        android:id="@+id/tvVerificationUrl"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        android:text="https://trakt.tv/activate"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- Polling status (hidden on TV but kept for compatibility) -->
+    <TextView
+        android:id="@+id/tvPollingStatus"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        android:text="Open the browser, sign in, then paste the code."
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- Device Code Container: Code entry, Open browser and Connect (bottom) -->
+    <LinearLayout
+        android:id="@+id/codeContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <EditText
+            android:id="@+id/etAuthorizationCode"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_trakt_input"
+            android:hint="Paste authorization code here"
+            android:inputType="textCapCharacters|textNoSuggestions"
+            android:padding="16dp"
+            android:textColor="@color/auth_text_primary"
+            android:textColorHint="@color/auth_text_dim"
+            android:textSize="18sp"
+            android:importantForAutofill="no"
+            android:autofillHints="" />
+
+        <Button
+            android:id="@+id/btnOpenBrowser"
+            android:layout_width="wrap_content"
+            android:layout_height="64dp"
+            android:layout_marginStart="16dp"
+            android:background="@android:color/transparent"
+            android:minWidth="160dp"
+            android:text="Open Browser"
+            android:textAllCaps="false"
+            android:textColor="@color/auth_text_primary"
+            android:textSize="18sp" />
+
+        <Button
+            android:id="@+id/btnConnect"
+            android:layout_width="wrap_content"
+            android:layout_height="64dp"
+            android:layout_marginStart="16dp"
+            android:background="@drawable/bg_trakt_button_tv"
+            android:minWidth="180dp"
+            android:text="Connect"
+            android:textAllCaps="false"
+            android:textColor="@color/auth_text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+    </LinearLayout>
+
+    <!-- Error State (overlays content) -->
+    <LinearLayout
+        android:id="@+id/errorContainer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@color/auth_card_bg"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="48dp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <ImageView
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:contentDescription="Error"
+            android:src="@drawable/ic_error"
+            app:tint="@color/auth_text_muted" />
+
+        <TextView
+            android:id="@+id/tvErrorMessage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:gravity="center"
+            android:text="Connection failed"
+            android:textColor="@color/auth_text_primary"
+            android:textSize="22sp" />
+
+        <Button
+            android:id="@+id/btnRetry"
+            android:layout_width="wrap_content"
+            android:layout_height="64dp"
+            android:layout_marginTop="32dp"
+            android:background="@drawable/bg_trakt_button_tv"
+            android:minWidth="180dp"
+            android:paddingHorizontal="32dp"
+            android:text="Retry"
+            android:textColor="@color/auth_text_primary"
+            android:textSize="18sp" />
+
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

@@ -1,4 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#141414</color>
+
+    <!-- Trakt Auth screen colors -->
+    <color name="trakt_purple">#9C41C1</color>
+    <color name="trakt_purple_dark">#7A2EA0</color>
+    <color name="trakt_red">#FF3B30</color>
+    <color name="auth_background">#121212</color>
+    <color name="auth_subheader_bg">#1A1A1A</color>
+    <color name="auth_card_bg">#1F1F1F</color>
+    <color name="auth_input_bg">#2D2D2D</color>
+    <color name="auth_input_border">#555555</color>
+    <color name="auth_text_primary">#FFFFFF</color>
+    <color name="auth_text_secondary">#99FFFFFF</color>
+    <color name="auth_text_muted">#AAAAAA</color>
+    <color name="auth_text_dim">#666666</color>
 </resources>

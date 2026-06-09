@@ -71,7 +71,7 @@ class TraktSyncManager @Inject constructor(
      * Sync watch history from Trakt.
      */
     private suspend fun syncWatchHistory() {
-        traktRepository.getWatchHistory(page = 1, limit = 100)
+        traktRepository.getTraktWatchHistory(page = 1, limit = 100)
             .collect { result ->
                 result.fold(
                     onSuccess = { history: List<com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktHistoryItem> ->

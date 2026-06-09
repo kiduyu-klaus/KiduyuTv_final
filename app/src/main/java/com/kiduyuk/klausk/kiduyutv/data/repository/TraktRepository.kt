@@ -41,9 +41,10 @@ class TraktRepository @Inject constructor(
     }
 
     /**
-     * Get user's watch history (movies and shows).
+     * Get user's watch history (movies and shows) from Trakt.tv.
+     * Renamed to avoid conflict with TmdbRepository.getWatchHistory.
      */
-    fun getWatchHistory(page: Int = 1, limit: Int = 20): Flow<Result<TraktWatchHistoryResponse>> = flow {
+    fun getTraktWatchHistory(page: Int = 1, limit: Int = 20): Flow<Result<TraktWatchHistoryResponse>> = flow {
         try {
             val token = traktAuthManager.getValidAccessToken()
             if (token == null) {

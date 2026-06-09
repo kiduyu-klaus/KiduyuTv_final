@@ -29,14 +29,24 @@ import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
 import com.kiduyuk.klausk.kiduyutv.data.model.CastMember
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktHistoryItem
+import com.kiduyuk.klausk.kiduyutv.data.remote.TraktApiClient
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
+import com.kiduyuk.klausk.kiduyutv.data.repository.TraktRepository
 import com.kiduyuk.klausk.kiduyutv.ui.components.MovieCard
 import com.kiduyuk.klausk.kiduyutv.ui.components.TopBar
 import com.kiduyuk.klausk.kiduyutv.ui.components.TvShowCard
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
+import com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeViewModel
 import com.kiduyuk.klausk.kiduyutv.viewmodel.MyListItem
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 /**
  * Composable function for the "My List" screen, displaying items saved by the user.
@@ -66,6 +76,33 @@ fun MyListScreen(
     val myList by MyListManager.myList.collectAsState()
     val context = LocalContext.current
 
+    // Trakt integration
+    val traktRepository = remember {
+        TraktRepository(TraktApiClient.apiService, TraktAuthManager)
+    }
+    val isTraktConnected by TraktAuthManager.isTraktAuthenticated.collectAsState()
+    val _traktWatchHistory = remember { MutableStateFlow<List<TraktHistoryItem>>(emptyList()) }
+    val traktWatchHistory: StateFlow<List<TraktHistoryItem>> = _traktWatchHistory.asStateFlow()
+    val isLoadingTrakt by remember { mutableStateOf(false) }
+
+    // Fetch Trakt watched history when connected
+    LaunchedEffect(isTraktConnected) {
+        if (isTraktConnected) {
+            traktRepository.getTraktWatchHistory(page = 1, limit = 100).collect { result ->
+                result.fold(
+                    onSuccess = { history ->
+                        _traktWatchHistory.value = history
+                    },
+                    onFailure = {
+                        // Handle error silently - watched tab will show empty state
+                    }
+                )
+            }
+        } else {
+            _traktWatchHistory.value = emptyList()
+        }
+    }
+
     // Categorize items
     val movies = myList.filter { it.type == "movie" }
     val tvShows = myList.filter { it.type == "tv" }
@@ -73,9 +110,14 @@ fun MyListScreen(
     val networks = myList.filter { it.type == "network" }
     val castMembers = myList.filter { it.type == "cast" }
 
-    // Tab state
+    // Tab state - Watched tab is first if Trakt is connected
     var selectedTabIndex by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Movies", "TV Shows", "Companies", "Networks", "Cast")
+    val baseTabs = listOf("Movies", "TV Shows", "Companies", "Networks", "Cast")
+    val tabs = if (isTraktConnected) {
+        listOf("Watched") + baseTabs
+    } else {
+        baseTabs
+    }
 
     // Get screen configuration to calculate responsive grid
     val configuration = LocalConfiguration.current
@@ -145,13 +187,49 @@ fun MyListScreen(
             Spacer(modifier = Modifier.height(15.dp)) // Vertical spacing.
 
             // Content based on selected tab
-            val currentList = when (selectedTabIndex) {
-                0 -> movies
-                1 -> tvShows
-                2 -> companies
-                3 -> networks
-                4 -> castMembers
-                else -> emptyList()
+            val currentList = when {
+                isTraktConnected && selectedTabIndex == 0 -> {
+                    // Watched tab - return items derived from Trakt history
+                    val watchedMovies = traktWatchHistory.value
+                        .filter { it.type == "movies" && it.movie != null }
+                        .mapNotNull { item ->
+                            item.movie?.ids?.tmdb?.let { tmdbId ->
+                                MyListItem(
+                                    id = tmdbId,
+                                    title = item.movie?.title ?: "Unknown",
+                                    posterPath = item.movie?.posterPath ?: item.movie?.ids?.tmdb?.toString(),
+                                    type = "movie",
+                                    voteAverage = item.movie?.rating ?: 0.0
+                                )
+                            }
+                        }
+                    val watchedShows = traktWatchHistory.value
+                        .filter { it.type == "shows" && it.show != null }
+                        .mapNotNull { item ->
+                            item.show?.ids?.tmdb?.let { tmdbId ->
+                                MyListItem(
+                                    id = tmdbId,
+                                    title = item.show?.title ?: "Unknown",
+                                    posterPath = item.show?.posterPath ?: item.show?.ids?.tmdb?.toString(),
+                                    type = "tv",
+                                    voteAverage = item.show?.rating ?: 0.0
+                                )
+                            }
+                        }
+                    (watchedMovies + watchedShows).distinctBy { it.id to it.type }
+                }
+                !isTraktConnected && selectedTabIndex == 0 -> movies
+                !isTraktConnected && selectedTabIndex == 1 -> tvShows
+                !isTraktConnected && selectedTabIndex == 2 -> companies
+                !isTraktConnected && selectedTabIndex == 3 -> networks
+                !isTraktConnected && selectedTabIndex == 4 -> castMembers
+                else -> when (selectedTabIndex) {
+                    1 -> tvShows
+                    2 -> companies
+                    3 -> networks
+                    4 -> castMembers
+                    else -> emptyList()
+                }
             }
 
             if (currentList.isEmpty()) {
@@ -159,8 +237,12 @@ fun MyListScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
+                    val emptyMessage = when {
+                        isTraktConnected && selectedTabIndex == 0 -> "No watched history from Trakt yet."
+                        else -> "No ${tabs[selectedTabIndex]} saved yet."
+                    }
                     Text(
-                        text = "No ${tabs[selectedTabIndex]} saved yet.",
+                        text = emptyMessage,
                         style = MaterialTheme.typography.bodyLarge,
                         color = TextSecondary
                     )
