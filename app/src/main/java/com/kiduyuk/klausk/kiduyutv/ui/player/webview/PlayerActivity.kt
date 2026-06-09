@@ -21,11 +21,15 @@ import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.webkit.WebViewCompat
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager
 import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
+import com.kiduyuk.klausk.kiduyutv.data.remote.TraktApiClient
+import com.kiduyuk.klausk.kiduyutv.data.repository.TraktRepository
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
+import com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager
 import com.kiduyuk.klausk.kiduyutv.util.WatchProgressTracker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -63,8 +67,19 @@ class PlayerActivity : AppCompatActivity() {
     private var currentReleaseDate: String? = null
     private var storedPlaybackPosition: Long = 0L
     private var isMediaInWatchHistory: Boolean = false
+    private var lastTraktScrobbleProgress: Double = -1.0
+    private var lastTraktScrobbleAt: Long = 0L
+    private var lastTraktScrobbleSeason: Int = -1
+    private var lastTraktScrobbleEpisode: Int = -1
+    private var lastTraktScrobbleContentId: Int = -1
 
     private val repository = TmdbRepository()
+    private val traktRepository by lazy {
+        TraktRepository(
+            TraktApiClient.apiService,
+            TraktAuthManager.getInstance(this)
+        )
+    }
 
     companion object {
         private const val TAG = "VideasyPlayer"
@@ -403,6 +418,9 @@ class PlayerActivity : AppCompatActivity() {
                 // Sync to Firebase for cross-device access
                 syncToFirebase(progressData.currentPosition)
 
+                // Sync to Trakt.tv when the user has an active session.
+                syncToTrakt(progressData)
+
             } catch (e: Exception) {
                 Log.e(TAG, "[Progress] Error handling progress update: ${e.message}")
             }
@@ -427,6 +445,97 @@ class PlayerActivity : AppCompatActivity() {
             voteAverage = currentVoteAverage,
             releaseDate = currentReleaseDate
         )
+    }
+
+    /**
+     * Throttles Trakt scrobble updates so we only send meaningful changes.
+     */
+    private suspend fun syncToTrakt(progressData: WatchProgressTracker.ProgressData) {
+        if (!TraktAuthManager.isTraktAuthenticated.value) return
+
+        val progressPercent = progressData.progressPercent.coerceIn(0.0, 100.0)
+        if (progressPercent <= 0.0) return
+
+        if (progressData.contentType == "tv") {
+            val season = progressData.season ?: return
+            val episode = progressData.episode ?: return
+
+            val targetChanged = currentTmdbId != lastTraktScrobbleContentId ||
+                season != lastTraktScrobbleSeason ||
+                episode != lastTraktScrobbleEpisode
+
+            if (targetChanged) {
+                lastTraktScrobbleProgress = -1.0
+                lastTraktScrobbleAt = 0L
+            }
+
+            if (!shouldSendTraktUpdate(progressPercent)) return
+
+            val result = traktRepository.scrobbleEpisode(
+                tmdbId = currentTmdbId,
+                season = season,
+                episode = episode,
+                progress = progressPercent.toFloat(),
+                status = traktStatusFor(progressPercent)
+            )
+
+            if (result.isSuccess) {
+                rememberTraktScrobble(progressPercent, season, episode)
+            }
+        } else {
+            val targetChanged = currentTmdbId != lastTraktScrobbleContentId
+
+            if (targetChanged) {
+                lastTraktScrobbleProgress = -1.0
+                lastTraktScrobbleAt = 0L
+            }
+
+            if (!shouldSendTraktUpdate(progressPercent)) return
+
+            val result = traktRepository.scrobbleMovie(
+                tmdbId = currentTmdbId,
+                progress = progressPercent.toFloat(),
+                status = traktStatusFor(progressPercent)
+            )
+
+            if (result.isSuccess) {
+                rememberTraktScrobble(progressPercent)
+            }
+        }
+    }
+
+    private fun shouldSendTraktUpdate(progressPercent: Double): Boolean {
+        val now = SystemClock.elapsedRealtime()
+        val percentDelta = kotlin.math.abs(progressPercent - lastTraktScrobbleProgress)
+        val timeDelta = now - lastTraktScrobbleAt
+
+        return when {
+            lastTraktScrobbleProgress < 0.0 -> true
+            progressPercent >= 90.0 && lastTraktScrobbleProgress < 90.0 -> true
+            percentDelta >= 10.0 -> true
+            timeDelta >= 60_000L -> true
+            else -> false
+        }
+    }
+
+    private fun traktStatusFor(progressPercent: Double): String {
+        return when {
+            progressPercent >= 90.0 -> "stop"
+            lastTraktScrobbleProgress < 0.0 -> "start"
+            else -> "pause"
+        }
+    }
+
+    private fun rememberTraktScrobble(
+        progressPercent: Double,
+        season: Int? = null,
+        episode: Int? = null
+    ) {
+        lastTraktScrobbleProgress = progressPercent
+        lastTraktScrobbleAt = SystemClock.elapsedRealtime()
+        lastTraktScrobbleContentId = currentTmdbId
+        lastTraktScrobbleSeason = season ?: -1
+        lastTraktScrobbleEpisode = episode ?: -1
     }
 
     private fun showExitConfirmationDialog() {
@@ -604,6 +713,7 @@ class PlayerActivity : AppCompatActivity() {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             return try {
                 val webViewPackage = WebView.getCurrentWebViewPackage()
+                //val webViewPackage = WebViewCompat.getCurrentWebViewPackage(this)
                 val isAmazon = webViewPackage?.packageName == "com.amazon.webview.chromium"
 
                 if (isAmazon) {
@@ -679,8 +789,8 @@ class PlayerActivity : AppCompatActivity() {
     /**
      * Check if the device is an Amazon Fire TV or Fire Stick.
      * Uses two methods for maximum compatibility:
-     * 1. Checks for amazon.hardware.fire_tv system feature
-     * 2. Falls back to checking if Build.MODEL starts with "AFT"
+     * 1. Checks for amazon.hardware.fire_TV system feature
+     * 2. Falls back to checking if Build. MODEL starts with "AFT"
      */
     private fun isFireTVDevice(context: Context): Boolean {
         val isFireTvHardware = context.packageManager.hasSystemFeature("amazon.hardware.fire_tv")
@@ -692,6 +802,7 @@ class PlayerActivity : AppCompatActivity() {
         val urlHost = try {
             android.net.Uri.parse(url).host?.lowercase() ?: ""
         } catch (e: Exception) {
+            Log.i(TAG, "[Provider] Error parsing URL: ${e.message}")
             return "VidLink"
         }
 

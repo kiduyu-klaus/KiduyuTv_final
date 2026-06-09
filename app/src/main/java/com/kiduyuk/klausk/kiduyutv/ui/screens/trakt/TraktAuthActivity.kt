@@ -1,12 +1,13 @@
 package com.kiduyuk.klausk.kiduyutv.ui.screens.trakt
 
 import android.annotation.SuppressLint
+import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.view.View
 import android.widget.Button
+import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -16,12 +17,10 @@ import androidx.lifecycle.lifecycleScope
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager
 import kotlinx.coroutines.launch
-import org.json.JSONObject
-import java.util.concurrent.TimeUnit
 
 /**
- * Activity that handles Trakt.tv OAuth 2.0 authentication using device code flow.
- * Displays a user code and polling interval, then waits for user to authorize at https://trakt.tv/activate
+ * Activity that handles Trakt.tv OAuth 2.0 authentication using the authorization code flow.
+ * Opens Trakt's authorization page and lets the user paste the resulting code back into the app.
  */
 class TraktAuthActivity : AppCompatActivity() {
 
@@ -30,9 +29,11 @@ class TraktAuthActivity : AppCompatActivity() {
     private lateinit var codeContainer: LinearLayout
     private lateinit var tvLoadingMessage: TextView
     private lateinit var tvErrorMessage: TextView
-    private lateinit var tvUserCode: TextView
     private lateinit var tvVerificationUrl: TextView
     private lateinit var tvPollingStatus: TextView
+    private lateinit var etAuthorizationCode: EditText
+    private lateinit var btnOpenBrowser: Button
+    private lateinit var btnConnect: Button
     private lateinit var btnBack: ImageButton
     private lateinit var btnRetry: Button
     private lateinit var traktAuthManager: TraktAuthManager
@@ -43,15 +44,7 @@ class TraktAuthActivity : AppCompatActivity() {
         const val RESULT_CANCELLED = "cancelled"
         const val RESULT_ERROR = "error"
 
-        // Polling interval in milliseconds
-        private const val POLL_INTERVAL_MS = 5000L
     }
-
-    private var isPolling = false
-    private val handler = Handler(Looper.getMainLooper())
-    private var deviceCode: String? = null
-    private var intervalMs: Int = POLL_INTERVAL_MS.toInt()
-    private var pollRunnable: Runnable? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,42 +56,77 @@ class TraktAuthActivity : AppCompatActivity() {
         codeContainer = findViewById(R.id.codeContainer)
         tvLoadingMessage = findViewById(R.id.tvLoadingMessage)
         tvErrorMessage = findViewById(R.id.tvErrorMessage)
-        tvUserCode = findViewById(R.id.tvUserCode)
         tvVerificationUrl = findViewById(R.id.tvVerificationUrl)
         tvPollingStatus = findViewById(R.id.tvPollingStatus)
+        etAuthorizationCode = findViewById(R.id.etAuthorizationCode)
+        btnOpenBrowser = findViewById(R.id.btnOpenBrowser)
+        btnConnect = findViewById(R.id.btnConnect)
         btnBack = findViewById(R.id.btnBack)
         btnRetry = findViewById(R.id.btnRetry)
 
         traktAuthManager = TraktAuthManager.getInstance(this)
 
         setupViews()
-        startDeviceCodeFlow()
+        startAuthorizationFlow()
     }
 
     private fun setupViews() {
         // Back button
         btnBack.setOnClickListener {
-            stopPolling()
             finish()
         }
 
         // Retry button
         btnRetry.setOnClickListener {
-            startDeviceCodeFlow()
+            startAuthorizationFlow()
+        }
+
+        btnOpenBrowser.setOnClickListener {
+            openAuthorizationPage()
+        }
+
+        btnConnect.setOnClickListener {
+            submitAuthorizationCode()
         }
     }
 
-    private fun startDeviceCodeFlow() {
-        showLoading("Requesting device code...")
+    private fun startAuthorizationFlow() {
+        showCodeContainer()
+        tvVerificationUrl.text = TraktAuthManager.getAuthorizationUrl()
+        tvPollingStatus.text = "Open the link in your browser, sign in, then paste the code here."
+        etAuthorizationCode.text?.clear()
+        openAuthorizationPage()
+    }
+
+    private fun openAuthorizationPage() {
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(TraktAuthManager.getAuthorizationUrl()))
+            startActivity(intent)
+        } catch (e: ActivityNotFoundException) {
+            showError("No browser app found to open Trakt.tv.")
+        } catch (e: Exception) {
+            showError("Could not open Trakt.tv login: ${e.message}")
+        }
+    }
+
+    private fun submitAuthorizationCode() {
+        val enteredCode = etAuthorizationCode.text?.toString()?.trim().orEmpty()
+        val code = normalizeAuthorizationCode(enteredCode)
+
+        if (code.isNullOrBlank()) {
+            showError("Paste the authorization code from Trakt.tv first.")
+            return
+        }
+
+        showLoading("Verifying your Trakt.tv code...")
 
         lifecycleScope.launch {
             try {
-                val result = requestDeviceCode()
-                if (result) {
-                    showCodeContainer()
-                    startPollingForAuth()
+                val success = traktAuthManager.exchangeCodeForTokens(code)
+                if (success) {
+                    onAuthSuccess()
                 } else {
-                    showError("Failed to get device code. Please try again.")
+                    showError("Trakt.tv rejected the code. Please open Trakt again and try once more.")
                 }
             } catch (e: Exception) {
                 showError("Error: ${e.message}")
@@ -106,138 +134,15 @@ class TraktAuthActivity : AppCompatActivity() {
         }
     }
 
-    private suspend fun requestDeviceCode(): Boolean {
-        return try {
-            showLoading("Connecting to Trakt.tv...")
-
-            val body = okhttp3.FormBody.Builder()
-                .add("client_id", TraktAuthManager.TRAKT_CLIENT_ID)
-                .build()
-
-            val request = okhttp3.Request.Builder()
-                .url(TraktAuthManager.TRAKT_DEVICE_CODE_URL)
-                .post(body)
-                .build()
-
-            val response = TraktAuthManager.getHttpClient().newCall(request).execute()
-            val responseBody = response.body?.string()
-
-            android.util.Log.d("TraktAuthActivity", "Device code response: ${response.code} body: $responseBody")
-
-            if (response.isSuccessful && responseBody != null) {
-                val json = JSONObject(responseBody)
-                deviceCode = json.getString("device_code")
-                val userCode = json.getString("user_code")
-                val verificationUrl = json.getString("verification_url")
-                intervalMs = json.optInt("interval", 5) * 1000
-
-                // Update UI with codes
-                runOnUiThread {
-                    tvUserCode.text = formatUserCode(userCode)
-                    tvVerificationUrl.text = "https://trakt.tv/activate"
-                    tvPollingStatus.text = "Waiting for authorization..."
-                }
-
-                true
-            } else {
-                android.util.Log.e("TraktAuthActivity", "Failed to get device code. HTTP: ${response.code}, Body: $responseBody")
-                false
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("TraktAuthActivity", "Device code error: ${e.message}")
-            false
+    private fun normalizeAuthorizationCode(input: String): String? {
+        if (input.isBlank()) return null
+        if (input.contains("code=") || input.startsWith("http")) {
+            return TraktAuthManager.extractCodeFromUrl(input) ?: input
         }
-    }
-
-    private fun formatUserCode(code: String): String {
-        // Format as XXX-XXX for better readability
-        return if (code.length == 6) {
-            "${code.substring(0, 3)}-${code.substring(3)}"
-        } else {
-            code
-        }
-    }
-
-    private fun startPollingForAuth() {
-        if (isPolling) return
-        isPolling = true
-
-        runOnUiThread {
-            tvPollingStatus.text = "Checking for authorization..."
-        }
-
-        // Start polling using a runnable
-        pollRunnable = object : Runnable {
-            override fun run() {
-                if (!isPolling) return
-
-                lifecycleScope.launch {
-                    val success = pollForToken()
-                    if (success) {
-                        onAuthSuccess()
-                    } else {
-                        // Schedule next poll
-                        handler.postDelayed(pollRunnable!!, intervalMs.toLong())
-                    }
-                }
-            }
-        }
-
-        // First poll happens immediately
-        handler.post(pollRunnable!!)
-    }
-
-    private suspend fun pollForToken(): Boolean {
-        val code = deviceCode ?: return false
-
-        return try {
-            val body = okhttp3.FormBody.Builder()
-                .add("code", code)
-                .add("client_id", TraktAuthManager.TRAKT_CLIENT_ID)
-                .add("client_secret", TraktAuthManager.TRAKT_CLIENT_SECRET)
-                .add("grant_type", "device_code")
-                .build()
-
-            val request = okhttp3.Request.Builder()
-                .url(TraktAuthManager.TRAKT_TOKEN_URL)
-                .post(body)
-                .build()
-
-            val response = TraktAuthManager.getHttpClient().newCall(request).execute()
-            val responseBody = response.body?.string()
-
-            if (response.isSuccessful && responseBody != null) {
-                val json = JSONObject(responseBody)
-                if (json.has("access_token")) {
-                    // Authorization successful
-                    return true
-                }
-            } else {
-                // Check error code - 404 means still pending, other errors may be terminal
-                val errorJson = responseBody?.let { JSONObject(it) }
-                val error = errorJson?.optString("error", "")
-                if (error == "authorization_pending") {
-                    // User hasn't authorized yet, continue polling
-                    return false
-                } else if (error == "expired_token") {
-                    // Device code expired, need to restart
-                    runOnUiThread {
-                        showError("Authorization expired. Please try again.")
-                    }
-                    return true // Stop polling with error
-                }
-            }
-            false
-        } catch (e: Exception) {
-            android.util.Log.e("TraktAuthActivity", "Poll error: ${e.message}")
-            false
-        }
+        return input
     }
 
     private fun onAuthSuccess() {
-        stopPolling()
-        isPolling = false
-
         Toast.makeText(
             this,
             "Successfully connected to Trakt.tv!",
@@ -248,11 +153,6 @@ class TraktAuthActivity : AppCompatActivity() {
             putExtra(EXTRA_RESULT, RESULT_SUCCESS)
         })
         finish()
-    }
-
-    private fun stopPolling() {
-        isPolling = false
-        handler.removeCallbacksAndMessages(null)
     }
 
     private fun showLoading(message: String) {
@@ -269,7 +169,6 @@ class TraktAuthActivity : AppCompatActivity() {
     }
 
     private fun showError(message: String) {
-        stopPolling()
         loadingContainer.visibility = View.GONE
         codeContainer.visibility = View.GONE
         errorContainer.visibility = View.VISIBLE
@@ -278,15 +177,9 @@ class TraktAuthActivity : AppCompatActivity() {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        stopPolling()
-    }
-
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        stopPolling()
-        setResult(RESULT_OK, Intent().apply {
+        setResult(RESULT_CANCELED, Intent().apply {
             putExtra(EXTRA_RESULT, RESULT_CANCELLED)
         })
         super.onBackPressed()

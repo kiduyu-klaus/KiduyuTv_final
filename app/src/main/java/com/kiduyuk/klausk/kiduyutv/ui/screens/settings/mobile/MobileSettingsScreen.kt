@@ -58,7 +58,6 @@ import com.android.volley.toolbox.JsonObjectRequest
 import com.android.volley.toolbox.Volley
 import com.google.firebase.auth.FirebaseAuth
 import org.json.JSONObject
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -374,13 +373,7 @@ fun MobileSettingsScreen(
                         context.startActivity(intent)
                     },
                     onSignOut = {
-                        // Handle sign out from Trakt
-                        kotlinx.coroutines.GlobalScope.launch {
-                            com.kiduyuk.klausk.kiduyutv.data.repository.TraktRepository(
-                                com.kiduyuk.klausk.kiduyutv.data.remote.TraktApiClient.apiService,
-                                com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager.getInstance(context)
-                            ).signOut()
-                        }
+                        TraktAuthManager.getInstance(context).signOut()
                     }
                 )
             }
@@ -1128,15 +1121,9 @@ private fun TraktSettingsItem(
     onSignIn: () -> Unit,
     onSignOut: () -> Unit
 ) {
-    var isConnected by remember { mutableStateOf(false) }
-    var username by remember { mutableStateOf<String?>(null) }
-
-    // Check connection status on composition
-    LaunchedEffect(Unit) {
-        val authManager = TraktAuthManager.getInstance(context)
-        username = authManager.getUsername()
-        isConnected = authManager.getValidAccessToken() != null
-    }
+    val traktAuthManager = remember(context) { TraktAuthManager.getInstance(context) }
+    val isConnected by traktAuthManager.isTraktAuthenticated.collectAsState()
+    val username by traktAuthManager.userName.collectAsState()
 
     Column(
         modifier = Modifier
@@ -1187,7 +1174,11 @@ private fun TraktSettingsItem(
                     fontWeight = FontWeight.Medium
                 )
                 Text(
-                    if (isConnected && username != null) "Connected as $username" else "Not connected - tap to sign in",
+                    when {
+                        isConnected && !username.isNullOrBlank() -> "Connected as $username"
+                        isConnected -> "Connected to Trakt.tv"
+                        else -> "Not connected - tap to sign in"
+                    },
                     color = TextSecondary,
                     fontSize = 12.sp
                 )

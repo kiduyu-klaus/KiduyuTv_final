@@ -21,6 +21,7 @@ import com.kiduyuk.klausk.kiduyutv.util.AuthManager
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
 import com.kiduyuk.klausk.kiduyutv.util.NotificationHelper
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
+import com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager
 
 /**
  * A Custom Application class for KiduyuTv.
@@ -76,6 +77,9 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
         // 3. Initialize FirebaseManager with the correct user ID
         FirebaseManager.init(userId)
         Log.i("KiduyuTvApp", "FirebaseManager initialized with userId: $userId")
+
+        // Initialize Trakt auth state early so persisted sessions are available app-wide.
+        TraktAuthManager.init(this)
 
         // Initialize AndroidApp reference for singleton access
         AndroidApp.instance = this

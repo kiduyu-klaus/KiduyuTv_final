@@ -8,9 +8,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
-import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
@@ -28,15 +29,11 @@ object TraktAuthManager {
     const val TRAKT_CLIENT_SECRET = "12c597436f61997d8fcb31d246af7400359533d0411374f456af6df2bf7313d9"
     
     // OAuth endpoints (public for use by other components)
-    const val TRAKT_AUTH_URL = "https://trakt.tv/oauth/device"
-    const val TRAKT_TOKEN_URL = "https://api.trakt.tv/oauth/device/token"
-    const val TRAKT_DEVICE_CODE_URL = "https://api.trakt.tv/oauth/device/code"
+    const val TRAKT_AUTHORIZE_URL = "https://trakt.tv/oauth/authorize"
+    const val TRAKT_TOKEN_URL = "https://api.trakt.tv/oauth/token"
     
-    // Redirect URI for Device authentication (Out-of-band)
+    // Redirect URI for authorization code flow (out-of-band)
     const val REDIRECT_URI = "urn:ietf:wg:oauth:2.0:oob"
-    
-    // Scopes
-    const val SCOPE = "SCROBBLE,SYNC,SETTINGS"
     
     // StateFlow for auth state
     private val _isTraktAuthenticated = MutableStateFlow(false)
@@ -60,11 +57,6 @@ object TraktAuthManager {
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
-    
-    // Device code flow state
-    private var deviceCode: String? = null
-    private var userCode: String? = null
-    private var intervalMs: Int = 5000
     
     // SharedPreferences for token storage
     private const val PREFS_NAME = "trakt_auth_prefs"
@@ -111,6 +103,8 @@ object TraktAuthManager {
         } else if (refreshToken != null) {
             // Try to refresh token
             Log.i(TAG, "Access token expired, attempting refresh")
+            _refreshToken.value = refreshToken
+            _userName.value = userName
             Thread {
                 kotlinx.coroutines.runBlocking {
                     refreshAccessToken()
@@ -122,13 +116,13 @@ object TraktAuthManager {
     }
     
     /**
-     * Generate OAuth authorization URL for device flow
+     * Generate OAuth authorization URL for the browser-based authorization code flow.
      */
     fun getAuthorizationUrl(redirectUri: String = REDIRECT_URI): String {
-        return "$TRAKT_AUTH_URL?" +
+        return "$TRAKT_AUTHORIZE_URL?" +
             "client_id=$TRAKT_CLIENT_ID" +
             "&redirect_uri=${Uri.encode(redirectUri)}" +
-            "&scope=${Uri.encode(SCOPE)}"
+            "&response_type=code"
     }
     
     /**
@@ -153,13 +147,14 @@ object TraktAuthManager {
             Log.i(TAG, "Exchanging authorization code for tokens")
             _isLoading.value = true
             
-            val body = FormBody.Builder()
-                .add("code", code)
-                .add("client_id", TRAKT_CLIENT_ID)
-                .add("client_secret", TRAKT_CLIENT_SECRET)
-                .add("redirect_uri", REDIRECT_URI)
-                .add("grant_type", "authorization_code")
-                .build()
+            val bodyJson = JSONObject().apply {
+                put("code", code)
+                put("client_id", TRAKT_CLIENT_ID)
+                put("client_secret", TRAKT_CLIENT_SECRET)
+                put("redirect_uri", REDIRECT_URI)
+                put("grant_type", "authorization_code")
+            }
+            val body = bodyJson.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
             
             val request = Request.Builder()
                 .url(TRAKT_TOKEN_URL)
@@ -171,11 +166,12 @@ object TraktAuthManager {
             
             if (response.isSuccessful && responseBody != null) {
                 val json = JSONObject(responseBody)
+                val username = json.optJSONObject("user")?.optString("username")
                 saveTokens(
                     accessToken = json.getString("access_token"),
                     refreshToken = json.getString("refresh_token"),
                     expiresIn = json.getInt("expires_in"),
-                    userName = json.optJSONObject("user")?.optString("username")
+                    userName = username?.takeIf { it.isNotBlank() }
                 )
                 Log.i(TAG, "Trakt authentication successful")
                 _isLoading.value = false
@@ -201,12 +197,13 @@ object TraktAuthManager {
         try {
             Log.i(TAG, "Refreshing Trakt access token")
             
-            val body = FormBody.Builder()
-                .add("refresh_token", currentRefreshToken)
-                .add("client_id", TRAKT_CLIENT_ID)
-                .add("client_secret", TRAKT_CLIENT_SECRET)
-                .add("grant_type", "refresh_token")
-                .build()
+            val bodyJson = JSONObject().apply {
+                put("refresh_token", currentRefreshToken)
+                put("client_id", TRAKT_CLIENT_ID)
+                put("client_secret", TRAKT_CLIENT_SECRET)
+                put("grant_type", "refresh_token")
+            }
+            val body = bodyJson.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
             
             val request = Request.Builder()
                 .url(TRAKT_TOKEN_URL)
@@ -218,11 +215,12 @@ object TraktAuthManager {
             
             if (response.isSuccessful && responseBody != null) {
                 val json = JSONObject(responseBody)
+                val username = json.optJSONObject("user")?.optString("username")
                 saveTokens(
                     accessToken = json.getString("access_token"),
                     refreshToken = json.getString("refresh_token"),
                     expiresIn = json.getInt("expires_in"),
-                    userName = json.optJSONObject("user")?.optString("username")
+                    userName = username?.takeIf { it.isNotBlank() }
                 )
                 Log.i(TAG, "Trakt token refresh successful")
                 true
@@ -272,7 +270,10 @@ object TraktAuthManager {
      * Get current access token (with auto-refresh if needed)
      */
     suspend fun getValidAccessToken(): String? {
-        if (_accessToken.value == null) return null
+        if (_accessToken.value == null) {
+            if (_refreshToken.value == null) return null
+            return if (refreshAccessToken()) _accessToken.value else null
+        }
         
         // Check if token is about to expire (within 5 minutes)
         val expiresAt = sharedPreferences?.getLong(PREF_EXPIRES_AT, 0) ?: 0

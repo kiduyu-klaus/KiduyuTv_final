@@ -81,7 +81,6 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import com.kiduyuk.klausk.kiduyutv.ui.screens.trakt.TraktAuthActivity
 import kotlinx.coroutines.delay
@@ -353,13 +352,7 @@ fun SettingsScreen(
                             context.startActivity(intent)
                         },
                         onSignOutClick = {
-                            kotlinx.coroutines.GlobalScope.launch {
-                                val repository = com.kiduyuk.klausk.kiduyutv.data.repository.TraktRepository(
-                                    com.kiduyuk.klausk.kiduyutv.data.remote.TraktApiClient.apiService,
-                                    com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager.getInstance(context)
-                                )
-                                repository.signOut()
-                            }
+                            com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager.getInstance(context).signOut()
                         }
                     )
                 }
@@ -1350,14 +1343,14 @@ private fun ProviderOptionItem(
             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
             textAlign = TextAlign.Center
         )
-        if (option == SettingsManager.AUTO) {
-            Text(
-                text = "Ask each time",
-                color = TextSecondary,
-                fontSize = 11.sp,
-                textAlign = TextAlign.Center
-            )
-        }
+//        if (option == SettingsManager.AUTO) {
+//            Text(
+//                text = "Ask each time",
+//                color = TextSecondary,
+//                fontSize = 11.sp,
+//                textAlign = TextAlign.Center
+//            )
+//        }
     }
 }
 
@@ -2750,15 +2743,11 @@ private fun TraktContent(
     onSignInClick: () -> Unit,
     onSignOutClick: () -> Unit
 ) {
-    var isConnected by remember { mutableStateOf(false) }
-    var username by remember { mutableStateOf<String?>(null) }
-
-    // Check connection status on composition
-    LaunchedEffect(Unit) {
-        val authManager = com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager.getInstance(context)
-        username = authManager.getUsername()
-        isConnected = authManager.getValidAccessToken() != null
+    val traktAuthManager = remember(context) {
+        com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager.getInstance(context)
     }
+    val isConnected by traktAuthManager.isTraktAuthenticated.collectAsState()
+    val username by traktAuthManager.userName.collectAsState()
 
     Column(
         modifier = Modifier
@@ -2812,9 +2801,15 @@ private fun TraktContent(
                             fontSize = 18.sp,
                             fontWeight = FontWeight.SemiBold
                         )
-                        if (isConnected && username != null) {
+                        if (isConnected && !username.isNullOrBlank()) {
                             Text(
                                 text = "Username: $username",
+                                color = TextSecondary,
+                                fontSize = 14.sp
+                            )
+                        } else if (isConnected) {
+                            Text(
+                                text = "Connected to Trakt.tv",
                                 color = TextSecondary,
                                 fontSize = 14.sp
                             )

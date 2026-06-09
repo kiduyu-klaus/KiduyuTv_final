@@ -53,7 +53,6 @@ class TraktRepository @Inject constructor(
 
             val response = traktApiService.getWatchedHistory(
                 token = "Bearer $token",
-                type = null,
                 page = page,
                 limit = limit
             )
@@ -140,7 +139,8 @@ class TraktRepository @Inject constructor(
      * Scrobble a movie (report watching progress).
      */
     suspend fun scrobbleMovie(
-        traktId: Int,
+        traktId: Int? = null,
+        tmdbId: Int? = null,
         progress: Float,
         status: String = "start" // start, pause, scrobble
     ): Result<TraktScrobbleResponse> {
@@ -148,15 +148,37 @@ class TraktRepository @Inject constructor(
             val token = traktAuthManager.getValidAccessToken()
                 ?: return Result.failure(Exception("Not authenticated with Trakt.tv"))
 
-            val response = traktApiService.scrobbleMovie(
-                token = "Bearer $token",
-                scrobble = TraktScrobbleRequest(
-                    movie = TraktScrobbleMovie(ids = TraktIds(trakt = traktId, slug = "", imdb = null, tmdb = null, tvdb = null)),
-                    episode = null,
-                    progress = progress.toDouble(),
-                    appVersion = "1.0"
+            val ids = buildIds(traktId = traktId, tmdbId = tmdbId)
+
+            val response = when (status.lowercase()) {
+                "pause" -> traktApiService.scrobblePause(
+                    token = "Bearer $token",
+                    scrobble = TraktScrobbleRequest(
+                        movie = TraktScrobbleMovie(ids = ids),
+                        episode = null,
+                        progress = progress.toDouble(),
+                        appVersion = "1.0"
+                    )
                 )
-            )
+                "scrobble", "stop" -> traktApiService.scrobbleStop(
+                    token = "Bearer $token",
+                    scrobble = TraktScrobbleRequest(
+                        movie = TraktScrobbleMovie(ids = ids),
+                        episode = null,
+                        progress = progress.toDouble(),
+                        appVersion = "1.0"
+                    )
+                )
+                else -> traktApiService.scrobbleMovie(
+                    token = "Bearer $token",
+                    scrobble = TraktScrobbleRequest(
+                        movie = TraktScrobbleMovie(ids = ids),
+                        episode = null,
+                        progress = progress.toDouble(),
+                        appVersion = "1.0"
+                    )
+                )
+            }
 
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)
@@ -172,7 +194,8 @@ class TraktRepository @Inject constructor(
      * Scrobble an episode (report watching progress).
      */
     suspend fun scrobbleEpisode(
-        traktId: Int,
+        traktId: Int? = null,
+        tmdbId: Int? = null,
         season: Int,
         episode: Int,
         progress: Float,
@@ -182,19 +205,49 @@ class TraktRepository @Inject constructor(
             val token = traktAuthManager.getValidAccessToken()
                 ?: return Result.failure(Exception("Not authenticated with Trakt.tv"))
 
-            val response = traktApiService.scrobbleEpisode(
-                token = "Bearer $token",
-                scrobble = TraktScrobbleRequest(
-                    movie = null,
-                    episode = TraktScrobbleEpisode(
-                        ids = TraktIds(trakt = traktId, slug = "", imdb = null, tmdb = null, tvdb = null),
-                        season = season,
-                        episode = episode
-                    ),
-                    progress = progress.toDouble(),
-                    appVersion = "1.0"
+            val ids = buildIds(traktId = traktId, tmdbId = tmdbId)
+
+            val response = when (status.lowercase()) {
+                "pause" -> traktApiService.scrobblePause(
+                    token = "Bearer $token",
+                    scrobble = TraktScrobbleRequest(
+                        movie = null,
+                        episode = TraktScrobbleEpisode(
+                            ids = ids,
+                            season = season,
+                            episode = episode
+                        ),
+                        progress = progress.toDouble(),
+                        appVersion = "1.0"
+                    )
                 )
-            )
+                "scrobble", "stop" -> traktApiService.scrobbleStop(
+                    token = "Bearer $token",
+                    scrobble = TraktScrobbleRequest(
+                        movie = null,
+                        episode = TraktScrobbleEpisode(
+                            ids = ids,
+                            season = season,
+                            episode = episode
+                        ),
+                        progress = progress.toDouble(),
+                        appVersion = "1.0"
+                    )
+                )
+                else -> traktApiService.scrobbleEpisode(
+                    token = "Bearer $token",
+                    scrobble = TraktScrobbleRequest(
+                        movie = null,
+                        episode = TraktScrobbleEpisode(
+                            ids = ids,
+                            season = season,
+                            episode = episode
+                        ),
+                        progress = progress.toDouble(),
+                        appVersion = "1.0"
+                    )
+                )
+            }
 
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!)
@@ -279,5 +332,15 @@ class TraktRepository @Inject constructor(
      */
     suspend fun signOut() {
         traktAuthManager.clearTokens()
+    }
+
+    private fun buildIds(traktId: Int? = null, tmdbId: Int? = null): TraktIds {
+        return TraktIds(
+            trakt = traktId,
+            slug = null,
+            imdb = null,
+            tmdb = tmdbId,
+            tvdb = null
+        )
     }
 }

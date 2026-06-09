@@ -21,8 +21,8 @@ data class TraktUser(
  * Trakt ID mappings (TMDB, IMDB, TVDB, etc.)
  */
 data class TraktIds(
-    @SerializedName("trakt") val trakt: Int,
-    @SerializedName("slug") val slug: String,
+    @SerializedName("trakt") val trakt: Int? = null,
+    @SerializedName("slug") val slug: String? = null,
     @SerializedName("imdb") val imdb: String?,
     @SerializedName("tmdb") val tmdb: Int?,
     @SerializedName("tvdb") val tvdb: Int?

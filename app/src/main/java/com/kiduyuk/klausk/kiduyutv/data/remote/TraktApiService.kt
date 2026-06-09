@@ -57,10 +57,10 @@ interface TraktApiService {
     /**
      * Get watchlist
      */
-    @GET("users/me/watchlist")
+    @GET("users/me/watchlist/{type}")
     suspend fun getWatchlist(
         @Header("Authorization") token: String,
-        @Query("type") type: String,
+        @Path("type") type: String,
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 100
     ): Response<List<TraktWatchlistItem>>
@@ -77,7 +77,7 @@ interface TraktApiService {
     /**
      * Remove item from watchlist
      */
-    @DELETE("sync/watchlist")
+    @POST("sync/watchlist/remove")
     suspend fun removeFromWatchlist(
         @Header("Authorization") token: String,
         @Body items: TraktSyncItems
@@ -138,7 +138,6 @@ interface TraktApiService {
     @GET("users/me/history")
     suspend fun getWatchedHistory(
         @Header("Authorization") token: String,
-        @Query("type") type: String? = null,
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 100
     ): Response<List<TraktHistoryItem>>
@@ -148,10 +147,10 @@ interface TraktApiService {
     /**
      * Get user's collection
      */
-    @GET("users/me/collection")
+    @GET("users/me/collection/{type}")
     suspend fun getCollection(
         @Header("Authorization") token: String,
-        @Query("type") type: String = "movies"
+        @Path("type") type: String = "movies"
     ): Response<List<TraktCollectionItem>>
     
     // ── Recommendations ──────────────────────────────────────────────────────
@@ -159,9 +158,9 @@ interface TraktApiService {
     /**
      * Get user's personalized recommendations
      */
-    @GET("users/me/recommendations")
+    @GET("recommendations/{type}")
     suspend fun getRecommendations(
         @Header("Authorization") token: String,
-        @Query("type") type: String = "movies"
+        @Path("type") type: String = "movies"
     ): Response<List<TraktRecommendation>>
 }

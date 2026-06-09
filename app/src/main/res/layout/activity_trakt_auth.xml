@@ -91,37 +91,53 @@
             android:textSize="18sp"
             android:textStyle="bold"
             android:gravity="center"
-            android:selectAllOnFocus="true" />
+            android:textIsSelectable="true" />
+
+        <Button
+            android:id="@+id/btnOpenBrowser"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="Open Trakt in Browser"
+            android:backgroundTint="#E50914"
+            android:textColor="#FFFFFF" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
-            android:text="Then enter this code:"
+            android:layout_marginTop="28dp"
+            android:text="Paste the authorization code here:"
             android:textColor="#AAAAAA"
             android:textSize="16sp"
             android:gravity="center" />
 
-        <TextView
-            android:id="@+id/tvUserCode"
-            android:layout_width="wrap_content"
+        <EditText
+            android:id="@+id/etAuthorizationCode"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:text="XXX-XXX"
+            android:background="@android:drawable/edit_text"
+            android:hint="Authorization code"
+            android:inputType="textNoSuggestions"
+            android:padding="12dp"
             android:textColor="#FFFFFF"
-            android:textSize="48sp"
-            android:textStyle="bold"
-            android:letterSpacing="0.15"
-            android:gravity="center"
-            android:fontFamily="monospace"
-            android:selectAllOnFocus="true" />
+            android:textColorHint="#888888" />
+
+        <Button
+            android:id="@+id/btnConnect"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Connect"
+            android:backgroundTint="#E50914"
+            android:textColor="#FFFFFF" />
 
         <TextView
             android:id="@+id/tvPollingStatus"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
-            android:text="Waiting for authorization..."
+            android:layout_marginTop="20dp"
+            android:text="Open the browser, sign in, then paste the code."
             android:textColor="#666666"
             android:textSize="14sp"
             android:gravity="center" />
