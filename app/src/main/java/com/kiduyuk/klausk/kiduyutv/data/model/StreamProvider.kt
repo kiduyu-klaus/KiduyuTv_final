@@ -206,7 +206,24 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
-        // 10. Peachify
+        // 10. MoviesApi
+        // Movies:   https://moviesapi.to/movie/$id
+        // TV Shows: https://moviesapi.to/tv/$id-$season-$episode
+        // ($id is a TMDB id)
+        // ═══════════════════════════════════════════════════════════════
+        StreamProvider(
+            name = "MoviesApi",
+            movieUrlTemplate = "https://moviesapi.to/movie/%d",
+            tvUrlTemplate = "https://moviesapi.to/tv/%d-%d-%d",
+            iframeAttributes = mapOf(
+                "frameborder" to "0"
+            ),
+            movieParameters = { _, _ -> emptyMap() },
+            tvParameters = { _, _, _, _ -> emptyMap() }
+        ),
+
+        // ═══════════════════════════════════════════════════════════════
+        // 11. Peachify
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
             name = "Peachify",
@@ -224,7 +241,7 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
-        // 11. VidAPI
+        // 12. VidAPI
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
             name = "VidAPI",
@@ -245,7 +262,7 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
-        // 12. VidPlus
+        // 13. VidPlus
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
             name = "VidPlus",
@@ -274,7 +291,7 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
-        // 13. CineSrc
+        // 14. CineSrc
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
             name = "CineSrc",
@@ -296,7 +313,7 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
-        // 14. Vidzen
+        // 15. Vidzen
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
             name = "Vidzen",
@@ -311,7 +328,7 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
-        // 15. Cinemaos
+        // 16. Cinemaos
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
             name = "Cinemaos",
@@ -326,7 +343,7 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
-        // 16. Amri
+        // 17. Amri
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
             name = "Amri",
@@ -341,7 +358,7 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
-        // 17. Zxc
+        // 18. Zxc
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
             name = "Zxc",
@@ -356,7 +373,7 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
-        // 18. Vlux
+        // 19. Vlux
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
             name = "Vlux",
@@ -371,7 +388,7 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
-        // 19. VidSrc (WTF) v4 - Premium
+        // 20. VidSrc (WTF) v4 - Premium
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
             name = "VidSrc (WTF) v4",
@@ -380,7 +397,7 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
-        // 20. PrimeSrc
+        // 21. PrimeSrc
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
             name = "PrimeSrc",
@@ -391,7 +408,7 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
-        // 21. VidSrc (WTF) v3 - Multi Providers
+        // 22. VidSrc (WTF) v3 - Multi Providers
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
             name = "VidSrc (WTF) v3 - Multi Providers",
@@ -400,7 +417,7 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
-        // 22. VidZee
+        // 23. VidZee
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
             name = "VidZee",
@@ -409,7 +426,7 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
-        // 23. Lordflix
+        // 24. Lordflix
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
             name = "Lordflix",
@@ -418,7 +435,7 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
-        // 24. Mapple
+        // 25. Mapple
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
             name = "Mapple",
@@ -427,7 +444,7 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
-        // 25. Smashystream
+        // 26. Smashystream
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
             name = "Smashystream",
@@ -449,7 +466,7 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
-        // 26. 111Movies
+        // 27. 111Movies
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
             name = "111Movies",
@@ -471,7 +488,7 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
-        // 27. Autoembed
+        // 28. Autoembed
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
             name = "Autoembed",
@@ -480,7 +497,7 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
-        // 28. EmbedMaster
+        // 29. EmbedMaster
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
             name = "EmbedMaster",
@@ -499,7 +516,7 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
-        // 29. Vidsync
+        // 30. Vidsync
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
             name = "Vidsync",
@@ -510,7 +527,7 @@ object StreamProviderManager {
         ),
 
         // ═══════════════════════════════════════════════════════════════
-        // 30. VidSrc (WTF) v1 - Multi Server
+        // 31. VidSrc (WTF) v1 - Multi Server
         // ═══════════════════════════════════════════════════════════════
         StreamProvider(
             name = "VidSrc (WTF) v1",
