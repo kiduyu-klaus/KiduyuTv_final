@@ -225,10 +225,10 @@ class PlayerActivity : AppCompatActivity() {
             )
 
             webChromeClient = object : WebChromeClient() {
-                override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
-                    super.onShowCustomView(view, callback)
-                    Log.i(TAG, "[WebChrome] onShowCustomView called")
-                }
+//                override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
+//                    super.onShowCustomView(view, callback)
+//                    Log.i(TAG, "[WebChrome] onShowCustomView called")
+//                }
 
                 override fun onCreateWindow(
                     view: WebView?,
@@ -268,7 +268,7 @@ class PlayerActivity : AppCompatActivity() {
         if (!isCursorDisabled) {
             rootLayout.addView(cursorView)
             // In updateCursorPosition(), add this:
-            cursorView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+            //cursorView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
             cursorView.bringToFront()
         }
 
@@ -276,7 +276,7 @@ class PlayerActivity : AppCompatActivity() {
 
         rootLayout.isFocusable = true
         rootLayout.isFocusableInTouchMode = true
-        rootLayout.requestFocus()
+        //rootLayout.requestFocus()
 
         rootLayout.post {
             screenWidth = rootLayout.width
