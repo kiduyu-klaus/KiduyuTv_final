@@ -280,3 +280,5 @@ data class TraktRecommendation(
     @SerializedName("movie") val movie: TraktMovie?,
     @SerializedName("show") val show: TraktShow?
 )
+
+

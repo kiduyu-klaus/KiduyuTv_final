@@ -67,6 +67,11 @@ fun TraktProfileScreen(
     var profile by remember { mutableStateOf<TraktUser?>(null) }
     var profileError by remember { mutableStateOf<String?>(null) }
 
+    val traktAuthManager = remember(context) {
+        com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager.getInstance(context)
+    }
+    val avatarUrl by traktAuthManager.userAvatarUrl.collectAsState()
+
     val traktRepository = remember {
         TraktRepository(TraktApiClient.apiService, TraktAuthManager)
     }
@@ -78,7 +83,7 @@ fun TraktProfileScreen(
         try {
             val token = TraktAuthManager.getValidAccessToken()
             if (token != null) {
-                val response = TraktApiClient.apiService.getUserProfile("Bearer $token")
+                val response = TraktApiClient.apiService.getUserProfile(token = "Bearer $token")
                 if (response.isSuccessful) {
                     profile = response.body()
                     Log.i("TraktProfileScreen", "Profile loaded: $profile")
@@ -146,10 +151,6 @@ fun TraktProfileScreen(
                 horizontalArrangement = Arrangement.spacedBy(20.dp),
                 modifier = Modifier.padding(horizontal = 16.dp)
             ) {
-                val avatarUrl = remember(profile!!.username) {
-                    "https://avatar-redcircle.trakt.tv/${profile!!.username}.png"
-                }
-
                 Box(
                     modifier = Modifier
                         .size(80.dp)

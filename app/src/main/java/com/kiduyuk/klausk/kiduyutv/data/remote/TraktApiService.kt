@@ -16,7 +16,8 @@ interface TraktApiService {
      */
     @GET("users/me")
     suspend fun getUserProfile(
-        @Header("Authorization") token: String
+        @Header("Authorization") token: String,
+        @Query("extended") extended: String = "full" // Defaults to "full" to always pull the bio
     ): Response<TraktUser>
     
     /**

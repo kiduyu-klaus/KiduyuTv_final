@@ -64,6 +64,11 @@ fun MobileTraktProfileScreen(
     var profile by remember { mutableStateOf<TraktUser?>(null) }
     var profileError by remember { mutableStateOf<String?>(null) }
 
+    val traktAuthManager = remember(context) {
+        com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager.getInstance(context)
+    }
+    val avatarUrl by traktAuthManager.userAvatarUrl.collectAsState()
+
     val traktRepository = remember {
         TraktRepository(TraktApiClient.apiService, TraktAuthManager)
     }
@@ -75,7 +80,7 @@ fun MobileTraktProfileScreen(
         try {
             val token = TraktAuthManager.getValidAccessToken()
             if (token != null) {
-                val response = TraktApiClient.apiService.getUserProfile("Bearer $token")
+                val response = TraktApiClient.apiService.getUserProfile(token = "Bearer $token")
                 if (response.isSuccessful) {
                     profile = response.body()
                     Log.i("MobileTraktProfile", "Profile loaded: $profile")
@@ -113,7 +118,7 @@ fun MobileTraktProfileScreen(
         ) {
             // Profile Header
             if (profile != null) {
-                MobileProfileHeader(profile = profile!!)
+                MobileProfileHeader(profile = profile!!, avatarUrl = avatarUrl)
             } else if (isLoadingProfile) {
                 Box(modifier = Modifier.fillMaxWidth().height(100.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = PrimaryRed, modifier = Modifier.size(32.dp))
@@ -184,11 +189,7 @@ fun MobileTraktProfileScreen(
 }
 
 @Composable
-private fun MobileProfileHeader(profile: TraktUser) {
-    val avatarUrl = remember(profile.username) {
-        "https://avatar-redcircle.trakt.tv/${profile.username}.png"
-    }
-
+private fun MobileProfileHeader(profile: TraktUser, avatarUrl: String?) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
