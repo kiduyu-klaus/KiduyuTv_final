@@ -12,6 +12,28 @@
 # AdMob mediation adapters (if added later)
 -keep class com.google.android.gms.ads.mediation.** { *; }
 
+##############################################
+# 🔐 GOOGLE TINK / GOOGLE API CLIENT
+##############################################
+
+# Keep Tink cryptography classes
+-keep class com.google.crypto.tink.** { *; }
+-keepclassmembers class com.google.crypto.tink.** { *; }
+
+# Keep Google API Client (required by Tink's KeysDownloader)
+-keep class com.google.api.client.** { *; }
+-keep class com.google.api.client.http.** { *; }
+-keep class com.google.api.client.http.javanet.** { *; }
+-keepclassmembers class com.google.api.client.** { *; }
+
+# Keep Joda Time (used by Google API Client)
+-keep class org.joda.time.** { *; }
+-keep class org.joda.money.** { *; }
+-keepclassmembers class org.joda.time.** { *; }
+
+-dontwarn com.google.api.client.**
+-dontwarn org.joda.time.**
+
 
 ##############################################
 # 🔒 GENERAL SAFE RULES
