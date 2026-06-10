@@ -1282,9 +1282,36 @@ private fun SearchContent(
     val isFireTv = remember(context) { isFireTVDevice(context) }
     val currentImeAction = if (isFireTv) ImeAction.Next else ImeAction.Search
 
+    // Track whether focus has already been moved to the first result for the
+    // current set of results. We re-arm it whenever the result list mutates
+    // (e.g. user keeps typing and the first result changes) so the first
+    // item is always focused and selected when results are (re)populated.
+    val lastFocusedResultKey = remember { mutableStateOf<String?>(null) }
+    val firstResultKey = searchResults.firstOrNull()?.id
+
     // Request focus on search field when screen opens
     LaunchedEffect(Unit) {
         searchFocusRequester.requestFocus()
+    }
+
+    // Auto-focus & select the first search result whenever it changes.
+    // Runs on every recomposition where the top result's key differs from
+    // the last one we focused — this gives the user D-pad focus on the
+    // first result as soon as results populate (no need to press Search).
+    LaunchedEffect(firstResultKey) {
+        if (searchResults.isNotEmpty() && firstResultKey != null && firstResultKey != lastFocusedResultKey.value) {
+            // Small delay to ensure the grid item has been composed and is
+            // focusable. 100ms is enough for the LazyVerticalGrid to lay out
+            // its first cell.
+            delay(100)
+            try {
+                firstSearchResultFocusRequester.requestFocus()
+                lastFocusedResultKey.value = firstResultKey
+            } catch (e: Exception) {
+                // Focus requester not yet attached — ignore; the next
+                // recomposition will retry.
+            }
+        }
     }
 
     // Handle IME action submission
@@ -1297,6 +1324,9 @@ private fun SearchContent(
                 coroutineScope.launch {
                     delay(50)
                     firstSearchResultFocusRequester.requestFocus()
+                    // Mark as focused so the auto-focus effect doesn't
+                    // double-fire for the same first result.
+                    lastFocusedResultKey.value = firstResultKey
                 }
             }
         }
@@ -1310,8 +1340,13 @@ private fun SearchContent(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = {
-                    // Keep focus on search field when clicking outside
-                    searchFocusRequester.requestFocus()
+                    // Only re-focus the search field when the user clicks
+                    // the empty area BEFORE results have appeared. Once
+                    // results are visible the first result owns focus and
+                    // stealing it back breaks D-pad navigation.
+                    if (searchResults.isEmpty()) {
+                        searchFocusRequester.requestFocus()
+                    }
                 }
             )
     ) {
