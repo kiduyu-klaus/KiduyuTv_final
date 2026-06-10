@@ -136,7 +136,7 @@ fun MyListScreen(
                                             )
                                         )
                                     }
-                                    "episode", "show" -> {
+                                    "show" -> {
                                         val traktShow = item.show
                                         traktShow?.ids?.tmdb?.let { tmdbId ->
                                             val cacheKey = "tv-$tmdbId"
