@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,6 +46,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 /**
  * Composable function for the "My List" screen, displaying items saved by the user.
@@ -286,12 +288,13 @@ fun MyListScreen(
                         )
                         if (isTraktConnected && selectedTabIndex == 0) {
                             Spacer(modifier = Modifier.height(16.dp))
+                            val coroutineScope = rememberCoroutineScope()
                             Button(
                                 onClick = {
                                     // Trigger a manual refresh
                                     _traktWatchHistory.value = emptyList()
                                     _watchedItems.value = emptyList()
-                                    LaunchedEffect(Unit) {
+                                    coroutineScope.launch {
                                         traktRepository.getTraktWatchHistory(page = 1, limit = 100).collect { result ->
                                             result.fold(
                                                 onSuccess = { history ->
