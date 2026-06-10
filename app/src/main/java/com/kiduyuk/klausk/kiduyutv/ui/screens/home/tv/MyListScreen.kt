@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.util.Log
 import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.ApiClient
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
@@ -90,10 +91,14 @@ fun MyListScreen(
 
     // Fetch Trakt watched history when connected
     LaunchedEffect(isTraktConnected) {
+        Log.i("MyListScreen", "isTraktConnected: $isTraktConnected")
         if (isTraktConnected) {
+            Log.i("MyListScreen", "Starting to fetch Trakt watch history...")
             traktRepository.getTraktWatchHistory(page = 1, limit = 100).collect { result ->
+                Log.i("MyListScreen", "getTraktWatchHistory result received: ${result.isSuccess}")
                 result.fold(
                     onSuccess = { history ->
+                        Log.i("MyListScreen", "History fetch SUCCESS - ${history.size} items")
                         _traktWatchHistory.value = history
                         // Load poster paths asynchronously
                         val items = mutableListOf<MyListItem>()
@@ -105,6 +110,7 @@ fun MyListScreen(
                                         try {
                                             tmdbApiService.getMovieDetail(tmdbId).posterPath
                                         } catch (e: Exception) {
+                                            Log.e("MyListScreen", "Failed to fetch movie poster for TMDB $tmdbId: ${e.message}")
                                             null
                                         }
                                     }
@@ -124,6 +130,7 @@ fun MyListScreen(
                                         try {
                                             tmdbApiService.getTvShowDetail(tmdbId).posterPath
                                         } catch (e: Exception) {
+                                            Log.e("MyListScreen", "Failed to fetch TV poster for TMDB $tmdbId: ${e.message}")
                                             null
                                         }
                                     }
@@ -139,14 +146,17 @@ fun MyListScreen(
                                 }
                             }
                         }
+                        Log.i("MyListScreen", "Built ${items.size} watched items")
                         _watchedItems.value = items.distinctBy { "${it.type}-${it.id}" }
                     },
-                    onFailure = {
+                    onFailure = { error ->
+                        Log.e("MyListScreen", "History fetch FAILED: ${error.message}", error)
                         // Handle error silently - watched tab will show empty state
                     }
                 )
             }
         } else {
+            Log.i("MyListScreen", "Trakt not connected, clearing history")
             _traktWatchHistory.value = emptyList()
             _watchedItems.value = emptyList()
         }
