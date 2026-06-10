@@ -2832,9 +2832,10 @@ private fun TraktContent(
                     }
 
                     Column {
-                        if (isConnected && !username.isNullOrBlank()) {
+                        val displayUsername = username
+                        if (isConnected && !displayUsername.isNullOrBlank()) {
                             Text(
-                                text = username,
+                                text = displayUsername,
                                 color = TextPrimary,
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.SemiBold

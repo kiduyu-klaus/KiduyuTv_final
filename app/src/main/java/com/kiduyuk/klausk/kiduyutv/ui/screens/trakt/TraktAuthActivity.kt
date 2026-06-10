@@ -281,7 +281,7 @@ class TraktAuthActivity : AppCompatActivity() {
                         if (isTvDevice) {
                             tvUiState = TraktAuthTvUiState.Authorized("Authorized! Completing sign in…")
                         } else {
-                            phoneShowLoading("Authorized! Completing sign in…")
+                            showPhoneLoading("Authorized! Completing sign in…")
                         }
                         // Exchange device code tokens for OAuth tokens
                         exchangeDeviceCodeForTokens(result.json)
