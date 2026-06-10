@@ -77,6 +77,9 @@ class LiveTvViewModel : ViewModel() {
     
     private val _uiState = MutableStateFlow(LiveTvUiState())
     val uiState: StateFlow<LiveTvUiState> = _uiState.asStateFlow()
+
+    private val _favoriteChannels = MutableStateFlow<List<IptvChannel>>(emptyList())
+    val favoriteChannels = _favoriteChannels.asStateFlow()
     
     private var cachedPlaylist: IptvPlaylist? = null
     private var appContext: Context? = null
@@ -97,6 +100,11 @@ class LiveTvViewModel : ViewModel() {
     fun initialize(context: Context) {
         appContext = context.applicationContext
         prefs = appContext?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        refreshFavoriteChannels()
+    }
+
+    private fun refreshFavoriteChannels() {
+        _favoriteChannels.value = getFavoriteChannels()
     }
 
     /**
@@ -132,6 +140,7 @@ class LiveTvViewModel : ViewModel() {
             arr.put(obj)
         }
         prefs?.edit()?.putString(FAVORITES_KEY, arr.toString())?.apply()
+        _favoriteChannels.value = channels
     }
 
     /**
@@ -282,6 +291,7 @@ class LiveTvViewModel : ViewModel() {
      */
     fun clearAllLocalFavorites() {
         prefs?.edit()?.putString(FAVORITES_KEY, "[]")?.apply()
+        _favoriteChannels.value = emptyList()
     }
     
     /**

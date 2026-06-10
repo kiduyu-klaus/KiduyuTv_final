@@ -99,6 +99,7 @@ fun LiveTvScreen(
     scheduleViewModel: ScheduleViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val favoriteChannels by viewModel.favoriteChannels.collectAsState()
     val scheduleUiState by scheduleViewModel.uiState.collectAsState()
     val context = LocalContext.current
     var favoriteChannelToConfirm by remember { mutableStateOf<IptvChannel?>(null) }
@@ -156,7 +157,7 @@ fun LiveTvScreen(
     val tabs = listOf(
         TabItem("Live TV", Icons.Default.Tv),
         TabItem("Schedule", Icons.Default.CalendarToday),
-        TabItem("My Channels (${viewModel.getFavoriteChannels().size})", Icons.Default.List)
+        TabItem("My Channels (${favoriteChannels.size})", Icons.Default.List)
     )
 
     Box(
@@ -225,7 +226,7 @@ fun LiveTvScreen(
                         viewModel.syncFavoriteChannelsWithFirebase()
                     }
                     FavoriteChannelsTabContent(
-                        favorites = viewModel.getFavoriteChannels(),
+                        favorites = favoriteChannels,
                         onChannelClick = { channel -> viewModel.selectChannel(channel) }
                     )
                 }
@@ -594,7 +595,7 @@ private fun FavoriteChannelsTabContent(
                     .fillMaxSize()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                itemsIndexed(favorites, key = { _, channel -> channel.id }) { index, channel ->
+                itemsIndexed(favorites, key = { index, channel -> "${channel.id}_$index" }) { index, channel ->
                     ChannelCard(
                         channel = channel,
                         modifier = if (index == 0) Modifier else Modifier,
@@ -765,7 +766,7 @@ private fun ScrapedChannelsGrid(
             .fillMaxSize()
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        itemsIndexed(channels, key = { _, channel -> channel.name }) { index, channel ->
+        itemsIndexed(channels, key = { index, channel -> "${channel.name}_$index" }) { index, channel ->
             val modifier = if (index == 0) {
                 Modifier.focusRequester(firstFocusRequester)
             } else {
@@ -1686,7 +1687,7 @@ private fun SearchContent(
                     .fillMaxWidth()
                     .padding(bottom = 16.dp)
             ) {
-                itemsIndexed(searchResults, key = { _, channel -> channel.id }) { index, channel ->
+                itemsIndexed(searchResults, key = { index, channel -> "${channel.id}_$index" }) { index, channel ->
                     ChannelCard(
                         channel = channel,
                         modifier = Modifier,
@@ -1953,7 +1954,7 @@ private fun ChannelsContent(
                     .fillMaxWidth()
                     .padding(bottom = 16.dp)
             ) {
-                itemsIndexed(channels, key = { _, channel -> channel.id }) { index, channel ->
+                itemsIndexed(channels, key = { index, channel -> "${channel.id}_$index" }) { index, channel ->
                     val modifier = if (index == 0) {
                         Modifier.focusRequester(firstChannelFocusRequester)
                     } else {
