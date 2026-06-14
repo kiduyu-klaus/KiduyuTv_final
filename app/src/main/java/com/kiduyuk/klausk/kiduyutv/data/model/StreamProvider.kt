@@ -583,6 +583,14 @@ object StreamProviderManager {
 
         val attrString = attributes.map { "${it.key}=\"${it.value}\"" }.joinToString(" ")
 
+        // Enable postMessage communication from iframes by setting document.domain
+        // This allows the tracking script to receive position updates from the embedded player
+        val domainScript = """
+            <script>
+            try { document.domain = document.domain; } catch(e) {}
+            </script>
+        """.trimIndent()
+
         // Unified tracking script for watch progress
         val trackingScript = """
             <script>
@@ -715,6 +723,7 @@ object StreamProviderManager {
                     src="$finalUrl" 
                     $attrString>
                 </iframe>
+                $domainScript
                 $trackingScript
             </body>
             </html>
