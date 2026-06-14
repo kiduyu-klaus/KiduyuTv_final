@@ -66,7 +66,7 @@ android {
                 unityAdsGameId: "2222222",
                 unityAdsTestMode: "false",
                 wortiseAppId: "00000000-0000-0000-0000-000000000002",
-                admobAppId: "ca-app-pub-xxxxxxx/xxxxxxx"  // TODO: Replace with real TV AdMob App ID
+                admobAppId: "ca-app-pub-3803477439180910~6736398964"  // TODO: Replace with real TV AdMob App ID
             ]
         }
     }
