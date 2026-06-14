@@ -31,6 +31,7 @@ import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.data.model.CastMember
 import com.kiduyuk.klausk.kiduyutv.data.model.MediaItem
+import com.kiduyuk.klausk.kiduyutv.data.model.ProfileImage
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
