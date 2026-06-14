@@ -93,10 +93,10 @@
             android:theme="@style/Theme.Translucent.NoTitleBar"
             tools:replace="android:configChanges,android:theme" />
 
-        <provider
-            android:name="com.google.android.gms.ads.MobileAdsInitProvider"
-            android:authorities="${applicationId}.mobileadsinitprovider"
-            android:exported="false" />
+<!--        <provider-->
+<!--            android:name="com.google.android.gms.ads.MobileAdsInitProvider"-->
+<!--            android:authorities="${applicationId}.mobileadsinitprovider"-->
+<!--            android:exported="false" />-->
 
         <receiver
             android:name=".util.UpdateReceiver"
