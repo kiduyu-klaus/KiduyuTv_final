@@ -16,6 +16,9 @@ import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.network.AndroidApp
 import com.kiduyuk.klausk.kiduyutv.network.NetworkConnectivityChecker
 import com.kiduyuk.klausk.kiduyutv.util.AdManager
+import com.kiduyuk.klausk.kiduyutv.util.StartAppAdManager
+import com.kiduyuk.klausk.kiduyutv.util.UnityAdManager
+import com.kiduyuk.klausk.kiduyutv.util.WortiseAdManager
 import com.kiduyuk.klausk.kiduyutv.util.AdvancedAdBlocker
 import com.kiduyuk.klausk.kiduyutv.util.AuthManager
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
@@ -86,6 +89,12 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
 
         // Initialize Mobile Ads SDK (AdMob for phone, GAM for tv)
         AdManager.init(this)
+
+        // Initialize Secondary Ad Networks (StartApp, Unity, Wortise)
+        // These are safe to call as they check if ads are disabled internally
+        StartAppAdManager.preloadAds(this)
+        UnityAdManager.preloadAds(this)
+        WortiseAdManager.preloadAds(this)
 
         // Start network connectivity monitoring
         NetworkConnectivityChecker.startMonitoring(this)

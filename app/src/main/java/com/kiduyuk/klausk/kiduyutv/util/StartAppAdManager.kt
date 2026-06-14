@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.os.Bundle
 import android.util.Log
+import android.view.View
 import android.view.ViewGroup
 import com.startapp.sdk.ads.banner.Banner
 import com.startapp.sdk.ads.banner.BannerListener
@@ -75,19 +76,19 @@ object StartAppAdManager {
             container.removeAllViews()
             val banner = Banner(activity)
             banner.setBannerListener(object : BannerListener {
-                override fun onReceiveAd(view: Banner) {
+                override fun onReceiveAd(view: View) {
                     Log.i(TAG, "StartApp banner received")
                 }
 
-                override fun onFailedToReceiveAd(view: Banner) {
+                override fun onFailedToReceiveAd(view: View) {
                     Log.w(TAG, "StartApp banner failed")
                 }
 
-                override fun onClick(view: Banner) {
+                override fun onClick(view: View) {
                     Log.i(TAG, "StartApp banner clicked")
                 }
 
-                override fun onImpression(view: Banner) {
+                override fun onImpression(view: View) {
                     Log.i(TAG, "StartApp banner impression")
                 }
             })
@@ -123,7 +124,7 @@ object StartAppAdManager {
         try {
             val startAppAd = StartAppAd(activity)
             // FIX: Exact overrides and method naming corrected to fit SDK specifications
-            startAppAd.setAdDisplayListener(object : AdDisplayListener {
+            startAppAd.showAd(object : AdDisplayListener {
                 override fun adDisplayed(ad: Ad?) {
                     Log.i(TAG, "StartApp interstitial displayed")
                 }
@@ -184,31 +185,29 @@ object StartAppAdManager {
                     onRewarded()
                 }
             })
-            // FIX: Explicitly declared required callbacks for interface conversion stability
-            rewardedVideo.setAdDisplayListener(object : AdDisplayListener {
-                override fun adDisplayed(ad: Ad?) {
-                    Log.i(TAG, "StartApp rewarded displayed")
-                }
-
-                override fun adHidden(ad: Ad?) {
-                    Log.i(TAG, "StartApp rewarded hidden")
-                    onDismissed()
-                }
-
-                override fun adClicked(ad: Ad?) {
-                    Log.i(TAG, "StartApp rewarded clicked")
-                }
-
-                override fun adNotDisplayed(ad: Ad?) {
-                    Log.w(TAG, "StartApp rewarded not displayed")
-                    onDismissed()
-                }
-            })
             // FIX: Added the explicit AdMode.REWARDED_VIDEO constraint parameter
             rewardedVideo.loadAd(StartAppAd.AdMode.REWARDED_VIDEO, object : AdEventListener {
                 override fun onReceiveAd(ad: Ad) {
                     Log.i(TAG, "StartApp rewarded loaded")
-                    rewardedVideo.showAd()
+                    rewardedVideo.showAd(object : AdDisplayListener {
+                        override fun adDisplayed(ad: Ad?) {
+                            Log.i(TAG, "StartApp rewarded displayed")
+                        }
+
+                        override fun adHidden(ad: Ad?) {
+                            Log.i(TAG, "StartApp rewarded hidden")
+                            onDismissed()
+                        }
+
+                        override fun adClicked(ad: Ad?) {
+                            Log.i(TAG, "StartApp rewarded clicked")
+                        }
+
+                        override fun adNotDisplayed(ad: Ad?) {
+                            Log.w(TAG, "StartApp rewarded not displayed")
+                            onDismissed()
+                        }
+                    })
                 }
 
                 override fun onFailedToReceiveAd(ad: Ad?) {

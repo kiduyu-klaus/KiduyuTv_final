@@ -7,10 +7,10 @@ import android.view.ViewGroup
 import com.wortise.ads.AdError
 import com.wortise.ads.RevenueData
 import com.wortise.ads.appopen.AppOpenAd
-import com.wortise.ads.banner.AdSize
+import com.wortise.ads.AdSize
 import com.wortise.ads.banner.BannerAd
 import com.wortise.ads.interstitial.InterstitialAd
-import com.wortise.ads.rewarded.Reward
+import com.wortise.ads.Reward
 import com.wortise.ads.rewarded.RewardedAd
 
 /**
@@ -112,7 +112,7 @@ object WortiseAdManager {
             val bannerAd = BannerAd(activity).apply {
                 adUnitId = AD_UNIT_BANNER
                 adSize = AdSize.HEIGHT_50
-                listener = object : BannerAd.Listener() {
+                listener = object : BannerAd.Listener {
                     override fun onBannerLoaded(ad: BannerAd) {
                         Log.i(TAG, "Wortise banner loaded")
                     }
@@ -214,7 +214,7 @@ object WortiseAdManager {
         activity: Activity?,
         onDismissed: (() -> Unit)?
     ): InterstitialAd.Listener {
-        return object : InterstitialAd.Listener() {
+        return object : InterstitialAd.Listener {
             override fun onInterstitialLoaded(ad: InterstitialAd) {
                 Log.i(TAG, "Wortise interstitial loaded")
             }
@@ -300,7 +300,7 @@ object WortiseAdManager {
         onRewarded: (() -> Unit)?,
         onDismissed: (() -> Unit)?
     ): RewardedAd.Listener {
-        return object : RewardedAd.Listener() {
+        return object : RewardedAd.Listener {
             override fun onRewardedLoaded(ad: RewardedAd) {
                 Log.i(TAG, "Wortise rewarded loaded")
             }
@@ -375,7 +375,7 @@ object WortiseAdManager {
     }
 
     private fun createAppOpenListener(onDismissed: (() -> Unit)?): AppOpenAd.Listener {
-        return object : AppOpenAd.Listener() {
+        return object : AppOpenAd.Listener {
             override fun onAppOpenLoaded(ad: AppOpenAd) {
                 Log.i(TAG, "Wortise app open loaded")
             }

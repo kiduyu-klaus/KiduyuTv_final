@@ -133,6 +133,10 @@ object UnityAdManager {
                 override fun onBannerLeftApplication(bannerAdView: BannerView) {
                     Log.i(TAG, "Unity banner left app")
                 }
+
+                override fun onBannerShown(bannerAdView: BannerView) {
+                    Log.i(TAG, "Unity banner shown")
+                }
             }
             container.addView(
                 bannerView,
