@@ -16,6 +16,7 @@ import android.app.UiModeManager
 import android.content.Context
 import android.widget.Toast
 import android.content.res.Configuration
+import android.graphics.PixelFormat
 import android.webkit.*
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
@@ -93,6 +94,11 @@ class PlayerActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Fix: Missing Translucent Window Format
+        // Fire TV's window manager often requires the Activity's window to be explicitly set 
+        // to a translucent format to correctly composite the video surface with the WebView UI.
+        window.setFormat(PixelFormat.TRANSLUCENT)
 
         val tmdbId = intent.getIntExtra("TMDB_ID", -1)
         val isTv = intent.getBooleanExtra("IS_TV", false)
@@ -158,13 +164,25 @@ class PlayerActivity : AppCompatActivity() {
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
 
-            setBackgroundColor(0xFF000000.toInt())
+            // Fix: Solid Background Color Overlapping Video
+            // On many Fire OS versions, the video is rendered on a SurfaceView that sits behind 
+            // the WebView's main drawing layer. Setting a solid black background hides the video.
+            setBackgroundColor(0x00000000) // Set to transparent
+            
+            // Fix: Amazon Chromium WebView vs. System WebView
+            // Enable debugging for Amazon Chromium WebView optimizations
+            if (isFireTV) {
+                WebView.setWebContentsDebuggingEnabled(true)
+            }
 
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
                 databaseEnabled = true
-                //mediaPlaybackRequiresUserGesture = false
+                
+                // Fix: Media Playback User Gesture Restriction
+                // Amazon's WebView implementation is stricter regarding autoplay.
+                mediaPlaybackRequiresUserGesture = false
                 allowFileAccess = true
                 allowContentAccess = true
                 loadWithOverviewMode = true
