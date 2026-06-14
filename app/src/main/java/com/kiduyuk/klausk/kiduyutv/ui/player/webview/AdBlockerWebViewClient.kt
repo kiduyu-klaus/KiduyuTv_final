@@ -14,6 +14,7 @@ import java.io.ByteArrayInputStream
 class AdBlockerWebViewClient(
     private val onPageFinished: () -> Unit,
     private val onError: () -> Unit,
+    private val onUrlChanged: (String) -> Unit = {},
     //private val shouldOverrideUrlLoading: (String) -> Unit
 ) : WebViewClient() {
 
@@ -71,6 +72,13 @@ class AdBlockerWebViewClient(
         if (request?.isForMainFrame == true) {
             Log.i("AdblockWebview", "Received error: ${error?.description}")
             onError()
+        }
+    }
+
+    override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
+        super.doUpdateVisitedHistory(view, url, isReload)
+        if (url != null) {
+            onUrlChanged(url)
         }
     }
 }

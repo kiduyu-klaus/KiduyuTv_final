@@ -160,4 +160,26 @@ object WebViewUtils {
 
         return "VidLink"
     }
+
+    /**
+     * Extracts (tmdbId, season, episode) from a stream URL by matching it against
+     * the TV URL template of the given provider. Providers structure their URLs
+     * differently — path segments, dash-combined segments, or query params — so
+     * this builds a regex directly from each provider's tvUrlTemplate rather than
+     * assuming a single fixed shape.
+     */
+    fun parseEpisodeFromUrl(url: String, providerName: String): Triple<Int, Int, Int>? {
+        val provider = StreamProviderManager.getProvider(providerName) ?: return null
+
+        val pattern = Regex.escape(provider.tvUrlTemplate).replace("%d", "\\E(\\d+)\\Q")
+
+        return try {
+            val match = Regex(pattern).find(url) ?: return null
+            val (tmdbId, season, episode) = match.destructured
+            Triple(tmdbId.toInt(), season.toInt(), episode.toInt())
+        } catch (e: Exception) {
+            Log.w(TAG, "[WebView] Failed to parse episode from URL for $providerName: ${e.message}")
+            null
+        }
+    }
 }

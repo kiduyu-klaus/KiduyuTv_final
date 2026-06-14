@@ -196,6 +196,18 @@ class PlayerActivity : AppCompatActivity() {
                     hasPageError = true
                     isPageLoading = false
                     Log.e(TAG, "[WebView] Error received with AdBlocker")
+                },
+                onUrlChanged = { newUrl ->
+                    if (currentIsTv) {
+                        WebViewUtils.parseEpisodeFromUrl(newUrl, currentProviderName)?.let { (tmdbId, season, episode) ->
+                            if (tmdbId == currentTmdbId && (season != currentSeason || episode != currentEpisode)) {
+                                Log.i(TAG, "[Episode] Detected change S${currentSeason}E${currentEpisode} -> S${season}E${episode}")
+                                currentSeason = season
+                                currentEpisode = episode
+                                currentPlaybackPosition = 0L
+                            }
+                        }
+                    }
                 }
                 //shouldOverrideUrlLoading = { }
             )
