@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.util.Log
 import android.view.ViewGroup
+import com.unity3d.ads.IUnityAdsLoadListener
 import com.unity3d.ads.IUnityAdsShowListener
 import com.unity3d.ads.UnityAds
 import com.unity3d.ads.UnityAdsShowOptions
@@ -38,6 +39,42 @@ object UnityAdManager {
     @Volatile
     private var currentBannerView: BannerView? = null
 
+    // Tracking states manually since UnityAds.isReady() was removed
+    @Volatile
+    private var _isInterstitialReady = false
+
+    @Volatile
+    private var _isRewardedReady = false
+
+    val isInterstitialReady: Boolean
+        get() = _isInterstitialReady
+
+    val isRewardedReady: Boolean
+        get() = _isRewardedReady
+
+    // Central listener implementation for handling ad load events
+    private val loadListener = object : IUnityAdsLoadListener {
+        override fun onUnityAdsAdLoaded(placementId: String) {
+            Log.i(TAG, "Unity ad successfully loaded: $placementId")
+            when (placementId) {
+                PLACEMENT_INTERSTITIAL -> _isInterstitialReady = true
+                PLACEMENT_REWARDED -> _isRewardedReady = true
+            }
+        }
+
+        override fun onUnityAdsFailedToLoad(
+            placementId: String,
+            error: UnityAds.UnityAdsLoadError,
+            message: String
+        ) {
+            Log.w(TAG, "Unity ad failed to load: $placementId, error: $error, message: $message")
+            when (placementId) {
+                PLACEMENT_INTERSTITIAL -> _isInterstitialReady = false
+                PLACEMENT_REWARDED -> _isRewardedReady = false
+            }
+        }
+    }
+
     private fun shouldShowAds(context: Context): Boolean = try {
         !SettingsManager(context).isAdsDisabled()
     } catch (e: Exception) {
@@ -53,10 +90,10 @@ object UnityAdManager {
             return
         }
         try {
-            UnityAds.load(PLACEMENT_INTERSTITIAL)
-            UnityAds.load(PLACEMENT_REWARDED)
+            UnityAds.load(PLACEMENT_INTERSTITIAL, loadListener)
+            UnityAds.load(PLACEMENT_REWARDED, loadListener)
             isInitialised = true
-            Log.i(TAG, "Unity Ads pre-loaded")
+            Log.i(TAG, "Unity Ads pre-loaded instructions sent")
         } catch (e: Exception) {
             Log.e(TAG, "Unity preload failed", e)
         }
@@ -142,13 +179,14 @@ object UnityAdManager {
             onDismissed()
             return
         }
-        if (!UnityAds.isReady(PLACEMENT_INTERSTITIAL)) {
+        if (!isInterstitialReady) {
             Log.i(TAG, "Unity interstitial not ready")
             onDismissed()
-            UnityAds.load(PLACEMENT_INTERSTITIAL)
+            UnityAds.load(PLACEMENT_INTERSTITIAL, loadListener)
             return
         }
         try {
+            _isInterstitialReady = false // Mark consumed immediately before showing
             UnityAds.show(
                 activity,
                 PLACEMENT_INTERSTITIAL,
@@ -160,6 +198,7 @@ object UnityAdManager {
                         message: String
                     ) {
                         Log.w(TAG, "Unity interstitial show failed: $message")
+                        UnityAds.load(PLACEMENT_INTERSTITIAL, loadListener)
                         onDismissed()
                     }
 
@@ -177,7 +216,7 @@ object UnityAdManager {
                     ) {
                         Log.i(TAG, "Unity interstitial complete: $state")
                         lastInterstitialShownAt = System.currentTimeMillis()
-                        UnityAds.load(PLACEMENT_INTERSTITIAL)
+                        UnityAds.load(PLACEMENT_INTERSTITIAL, loadListener)
                         onDismissed()
                     }
                 }
@@ -204,13 +243,14 @@ object UnityAdManager {
             onDismissed()
             return
         }
-        if (!UnityAds.isReady(PLACEMENT_REWARDED)) {
+        if (!isRewardedReady) {
             Log.i(TAG, "Unity rewarded not ready")
             onDismissed()
-            UnityAds.load(PLACEMENT_REWARDED)
+            UnityAds.load(PLACEMENT_REWARDED, loadListener)
             return
         }
         try {
+            _isRewardedReady = false // Mark consumed immediately before showing
             UnityAds.show(
                 activity,
                 PLACEMENT_REWARDED,
@@ -222,6 +262,7 @@ object UnityAdManager {
                         message: String
                     ) {
                         Log.w(TAG, "Unity rewarded show failed: $message")
+                        UnityAds.load(PLACEMENT_REWARDED, loadListener)
                         onDismissed()
                     }
 
@@ -238,7 +279,7 @@ object UnityAdManager {
                         state: UnityAds.UnityAdsShowCompletionState
                     ) {
                         Log.i(TAG, "Unity rewarded complete: $state")
-                        UnityAds.load(PLACEMENT_REWARDED)
+                        UnityAds.load(PLACEMENT_REWARDED, loadListener)
                         if (state == UnityAds.UnityAdsShowCompletionState.COMPLETED) {
                             onRewarded()
                         }
@@ -251,10 +292,4 @@ object UnityAdManager {
             onDismissed()
         }
     }
-
-    val isInterstitialReady: Boolean
-        get() = UnityAds.isReady(PLACEMENT_INTERSTITIAL)
-
-    val isRewardedReady: Boolean
-        get() = UnityAds.isReady(PLACEMENT_REWARDED)
 }

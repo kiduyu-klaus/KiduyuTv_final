@@ -2,12 +2,15 @@ package com.kiduyuk.klausk.kiduyutv.util
 
 import android.app.Activity
 import android.content.Context
+import android.os.Bundle
 import android.util.Log
 import android.view.ViewGroup
 import com.startapp.sdk.ads.banner.Banner
 import com.startapp.sdk.ads.banner.BannerListener
 import com.startapp.sdk.adsbase.Ad
 import com.startapp.sdk.adsbase.StartAppAd
+import com.startapp.sdk.adsbase.StartAppSDK
+import com.startapp.sdk.adsbase.VideoListener
 import com.startapp.sdk.adsbase.adlisteners.AdDisplayListener
 import com.startapp.sdk.adsbase.adlisteners.AdEventListener
 
@@ -24,6 +27,7 @@ object StartAppAdManager {
 
     private const val TAG = "StartAppAdManager"
     private const val MIN_INTERSTITIAL_INTERVAL_MS = 3 * 60 * 1000L
+    private const val APP_ID = "YOUR_STARTAPP_APP_ID" // TODO: Replace with your actual Start.io App ID
 
     @Volatile
     var isInitialised = false
@@ -41,7 +45,11 @@ object StartAppAdManager {
             return
         }
         try {
-            StartAppAd.init(context, StartAppAd.AUTOMATIC_LOAD)
+            // FIX: Use modern StartAppSDK.initParams builder pattern
+            StartAppSDK.initParams(context, APP_ID)
+                .setReturnAdsEnabled(false) // Blocks annoying ads when users re-open the app
+                .init()
+
             isInitialised = true
             Log.i(TAG, "StartApp ads pre-loaded")
         } catch (e: Exception) {
@@ -114,9 +122,23 @@ object StartAppAdManager {
 
         try {
             val startAppAd = StartAppAd(activity)
+            // FIX: Exact overrides and method naming corrected to fit SDK specifications
             startAppAd.setAdDisplayListener(object : AdDisplayListener {
-                override fun onHidden(ad: Ad?) {
+                override fun adDisplayed(ad: Ad?) {
+                    Log.i(TAG, "StartApp interstitial displayed")
+                }
+
+                override fun adHidden(ad: Ad?) {
                     Log.i(TAG, "StartApp interstitial hidden")
+                    onDismissed()
+                }
+
+                override fun adClicked(ad: Ad?) {
+                    Log.i(TAG, "StartApp interstitial clicked")
+                }
+
+                override fun adNotDisplayed(ad: Ad?) {
+                    Log.w(TAG, "StartApp interstitial not displayed")
                     onDismissed()
                 }
             })
@@ -156,20 +178,34 @@ object StartAppAdManager {
         }
         try {
             val rewardedVideo = StartAppAd(activity)
-            rewardedVideo.setVideoListener(object :
-                com.startapp.sdk.adsbase.VideoListener {
+            rewardedVideo.setVideoListener(object : VideoListener {
                 override fun onVideoCompleted() {
                     Log.i(TAG, "StartApp rewarded video completed")
                     onRewarded()
                 }
             })
+            // FIX: Explicitly declared required callbacks for interface conversion stability
             rewardedVideo.setAdDisplayListener(object : AdDisplayListener {
-                override fun onHidden(ad: Ad?) {
+                override fun adDisplayed(ad: Ad?) {
+                    Log.i(TAG, "StartApp rewarded displayed")
+                }
+
+                override fun adHidden(ad: Ad?) {
                     Log.i(TAG, "StartApp rewarded hidden")
                     onDismissed()
                 }
+
+                override fun adClicked(ad: Ad?) {
+                    Log.i(TAG, "StartApp rewarded clicked")
+                }
+
+                override fun adNotDisplayed(ad: Ad?) {
+                    Log.w(TAG, "StartApp rewarded not displayed")
+                    onDismissed()
+                }
             })
-            rewardedVideo.loadAd(object : AdEventListener {
+            // FIX: Added the explicit AdMode.REWARDED_VIDEO constraint parameter
+            rewardedVideo.loadAd(StartAppAd.AdMode.REWARDED_VIDEO, object : AdEventListener {
                 override fun onReceiveAd(ad: Ad) {
                     Log.i(TAG, "StartApp rewarded loaded")
                     rewardedVideo.showAd()
@@ -191,43 +227,14 @@ object StartAppAdManager {
     /**
      * Shows a StartApp splash ad. Call from [SplashActivity.onCreate].
      */
-    fun showSplash(activity: Activity) {
+    fun showSplash(activity: Activity, savedInstanceState: Bundle? = null) {
         if (!shouldShowAds(activity)) return
         try {
-            StartAppAd.showSplash(activity, object : AdEventListener {
-                override fun onReceiveAd(ad: Ad) {
-                    Log.i(TAG, "StartApp splash shown")
-                }
-
-                override fun onFailedToReceiveAd(ad: Ad?) {
-                    Log.w(TAG, "StartApp splash failed")
-                }
-            })
+            // FIX: Signature updated to standard (Activity, Bundle?)
+            StartAppAd.showSplash(activity, savedInstanceState)
+            Log.i(TAG, "StartApp splash setup requested")
         } catch (e: Exception) {
             Log.e(TAG, "StartApp splash failed", e)
-        }
-    }
-
-    // ── Lifecycle hooks ───────────────────────────────────────────────────
-
-    fun onResume(activity: Activity) {
-        if (shouldShowAds(activity)) try {
-            StartAppAd.onResume(activity)
-        } catch (_: Exception) {
-        }
-    }
-
-    fun onPause(activity: Activity) {
-        if (shouldShowAds(activity)) try {
-            StartAppAd.onPause(activity)
-        } catch (_: Exception) {
-        }
-    }
-
-    fun onBackPressed(activity: Activity) {
-        if (shouldShowAds(activity)) try {
-            StartAppAd.onBackPressed(activity)
-        } catch (_: Exception) {
         }
     }
 }
