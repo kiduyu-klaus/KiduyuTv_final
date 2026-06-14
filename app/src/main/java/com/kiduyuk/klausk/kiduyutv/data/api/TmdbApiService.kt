@@ -252,3 +252,9 @@ interface TmdbApiService {
         @Path("person_id") personId: Int
     ): PersonDetail
 }
+
+    /** Fetches images for a specific person. */
+    @GET("person/{person_id}/images")
+    suspend fun getPersonImages(
+        @Path("person_id") personId: Int
+    ): PersonImagesResponse

@@ -26,6 +26,8 @@ import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.SeasonEpisodesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.StreamLinksScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.TvShowDetailScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.CastDetailScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.CastImagesScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.ImageSliderScreen
 import com.kiduyuk.klausk.kiduyutv.data.model.CastMember
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.HomeScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.MoviesScreen
@@ -452,7 +454,49 @@ fun NavGraph(navController: NavHostController) {
                 },
                 onTvShowClick = { tvId ->
                     navController.navigate(Screen.TvShowDetail.createRoute(tvId))
+                },
+                onShowImagesClick = { id, name ->
+                    navController.navigate(Screen.CastImages.createRoute(id, name))
                 }
+            )
+        }
+
+        // Cast Images Screen
+        composable(
+            route = Screen.CastImages.route,
+            arguments = listOf(
+                navArgument("castId") { type = NavType.IntType },
+                navArgument("castName") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val castId = backStackEntry.arguments?.getInt("castId") ?: 0
+            val castName = backStackEntry.arguments?.getString("castName") ?: ""
+            CastImagesScreen(
+                castId = castId,
+                castName = Uri.decode(castName),
+                onBackClick = { navController.popBackStack() },
+                onImageClick = { initialIndex, imageUrls ->
+                    navController.navigate(Screen.ImageSlider.createRoute(initialIndex, imageUrls))
+                }
+            )
+        }
+
+        // Image Slider Screen
+        composable(
+            route = Screen.ImageSlider.route,
+            arguments = listOf(
+                navArgument("initialIndex") { type = NavType.IntType },
+                navArgument("imageUrls") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val initialIndex = backStackEntry.arguments?.getInt("initialIndex") ?: 0
+            val imageUrlsString = backStackEntry.arguments?.getString("imageUrls") ?: ""
+            val imageUrls = Uri.decode(imageUrlsString).split(",")
+            
+            ImageSliderScreen(
+                initialIndex = initialIndex,
+                imageUrls = imageUrls,
+                onBackClick = { navController.popBackStack() }
             )
         }
     }

@@ -54,6 +54,7 @@ data class MobileCastDetailUiState(
     val isLoading: Boolean = true,
     val castMember: CastMember? = null,
     val mediaItems: List<MediaItem> = emptyList(),
+    val profileImages: List<ProfileImage> = emptyList(),
     val isSaved: Boolean = false,
     val error: String? = null
 )
@@ -78,10 +79,12 @@ class MobileCastDetailViewModel : ViewModel() {
                 val personDetailsDeferred = async { repository.getPersonDetails(castMember.id) }
                 val movieCreditsDeferred = async { repository.getPersonMovieCredits(castMember.id) }
                 val tvCreditsDeferred = async { repository.getPersonTvCredits(castMember.id) }
+                val personImagesDeferred = async { repository.getPersonImages(castMember.id) }
 
                 val personDetails = personDetailsDeferred.await().getOrNull()
                 val movieResult = movieCreditsDeferred.await()
                 val tvResult = tvCreditsDeferred.await()
+                val personImages = personImagesDeferred.await().getOrNull() ?: emptyList()
 
                 val biography = personDetails?.biography
                 val castMemberWithOverview = castMember.copy(overview = biography)
@@ -121,7 +124,8 @@ class MobileCastDetailViewModel : ViewModel() {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     castMember = castMemberWithOverview,
-                    mediaItems = combinedMedia
+                    mediaItems = combinedMedia,
+                    profileImages = personImages
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
@@ -168,6 +172,7 @@ fun MobileCastDetailScreen(
     onBackClick: () -> Unit,
     onMovieClick: (Int) -> Unit,
     onTvShowClick: (Int) -> Unit,
+    onShowImagesClick: (Int, String) -> Unit,
     viewModel: MobileCastDetailViewModel = remember { MobileCastDetailViewModel() }
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -211,10 +216,12 @@ fun MobileCastDetailScreen(
                     MobileCastDetailContent(
                         castMember = uiState.castMember ?: castMember,
                         mediaItems = uiState.mediaItems,
+                        profileImages = uiState.profileImages,
                         isSaved = uiState.isSaved,
                         onSaveClick = { viewModel.toggleSave(context, uiState.castMember ?: castMember) },
                         onMovieClick = onMovieClick,
-                        onTvShowClick = onTvShowClick
+                        onTvShowClick = onTvShowClick,
+                        onShowImagesClick = onShowImagesClick
                     )
                 }
             }
@@ -229,10 +236,12 @@ fun MobileCastDetailScreen(
 private fun MobileCastDetailContent(
     castMember: CastMember,
     mediaItems: List<MediaItem>,
+    profileImages: List<ProfileImage>,
     isSaved: Boolean,
     onSaveClick: () -> Unit,
     onMovieClick: (Int) -> Unit,
-    onTvShowClick: (Int) -> Unit
+    onTvShowClick: (Int) -> Unit,
+    onShowImagesClick: (Int, String) -> Unit
 ) {
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
@@ -368,6 +377,18 @@ val horizontalPadding = 16.dp
                         maxLines = 6,
                         overflow = TextOverflow.Ellipsis
                     )
+
+                    // Show Cast Images Button
+                    if (profileImages.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = { onShowImagesClick(castMember.id, castMember.name) },
+                            colors = ButtonDefaults.buttonColors(containerColor = SurfaceDark),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Show Cast Images")
+                        }
+                    }
                 }
             }
         }

@@ -705,3 +705,24 @@ data class OscarMovie(
         )
     }
 }
+
+/**
+ * Represents a single profile image for a person
+ */
+data class ProfileImage(
+    @SerializedName("aspect_ratio") val aspectRatio: Double,
+    @SerializedName("height") val height: Int,
+    @SerializedName("iso_639_1") val iso6391: String?,
+    @SerializedName("file_path") val filePath: String,
+    @SerializedName("vote_average") val voteAverage: Double,
+    @SerializedName("vote_count") val voteCount: Int,
+    @SerializedName("width") val width: Int
+)
+
+/**
+ * Response for the person images endpoint
+ */
+data class PersonImagesResponse(
+    @SerializedName("id") val id: Int,
+    @SerializedName("profiles") val profiles: List<ProfileImage>
+)

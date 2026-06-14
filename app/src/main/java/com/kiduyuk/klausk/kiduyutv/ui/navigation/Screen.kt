@@ -40,7 +40,35 @@ sealed class Screen(val route: String) {
             return "mobile_cast_detail/$castId?castName=$encodedName&character=$encodedChar&profilePath=$encodedProfile&knownForDepartment=$encodedKnown"
         }
     }
-    object CastDetail : Screen("cast_detail/{castId}/{castName}/{character}/{profilePath}/{knownForDepartment}")
+    object CastDetail : Screen("cast_detail/{castId}/{castName}/{character}/{profilePath}/{knownForDepartment}") {
+        fun createRoute(
+            castId: Int,
+            castName: String,
+            character: String?,
+            profilePath: String?,
+            knownForDepartment: String?
+        ): String {
+            val encodedName = android.net.Uri.encode(castName)
+            val encodedChar = android.net.Uri.encode(character ?: "N/A")
+            val encodedProfile = android.net.Uri.encode(profilePath ?: "null")
+            val encodedKnown = android.net.Uri.encode(knownForDepartment ?: "N/A")
+            return "cast_detail/$castId/$encodedName/$encodedChar/$encodedProfile/$encodedKnown"
+        }
+    }
+
+    object CastImages : Screen("cast_images/{castId}/{castName}") {
+        fun createRoute(castId: Int, castName: String): String {
+            val encodedName = android.net.Uri.encode(castName)
+            return "cast_images/$castId/$encodedName"
+        }
+    }
+
+    object ImageSlider : Screen("image_slider/{initialIndex}?imageUrls={imageUrls}") {
+        fun createRoute(initialIndex: Int, imageUrls: List<String>): String {
+            val encodedUrls = android.net.Uri.encode(imageUrls.joinToString(","))
+            return "image_slider/$initialIndex?imageUrls=$encodedUrls"
+        }
+    }
     object MobileStreamLinks : Screen("mobile_stream_links/{tmdbId}/{isTv}?season={season}&episode={episode}&title={title}&overview={overview}&posterPath={posterPath}&backdropPath={backdropPath}&voteAverage={voteAverage}&releaseDate={releaseDate}&timestamp={timestamp}") {
         fun createRoute(
             tmdbId: Int,

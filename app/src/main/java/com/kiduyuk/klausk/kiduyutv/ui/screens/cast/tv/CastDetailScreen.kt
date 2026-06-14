@@ -59,6 +59,7 @@ data class CastDetailUiState(
     val isLoading: Boolean = true,
     val castMember: CastMember? = null,
     val mediaItems: List<MediaItem> = emptyList(),
+    val profileImages: List<ProfileImage> = emptyList(),
     val isSaved: Boolean = false,
     val error: String? = null
 )
@@ -85,15 +86,17 @@ class CastDetailViewModel : ViewModel() {
             _uiState.value = CastDetailUiState(isLoading = true, castMember = castMember, isSaved = isSaved)
 
             try {
-                // Fetch person details, movie credits, and TV credits in parallel using async
+                // Fetch person details, movie credits, TV credits, and images in parallel using async
                 val personDetailsDeferred = async { repository.getPersonDetails(castMember.id) }
                 val movieCreditsDeferred = async { repository.getPersonMovieCredits(castMember.id) }
                 val tvCreditsDeferred = async { repository.getPersonTvCredits(castMember.id) }
+                val personImagesDeferred = async { repository.getPersonImages(castMember.id) }
 
                 // Wait for all requests to complete
                 val personDetails = personDetailsDeferred.await().getOrNull()
                 val movieResult = movieCreditsDeferred.await()
                 val tvResult = tvCreditsDeferred.await()
+                val personImages = personImagesDeferred.await().getOrNull() ?: emptyList()
 
                 // Get biography/overview from person details
                 val biography = personDetails?.biography
@@ -138,7 +141,8 @@ class CastDetailViewModel : ViewModel() {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     castMember = castMemberWithOverview,
-                    mediaItems = combinedMedia
+                    mediaItems = combinedMedia,
+                    profileImages = personImages
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
@@ -191,6 +195,7 @@ fun CastDetailScreen(
     onBackClick: () -> Unit,
     onMovieClick: (Int) -> Unit,
     onTvShowClick: (Int) -> Unit,
+    onShowImagesClick: (Int, String) -> Unit,
     viewModel: CastDetailViewModel = remember { CastDetailViewModel() }
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -221,11 +226,13 @@ fun CastDetailScreen(
             CastDetailContent(
                 castMember = uiState.castMember ?: castMember,
                 mediaItems = uiState.mediaItems,
+                profileImages = uiState.profileImages,
                 isSaved = uiState.isSaved,
                 onSaveClick = { viewModel.toggleSave(context, uiState.castMember ?: castMember) },
                 onBackClick = onBackClick,
                 onMovieClick = onMovieClick,
-                onTvShowClick = onTvShowClick
+                onTvShowClick = onTvShowClick,
+                onShowImagesClick = onShowImagesClick
             )
         }
     }
@@ -239,11 +246,13 @@ fun CastDetailScreen(
 private fun CastDetailContent(
     castMember: CastMember,
     mediaItems: List<MediaItem>,
+    profileImages: List<ProfileImage>,
     isSaved: Boolean,
     onSaveClick: () -> Unit,
     onBackClick: () -> Unit,
     onMovieClick: (Int) -> Unit,
-    onTvShowClick: (Int) -> Unit
+    onTvShowClick: (Int) -> Unit,
+    onShowImagesClick: (Int, String) -> Unit
 ) {
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
@@ -432,6 +441,18 @@ private fun CastDetailContent(
                             biography = castMember.overview!!,
                             onClick = { showBiographyDialog = true }
                         )
+                    }
+
+                    // Show Cast Images Button
+                    if (profileImages.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = { onShowImagesClick(castMember.id, castMember.name) },
+                            colors = ButtonDefaults.buttonColors(containerColor = SurfaceDark),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Show Cast Images")
+                        }
                     }
                 }
             }

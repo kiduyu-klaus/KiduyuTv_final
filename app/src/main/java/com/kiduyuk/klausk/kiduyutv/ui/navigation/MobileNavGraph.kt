@@ -13,6 +13,8 @@ import androidx.navigation.navArgument
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.mobile.MobileCastDetailScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.CastDetailScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.CastImagesScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.ImageSliderScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.company_network_list.mobile.MobileMediaListScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.mobile.MobileMovieDetailScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.mobile.MobileSeasonEpisodesScreen
@@ -458,6 +460,9 @@ fun MobileNavGraph(navController: NavHostController) {
                             tvId
                         )
                     )
+                },
+                onShowImagesClick = { id, name ->
+                    navController.navigate(Screen.CastImages.createRoute(id, name))
                 }
             )
         }
@@ -505,7 +510,49 @@ fun MobileNavGraph(navController: NavHostController) {
                             tvId
                         )
                     )
+                },
+                onShowImagesClick = { id, name ->
+                    navController.navigate(Screen.CastImages.createRoute(id, name))
                 }
+            )
+        }
+
+        // Cast Images Screen
+        composable(
+            route = Screen.CastImages.route,
+            arguments = listOf(
+                navArgument("castId") { type = NavType.IntType },
+                navArgument("castName") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val castId = backStackEntry.arguments?.getInt("castId") ?: 0
+            val castName = backStackEntry.arguments?.getString("castName") ?: ""
+            CastImagesScreen(
+                castId = castId,
+                castName = android.net.Uri.decode(castName),
+                onBackClick = { navController.popBackStack() },
+                onImageClick = { initialIndex, imageUrls ->
+                    navController.navigate(Screen.ImageSlider.createRoute(initialIndex, imageUrls))
+                }
+            )
+        }
+
+        // Image Slider Screen
+        composable(
+            route = Screen.ImageSlider.route,
+            arguments = listOf(
+                navArgument("initialIndex") { type = NavType.IntType },
+                navArgument("imageUrls") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val initialIndex = backStackEntry.arguments?.getInt("initialIndex") ?: 0
+            val imageUrlsString = backStackEntry.arguments?.getString("imageUrls") ?: ""
+            val imageUrls = android.net.Uri.decode(imageUrlsString).split(",")
+
+            ImageSliderScreen(
+                initialIndex = initialIndex,
+                imageUrls = imageUrls,
+                onBackClick = { navController.popBackStack() }
             )
         }
 
