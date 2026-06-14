@@ -204,6 +204,9 @@ class PlayerActivity : AppCompatActivity() {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                     mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                 }
+
+                cacheMode = WebSettings.LOAD_DEFAULT // Utilizes the browser cache for buffering
+                setAppCacheEnabled(true)
                 
                 userAgentString = if (isFireTV) {
                     "Mozilla/5.0 (Linux; Android 9; AFTMM Build/PS7233) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
