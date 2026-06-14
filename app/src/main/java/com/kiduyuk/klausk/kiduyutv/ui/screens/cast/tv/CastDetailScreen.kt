@@ -258,7 +258,11 @@ private fun CastDetailContent(
     val configuration = LocalConfiguration.current
     val screenHeight = configuration.screenHeightDp.dp
     val screenWidth = configuration.screenWidthDp.dp
-    val headerHeight = screenHeight * 0.40f // 35% of screen height to fit overview
+    val headerHeight = if (!castMember.overview.isNullOrBlank()) {
+        screenHeight * 0.48f
+    } else {
+        screenHeight * 0.35f
+    }
 
     // Dialog state for biography
     var showBiographyDialog by remember { mutableStateOf(false) }
@@ -398,9 +402,9 @@ private fun CastDetailContent(
                             modifier = Modifier.weight(1f)
                         )
 
-                        Column(
-                            horizontalAlignment = Alignment.End,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             // Save Button
                             Button(

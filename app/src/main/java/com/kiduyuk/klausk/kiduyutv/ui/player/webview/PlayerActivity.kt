@@ -164,7 +164,7 @@ class PlayerActivity : AppCompatActivity() {
                 javaScriptEnabled = true
                 domStorageEnabled = true
                 databaseEnabled = true
-                mediaPlaybackRequiresUserGesture = false
+                //mediaPlaybackRequiresUserGesture = false
                 allowFileAccess = true
                 allowContentAccess = true
                 loadWithOverviewMode = true
@@ -172,7 +172,7 @@ class PlayerActivity : AppCompatActivity() {
                 builtInZoomControls = false
                 displayZoomControls = false
                 setSupportZoom(false)
-                setSupportMultipleWindows(true)
+                setSupportMultipleWindows(false)
                 javaScriptCanOpenWindowsAutomatically = false
                 mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                 userAgentString = if (isFireTV) {
