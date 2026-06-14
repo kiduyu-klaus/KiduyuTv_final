@@ -40,13 +40,9 @@
             android:name="com.google.android.gms.ads.DELAY_APP_MEASUREMENT_INIT"
             android:value="true"/>
 
-        <!-- ═══════════════════════════════════════════ -->
-        <!-- SECONDARY: StartApp (Start.io)              -->
-        <!-- ═══════════════════════════════════════════ -->
         <meta-data
             android:name="com.startapp.sdk.APPLICATION_ID"
             android:value="${startAppAppId}"/>
-        <!-- Disable app wall & splash for TV-friendly experience -->
         <meta-data
             android:name="com.startapp.sdk.DISABLE_APP_WALL"
             android:value="true"/>
@@ -54,9 +50,6 @@
             android:name="com.startapp.sdk.DISABLE_SPLASH"
             android:value="true"/>
 
-        <!-- ═══════════════════════════════════════════ -->
-        <!-- SECONDARY: Unity Ads                        -->
-        <!-- ═══════════════════════════════════════════ -->
         <meta-data
             android:name="com.unity3d.ads.UNITY_ADS_GAME_ID"
             android:value="${unityAdsGameId}"/>
@@ -64,41 +57,37 @@
             android:name="com.unity3d.ads.UNITY_ADS_TEST_MODE"
             android:value="${unityAdsTestMode}"/>
 
-        <!-- Unity required activities -->
         <activity
             android:name="com.unity3d.services.ads.adunit.AdUnitActivity"
             android:configChanges="fontScale|keyboard|keyboardHidden|locale|mnc|mcc|navigation|orientation|screenLayout|screenSize|smallestScreenSize|uiMode|touchscreen"
             android:hardwareAccelerated="true"
-            android:theme="@android:style/Theme.NoTitleBar.Fullscreen" />
+            android:theme="@style/Theme.NoTitleBar.Fullscreen" />
         <activity
             android:name="com.unity3d.services.ads.adunit.AdUnitTransparentActivity"
             android:configChanges="fontScale|keyboard|keyboardHidden|locale|mnc|mcc|navigation|orientation|screenLayout|screenSize|smallestScreenSize|uiMode|touchscreen"
             android:hardwareAccelerated="true"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar.Fullscreen" />
+            android:theme="@style/Theme.Translucent.NoTitleBar.Fullscreen" />
         <activity
             android:name="com.unity3d.services.ads.adunit.AdUnitTransparentSoftwareActivity"
             android:configChanges="fontScale|keyboard|keyboardHidden|locale|mnc|mcc|navigation|orientation|screenLayout|screenSize|smallestScreenSize|uiMode|touchscreen"
             android:hardwareAccelerated="false"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar.Fullscreen" />
+            android:theme="@style/Theme.Translucent.NoTitleBar.Fullscreen" />
         <activity
             android:name="com.unity3d.services.ads.adunit.AdUnitSoftwareActivity"
             android:configChanges="fontScale|keyboard|keyboardHidden|locale|mnc|mcc|navigation|orientation|screenLayout|screenSize|smallestScreenSize|uiMode|touchscreen"
             android:hardwareAccelerated="false"
-            android:theme="@android:style/Theme.NoTitleBar.Fullscreen" />
+            android:theme="@style/Theme.NoTitleBar.Fullscreen" />
 
 
-        <!-- ═══════════════════════════════════════════ -->
-        <!-- SECONDARY: Wortise                          -->
-        <!-- ═══════════════════════════════════════════ -->
         <meta-data
             android:name="com.wortise.WORTISE_APP_ID"
             android:value="${wortiseAppId}"/>
 
-        <!-- Optional: Wortise activities (usually auto-merged from AAR) -->
         <activity
             android:name="com.google.android.gms.ads.AdActivity"
             android:configChanges="keyboard|keyboardHidden|orientation|screenSize|uiMode|smallestScreenSize|screenLayout"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+            android:theme="@style/Theme.Translucent.NoTitleBar"
+            tools:replace="android:configChanges,android:theme" />
 
         <provider
             android:name="com.google.android.gms.ads.MobileAdsInitProvider"
@@ -156,7 +145,6 @@
             android:theme="@style/Theme.KiduyuTv">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>

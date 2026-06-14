@@ -12,14 +12,12 @@
         <item name="postSplashScreenTheme">@style/Theme.KiduyuTv</item>
     </style>
 
-    <!-- TraktAuthActivity theme - uses AppCompat for WebView compatibility -->
     <style name="Theme.KiduyuTv.Auth" parent="Theme.AppCompat.NoActionBar">
         <item name="android:windowBackground">@android:color/black</item>
         <item name="android:statusBarColor">@android:color/black</item>
         <item name="android:navigationBarColor">@android:color/black</item>
     </style>
 
-    <!-- ADD THIS ↓ -->
     <style name="Theme.KiduyuTv.Player" parent="Theme.AppCompat.NoActionBar">
         <item name="android:windowBackground">@android:color/black</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
@@ -28,4 +26,9 @@
         <item name="android:windowContentOverlay">@null</item>
         <item name="android:hardwareAccelerated">true</item>
     </style>
+
+    <style name="Theme.NoTitleBar.Fullscreen" parent="@android:style/Theme.NoTitleBar.Fullscreen" />
+    <style name="Theme.Translucent.NoTitleBar.Fullscreen" parent="@android:style/Theme.Translucent.NoTitleBar.Fullscreen" />
+    <style name="Theme.Translucent.NoTitleBar" parent="@android:style/Theme.Translucent.NoTitleBar" />
 </resources>
+
