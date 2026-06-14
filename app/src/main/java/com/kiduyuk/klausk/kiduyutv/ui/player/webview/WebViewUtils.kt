@@ -27,10 +27,10 @@ object WebViewUtils {
             Log.i(TAG, "[WebView] Hardware acceleration available: $isHardwareAccelerated")
 
             if (isHardwareAccelerated) {
-                webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+                //webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
                 Log.i(TAG, "[WebView] Fire TV: hardware acceleration enabled")
             } else {
-                webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+                //webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
                 Log.w(TAG, "[WebView] Fire TV: hardware acceleration unavailable, using software rendering")
             }
 
