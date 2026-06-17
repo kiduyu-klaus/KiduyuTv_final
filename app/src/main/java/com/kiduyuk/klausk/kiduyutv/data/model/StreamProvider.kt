@@ -594,10 +594,11 @@ object StreamProviderManager {
                 const currentSeason = ${season ?: 1};
                 const currentEpisode = ${episode ?: 1};
 
-                function sendToAndroid(currentTime, seasonNum, episodeNum, provider) {
+                function sendToAndroid(currentTime, duration, seasonNum, episodeNum, provider) {
                     if (typeof MavisInterface !== 'undefined' && MavisInterface.onPlayerEvent) {
                         const payload = {
                             currentTime: parseFloat(currentTime),
+                            duration:    parseFloat(duration),
                             season: seasonNum ? parseInt(seasonNum, 10) : null,
                             episode: episodeNum ? parseInt(episodeNum, 10) : null,
                             provider: provider || ""
@@ -635,6 +636,7 @@ object StreamProviderManager {
                             if (data.type === 'timeupdate' && data.data) {
                                 sendToAndroid(
                                     data.data.currentTime,
+                                    data.data.duration,
                                     currentIsTv ? currentSeason : null,
                                     currentIsTv ? currentEpisode : null,
                                     'Vidcore'

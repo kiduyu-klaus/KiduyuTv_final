@@ -14,7 +14,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.app.UiModeManager
 import android.content.Context
-import android.widget.Toast
+
 import android.content.res.Configuration
 import android.graphics.PixelFormat
 import android.webkit.*
@@ -62,6 +62,7 @@ class PlayerActivity : AppCompatActivity() {
     private var currentVoteAverage: Double = 0.0
     private var currentReleaseDate: String? = null
     private var currentPlaybackPosition: Long = 0L
+    private var currentDuration: Long = 0L
 
     // 15-second progress update handler
     private val progressUpdateHandler = Handler(Looper.getMainLooper())
@@ -129,7 +130,7 @@ class PlayerActivity : AppCompatActivity() {
         // Check and add to watch history, timer will be started after check completes
         checkAndAddToWatchHistory()
 
-        val uiModeManager = getSystemService(Context.UI_MODE_SERVICE) as UiModeManager
+        val uiModeManager = getSystemService(android.content.Context.UI_MODE_SERVICE) as UiModeManager
         val deviceModel = Build.MODEL
         val deviceBrand = Build.BRAND.replaceFirstChar { it.uppercase() }
 
@@ -178,7 +179,7 @@ class PlayerActivity : AppCompatActivity() {
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
-                databaseEnabled = true
+                
 
                 // Fix: Media Playback User Gesture Restriction
                 mediaPlaybackRequiresUserGesture = false
@@ -201,7 +202,7 @@ class PlayerActivity : AppCompatActivity() {
                 javaScriptCanOpenWindowsAutomatically = true // Allows player scripts to execute properly
 
                 // Security layer bypass for http:// streaming streams running on https:// pages
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                if (Build.VERSION.SDK_INT >= 21) {
                     mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                 }
 
@@ -271,13 +272,14 @@ class PlayerActivity : AppCompatActivity() {
 
         // Add JavascriptInterface bridge for player events (must be called on webView, not Activity)
         webView.addJavascriptInterface(
-            PlayerBridge { provider, positionSec, season, episode ->
+            PlayerBridge { provider, positionSec, durationSec, season, episode ->
                 runOnUiThread {
-                    // Update current position from player (don't save yet - timer handles DB save)
+                    // positionSec is in seconds, convert to milliseconds for storage
                     currentPlaybackPosition = (positionSec * 1000).toLong()
-
-                    // Update season/episode if provided (TV shows)
-                    if (season != null && episode != null && currentIsTv) {
+                    // Store duration in milliseconds
+                    currentDuration = (durationSec * 1000).toLong()
+                    // Update season and episode if provided and they have changed
+                    if (currentIsTv && season != null && episode != null) {
                         if (season != currentSeason || episode != currentEpisode) {
                             Log.i(TAG, "[Episode] Changed S${currentSeason}E${currentEpisode} -> S${season}E${episode}")
                             currentSeason = season
@@ -559,7 +561,7 @@ class PlayerActivity : AppCompatActivity() {
                     seasonNumber = if (currentIsTv) currentSeason else null,
                     episodeNumber = if (currentIsTv) currentEpisode else null,
                     playbackPosition = currentPlaybackPosition,
-                    duration = 0L,
+                    duration = currentDuration,
                     title = currentTitle,
                     overview = currentOverview,
                     posterPath = currentPosterPath,

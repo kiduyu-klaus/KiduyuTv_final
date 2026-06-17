@@ -107,13 +107,13 @@ class HomeViewModel : ViewModel() {
 
                 // Get watch history
                 val watchHistory = repository.getWatchHistory(context)
-                android.util.Log.d("HomeViewModel", "[WatchHistory] Fetched ${watchHistory.size} items from database")
+                android.util.Log.i("HomeViewModel", "[WatchHistory] Fetched ${watchHistory.size} items from database")
                 
                 // Filter TV shows from watch history
                 val tvHistory = watchHistory.filter { it.isTv }
-                android.util.Log.d("HomeViewModel", "[WatchHistory] TV shows in watch history: ${tvHistory.size}")
+                android.util.Log.i("HomeViewModel", "[WatchHistory] TV shows in watch history: ${tvHistory.size}")
                 for (item in tvHistory) {
-                    android.util.Log.d("HomeViewModel", "[WatchHistory] TV Show: id=${item.id}, title=${item.title}, season=${item.seasonNumber}, episode=${item.episodeNumber}")
+                    android.util.Log.i("HomeViewModel", "[WatchHistory] TV Show: id=${item.id}, title=${item.title}, season=${item.seasonNumber}, episode=${item.episodeNumber}")
                 }
 
                 // Sort all content rows by vote average (highest first)

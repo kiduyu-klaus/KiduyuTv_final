@@ -369,7 +369,7 @@ object WatchHistoryEnricher {
         return try {
             val dao = DatabaseManager.watchHistoryDao()
             withContext(Dispatchers.IO) {
-                dao.getRecentWatchHistory(20).first().map {
+                dao.getContinueWatching(20).first().map {
                     DatabaseManager.entityToWatchHistoryItem(it)
                 }
             }

@@ -136,10 +136,10 @@ object ChannelScraper {
             try {
                 // Get href and build watchPageUrl
                 val href = link.attr("href")
-                android.util.Log.d(TAG, "[${index + 1}] Processing card with href: $href")
+                android.util.Log.i(TAG, "[${index + 1}] Processing card with href: $href")
                 
                 if (!href.contains("/watch.php?id=")) {
-                    android.util.Log.d(TAG, "[${index + 1}] Skipping - href doesn't contain '/watch.php?id='")
+                    android.util.Log.i(TAG, "[${index + 1}] Skipping - href doesn't contain '/watch.php?id='")
                     continue
                 }
 
@@ -148,12 +148,12 @@ object ChannelScraper {
                 // Get name from div.card__title
                 val titleElement = link.selectFirst("div.card__title")
                 val name = titleElement?.text()?.trim() ?: "Unknown Channel"
-                android.util.Log.d(TAG, "[${index + 1}] Channel name: '$name'")
+                android.util.Log.i(TAG, "[${index + 1}] Channel name: '$name'")
 
                 // Get id from href (e.g., /watch.php?id=51 -> 51)
                 val idMatch = Regex("""id=(\d+)""").find(href)
                 val channelId = idMatch?.groupValues?.get(1) ?: "0"
-                android.util.Log.d(TAG, "[${index + 1}] Channel ID: $channelId")
+                android.util.Log.i(TAG, "[${index + 1}] Channel ID: $channelId")
 
                 // Get additional attributes if available
                 val dataTitle = link.attr("data-title")
@@ -214,36 +214,36 @@ object ChannelScraper {
                 .get()
             
             val loadTime = System.currentTimeMillis() - startTime
-            android.util.Log.d(TAG, "  Watch page loaded in ${loadTime}ms")
-            android.util.Log.d(TAG, "  Page title: ${document.title()}")
+            android.util.Log.i(TAG, "  Watch page loaded in ${loadTime}ms")
+            android.util.Log.i(TAG, "  Page title: ${document.title()}")
 
             val streamUrls = mutableListOf<String>()
 
             // Method 1: Direct selector for div#playerBtns (most specific)
-            android.util.Log.d(TAG, "  Trying selector: div#playerBtns button.player-btn[data-url]")
+            android.util.Log.i(TAG, "  Trying selector: div#playerBtns button.player-btn[data-url]")
             var playerButtons = document.select("div#playerBtns button.player-btn[data-url]")
             
             // Method 2: If not found, try with the full path
             if (playerButtons.isEmpty()) {
-                android.util.Log.d(TAG, "  No buttons found, trying: div.watch__actions div#playerBtns button.player-btn[data-url]")
+                android.util.Log.i(TAG, "  No buttons found, trying: div.watch__actions div#playerBtns button.player-btn[data-url]")
                 playerButtons = document.select("div.watch__actions div#playerBtns button.player-btn[data-url]")
             }
             
             // Method 3: Try without the player-btn class
             if (playerButtons.isEmpty()) {
-                android.util.Log.d(TAG, "  No buttons found, trying: div#playerBtns button[data-url]")
+                android.util.Log.i(TAG, "  No buttons found, trying: div#playerBtns button[data-url]")
                 playerButtons = document.select("div#playerBtns button[data-url]")
             }
             
             // Method 4: Try finding by class only
             if (playerButtons.isEmpty()) {
-                android.util.Log.d(TAG, "  No buttons found, trying: button.player-btn[data-url]")
+                android.util.Log.i(TAG, "  No buttons found, trying: button.player-btn[data-url]")
                 playerButtons = document.select("button.player-btn[data-url]")
             }
             
             // Method 5: Most generic - any button with data-url inside watch area
             if (playerButtons.isEmpty()) {
-                android.util.Log.d(TAG, "  No buttons found, trying: .watch__player button[data-url]")
+                android.util.Log.i(TAG, "  No buttons found, trying: .watch__player button[data-url]")
                 playerButtons = document.select(".watch__player button[data-url]")
             }
             
@@ -255,7 +255,7 @@ object ChannelScraper {
                 val text = button.text()
                 val isActive = button.hasClass("is-active")
                 
-                android.util.Log.d(TAG, "  Button ${index + 1}: title='$title', text='$text', isActive='$isActive', data-url='$dataUrl'")
+                android.util.Log.i(TAG, "  Button ${index + 1}: title='$title', text='$text', isActive='$isActive', data-url='$dataUrl'")
                 
                 if (dataUrl.isNotEmpty() && dataUrl.startsWith("http")) {
                     streamUrls.add(dataUrl)
@@ -267,7 +267,7 @@ object ChannelScraper {
 
             // Also extract the iframe src as a fallback
             if (streamUrls.isEmpty()) {
-                android.util.Log.d(TAG, "  No button URLs found, trying to extract iframe src...")
+                android.util.Log.i(TAG, "  No button URLs found, trying to extract iframe src...")
                 val iframe = document.selectFirst("iframe#playerFrame")
                 if (iframe != null) {
                     val iframeSrc = iframe.attr("src").trim()
@@ -309,25 +309,25 @@ object ChannelScraper {
      * Useful for troubleshooting when selectors fail
      */
     private fun debugPlayerButtonsStructure(document: Document) {
-        android.util.Log.d(TAG, "========== DEBUG: Player Buttons Structure ==========")
+        android.util.Log.i(TAG, "========== DEBUG: Player Buttons Structure ==========")
         
         // Check for watch__player div
         val watchPlayer = document.selectFirst(".watch__player")
         if (watchPlayer != null) {
-            android.util.Log.d(TAG, "Found .watch__player")
+            android.util.Log.i(TAG, "Found .watch__player")
             
             val playerActions = watchPlayer.selectFirst(".watch__actions")
             if (playerActions != null) {
-                android.util.Log.d(TAG, "  Found .watch__actions")
+                android.util.Log.i(TAG, "  Found .watch__actions")
                 
                 val playerBtns = playerActions.selectFirst("#playerBtns")
                 if (playerBtns != null) {
-                    android.util.Log.d(TAG, "    Found #playerBtns")
+                    android.util.Log.i(TAG, "    Found #playerBtns")
                     val buttons = playerBtns.select("button")
-                    android.util.Log.d(TAG, "    Found ${buttons.size} buttons")
+                    android.util.Log.i(TAG, "    Found ${buttons.size} buttons")
                     
                     buttons.forEachIndexed { index, button ->
-                        android.util.Log.d(TAG, "      Button $index: class='${button.className()}', data-url='${button.attr("data-url")}'")
+                        android.util.Log.i(TAG, "      Button $index: class='${button.className()}', data-url='${button.attr("data-url")}'")
                     }
                 } else {
                     android.util.Log.w(TAG, "    No #playerBtns found in .watch__actions")
@@ -342,9 +342,9 @@ object ChannelScraper {
         // Alternative: direct search
         val directBtns = document.select("#playerBtns")
         if (directBtns.isNotEmpty()) {
-            android.util.Log.d(TAG, "Direct #playerBtns search found ${directBtns.size} elements")
+            android.util.Log.i(TAG, "Direct #playerBtns search found ${directBtns.size} elements")
             directBtns.forEachIndexed { index, element ->
-                android.util.Log.d(TAG, "  Direct #playerBtns $index: ${element.className()}, buttons: ${element.select("button").size}")
+                android.util.Log.i(TAG, "  Direct #playerBtns $index: ${element.className()}, buttons: ${element.select("button").size}")
             }
         } else {
             android.util.Log.w(TAG, "Direct #playerBtns search found nothing")
@@ -352,9 +352,9 @@ object ChannelScraper {
         
         // Check for any button with data-url in the entire document
         val allDataUrlButtons = document.select("button[data-url]")
-        android.util.Log.d(TAG, "Total buttons with data-url in document: ${allDataUrlButtons.size}")
+        android.util.Log.i(TAG, "Total buttons with data-url in document: ${allDataUrlButtons.size}")
         
-        android.util.Log.d(TAG, "====================================================")
+        android.util.Log.i(TAG, "====================================================")
     }
 
     /**
@@ -386,7 +386,7 @@ object ChannelScraper {
     fun searchChannels(channels: List<ScrapedChannel>, query: String): List<ScrapedChannel> {
         android.util.Log.i(TAG, "Searching channels with query: '$query' (total channels: ${channels.size})")
         if (query.isBlank()) {
-            android.util.Log.d(TAG, "Query is blank, returning all channels")
+            android.util.Log.i(TAG, "Query is blank, returning all channels")
             return channels
         }
         

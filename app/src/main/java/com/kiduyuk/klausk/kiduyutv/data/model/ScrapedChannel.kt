@@ -53,7 +53,7 @@ data class ScrapedChannel(
     val hasMultiplePlayers: Boolean get() {
         val multiple = iframeUrls.size > 1
         if (multiple) {
-            android.util.Log.d("ScrapedChannel", "Channel '$name' has ${iframeUrls.size} player options")
+            android.util.Log.i("ScrapedChannel", "Channel '$name' has ${iframeUrls.size} player options")
         }
         return multiple
     }
@@ -75,7 +75,7 @@ data class ScrapedChannel(
      * Returns a formatted iframe HTML for the given URL
      */
     fun getIframeHtml(url: String): String {
-        android.util.Log.d("ScrapedChannel", "getIframeHtml for '$name' with URL: $url")
+        android.util.Log.i("ScrapedChannel", "getIframeHtml for '$name' with URL: $url")
         
         if (url.isEmpty()) {
             android.util.Log.e("ScrapedChannel", "getIframeHtml called with empty URL for channel '$name'")
@@ -107,7 +107,7 @@ data class ScrapedChannel(
      * Returns iframe HTML for the primary stream
      */
     fun getPrimaryIframeHtml(): String? {
-        android.util.Log.d("ScrapedChannel", "getPrimaryIframeHtml called for '$name'")
+        android.util.Log.i("ScrapedChannel", "getPrimaryIframeHtml called for '$name'")
         val primaryUrl = primaryStreamUrl
         
         return if (primaryUrl != null) {

@@ -582,7 +582,7 @@ class SchedulePlayerActivity : ComponentActivity() {
                     // Block at the network level before anything loads or renders.
                     // Covers both the iframe src request and any ad script/pixel URLs.
                     if (isAdRequest(url)) {
-                        android.util.Log.d(TAG, "[AdBlock] Blocked: $url")
+                        android.util.Log.i(TAG, "[AdBlock] Blocked: $url")
                         return emptyResponse()
                     }
 
