@@ -227,7 +227,7 @@ class SplashActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         // ── First: Check if device version matches Firebase app_info ─────────────────
-        checkDeviceVersionFromFirebase()
+        //checkDeviceVersionFromFirebase()
 
         // Set up the Compose UI first so Compose owns android.R.id.content before
         // any third-party SDK (UMP/ConsentManager, AdManager, Firebase) has a chance
