@@ -46,12 +46,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
 import com.airbnb.lottie.compose.*
+import com.google.firebase.database.DatabaseError
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.activity.mainactivity.MainActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
 import com.kiduyuk.klausk.kiduyutv.util.ApkInfo
 import com.kiduyuk.klausk.kiduyutv.util.AuthManager
+import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseSyncManager
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import com.kiduyuk.klausk.kiduyutv.util.UpdateUtil
@@ -223,6 +225,9 @@ class SplashActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // ── First: Check if device version matches Firebase app_info ─────────────────
+        checkDeviceVersionFromFirebase()
+
         // Set up the Compose UI first so Compose owns android.R.id.content before
         // any third-party SDK (UMP/ConsentManager, AdManager, Firebase) has a chance
         // to touch the window hierarchy.  Those SDKs can call through to the window
@@ -260,6 +265,72 @@ class SplashActivity : ComponentActivity() {
 
         checkForUpdates()
         checkNotificationPermission()
+    }
+
+    // ── Device Version Check ────────────────────────────────────────────────────
+
+    /**
+     * Checks if the device type matches the app version stored in Firebase.
+     * If TV device is running phone version (or vice versa), shows QuitDialog.
+     */
+    private fun checkDeviceVersionFromFirebase() {
+        val isTvDevice = UpdateUtil.isTvDevice(this)
+        val expectedVersionKey = if (isTvDevice) "tv_version" else "phone_version"
+
+        Log.i(TAG, "Checking device version: isTv=$isTvDevice, checking $expectedVersionKey")
+
+        FirebaseManager.getFirebaseDatabaseInstance()
+            .getReference("app_config/app_info/$expectedVersionKey")
+            .addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
+                override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                    val expectedVersion = snapshot.getValue(String::class.java)
+                    val currentPackage = packageName
+
+                    Log.i(TAG, "Firebase $expectedVersionKey: $expectedVersion, Current package: $currentPackage")
+
+                    if (expectedVersion != null && expectedVersion != currentPackage) {
+                        Log.w(TAG, "Version mismatch! Expected: $expectedVersion, Current: $currentPackage")
+                        showVersionMismatchDialog(isTvDevice, expectedVersion)
+                    } else {
+                        Log.i(TAG, "Version check passed - continuing with splash")
+                    }
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    TODO("Not yet implemented")
+                }
+
+                fun onError (error: DatabaseError) {
+                    Log.e(TAG, "Failed to fetch app_info from Firebase: ${error.message}")
+                    // Continue anyway - don't block app if Firebase is unreachable
+                }
+            })
+    }
+
+    /**
+     * Shows QuitDialog when device version doesn't match Firebase configuration.
+     */
+    private fun showVersionMismatchDialog(isTvDevice: Boolean, expectedVersion: String) {
+        val deviceType = if (isTvDevice) "TV" else "phone"
+        QuitDialog(
+            context = this,
+            title = "Wrong App Version",
+            message = "This $deviceType app does not match the official version.\n\n" +
+                    "Current: $packageName\n" +
+                    "Required: $expectedVersion\n\n" +
+                    "Please download the official APK from GitHub.",
+            positiveButtonText = "Download",
+            negativeButtonText = "Exit",
+            lottieAnimRes = R.raw.exit,
+            onNo = { finish() },
+            onYes = {
+                // Open GitHub releases page
+                startActivity(
+                    Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/kiduyu-klaus/KiduyuTv_final/releases/latest"))
+                )
+                finish()
+            }
+        ).showTracked()
     }
 
     /**
