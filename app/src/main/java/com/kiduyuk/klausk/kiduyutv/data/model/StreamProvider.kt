@@ -588,157 +588,147 @@ object StreamProviderManager {
         // Some providers use targetOrigin='*' so event.origin may be empty
         val trackingScript = """
             <script>
-            (function () {
-              'use strict';
-              var PROVIDER = '${provider.name.replace("'", "\\'")}';
-              var lastReportedTime = 0;
-              var lastReportedSeason = null;
-              var lastReportedEpisode = null;
+            (function() {
+                const currentContentId = $tmdbId;
+                const currentIsTv = $isTv;
+                const currentSeason = ${season ?: 1};
+                const currentEpisode = ${episode ?: 1};
 
-              // VidFast serves its messages from several mirror domains
-              var VIDFAST_ORIGINS = {
-                'https://vidfast.pro': 1, 'https://vidfast.in': 1, 'https://vidfast.io': 1,
-                'https://vidfast.me':  1, 'https://vidfast.net': 1, 'https://vidfast.pm': 1,
-                'https://vidfast.xyz': 1
-              };
-
-              // Check if origin is allowed for this provider
-              function originOK(origin) {
-                // Some providers use targetOrigin='*' resulting in empty origin
-                // For Videasy and VidKing, we accept any origin since they send stringified JSON
-                if (!origin || origin === '') {
-                  return PROVIDER === 'Videasy' || PROVIDER === 'VidKing';
-                }
-                switch (PROVIDER) {
-                  case 'Vidrock':  return origin === 'https://vidrock.ru';
-                  case 'VidLink':  return origin === 'https://vidlink.pro';
-                  case 'VidFast':  return !!VIDFAST_ORIGINS[origin];
-                  case 'VidNest':  return origin === 'https://vidnest.fun';
-                  case 'VidUp':    return origin === 'https://vidup.to';
-                  case 'VidCore':  return origin === 'https://vidcore.net';
-                  case 'Peachify': return origin === 'https://peachify.top';
-                  // Videasy and VidKing send stringified JSON without stable origin
-                  case 'Videasy':  return true;
-                  case 'VidKing':  return true;
-                  default:         return true;
-                }
-              }
-
-              // Single emit point - send data to Android via MavisInterface
-              function emit(position, season, episode) {
-                if (!window.MavisInterface || !window.MavisInterface.onPlayerEvent) return;
-                window.MavisInterface.onPlayerEvent(JSON.stringify({
-                  provider:    PROVIDER,
-                  currentTime: position,
-                  season:      season,
-                  episode:     episode
-                }));
-              }
-
-              // ─────────────────────────────────────────────────────────────────
-              // 1. Videasy / VidKing
-              //    event.data is a JSON STRING:
-              //      { id, type, season, episode, timestamp, duration, progress }
-              // ─────────────────────────────────────────────────────────────────
-              function fromStringPayload(str) {
-                if (PROVIDER !== 'Videasy' && PROVIDER !== 'VidKing') return false;
-                var msg;
-                try { msg = JSON.parse(str); } catch (e) { return false; }
-                if (!msg || typeof msg !== 'object') return false;
-
-                emit(
-                  typeof msg.timestamp === 'number' ? msg.timestamp : null,
-                  typeof msg.season   === 'number' ? msg.season   : null,
-                  typeof msg.episode  === 'number' ? msg.episode  : null
-                );
-                return true;
-              }
-
-              // ─────────────────────────────────────────────────────────────────
-              // 2. Vidrock / VidLink / VidFast / VidNest / VidUp / Peachify
-              //    { type: "MEDIA_DATA", data: { "<key>": {...} } }
-              //    Contains: last_season_watched, last_episode_watched,
-              //    progress: { watched, duration }, show_progress: { "s{s}e{e}": {...} }
-              // ─────────────────────────────────────────────────────────────────
-              function fromMediaData(payload) {
-                if (!payload || payload.type !== 'MEDIA_DATA' || !payload.data) return false;
-
-                for (var key in payload.data) {
-                  if (!Object.prototype.hasOwnProperty.call(payload.data, key)) continue;
-                  var item = payload.data[key];
-                  if (!item) continue;
-
-                  var season  = item.last_season_watched  != null ? item.last_season_watched  : null;
-                  var episode = item.last_episode_watched != null ? item.last_episode_watched : null;
-
-                  // Prefer the per-episode entry for exact season/episode
-                  var ep = null;
-                  if (season != null && episode != null && item.show_progress) {
-                    ep = item.show_progress['s' + season + 'e' + episode] || null;
-                  }
-
-                  var currentTime = null;
-                  if (ep && ep.progress && typeof ep.progress.watched === 'number') {
-                    currentTime = ep.progress.watched;
-                    if (typeof ep.season  === 'number') season  = ep.season;
-                    if (typeof ep.episode === 'number') episode = ep.episode;
-                  } else if (item.progress && typeof item.progress.watched === 'number') {
-                    currentTime = item.progress.watched;
-                  }
-
-                  // Coerce string season/episode to integers
-                  if (typeof season  === 'string') season  = parseInt(season,  10);
-                  if (typeof episode === 'string') episode = parseInt(episode, 10);
-
-                  // Update stored season/episode for timeupdate events
-                  if (season != null)  lastReportedSeason = season;
-                  if (episode != null) lastReportedEpisode = episode;
-
-                  emit(currentTime, season, episode);
-                }
-                return true;
-              }
-
-              // ─────────────────────────────────────────────────────────────────
-              // 3. VidCore
-              //    { type: "timeupdate", data: { currentTime, duration, percent } }
-              // ─────────────────────────────────────────────────────────────────
-              function fromTimeUpdate(payload) {
-                if (!payload || payload.type !== 'timeupdate' || !payload.data) return false;
-                emit(
-                  typeof payload.data.currentTime === 'number' ? payload.data.currentTime : null,
-                  lastReportedSeason,
-                  lastReportedEpisode
-                );
-                return true;
-              }
-
-              // ── message event listener ────────────────────────────────────────
-              window.addEventListener('message', function (event) {
-                // Allow messages from empty origin (targetOrigin='*') for compatible providers
-                if (!originOK(event.origin)) return;
-
-                var raw = event.data;
-
-                // (1) Stringified JSON - Videasy / VidKing
-                if (typeof raw === 'string') {
-                  fromStringPayload(raw);
-                  return;
-                }
-                if (!raw || typeof raw !== 'object') return;
-
-                // (3) VidCore timeupdate (check before MEDIA_DATA)
-                if (raw.type === 'timeupdate') {
-                  fromTimeUpdate(raw);
-                  return;
+                function sendToAndroid(currentTime, seasonNum, episodeNum, provider) {
+                    if (typeof MavisInterface !== 'undefined' && MavisInterface.onPlayerEvent) {
+                        const payload = {
+                            currentTime: parseFloat(currentTime),
+                            season: seasonNum ? parseInt(seasonNum, 10) : null,
+                            episode: episodeNum ? parseInt(episodeNum, 10) : null,
+                            provider: provider || ""
+                        };
+                        MavisInterface.onPlayerEvent(JSON.stringify(payload));
+                    }
                 }
 
-                // (2) MEDIA_DATA - Vidrock / VidLink / VidFast / VidNest / VidUp / Peachify
-                if (raw.type === 'MEDIA_DATA') {
-                  fromMediaData(raw);
-                  return;
-                }
-              });
+                window.addEventListener('message', function(event) {
+                    const origin = event.origin || "";
+                    let data = event.data;
+
+                    if (!data) return;
+
+                    // 1. Handle Stringified JSON Messages (e.g., Videasy, Vidking)
+                    if (typeof data === 'string') {
+                        try {
+                            const p = JSON.parse(data);
+                            if (p && (p.timestamp !== undefined || p.progress !== undefined)) {
+                                const provider = (p.type === 'anime' || p.type === 'tv' || p.type === 'movie') ? 'Videasy/Vidking' : '';
+                                const seasonVal = p.season !== undefined ? p.season : (currentIsTv ? currentSeason : null);
+                                const epVal = p.episode !== undefined ? p.episode : (currentIsTv ? currentEpisode : null);
+                                sendToAndroid(p.timestamp || 0, seasonVal, epVal, provider);
+                            }
+                        } catch (e) {
+                            // Not valid JSON string
+                        }
+                        return;
+                    }
+
+                    // 2. Handle Object Messages (Vidcore, Peachify, and MEDIA_DATA platforms)
+                    if (typeof data === 'object') {
+                        // 2a. Vidcore (Origin: https://vidcore.net)
+                        if (origin === 'https://vidcore.net') {
+                            if (data.type === 'timeupdate' && data.data) {
+                                sendToAndroid(
+                                    data.data.currentTime,
+                                    currentIsTv ? currentSeason : null,
+                                    currentIsTv ? currentEpisode : null,
+                                    'Vidcore'
+                                );
+                            }
+                            return;
+                        }
+
+                        // 2b. Peachify PLAYER_EVENT (Origin: https://peachify.top)
+                        if (origin === 'https://peachify.top' && data.type === 'PLAYER_EVENT' && data.data) {
+                            const pd = data.data;
+                            if (pd.currentTime !== undefined) {
+                                sendToAndroid(
+                                    pd.currentTime,
+                                    currentIsTv ? currentSeason : null,
+                                    currentIsTv ? currentEpisode : null,
+                                    'Peachify'
+                                );
+                            }
+                            return;
+                        }
+
+                        // 2c. MEDIA_DATA platforms (Vidrock, Vidlink, Vidfast, Vidnest, Vidup, Peachify)
+                        if (data.type === 'MEDIA_DATA' && data.data) {
+                            const mediaData = data.data;
+                            let item = null;
+                            let provider = 'Unknown';
+
+                            // Determine provider and extract the correct item by ID
+                            if (origin.includes('vidrock.ru')) {
+                                provider = 'Vidrock';
+                                if (Array.isArray(mediaData)) {
+                                    item = mediaData.find(function(x) { return x && x.id == currentContentId; });
+                                }
+                            } else if (origin.includes('vidlink.pro')) {
+                                provider = 'Vidlink';
+                                item = mediaData[currentContentId] || mediaData[String(currentContentId)];
+                            } else if (origin.includes('vidnest.fun')) {
+                                provider = 'Vidnest';
+                                item = mediaData[currentContentId] || mediaData[String(currentContentId)];
+                            } else if (origin.includes('peachify.top')) {
+                                provider = 'Peachify';
+                                item = mediaData[currentContentId] || mediaData[String(currentContentId)];
+                            } else if (
+                                origin.includes('vidfast.') || 
+                                origin.includes('vidup.to')
+                            ) {
+                                provider = origin.includes('vidfast.') ? 'Vidfast' : 'Vidup';
+                                const key = (currentIsTv ? 't' : 'm') + currentContentId;
+                                item = mediaData[key] || mediaData[currentContentId] || mediaData[String(currentContentId)];
+                            }
+
+                            if (item) {
+                                let watched = 0;
+                                let seasonVal = null;
+                                let epVal = null;
+
+                                if (currentIsTv) {
+                                    // Extract season and episode number
+                                    const rawSeason = item.last_season_watched !== undefined ? item.last_season_watched : currentSeason;
+                                    const rawEpisode = item.last_episode_watched !== undefined ? item.last_episode_watched : currentEpisode;
+                                    
+                                    seasonVal = parseInt(rawSeason, 10) || currentSeason;
+                                    epVal = parseInt(rawEpisode, 10) || currentEpisode;
+
+                                    // Extract the episode-specific progress
+                                    const sKey = 's' + seasonVal + 'e' + epVal;
+                                    if (item.show_progress && item.show_progress[sKey]) {
+                                        const epProgress = item.show_progress[sKey];
+                                        if (epProgress.progress && epProgress.progress.watched !== undefined) {
+                                            watched = epProgress.progress.watched;
+                                        } else if (epProgress.watched !== undefined) {
+                                            watched = epProgress.watched;
+                                        }
+                                    } else if (item.progress && item.progress.watched !== undefined) {
+                                        watched = item.progress.watched;
+                                    }
+                                } else {
+                                    // Movie progress
+                                    if (item.progress && item.progress.watched !== undefined) {
+                                        watched = item.progress.watched;
+                                    }
+                                }
+
+                                sendToAndroid(
+                                    watched,
+                                    currentIsTv ? seasonVal : null,
+                                    currentIsTv ? epVal : null,
+                                    provider
+                                );
+                            }
+                        }
+                    }
+                });
             })();
             </script>
         """.trimIndent()

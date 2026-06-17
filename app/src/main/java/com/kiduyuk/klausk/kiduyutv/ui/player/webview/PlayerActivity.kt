@@ -94,9 +94,9 @@ class PlayerActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         // Fix: Missing Translucent Window Format
-        // Fire TV's window manager often requires the Activity's window to be explicitly set 
+        // Fire TV's window manager often requires the Activity's window to be explicitly set
         // to a translucent format to correctly composite the video surface with the WebView UI.
         window.setFormat(PixelFormat.TRANSLUCENT)
 
@@ -165,10 +165,10 @@ class PlayerActivity : AppCompatActivity() {
             )
 
             // Fix: Solid Background Color Overlapping Video
-            // On many Fire OS versions, the video is rendered on a SurfaceView that sits behind 
+            // On many Fire OS versions, the video is rendered on a SurfaceView that sits behind
             // the WebView's main drawing layer. Setting a solid black background hides the video.
             setBackgroundColor(0x00000000) // Set to transparent
-            
+
             // Fix: Amazon Chromium WebView vs. System WebView
             // Enable debugging for Amazon Chromium WebView optimizations
             if (isFireTV) {
@@ -179,34 +179,34 @@ class PlayerActivity : AppCompatActivity() {
                 javaScriptEnabled = true
                 domStorageEnabled = true
                 databaseEnabled = true
-                
+
                 // Fix: Media Playback User Gesture Restriction
                 mediaPlaybackRequiresUserGesture = false
                 allowFileAccess = true
                 allowContentAccess = true
-                
+
                 // Viewport scaling
                 loadWithOverviewMode = true
                 useWideViewPort = true
-                
+
                 // FIX: Changed zoom constraints to allow video players to properly resize video layouts.
                 // We disable visual buttons (displayZoomControls) so it stays clean.
                 builtInZoomControls = false  // True on phones/tablets, False on TV (removes visual artifacts)
                 displayZoomControls = false       // Keeps UI completely clean of ugly +/- buttons
                 setSupportZoom(true)         // Allows standard devices to stretch cinematic views if needed
-                
-                // FIX: Multi-window support must be TRUE for standard HTML5 video elements 
+
+                // FIX: Multi-window support must be TRUE for standard HTML5 video elements
                 // to scale up and trigger full-screen player states natively.
                 setSupportMultipleWindows(true)
                 javaScriptCanOpenWindowsAutomatically = true // Allows player scripts to execute properly
-                
+
                 // Security layer bypass for http:// streaming streams running on https:// pages
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                     mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                 }
 
                 cacheMode = WebSettings.LOAD_DEFAULT // Utilizes the browser cache for buffering
-                
+
                 userAgentString = if (isFireTV) {
                     "Mozilla/5.0 (Linux; Android 9; AFTMM Build/PS7233) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                 } else {
@@ -254,7 +254,7 @@ class PlayerActivity : AppCompatActivity() {
                     Log.d(TAG, "[WebChrome] Load progress: $newProgress%")
                 }
             }
-            
+
 
             val iframeHtml = intent.getStringExtra("IFRAME_HTML")
             if (iframeHtml != null) {
@@ -460,14 +460,14 @@ class PlayerActivity : AppCompatActivity() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 Log.d(TAG, "[WatchHistory] Checking if media is in watch history: id=$currentTmdbId, isTv=$currentIsTv")
-                
+
                 // Check synchronously before deciding to add
                 val alreadyInHistory = repository.isInWatchHistory(
                     this@PlayerActivity,
                     currentTmdbId,
                     currentIsTv
                 )
-                
+
                 if (!alreadyInHistory) {
                     Log.d(TAG, "[WatchHistory] Adding to watch history: id=$currentTmdbId, title=$currentTitle, isTv=$currentIsTv, season=$currentSeason, episode=$currentEpisode")
                     val watchHistoryItem = WatchHistoryItem(
@@ -487,7 +487,7 @@ class PlayerActivity : AppCompatActivity() {
 
                     repository.saveToWatchHistory(this@PlayerActivity, watchHistoryItem)
                     Log.d(TAG, "[WatchHistory] saveToWatchHistory called successfully")
-                    
+
                     // Start progress timer only after adding to history
                     withContext(Dispatchers.Main) {
                         startProgressUpdateTimer()
