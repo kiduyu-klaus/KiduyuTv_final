@@ -440,10 +440,7 @@ Contributions are welcome and appreciated. Whether you find a bug, have a featur
 ---
 
 ## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-The MIT License is a permissive license that allows you to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the software, provided you include the copyright notice and permission notice in all copies or substantial portions of the software.
+This project is proprietary and all rights are reserved. No part of this codebase — including source code, documentation, or associated assets — may be used, copied, modified, merged, published, distributed, sublicensed, or sold without prior written authorization from the copyright holder. See the [LICENSE](LICENSE) file for details.
 
 ---
 
