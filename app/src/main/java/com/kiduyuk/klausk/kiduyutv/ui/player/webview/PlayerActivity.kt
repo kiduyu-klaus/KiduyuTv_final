@@ -256,13 +256,17 @@ class PlayerActivity : AppCompatActivity() {
             }
 
 
-            val iframeHtml = intent.getStringExtra("IFRAME_HTML")
-            if (iframeHtml != null) {
-                val baseUrl = StreamProviderManager.getBaseUrl(currentProviderName)
-                loadDataWithBaseURL(baseUrl, iframeHtml, "text/html", "UTF-8", null)
-            } else {
-                loadUrl(url)
-            }
+            // ── Updated: Unified structure loading with generateIframeHtml ──
+            val baseUrl = StreamProviderManager.getBaseUrl(currentProviderName)
+            val finalHtml = intent.getStringExtra("IFRAME_HTML") ?: StreamProviderManager.generateIframeHtml(
+                providerName = currentProviderName,
+                tmdbId = currentTmdbId,
+                isTv = currentIsTv,
+                season = if (currentIsTv) currentSeason else null,
+                episode = if (currentIsTv) currentEpisode else null,
+                timestamp = currentPlaybackPosition / 1000L // Convert ms to seconds for provider URL parameters
+            )
+            loadDataWithBaseURL(baseUrl, finalHtml, "text/html", "UTF-8", null)
         }
 
         // Add JavascriptInterface bridge for player events (must be called on webView, not Activity)
