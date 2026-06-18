@@ -46,7 +46,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
 import com.airbnb.lottie.compose.*
-import com.google.firebase.database.DatabaseError
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.activity.mainactivity.MainActivity
@@ -62,6 +61,8 @@ import com.kiduyuk.klausk.kiduyutv.util.AdManager
 import io.github.cutelibs.cutedialog.CuteDialog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import androidx.core.net.toUri
 
@@ -72,12 +73,14 @@ class SplashActivity : ComponentActivity() {
         private const val TAG = "SplashActivity"
         private const val SPLASH_DURATION_MS = 6000
         private const val SYNC_TIMEOUT_MS = 10000L // 10 seconds max for sync
+        private const val VERSION_CHECK_TIMEOUT_MS = 5000L // 5 seconds max for version check
     }
 
     // Compose-observable flags
     private var updateAvailable by mutableStateOf(false)
     private var permissionHandled by mutableStateOf(false)
     private var syncCompleted by mutableStateOf(false)
+    private var versionCheckHandled by mutableStateOf(false)
 
     // Remote version shown in the status chip
     private var currentRemoteVersion by mutableStateOf<String?>(null)
@@ -273,6 +276,10 @@ class SplashActivity : ComponentActivity() {
     /**
      * Checks if the device type matches the app version stored in Firebase.
      * If TV device is running phone version (or vice versa), shows QuitDialog.
+     *
+     * Uses a coroutine + timeout so the splash navigation can proceed if Firebase
+     * is slow or unreachable.  Sets [versionCheckHandled] in every terminal branch
+     * so [navigateToMain] never races past this check.
      */
     private fun checkDeviceVersionFromFirebase() {
         val isTvDevice = UpdateUtil.isTvDevice(this)
@@ -280,38 +287,70 @@ class SplashActivity : ComponentActivity() {
 
         Log.i(TAG, "Checking device version: isTv=$isTvDevice, checking $expectedVersionKey")
 
-            FirebaseManager.getFirebaseDatabaseInstance()
-            .getReference("app_config/app_info/$expectedVersionKey")
-            .addListenerForSingleValueEvent(object : com.google.firebase.database.ValueEventListener {
-                override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
-                    val expectedVersion = snapshot.getValue(String::class.java)
-                    val currentPackage = BuildConfig.APPLICATION_ID
-
-                    Log.i(TAG, "Firebase $expectedVersionKey: $expectedVersion, Current package: $currentPackage")
-
-                    if (expectedVersion != null && expectedVersion != currentPackage) {
-                        Log.w(TAG, "Version mismatch! Expected: $expectedVersion, Current: $currentPackage")
-                        showVersionMismatchDialog(isTvDevice, expectedVersion)
-                    } else {
-                        Log.i(TAG, "Version check passed - continuing with splash")
-                    }
+        lifecycleScope.launch {
+            try {
+                val snapshot = withTimeoutOrNull(VERSION_CHECK_TIMEOUT_MS) {
+                    FirebaseManager.getFirebaseDatabaseInstance()
+                        .getReference("app_config/app_info/$expectedVersionKey")
+                        .get()
+                        .await()
                 }
 
-                override fun onCancelled(error: DatabaseError) {
-                    Log.e(TAG, "Failed to fetch app_info from Firebase: ${error.message}")
-
-                    // Continue app startup even if Firebase fails
+                if (snapshot == null) {
+                    Log.w(TAG, "Version check timed out after ${VERSION_CHECK_TIMEOUT_MS}ms — continuing with splash")
                     Toast.makeText(
                         this@SplashActivity,
                         "Version check unavailable",
                         Toast.LENGTH_SHORT
                     ).show()
+                    versionCheckHandled = true
+                    return@launch
                 }
-            })
+
+                // Use runtime packageName (not BuildConfig.APPLICATION_ID) so this
+                // matches the dialog message and is robust to build-variant overrides.
+                val expectedVersion = snapshot.getValue(String::class.java)
+                val currentPackage = packageName
+
+                Log.i(TAG, "Firebase $expectedVersionKey: $expectedVersion, Current package: $currentPackage")
+
+                when {
+                    expectedVersion == null -> {
+                        Log.w(TAG, "Firebase $expectedVersionKey is missing or not a string — continuing")
+                        Toast.makeText(
+                            this@SplashActivity,
+                            "Version check unavailable",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        versionCheckHandled = true
+                    }
+                    expectedVersion != currentPackage -> {
+                        Log.w(TAG, "Version mismatch! Expected: $expectedVersion, Current: $currentPackage")
+                        // versionCheckHandled is flipped to true inside the dialog
+                        // buttons so the splash stays paused until the user decides.
+                        showVersionMismatchDialog(isTvDevice, expectedVersion)
+                    }
+                    else -> {
+                        Log.i(TAG, "Version check passed - continuing with splash")
+                        versionCheckHandled = true
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to fetch app_info from Firebase", e)
+                Toast.makeText(
+                    this@SplashActivity,
+                    "Version check unavailable",
+                    Toast.LENGTH_SHORT
+                ).show()
+                versionCheckHandled = true
+            }
+        }
     }
 
     /**
      * Shows QuitDialog when device version doesn't match Firebase configuration.
+     * Sets [versionCheckHandled] in both branches so the splash navigation guard
+     * never blocks the user's explicit choice to leave or open the browser.
      */
     private fun showVersionMismatchDialog(isTvDevice: Boolean, expectedVersion: String) {
         val deviceType = if (isTvDevice) "TV" else "phone"
@@ -325,8 +364,12 @@ class SplashActivity : ComponentActivity() {
             positiveButtonText = "Download",
             negativeButtonText = "Exit",
             lottieAnimRes = R.raw.exit,
-            onNo = { finish() },
+            onNo = {
+                versionCheckHandled = true
+                finish()
+            },
             onYes = {
+                versionCheckHandled = true
                 // Open GitHub releases page
                 startActivity(
                     Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/kiduyu-klaus/KiduyuTv_final/releases/latest"))
@@ -394,10 +437,11 @@ class SplashActivity : ComponentActivity() {
     /**
      * Navigate to MainActivity and finish this splash screen.
      * Guards against navigation while any blocking condition is still active:
-     * an update dialog is open, permissions haven't been resolved, or sync is
-     * still running.  The Compose layer also prevents onTimeout() from being
-     * called in those states, but this is a second safety net at the Activity
-     * level so that even a race-condition early call is silently dropped.
+     * an update dialog is open, permissions haven't been resolved, sync is
+     * still running, or the Firebase device-version check has not completed.
+     * The Compose layer also prevents onTimeout() from being called in those
+     * states, but this is a second safety net at the Activity level so that
+     * even a race-condition early call is silently dropped.
      */
     private fun navigateToMain() {
         if (isFinishing) return
@@ -413,6 +457,10 @@ class SplashActivity : ComponentActivity() {
         }
         if (!syncCompleted) {
             Log.i(TAG, "Firebase sync still in progress — suppressing navigation")
+            return
+        }
+        if (!versionCheckHandled) {
+            Log.i(TAG, "Device version check still in progress — suppressing navigation")
             return
         }
 
@@ -689,8 +737,8 @@ class SplashActivity : ComponentActivity() {
         onTimeout: () -> Unit
     ) {
         // Progress pauses when a dialog is open, permission hasn't been resolved yet,
-        // or sync hasn't completed yet.
-        val isPaused = updateAvailable || !permissionHandled || !syncCompleted
+        // sync hasn't completed yet, or the Firebase device-version check is still pending.
+        val isPaused = updateAvailable || !permissionHandled || !syncCompleted || !versionCheckHandled
 
         val barProgress = remember { Animatable(0f) }
 
@@ -860,6 +908,8 @@ class SplashActivity : ComponentActivity() {
                             "Update available" to Color(0xFFE50914)
                         !permissionHandled ->
                             "Requesting permissions…" to Color(0xFF808080)
+                        !versionCheckHandled ->
+                            "Verifying app version…" to Color(0xFF808080)
                         !syncCompleted ->
                             "Syncing data..." to Color(0xFF808080)
                         else ->
