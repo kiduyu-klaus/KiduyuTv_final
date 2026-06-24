@@ -1,6 +1,11 @@
 package com.kiduyuk.klausk.kiduyutv.ui.components
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.util.Log
+import android.view.ViewGroup
+import android.widget.FrameLayout
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,17 +16,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.google.android.gms.ads.AdSize
-import com.google.android.gms.ads.admanager.AdManagerAdRequest
-import com.google.android.gms.ads.admanager.AdManagerAdView
-import com.kiduyuk.klausk.kiduyutv.util.AdUnitIds
+import com.kiduyuk.klausk.kiduyutv.util.AdFallbackDispatcher
+import com.kiduyuk.klausk.kiduyutv.util.AdFallbackDispatcher.BannerNetwork
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 
 /**
- * GAM banner for the TV flavour.
- * Uses a 728×90 leaderboard — appropriate for a 1080p TV canvas.
- * Fire TV and Android TV compatible.
- * Respects the ads disabled setting from SettingsManager.
+ * TV banner ad — loaded via the unified [AdFallbackDispatcher].
+ *
+ * The dispatcher picks the requested banner network (AdMob for the TV flavour)
+ * and injects the banner into a [FrameLayout] container. A 728×90 leaderboard
+ * container height keeps the layout stable while the ad loads.
+ *
+ * No-op when the user has disabled ads in settings.
  */
 @Composable
 fun TvBannerAdView(
@@ -32,7 +38,7 @@ fun TvBannerAdView(
 ) {
     val context = LocalContext.current
 
-    // Check if ads are disabled - return empty box if disabled
+    // Respect the user's "disable ads" preference.
     if (SettingsManager(context).isAdsDisabled()) {
         Box(modifier = modifier)
         return
@@ -41,12 +47,38 @@ fun TvBannerAdView(
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
-            AdManagerAdView(ctx).apply {
-                setAdSizes(AdSize.LEADERBOARD) // 728×90
-                adUnitId = AdUnitIds.TV_BANNER
-                Log.i("TvBannerAdView", "Loading TV banner ad — unit: ${AdUnitIds.TV_BANNER}")
-                loadAd(AdManagerAdRequest.Builder().build())
+            // FrameLayout acts as the ViewGroup host for the dispatcher.
+            val container = FrameLayout(ctx).apply {
+                layoutParams = ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
             }
+            val activity = ctx.findActivity()
+            if (activity != null) {
+                Log.i(TAG, "Loading TV banner via AdFallbackDispatcher (preferred=ADMOB)")
+                AdFallbackDispatcher.loadBanner(
+                    activity = activity,
+                    container = container,
+                    preferred = BannerNetwork.ADMOB
+                )
+            } else {
+                Log.w(TAG, "No Activity context — banner not loaded")
+            }
+            container
         }
     )
 }
+
+/** Walk up the context wrapper chain looking for the hosting [Activity]. */
+private fun Context.findActivity(): Activity? {
+    var ctx: Context? = this
+    while (ctx is ContextWrapper) {
+        if (ctx is Activity) return ctx
+        ctx = ctx.baseContext
+    }
+    return null
+}
+
+/** Log tag kept in one place for grep-ability. */
+private const val TAG = "TvBannerAdView"
