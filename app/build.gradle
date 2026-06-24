@@ -25,8 +25,8 @@ android {
         }
         multiDexEnabled = true
         manifestPlaceholders = [
-            startAppAppId: "DEFAULT",
-            unityAdsGameId: "DEFAULT",
+            startAppAppId: "205544913",
+            unityAdsGameId: "800077880",
             unityAdsTestMode: "false",
             wortiseAppId: "DEFAULT"
         ]
@@ -53,7 +53,7 @@ android {
                 unityAdsGameId: "800077880",
                 unityAdsTestMode: "false",
                 wortiseAppId: "844b2438-d532-423c-9ac1-523ca3bbc8c4",
-                admobAppId: "ca-app-pub-3803477439180910~6736398964"  // TODO: Replace with real phone AdMob App ID
+                admobAppId: "ca-app-pub-3803477439180910~6736398964"
             ]
         }
         tv {
@@ -66,7 +66,7 @@ android {
                 unityAdsGameId: "800077880",
                 unityAdsTestMode: "false",
                 wortiseAppId: "844b2438-d532-423c-9ac1-523ca3bbc8c4",
-                admobAppId: "ca-app-pub-3803477439180910~6736398964"  // TODO: Replace with real TV AdMob App ID
+                admobAppId: "ca-app-pub-3803477439180910~6736398964"
             ]
         }
     }

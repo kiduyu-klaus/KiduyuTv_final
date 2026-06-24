@@ -12,6 +12,7 @@ import com.wortise.ads.banner.BannerAd
 import com.wortise.ads.interstitial.InterstitialAd
 // import com.wortise.ads.Reward
 import com.wortise.ads.rewarded.RewardedAd
+import com.wortise.ads.rewarded.models.Reward
 
 /**
  * Wortise Ad Manager — singleton.
@@ -332,10 +333,10 @@ object WortiseAdManager {
                 onDismissed?.invoke()
             }
 
-            // override fun onRewardedCompleted(ad: RewardedAd, reward: Reward) {
-            //     Log.i(TAG, "Wortise rewarded completed")
-            //     onRewarded?.invoke()
-            // }
+             override fun onRewardedCompleted(ad: RewardedAd, reward: Reward) {
+                 Log.i(TAG, "Wortise rewarded completed")
+                 onRewarded?.invoke()
+             }
 
             // Depending on SDK version, the signature might be different or Reward might be in a different package.
             // Based on error log, the expected signature is:
