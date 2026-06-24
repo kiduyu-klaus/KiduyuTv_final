@@ -46,7 +46,7 @@ fun StartAppBannerAdView(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
                 )
-                AdFallbackDispatcher.loadBanner(activity, this, BannerNetwork.STARTAPP)
+                AdFallbackDispatcher.loadBanner(activity, this, AdFallbackDispatcher.BannerNetwork.STARTAPP)
             }
         }
     )

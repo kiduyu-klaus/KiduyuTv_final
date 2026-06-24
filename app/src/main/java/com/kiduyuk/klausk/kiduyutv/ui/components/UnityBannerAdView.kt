@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.kiduyuk.klausk.kiduyutv.util.AdFallbackDispatcher
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
+import com.kiduyuk.klausk.kiduyutv.util.UnityAdManager
 
 /**
  * Unity Ads banner wrapped for Jetpack Compose.
@@ -55,7 +56,7 @@ fun UnityBannerAdView(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
                 )
-                AdFallbackDispatcher.loadBanner(activity, this, BannerNetwork.UNITY)
+                AdFallbackDispatcher.loadBanner(activity, this, AdFallbackDispatcher.BannerNetwork.UNITY)
             }
         }
     )
