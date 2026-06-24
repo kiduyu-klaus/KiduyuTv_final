@@ -25,9 +25,9 @@ object UnityAdManager {
 
     private const val TAG = "UnityAdManager"
     private const val MIN_INTERSTITIAL_INTERVAL_MS = 3 * 60 * 1000L
-    private const val PLACEMENT_REWARDED = "rewardedVideo"
-    private const val PLACEMENT_INTERSTITIAL = "interstitial"
-    private const val PLACEMENT_BANNER = "banner"
+    private const val PLACEMENT_REWARDED = "Rewarded_Android"
+    private const val PLACEMENT_INTERSTITIAL = "Interstitial_Android"
+    private const val PLACEMENT_BANNER = "Banner_Android"
 
     @Volatile
     var isInitialised = false

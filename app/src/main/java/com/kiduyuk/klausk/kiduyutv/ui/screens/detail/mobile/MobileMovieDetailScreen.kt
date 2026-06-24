@@ -45,6 +45,7 @@ import android.widget.Toast
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
 import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamLinksViewModel
 import com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager
+import com.kiduyuk.klausk.kiduyutv.util.AdFallbackDispatcher
 import com.kiduyuk.klausk.kiduyutv.util.AdManager
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import androidx.activity.compose.BackHandler
@@ -79,7 +80,7 @@ fun MobileMovieDetailScreen(
     val activity = context as? Activity
     BackHandler {
         if (BuildConfig.FLAVOR == "phone" && activity != null) {
-            AdManager.showInterstitial(activity) {
+            AdFallbackDispatcher.showInterstitial(activity) {
                 onBackClick()
             }
         } else {

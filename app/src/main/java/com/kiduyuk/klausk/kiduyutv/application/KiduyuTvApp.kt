@@ -44,7 +44,7 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
         MyListManager.init(this)
 
         // Initialize Ad Blocker (previously in PlayerActivity)
-        AdvancedAdBlocker.init(this)
+        //AdvancedAdBlocker.init(this)
 
         // Initialize notification channels
         NotificationHelper.createNotificationChannel(this)

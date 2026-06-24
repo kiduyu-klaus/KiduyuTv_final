@@ -49,10 +49,10 @@ android {
             versionNameSuffix "-phone"
             resValue "string", "app_name", "KiduyuTV"
             manifestPlaceholders = [
-                startAppAppId: "111111111",
-                unityAdsGameId: "1111111",
-                unityAdsTestMode: "true",
-                wortiseAppId: "00000000-0000-0000-0000-000000000001",
+                startAppAppId: "205544913",
+                unityAdsGameId: "800077880",
+                unityAdsTestMode: "false",
+                wortiseAppId: "844b2438-d532-423c-9ac1-523ca3bbc8c4",
                 admobAppId: "ca-app-pub-3803477439180910~6736398964"  // TODO: Replace with real phone AdMob App ID
             ]
         }
@@ -62,10 +62,10 @@ android {
             versionNameSuffix "-tv"
             resValue "string", "app_name", "KiduyuTV"
             manifestPlaceholders = [
-                startAppAppId: "222222222",
-                unityAdsGameId: "2222222",
+                startAppAppId: "205544913",
+                unityAdsGameId: "800077880",
                 unityAdsTestMode: "false",
-                wortiseAppId: "00000000-0000-0000-0000-000000000002",
+                wortiseAppId: "844b2438-d532-423c-9ac1-523ca3bbc8c4",
                 admobAppId: "ca-app-pub-3803477439180910~6736398964"  // TODO: Replace with real TV AdMob App ID
             ]
         }

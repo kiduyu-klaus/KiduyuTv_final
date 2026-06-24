@@ -1,98 +1,34 @@
 package com.kiduyuk.klausk.kiduyutv.util
 
 import android.app.Activity
-import android.content.Context
 import android.util.Log
-import com.google.android.gms.ads.AdError
-import com.google.android.gms.ads.FullScreenContentCallback
-import com.google.android.gms.ads.LoadAdError
-import com.google.android.gms.ads.admanager.AdManagerAdRequest
-import com.google.android.gms.ads.admanager.AdManagerInterstitialAd
-import com.google.android.gms.ads.admanager.AdManagerInterstitialAdLoadCallback
 
 /**
- * Manages GAM (Google Ad Manager) interstitial ads for the TV flavour.
- * TV interstitials use AdManagerInterstitialAd and are D-pad navigable by default.
+ * TV interstitial facade — delegates to [AdFallbackDispatcher] which handles
+ * the full fallback chain (AdMob → StartApp → Unity → Wortise) and enforces
+ * the 3-minute cooldown across all networks.
  */
 object TvInterstitialManager {
 
     private const val TAG = "TvInterstitialManager"
 
-    @Volatile private var interstitialAd: AdManagerInterstitialAd? = null
-
     /**
-     * Pre-loads a GAM interstitial ad for TV.
-     */
-    fun preload(context: Context) {
-        val adRequest = AdManagerAdRequest.Builder().build()
-        AdManagerInterstitialAd.load(
-            context,
-            AdUnitIds.TV_INTERSTITIAL,
-            adRequest,
-            object : AdManagerInterstitialAdLoadCallback() {
-                override fun onAdLoaded(ad: AdManagerInterstitialAd) {
-                    interstitialAd = ad
-                    Log.i(TAG, "TV interstitial loaded")
-                }
-                override fun onAdFailedToLoad(error: LoadAdError) {
-                    interstitialAd = null
-                    Log.w(TAG, "TV interstitial failed: ${error.message}")
-                }
-            }
-        )
-    }
-
-    /**
-     * Shows the interstitial ad and then launches [onDismissed] callback.
+     * Shows an interstitial ad, then launches [onDismissed].
      * Used before PlayerActivity launches on TV.
      */
     fun showAndThenLaunch(activity: Activity, onDismissed: () -> Unit) {
-        val ad = interstitialAd
-        if (ad == null) {
-            Log.i(TAG, "No TV interstitial ready — proceeding to launch")
-            onDismissed()
-            preload(activity)
-            return
-        }
-        ad.fullScreenContentCallback = object : FullScreenContentCallback() {
-            override fun onAdDismissedFullScreenContent() {
-                interstitialAd = null
-                preload(activity)
-                onDismissed()
-            }
-            override fun onAdFailedToShowFullScreenContent(error: AdError) {
-                interstitialAd = null
-                onDismissed()
-            }
-        }
-        ad.show(activity)
+        Log.i(TAG, "Requesting interstitial via AdFallbackDispatcher")
+        AdFallbackDispatcher.showInterstitial(activity, onDismissed)
     }
 
     /**
-     * Shows the interstitial ad and then calls [onDismissed] callback.
+     * Shows an interstitial ad, then calls [onDismissed].
      * Used for back navigation on TV detail screens.
      */
     fun showAndThen(activity: Activity, onDismissed: () -> Unit) {
-        val ad = interstitialAd
-        if (ad == null) {
-            Log.i(TAG, "No TV interstitial ready — proceeding back")
-            onDismissed()
-            preload(activity)
-            return
-        }
-        ad.fullScreenContentCallback = object : FullScreenContentCallback() {
-            override fun onAdDismissedFullScreenContent() {
-                interstitialAd = null
-                preload(activity)
-                onDismissed()
-            }
-            override fun onAdFailedToShowFullScreenContent(error: AdError) {
-                interstitialAd = null
-                onDismissed()
-            }
-        }
-        ad.show(activity)
+        Log.i(TAG, "Requesting interstitial via AdFallbackDispatcher")
+        AdFallbackDispatcher.showInterstitial(activity, onDismissed)
     }
 
-    val isReady: Boolean get() = interstitialAd != null
+    val isReady: Boolean get() = AdManager.isInterstitialReady
 }

@@ -28,7 +28,7 @@ object StartAppAdManager {
 
     private const val TAG = "StartAppAdManager"
     private const val MIN_INTERSTITIAL_INTERVAL_MS = 3 * 60 * 1000L
-    private const val APP_ID = "YOUR_STARTAPP_APP_ID" // TODO: Replace with your actual Start.io App ID
+    private const val APP_ID = "205544913" // TODO: Replace with your actual Start.io App ID
 
     @Volatile
     var isInitialised = false
@@ -50,6 +50,11 @@ object StartAppAdManager {
             StartAppSDK.initParams(context, APP_ID)
                 .setReturnAdsEnabled(false) // Blocks annoying ads when users re-open the app
                 .init()
+
+            StartAppSDK.setUserConsent (this,
+                            "pas",
+                            System.currentTimeMillis(),
+                            true)
 
             isInitialised = true
             Log.i(TAG, "StartApp ads pre-loaded")

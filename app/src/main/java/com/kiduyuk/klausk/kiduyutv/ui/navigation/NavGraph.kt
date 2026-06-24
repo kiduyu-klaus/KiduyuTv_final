@@ -77,7 +77,7 @@ fun NavGraph(navController: NavHostController) {
                 )
 
                 // Overlay a non-intrusive banner at the bottom when on TV flavour
-                /*if (BuildConfig.FLAVOR == "tv") {
+                if (BuildConfig.FLAVOR == "tv") {
                     TvBannerAdView(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
@@ -85,7 +85,7 @@ fun NavGraph(navController: NavHostController) {
                             .height(90.dp)
                             .background(Color(0xCC000000))
                     )
-                }*/
+                }
             }
         }
 

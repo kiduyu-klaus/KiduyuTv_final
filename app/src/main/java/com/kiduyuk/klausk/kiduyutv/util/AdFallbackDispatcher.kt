@@ -63,7 +63,7 @@ object AdFallbackDispatcher {
 
     /**
      * Shows a rewarded video ad using the first ready network in the chain:
-     * AdMob → Unity Ads → Wortise.
+     * AdMob → StartApp → Unity Ads → Wortise.
      *
      * [onRewarded] fires only when the user fully watches the ad.
      * [onDismissed] always fires when the ad closes.
@@ -82,6 +82,11 @@ object AdFallbackDispatcher {
             UnityAdManager.isRewardedReady -> {
                 Log.i(TAG, "Falling back to Unity rewarded")
                 UnityAdManager.showRewarded(activity, onRewarded, onDismissed)
+            }
+
+            StartAppAdManager.isInitialised -> {
+                Log.i(TAG, "Falling back to StartApp rewarded")
+                StartAppAdManager.showRewarded(activity, onRewarded, onDismissed)
             }
 
             WortiseAdManager.isRewardedReady -> {

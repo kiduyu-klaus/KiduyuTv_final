@@ -39,10 +39,10 @@ object WortiseAdManager {
     private const val MIN_INTERSTITIAL_INTERVAL_MS = 3 * 60 * 1000L
 
     // TODO: Replace these placeholders with your real Wortise ad unit IDs
-    private const val AD_UNIT_BANNER = "wortise-banner-id"
-    private const val AD_UNIT_INTERSTITIAL = "wortise-interstitial-id"
-    private const val AD_UNIT_REWARDED = "wortise-rewarded-id"
-    private const val AD_UNIT_APP_OPEN = "wortise-app-open-id"
+    private const val AD_UNIT_BANNER = "90713170-a74f-4ccd-becd-324bb010b89a"
+    private const val AD_UNIT_INTERSTITIAL = "2c5fbdcc-a843-4540-90cf-e6f2ccbfb4e8"
+    private const val AD_UNIT_REWARDED = "f598ac5c-7b3a-4f83-93b5-60f84b07571b"
+    private const val AD_UNIT_APP_OPEN = "a4e27bae-7b6a-4281-8648-c7ff875c33a4"
 
     @Volatile
     var isInitialised = false

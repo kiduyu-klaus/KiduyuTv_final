@@ -35,6 +35,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import android.app.Activity
 import android.widget.Toast
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
+import com.kiduyuk.klausk.kiduyutv.util.AdFallbackDispatcher
 import com.kiduyuk.klausk.kiduyutv.util.AdManager
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamProviderUi
@@ -82,7 +83,7 @@ fun MobileStreamLinksScreen(
     // Show interstitial ad once when the screen first opens (phone flavour only)
     LaunchedEffect(tmdbId) {
         if (BuildConfig.FLAVOR == "phone" && activity != null) {
-            AdManager.showInterstitial(activity)
+            AdFallbackDispatcher.showInterstitial(activity) {}
         }
     }
 
