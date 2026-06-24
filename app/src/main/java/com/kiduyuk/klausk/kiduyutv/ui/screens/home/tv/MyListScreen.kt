@@ -360,6 +360,43 @@ fun MyListScreen(
             cached.items.forEach { item ->
                 processedTmdbIds.add("${item.type}-${item.id}")
             }
+
+            // Check for items with missing posterPath or rating and enrich them
+            coroutineScope.launch {
+                val itemsToEnrich = watchedItems.filter { it.posterPath == null || it.voteAverage == 0.0 }
+                if (itemsToEnrich.isNotEmpty()) {
+                    Log.i("MyListScreen", "Enriching ${itemsToEnrich.size} cached items with missing info")
+                    val enrichedItems = watchedItems.map { item ->
+                        if (item.posterPath == null || item.voteAverage == 0.0) {
+                            try {
+                                if (item.type == "movie") {
+                                    val detail = tmdbApiService.getMovieDetail(item.id)
+                                    item.copy(
+                                        posterPath = item.posterPath ?: detail.posterPath,
+                                        voteAverage = if (item.voteAverage == 0.0) detail.voteAverage else item.voteAverage
+                                    )
+                                } else {
+                                    val detail = tmdbApiService.getTvShowDetail(item.id)
+                                    item.copy(
+                                        posterPath = item.posterPath ?: detail.posterPath,
+                                        voteAverage = if (item.voteAverage == 0.0) detail.voteAverage else item.voteAverage
+                                    )
+                                }
+                            } catch (e: Exception) {
+                                Log.e("MyListScreen", "Failed to enrich cached item ${item.id}: ${e.message}")
+                                item
+                            }
+                        } else {
+                            item
+                        }
+                    }
+                    withContext(Dispatchers.Main) {
+                        watchedItems = enrichedItems
+                        saveWatchedCache(context, watchedItems, currentWatchedPage, hasMoreWatched)
+                    }
+                }
+            }
+
             // Always continue loading from the next page so that items added since
             // the last save appear as the user scrolls. (Silent background append.)
             if (hasMoreWatched) {

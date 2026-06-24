@@ -1,5 +1,7 @@
 package com.kiduyuk.klausk.kiduyutv.application
 
+import android.app.Activity
+import android.app.Application
 import android.util.Log
 import androidx.multidex.MultiDexApplication
 import coil.ImageLoader
@@ -99,6 +101,44 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
         StartAppAdManager.preloadAds(this)
         UnityAdManager.preloadAds(this)
         WortiseAdManager.preloadAds(this)
+
+        // Register ActivityLifecycleCallback to track current Activity for dialog display
+        registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
+            override fun onActivityCreated(activity: Activity, savedInstanceState: android.os.Bundle?) {
+                // Not needed for tracking
+            }
+
+            override fun onActivityStarted(activity: Activity) {
+                // Not needed for tracking
+            }
+
+            override fun onActivityResumed(activity: Activity) {
+                // Track the current resumed Activity for dialog display
+                AndroidApp.setCurrentActivity(activity)
+            }
+
+            override fun onActivityPaused(activity: Activity) {
+                // Not needed for tracking
+            }
+
+            override fun onActivityStopped(activity: Activity) {
+                // Clear the current Activity when app goes to background
+                if (AndroidApp.getCurrentActivity() === activity) {
+                    AndroidApp.setCurrentActivity(null)
+                }
+            }
+
+            override fun onActivitySaveInstanceState(activity: Activity, outState: android.os.Bundle) {
+                // Not needed for tracking
+            }
+
+            override fun onActivityDestroyed(activity: Activity) {
+                // Clear if this was the current Activity
+                if (AndroidApp.getCurrentActivity() === activity) {
+                    AndroidApp.setCurrentActivity(null)
+                }
+            }
+        })
 
         // Start network connectivity monitoring
         NetworkConnectivityChecker.startMonitoring(this)

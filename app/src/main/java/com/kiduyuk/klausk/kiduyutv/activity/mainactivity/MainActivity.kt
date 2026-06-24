@@ -32,6 +32,7 @@ import android.content.Context
 import android.content.res.Configuration
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
+import com.kiduyuk.klausk.kiduyutv.network.AndroidApp
 import com.kiduyuk.klausk.kiduyutv.network.NetworkConnectivityChecker
 import com.kiduyuk.klausk.kiduyutv.network.NetworkConnectivityObserver
 import com.kiduyuk.klausk.kiduyutv.network.NetworkState
@@ -55,6 +56,9 @@ class MainActivity : ComponentActivity() {
     @OptIn(UnstableApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Set this Activity as the current Activity for dialog display
+        AndroidApp.setCurrentActivity(this)
 
         // Note: DatabaseManager and MyListManager are now initialized in KiduyuTvApp
 
@@ -220,4 +224,3 @@ class MainActivity : ComponentActivity() {
         ).show()
     }
 }
-

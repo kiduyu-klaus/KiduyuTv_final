@@ -523,16 +523,20 @@ object NetworkConnectivityChecker {
                 // are intentionally ignored per current product requirements.
                 if (isCustomDns) {
                     withContext(Dispatchers.Main) {
-                        // Only show dialog if app is in foreground
-                        if (isAppInForeground()) {
+                        // Try to get Activity context for proper dialog display
+                        // Fall back to Application context if no Activity is available
+                        val activityContext = AndroidApp.getCurrentActivity() ?: AndroidApp.instance
+                        
+                        // Only show dialog if we have a valid context
+                        if (activityContext != null) {
                             try {
                                 Log.i(TAG, "Ad-blocking DNS detected, showing DNS dialog")
-                                NetworkStateDialog.showAdBlockingDnsDialog(AndroidApp.instance)
+                                NetworkStateDialog.showAdBlockingDnsDialog(activityContext)
                             } catch (e: Exception) {
                                 Log.w(TAG, "Error showing DNS dialog: ${e.message}")
                             }
                         } else {
-                            Log.i(TAG, "App in background, skipping DNS dialog")
+                            Log.i(TAG, "No Activity context available, skipping DNS dialog")
                         }
                     }
                 }
@@ -593,4 +597,22 @@ object NetworkConnectivityChecker {
  */
 object AndroidApp {
     lateinit var instance: Application
+    
+    // Track the current foreground Activity for dialog display
+    @Volatile
+    private var currentActivity: android.app.Activity? = null
+    
+    /**
+     * Gets the current foreground Activity context.
+     * Returns null if no Activity is available.
+     */
+    fun getCurrentActivity(): android.app.Activity? = currentActivity
+    
+    /**
+     * Sets the current foreground Activity.
+     * Should be called when an Activity resumes.
+     */
+    fun setCurrentActivity(activity: android.app.Activity?) {
+        currentActivity = activity
+    }
 }
