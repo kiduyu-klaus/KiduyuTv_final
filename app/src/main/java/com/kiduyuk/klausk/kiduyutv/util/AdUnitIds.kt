@@ -12,7 +12,8 @@ object AdUnitIds {
     val PHONE_BANNER: String get() = if (useTestIds)
         "ca-app-pub-3940256099942544/6300978111"           // Google test banner
     else
-        "ca-app-pub-3803477439180910/7183108212"           // AdMob banner unit
+        "ca-app-pub-3940256099942544/6300978111"
+        //"ca-app-pub-3803477439180910/7183108212"           // AdMob banner unit
 
     val PHONE_INTERSTITIAL: String get() = if (useTestIds)
         "ca-app-pub-3940256099942544/1033173712"           // Google test interstitial
