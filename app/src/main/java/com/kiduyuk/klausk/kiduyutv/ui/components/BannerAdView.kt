@@ -1,5 +1,6 @@
 package com.kiduyuk.klausk.kiduyutv.ui.components
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -44,6 +45,7 @@ fun BannerAdView(
             AdView(ctx).apply {
                 setAdSize(AdSize.BANNER)
                 adUnitId = AdUnitIds.PHONE_BANNER
+                Log.i("BannerAdView", "Loading mobile banner ad — unit: ${AdUnitIds.PHONE_BANNER}")
                 loadAd(AdRequest.Builder().build())
             }
         }

@@ -40,10 +40,10 @@ object AdManager {
      */
     fun init(context: Context) {
         // Check if ads are disabled
-        if (SettingsManager(context).isAdsDisabled()) {
-            Log.i(TAG, "Ads disabled by user - skipping initialization")
-            return
-        }
+//        if (SettingsManager(context).isAdsDisabled()) {
+//            Log.i(TAG, "Ads disabled by user - skipping initialization")
+//            return
+//        }
 
         if (isInitialised) return
         MobileAds.initialize(context) { initStatus ->
@@ -63,7 +63,8 @@ object AdManager {
      * Check if ads should be shown based on user settings.
      */
     private fun shouldShowAds(context: Context): Boolean {
-        return !SettingsManager(context).isAdsDisabled()
+        //return !SettingsManager(context).isAdsDisabled()
+        return true;
     }
 
     // ── Interstitial ──────────────────────────────────────────────────────

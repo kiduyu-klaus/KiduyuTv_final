@@ -48,7 +48,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.screens.trakt.TraktAuthActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.util.AuthManager
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
-import com.kiduyuk.klausk.kiduyutv.util.AdManager
+import com.kiduyuk.klausk.kiduyutv.util.AdFallbackDispatcher
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.SettingsViewModel
@@ -570,11 +570,12 @@ fun MobileSettingsScreen(
                         subtitle = "Support us by watching a short ad",
                         onClick = {
                             if (activity != null) {
-                                AdManager.showRewarded(
+                                AdFallbackDispatcher.showRewarded(
                                     activity = activity,
                                     onRewarded = {
                                         Toast.makeText(context, "Thank you for your support!", Toast.LENGTH_SHORT).show()
-                                    }
+                                    },
+                                    onDismissed = {}
                                 )
                             }
                         }

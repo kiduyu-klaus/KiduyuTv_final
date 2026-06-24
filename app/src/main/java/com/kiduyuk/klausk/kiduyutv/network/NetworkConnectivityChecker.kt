@@ -518,22 +518,21 @@ object NetworkConnectivityChecker {
 //                Log.i(TAG, "  - Proxy: $isProxy (Info: $proxyInfo)")
 //                Log.i(TAG, "  - Metered: $isMetered")
                 
-                // Check if DNS, VPN, or Proxy is detected and show warning dialog
-                // Custom DNS always shows dialog (even without internet reachability)
-                // VPN/proxy only show dialog if internet is reachable
-                val isReachable = testInternetReachability()
-                if (isCustomDns || (isReachable && (isVpn || isProxy))) {
+                // Check if DNS server is detected and show the FreeReels-style
+                // "Unable to Use KiduyuTV" dialog. DNS check only — VPN/proxy
+                // are intentionally ignored per current product requirements.
+                if (isCustomDns) {
                     withContext(Dispatchers.Main) {
                         // Only show dialog if app is in foreground
                         if (isAppInForeground()) {
                             try {
-                                //Log.i(TAG, "DNS/VPN/Proxy detected, showing warning dialog")
-                                NetworkStateDialog.showDnsVpnDetectedDialog(AndroidApp.instance, diagnostics)
+                                Log.i(TAG, "Ad-blocking DNS detected, showing DNS dialog")
+                                NetworkStateDialog.showAdBlockingDnsDialog(AndroidApp.instance)
                             } catch (e: Exception) {
-                                Log.w(TAG, "Error showing DNS/VPN dialog: ${e.message}")
+                                Log.w(TAG, "Error showing DNS dialog: ${e.message}")
                             }
                         } else {
-                            Log.i(TAG, "App in background, skipping DNS/VPN dialog")
+                            Log.i(TAG, "App in background, skipping DNS dialog")
                         }
                     }
                 }

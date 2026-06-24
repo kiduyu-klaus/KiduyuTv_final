@@ -1,5 +1,6 @@
 package com.kiduyuk.klausk.kiduyutv.ui.components
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -43,6 +44,7 @@ fun TvBannerAdView(
             AdManagerAdView(ctx).apply {
                 setAdSizes(AdSize.LEADERBOARD) // 728×90
                 adUnitId = AdUnitIds.TV_BANNER
+                Log.i("TvBannerAdView", "Loading TV banner ad — unit: ${AdUnitIds.TV_BANNER}")
                 loadAd(AdManagerAdRequest.Builder().build())
             }
         }

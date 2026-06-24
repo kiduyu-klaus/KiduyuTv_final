@@ -1,11 +1,21 @@
 package com.kiduyuk.klausk.kiduyutv.network
 
+
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.os.Process
 import android.provider.Settings
 import android.util.Log
+import android.util.TypedValue
+import android.view.Gravity
+import android.view.View
+import android.widget.Button
+import android.widget.LinearLayout
+import android.widget.TextView
+import androidx.compose.runtime.Composable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -13,6 +23,25 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /**
  * Dialog manager for displaying network connectivity status.
@@ -263,6 +292,116 @@ object NetworkStateDialog {
     }
 
     /**
+     * Shows a custom dialog when an ad-blocking DNS service is detected.
+     * Matches the FreeReels-style layout: dark rounded card, centered lock+warning
+     * emoji, body text about ad-blocking DNS, single full-width "Recheck" button.
+     * Non-cancelable. Re-runs the DNS detection on Recheck.
+     *
+     * @param context Context for dialog creation (use Activity for theming)
+     */
+    fun showAdBlockingDnsDialog(context: Context) {
+        // Don't recreate if already showing
+        if (currentDialog?.isShowing == true) {
+            return
+        }
+        currentDialog?.dismiss()
+
+        // Convert dp to pixels
+        fun dp(value: Int): Int = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, value.toFloat(),
+            context.resources.displayMetrics
+        ).toInt()
+
+        val rootBg = Color.parseColor("#2A2A2A")
+
+        // Root vertical layout
+        val root = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(rootBg)
+            setPadding(dp(28), dp(32), dp(28), dp(32))
+            gravity = Gravity.CENTER_HORIZONTAL
+        }
+
+        // Title
+        val title = TextView(context).apply {
+            text = "Unable to Use KiduyuTV"
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setPadding(0, 0, 0, dp(20))
+        }
+        root.addView(title)
+
+        // Lock + warning icon (emoji)
+        val icon = TextView(context).apply {
+            text = "\uD83D\uDD12\u26A0\uFE0F"   // 🔒 + ⚠️
+            gravity = Gravity.CENTER
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 72f)
+            setPadding(0, dp(8), 0, dp(20))
+        }
+        root.addView(icon)
+
+        // Body message
+        val message = TextView(context).apply {
+            text = "An ad-blocking DNS service (e.g., AdGuard DNS, NextDNS, Pi-hole) " +
+                    "is enabled on your device and is preventing the app from working " +
+                    "properly. Ads support our free content. Please disable the service " +
+                    "and tap \u201CRecheck.\u201D"
+            setTextColor(Color.parseColor("#E0E0E0"))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            setLineSpacing(0f, 1.2f)
+            gravity = Gravity.CENTER
+            setPadding(dp(8), 0, dp(8), dp(28))
+        }
+        root.addView(message)
+
+        // Recheck button — full width, red background, white text, rounded
+        val buttonColor = Color.parseColor("#E50914") // PrimaryRed
+        val button = Button(context).apply {
+            text = "Recheck"
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            isAllCaps = false
+            background = GradientDrawable().apply {
+                setColor(buttonColor)
+                cornerRadius = dp(10).toFloat()
+            }
+            minHeight = 0
+            minimumHeight = 0
+            setPadding(dp(16), dp(18), dp(16), dp(18))
+            stateListAnimator = null  // remove default elevation animation
+            elevation = 0f
+        }
+        val buttonParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+        root.addView(button, buttonParams)
+
+        val dialog = AlertDialog.Builder(context)
+            .setView(root)
+            .setCancelable(false)
+            .create()
+
+        dialog.setCanceledOnTouchOutside(false)
+        button.setOnClickListener {
+            Log.i(TAG, "Recheck tapped — re-running DNS detection")
+            dialog.dismiss()
+            currentDialog = null
+            try {
+                NetworkConnectivityChecker.forceRefresh(context)
+            } catch (e: Exception) {
+                Log.w(TAG, "forceRefresh on recheck failed: ${e.message}")
+            }
+        }
+
+        currentDialog = dialog
+        dialog.show()
+    }
+
+    /**
      * Checks if a dialog is currently showing.
      */
     fun isShowing(): Boolean {
@@ -437,4 +576,87 @@ object NetworkStateDialog {
             Log.e(TAG, "Error closing app: ${e.message}")
         }
     }
+
+
+}
+
+/**
+ * Preview layout for the Ad-Blocking DNS warning dialog.
+ * Replicates the visual design of [NetworkStateDialog.showAdBlockingDnsDialog].
+ */
+@Composable
+fun AdBlockingDnsDialogContent(
+    modifier: Modifier = Modifier,
+    onRecheckClick: () -> Unit = {}
+) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = androidx.compose.ui.graphics.Color(0xFF2A2A2A)
+        ),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 28.dp, top = 32.dp, end = 28.dp, bottom = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            // Title
+            Text(
+                text = "Unable to Use KiduyuTV",
+                color = androidx.compose.ui.graphics.Color.White,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(bottom = 20.dp)
+            )
+
+            // Lock + warning icon (emoji)
+            Text(
+                text = "\uD83D\uDD12\u26A0\uFE0F", // 🔒 + ⚠️
+                fontSize = 72.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 8.dp, bottom = 20.dp)
+            )
+
+            // Body message
+            Text(
+                text = "An ad-blocking DNS service (e.g., AdGuard DNS, NextDNS, Pi-hole) is enabled on your device and is preventing the app from working properly. Ads support our free content. Please disable the service and tap \u201CRecheck.\u201D",
+                color = androidx.compose.ui.graphics.Color(0xFFE0E0E0),
+                fontSize = 15.sp,
+                lineHeight = 18.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .padding(start = 8.dp, end = 8.dp, bottom = 28.dp)
+            )
+
+            // Recheck button — full width, red background, white text, rounded
+            Button(
+                onClick = onRecheckClick,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = androidx.compose.ui.graphics.Color(0xFFE50914) // PrimaryRed
+                ),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 14.dp)
+            ) {
+                Text(
+                    text = "Recheck",
+                    color = androidx.compose.ui.graphics.Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF121212)
+@Composable
+fun AdBlockingDnsDialogPreview() {
+    AdBlockingDnsDialogContent()
 }
