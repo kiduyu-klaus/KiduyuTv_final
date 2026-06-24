@@ -1,6 +1,10 @@
 package com.kiduyuk.klausk.kiduyutv.ui.components.mobile
 
+import android.app.Activity
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LiveTv // Added this import
@@ -10,16 +14,22 @@ import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
+import android.widget.FrameLayout
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
-import com.kiduyuk.klausk.kiduyutv.ui.components.BannerAdView
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
 import com.kiduyuk.klausk.kiduyutv.ui.theme.SurfaceDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextSecondary
+import com.kiduyuk.klausk.kiduyutv.util.AdFallbackDispatcher
+import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 
 data class BottomNavItem(val route: String, val icon: ImageVector, val label: String)
 
@@ -79,9 +89,31 @@ fun MobileBottomNavigation(
             }
         }
 
-        // Show banner ad only on phone flavour
+        // Show banner ad only on phone flavour via AdFallbackDispatcher
         if (BuildConfig.FLAVOR == "phone") {
-            BannerAdView()
+            val context = LocalContext.current
+            val activity = context as? Activity ?: return
+            if (!SettingsManager(context).isAdsDisabled()) {
+                AndroidView(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(60.dp)
+                        .background(Color(0xFF141414)),
+                    factory = { ctx ->
+                        FrameLayout(ctx).apply {
+                            layoutParams = FrameLayout.LayoutParams(
+                                FrameLayout.LayoutParams.MATCH_PARENT,
+                                FrameLayout.LayoutParams.WRAP_CONTENT
+                            )
+                            AdFallbackDispatcher.loadBanner(
+                                activity,
+                                this,
+                                AdFallbackDispatcher.BannerNetwork.ADMOB
+                            )
+                        }
+                    }
+                )
+            }
         }
     }
 }

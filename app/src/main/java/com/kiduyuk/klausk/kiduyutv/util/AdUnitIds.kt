@@ -29,10 +29,10 @@ object AdUnitIds {
     val TV_BANNER: String get() = if (useTestIds)
         "/6499/example/banner"                             // GAM test banner
     else
-        "ca-app-pub-3803477439180910/7183108212"           // AdMob banner unit
+        "/6499/example/banner"            // AdMob banner unit
 
     val TV_INTERSTITIAL: String get() = if (useTestIds)
         "/6499/example/interstitial"                       // GAM test interstitial
     else
-        "ca-app-pub-3803477439180910/5295324788"           // AdMob interstitial unit
+        "/6499/example/interstitial"          // AdMob interstitial unit
 }
