@@ -123,6 +123,14 @@ class IptvPlayerActivity : AppCompatActivity() {
         }
     }
 
+    // ── Video Resize Mode Enum ──────────────────────────────────────────────
+
+    private enum class VideoResizeMode {
+        FIT,
+        FILL,
+        STRETCH
+    }
+
     // ── ExoPlayer ────────────────────────────────────────────────────────────
 
     private var player: ExoPlayer? = null
@@ -162,7 +170,7 @@ class IptvPlayerActivity : AppCompatActivity() {
     private lateinit var btnCast: ImageButton
     private lateinit var btnPip: ImageButton
 
-// ── State ────────────────────────────────────────────────────────────────
+    // ── State ────────────────────────────────────────────────────────────────
 
     private var channelName = "Live TV"
     private var streamUrl   = ""
@@ -178,7 +186,7 @@ class IptvPlayerActivity : AppCompatActivity() {
 
     private var isOverlayVisible = true
     private var isLocked         = false
-    private var isFillMode       = true
+    private var currentResizeMode = VideoResizeMode.FIT
     private var isMuted = false
 
     // D-pad navigation tracking for keeping controls visible
@@ -787,14 +795,23 @@ class IptvPlayerActivity : AppCompatActivity() {
             scheduleHideOverlay()
         }
 
-        // ── Fill / Fit ───────────────────────────────────────────────────────
+        // ── Fill / Fit / Stretch ───────────────────────────────────────────────
         btnFill.setOnClickListener {
-            isFillMode = !isFillMode
-            playerView.resizeMode = if (isFillMode)
-                AspectRatioFrameLayout.RESIZE_MODE_FILL
-            else
-                AspectRatioFrameLayout.RESIZE_MODE_FIT
-            btnFill.text = if (isFillMode) "Fill" else "Fit"
+            when (currentResizeMode) {
+                VideoResizeMode.FIT -> {
+                    currentResizeMode = VideoResizeMode.FILL
+                    btnFill.text = "Fill"
+                }
+                VideoResizeMode.FILL -> {
+                    currentResizeMode = VideoResizeMode.STRETCH
+                    btnFill.text = "Stretch"
+                }
+                VideoResizeMode.STRETCH -> {
+                    currentResizeMode = VideoResizeMode.FIT
+                    btnFill.text = "Fit"
+                }
+            }
+            applyResizeMode(currentResizeMode)
             scheduleHideOverlay()
         }
 
@@ -845,6 +862,23 @@ class IptvPlayerActivity : AppCompatActivity() {
         // ── Picture-in-Picture ───────────────────────────────────────────────
         btnPip.setOnClickListener {
             enterPipMode()
+        }
+    }
+
+    /**
+     * Applies the selected video resize mode to the player view.
+     */
+    private fun applyResizeMode(mode: VideoResizeMode) {
+        when (mode) {
+            VideoResizeMode.FIT -> {
+                playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+            }
+            VideoResizeMode.FILL -> {
+                playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM  // Fills view while maintaining aspect ratio (crops)
+            }
+            VideoResizeMode.STRETCH -> {
+                playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL  // Stretches to fill view (distorts)
+            }
         }
     }
 
@@ -906,8 +940,6 @@ class IptvPlayerActivity : AppCompatActivity() {
 
     // ── ExoPlayer ────────────────────────────────────────────────────────────
 
-
-
     private fun initPlayer() {
         trackSelector = DefaultTrackSelector(this).apply {
             setParameters(
@@ -953,7 +985,7 @@ class IptvPlayerActivity : AppCompatActivity() {
                 playerView.player = exo
                 playerView.useController = false
                 playerView.setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING)
-                playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
+                playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT // Default to FIT
 
                 configureSubtitleStyling()
 

@@ -89,15 +89,16 @@
             android:name="com.wortise.WORTISE_APP_ID"
             android:value="${wortiseAppId}"/>
 
+        <!-- FIXED: Changed from @style/Theme.Translucent.NoTitleBar to @android:style/Theme.Translucent -->
         <activity
             android:name="com.google.android.gms.ads.AdActivity"
             android:configChanges="keyboard|keyboardHidden|orientation|screenSize|uiMode|smallestScreenSize|screenLayout"
-            android:theme="@style/Theme.Translucent.NoTitleBar"
+            android:theme="@android:style/Theme.Translucent"
             tools:replace="android:configChanges,android:theme" />
 
         <provider
             android:name="com.google.android.gms.ads.MobileAdsInitProvider"
-           android:authorities="${applicationId}.mobileadsinitprovider"
+            android:authorities="${applicationId}.mobileadsinitprovider"
             android:exported="false" />
 
         <receiver
@@ -167,4 +168,3 @@
     </application>
 
 </manifest>
-

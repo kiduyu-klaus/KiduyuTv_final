@@ -6,6 +6,7 @@
 
 **A modern dual-platform streaming application for Android TV, Fire TV, and mobile devices featuring a curated collection of movies and TV shows**
 
+[![Android Release CI](https://github.com/kiduyu-klaus/KiduyuTv_final/actions/workflows/kiduyu_final.yml/badge.svg)](https://github.com/kiduyu-klaus/KiduyuTv_final/actions/workflows/kiduyu_final.yml)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Android%20TV%20%7C%20Fire%20TV%20%7C%20Mobile-FF6B35?style=for-the-badge)](https://developer.android.com/tv)
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9.24-purple?style=for-the-badge)](https://kotlinlang.org)

@@ -5,7 +5,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LiveTv // Added this import
 import androidx.compose.material.icons.filled.Movie
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -34,7 +34,7 @@ fun MobileBottomNavigation(
         BottomNavItem(Screen.Movies.route, Icons.Default.Movie, "Movies"),
         BottomNavItem(Screen.LiveTv.route, Icons.Default.LiveTv, "Live Tv"), // Updated icon here
         BottomNavItem(Screen.TvShows.route, Icons.Default.Tv, "TV Shows"),
-        BottomNavItem(Screen.Settings.route, Icons.Default.Settings, "Settings")
+        BottomNavItem(Screen.MyList.route, Icons.Default.PlaylistPlay, "My List")
     )
 
     Column(modifier = modifier) {
@@ -80,9 +80,9 @@ fun MobileBottomNavigation(
         }
 
         // Show banner ad only on phone flavour
-        /*if (BuildConfig.FLAVOR == "phone") {
+        if (BuildConfig.FLAVOR == "phone") {
             BannerAdView()
-        }*/
+        }
     }
 }
 
