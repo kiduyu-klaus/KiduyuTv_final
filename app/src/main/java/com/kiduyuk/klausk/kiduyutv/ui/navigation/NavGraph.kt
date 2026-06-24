@@ -5,11 +5,17 @@ import android.net.Uri
 import android.os.Build
 import androidx.annotation.OptIn
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavHostController
@@ -33,8 +39,10 @@ import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.HomeScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.MoviesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.MyListScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.TvShowsScreen
-import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.LiveTvScreen
 import com.kiduyuk.klausk.kiduyutv.ui.player.iptv.IptvPlayerActivity
+import com.kiduyuk.klausk.kiduyutv.BuildConfig
+import com.kiduyuk.klausk.kiduyutv.ui.components.TvBannerAdView
+import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.LiveTvScreen
 import com.kiduyuk.klausk.kiduyutv.viewmodel.SearchViewModelFactory
 import com.kiduyuk.klausk.kiduyutv.viewmodel.SearchViewModel
 

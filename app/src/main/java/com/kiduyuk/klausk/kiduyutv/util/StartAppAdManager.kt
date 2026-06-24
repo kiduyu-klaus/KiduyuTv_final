@@ -51,7 +51,7 @@ object StartAppAdManager {
                 .setReturnAdsEnabled(false) // Blocks annoying ads when users re-open the app
                 .init()
 
-            StartAppSDK.setUserConsent (this,
+            StartAppSDK.setUserConsent (context,
                             "pas",
                             System.currentTimeMillis(),
                             true)
