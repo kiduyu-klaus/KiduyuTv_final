@@ -1072,9 +1072,9 @@ private fun AppVersionContent(
                     lineHeight = 20.sp
                 )
 
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    horizontalAlignment = Alignment.Start
+Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // Check for Updates Button
                     val interactionSource = remember { MutableInteractionSource() }

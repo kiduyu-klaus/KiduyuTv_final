@@ -43,6 +43,7 @@ fun TvBannerAdView(
         Box(modifier = modifier)
         return
     }
+    val activity = context as? Activity ?: return
 
     AndroidView(
         modifier = modifier,
@@ -54,7 +55,7 @@ fun TvBannerAdView(
                     ViewGroup.LayoutParams.WRAP_CONTENT
                 )
             }
-            val activity = ctx.findActivity()
+
             if (activity != null) {
                 Log.i(TAG, "Loading TV banner via AdFallbackDispatcher (preferred=ADMOB)")
                 AdFallbackDispatcher.loadBanner(
@@ -63,7 +64,7 @@ fun TvBannerAdView(
                     preferred = BannerNetwork.ADMOB
                 )
             } else {
-                Log.w(TAG, "No Activity context — banner not loaded")
+                Log.i(TAG, "No Activity context — banner not loaded")
             }
             container
         }
