@@ -132,6 +132,7 @@ private fun loadWatchedCache(context: Context): WatchedCache? {
                     voteAverage = it.voteAverage
                 )
             }
+            Log.i("MyListScreen", "Loaded ${items.get(0).posterPath} ")
             val lastPage = prefs.getInt(KEY_CACHED_PAGE, 0)
             val hasMore = prefs.getBoolean(KEY_CACHED_HAS_MORE, true)
             Log.i("MyListScreen", "Loaded ${items.size} watched items from cache (page=$lastPage, hasMore=$hasMore)")
