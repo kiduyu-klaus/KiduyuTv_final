@@ -865,28 +865,35 @@ private fun EventItem(
         }
     }
 
-    Surface(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 2.dp)
-            .focusable(interactionSource = interactionSource)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick
-            ),
-        color = if (isFocused) DarkRed.copy(alpha = 0.5f) else if (isExpanded) PrimaryRed.copy(alpha = 0.1f) else Color.Transparent,
-        shape = RoundedCornerShape(8.dp),
-        border = if (isFocused) BorderStroke(1.dp, Color.White) else null
     ) {
-        Column(
+        // Header row owns the expand/collapse click+focus target. This is
+        // intentionally its own clickable/focusable surface, separate from
+        // the channel chips below — nesting the chips inside this same
+        // clickable region was causing D-pad presses on a chip to be
+        // captured by this row's onClick (toggleEventExpansion) instead of
+        // the chip's own onClick (open SchedulePlayerActivity).
+        Surface(
             modifier = Modifier
-                .padding(12.dp)
+                .fillMaxWidth()
+                .focusable(interactionSource = interactionSource)
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onClick
+                ),
+            color = if (isFocused) DarkRed.copy(alpha = 0.5f) else if (isExpanded) PrimaryRed.copy(alpha = 0.1f) else Color.Transparent,
+            shape = RoundedCornerShape(8.dp),
+            border = if (isFocused) BorderStroke(1.dp, Color.White) else null
         ) {
-            // Event header row
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp)
             ) {
                 // Time badge
                 Surface(
@@ -939,49 +946,52 @@ private fun EventItem(
                     )
                 }
             }
+        }
 
-            // Expanded channels section - always shown when event has channels and is expanded
-            AnimatedVisibility(
-                visible = isExpanded && event.channels.isNotEmpty(),
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                Column(modifier = Modifier.padding(top = 12.dp)) {
-                    Row(
-                        modifier = Modifier.padding(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Tv,
-                            contentDescription = null,
-                            tint = TextSecondary,
-                            modifier = Modifier.size(16.dp)
+        // Expanded channels section - always shown when event has channels
+        // and is expanded. Lives OUTSIDE the header's clickable Surface
+        // above so a chip's own click/focus is never nested inside (and
+        // therefore never capturable by) the toggle row's click target.
+        AnimatedVisibility(
+            visible = isExpanded && event.channels.isNotEmpty(),
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
+        ) {
+            Column(modifier = Modifier.padding(top = 12.dp, start = 12.dp, end = 12.dp)) {
+                Row(
+                    modifier = Modifier.padding(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Tv,
+                        contentDescription = null,
+                        tint = TextSecondary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Available Channels",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = TextSecondary,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Channel chips - use LazyRow for better focus management
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(count = event.channels.size, key = { index -> event.channels[index].id }) { index ->
+                        val channel = event.channels[index]
+                        ChannelChip(
+                            channel = channel,
+                            isFirst = index == 0,
+                            focusRequester = if (index == 0) firstChannelFocusRequester else null,
+                            onClick = { onChannelClick(channel) }
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Available Channels",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = TextSecondary,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Channel chips - use LazyRow for better focus management
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(count = event.channels.size, key = { index -> event.channels[index].id }) { index ->
-                            val channel = event.channels[index]
-                            ChannelChip(
-                                channel = channel,
-                                isFirst = index == 0,
-                                focusRequester = if (index == 0) firstChannelFocusRequester else null,
-                                onClick = { onChannelClick(channel) }
-                            )
-                        }
                     }
                 }
             }
