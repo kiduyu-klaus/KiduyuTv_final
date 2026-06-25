@@ -4,7 +4,7 @@
 
 ![KiduyuTV Banner](https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/main/app/src/main/res/mipmap-xhdpi/ic_banner.png)
 
-**A modern dual-platform streaming application for Android TV, Fire TV, and mobile devices featuring a curated collection of movies and TV shows**
+**KiduyuTV is a dual-form-factor Android streaming app for Android TV, Fire TV, and mobile devices. The codebase uses one Android app module with `phone` and `tv` product flavors, separate Compose navigation graphs, shared data/repository layers, local Room caching, Firebase sync, Trakt integration, IPTV playback, schedule playback, and a multi-network ads stack.**
 
 [![Android Release CI](https://github.com/kiduyu-klaus/KiduyuTv_final/actions/workflows/kiduyu_final.yml/badge.svg)](https://github.com/kiduyu-klaus/KiduyuTv_final/actions/workflows/kiduyu_final.yml)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -17,456 +17,545 @@
 [![TMDB API](https://img.shields.io/badge/TMDB%20API-01B4E4?style=for-the-badge&logo=themoviedatabase&logoColor=white)](https://www.themoviedb.org)
 
 </div>
-<div align="center">
 
-<h3>📢 Stay updated — join the Telegram channel for new releases & updates</h3>
-
-<a href="https://t.me/kiduyutv">
-  <img src="https://img.shields.io/badge/Join%20on%20Telegram-%40kiduyutv-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white" alt="Join KiduyuTV on Telegram" height="50"/>
-</a>
-
-</div>
----
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Features](#features)
+## Contents
+- [Main Features](#main-features)
+- [Implementation Overview](#implementation-overview)
+- [Screens And Navigation](#screens-and-navigation)
+- [Playback](#playback)
+- [Live TV And Schedule](#live-tv-and-schedule)
+- [Data, Sync, And Storage](#data-sync-and-storage)
+- [Ads And Consent](#ads-and-consent)
+- [Network And Protection](#network-and-protection)
 - [Tech Stack](#tech-stack)
-- [Architecture](#architecture)
 - [Project Structure](#project-structure)
-- [Getting Started](#getting-started)
-- [Configuration](#configuration)
 - [Build Variants](#build-variants)
-- [Content Categories](#content-categories)
-- [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
+- [Configuration](#configuration)
+- [Development Notes](#development-notes)
 - [License](#license)
 
----
+## Main Features
 
-## Overview
+- Android TV, Fire TV, phone, and tablet support from one codebase.
+- Dedicated TV UI with D-pad focus handling and dedicated mobile UI with touch-first screens.
+- Home, Movies, TV Shows, My List, Live TV, Search, Settings, and Trakt profile areas.
+- TMDB-powered movie and TV metadata, details, cast, crew, genres, companies, networks, recommendations, videos, seasons, and episodes.
+- Curated GitHub-hosted content rows for themed movie and TV collections.
+- My List with local Room persistence and Firebase sync.
+- Watch history and continue-watching support with playback position tracking.
+- Trakt OAuth login, profile data, watch history, collection, watchlist, recommendations, and scrobbling helpers.
+- Live TV playlist browsing from M3U, EPG loading from XMLTV, category browsing, search, and favorite channels.
+- Schedule tab with expandable events, available channel selection, and schedule-player launch.
+- WebView streaming provider system with Firebase-configurable provider templates and local fallback providers.
+- Dedicated players for WebView streams, IPTV streams, scheduled channels, and YouTube videos.
+- WebView ad blocking, popup suppression, EasyList/EasyPrivacy assets, and schedule-player autoplay injection.
+- Multi-network ads with UMP consent and priority: `StartApp -> AdMob -> Wortise -> Unity`.
+- App-open ads through Wortise where available.
+- Network reachability checks, network state dialogs, VPN/proxy/DNS diagnostics, and ad-blocking DNS detection.
+- Firebase Auth, Analytics, Realtime Database, Firestore, and Cloud Messaging dependencies.
+- In-app update helpers for checking, downloading, and installing APK updates.
+- Notification channel support with deep links into movie and TV detail screens.
 
-KiduyuTV is a production-ready streaming application that delivers a premium viewing experience across Android TV, Amazon Fire TV, and mobile devices. Built with modern Android development practices using Jetpack Compose and Material Design 3, the app provides a Netflix-style interface with smooth D-pad navigation for television remotes and intuitive touch interactions for mobile devices.
+## Implementation Overview
 
-The application integrates with The Movie Database (TMDB) API to provide real-time access to extensive movie and television content, enhanced by curated collections hosted on GitHub. With intelligent caching powered by Room database, users enjoy seamless offline access to previously viewed content while maintaining fresh data synchronization.
+The app starts in `SplashActivity`, resolves consent, initializes Firebase sync, initializes ad SDKs, checks updates/notifications, and then launches `MainActivity`. `MainActivity` chooses the TV or mobile navigation graph based on `UiModeManager`.
 
-KiduyuTV supports multiple streaming formats including HLS adaptive streaming through Media3 ExoPlayer, YouTube video playback, and WebView-based content. The app implements a dual-platform strategy through build flavors, generating optimized variants for both television and mobile experiences from a single codebase.
+Core app initialization happens in `KiduyuTvApp`:
 
----
+- Initializes Room through `DatabaseManager`.
+- Initializes `MyListManager`.
+- Creates notification channels.
+- Cleans expired Room cache.
+- Initializes Firebase Analytics and Realtime Database persistence.
+- Restores Firebase auth state through `AuthManager`.
+- Initializes `FirebaseManager` using either authenticated UID or a generated device ID.
+- Restores Trakt auth through `TraktAuthManager`.
+- Starts Firebase-backed stream-provider configuration sync.
+- Starts continuous network monitoring through `NetworkConnectivityChecker`.
 
-## Features
+The main architecture is MVVM plus repositories:
 
-### Dual-Platform Experience
+- Compose screens render state and dispatch UI events.
+- ViewModels expose `StateFlow` UI state.
+- Repositories handle TMDB, Trakt, IPTV, schedule, and local data operations.
+- Room stores saved media, watch history, cached movie/TV rows, cached detail records, and genres.
+- SharedPreferences stores lightweight settings, device ID, IPTV favorites, and provider preferences.
 
-KiduyuTV provides optimized interfaces for both television and mobile platforms, automatically detecting the device type at runtime and applying the appropriate navigation patterns and UI layouts. The television interface features D-pad focus management with visual focus indicators, while the mobile interface leverages touch gestures and swipe navigation for fluid content browsing.
+## Screens And Navigation
 
-### Content Discovery
+TV navigation is implemented in `ui/navigation/NavGraph.kt`.
 
-The home screen presents a dynamic hero section showcasing featured content with backdrop images and smooth transitions. Below the hero, content rows organized by category enable horizontal scrolling through curated collections. Users can browse by production company, television network, genre, or curated themes, with intelligent search functionality supporting both movies and TV shows.
+Mobile navigation is implemented in `ui/navigation/MobileNavGraph.kt`.
 
-### Curated Collections
+Shared routes are declared in `ui/navigation/Screen.kt`.
 
-KiduyuTV includes twelve pre-configured content categories spanning diverse genres and themes. Oscar Winners 2026 showcases recent award-winning films, while Hallmark Movies provides family-friendly holiday content. Action enthusiasts can explore the Jason Statham Collection, and fans of science fiction can dive into Time Travel movies and TV shows. Additional collections include Best Classics, Best Sitcoms, Spy Thrillers, True Stories, Christian Movies and TV Shows, Bible Movies, and Doctor Who Specials.
+### TV Screens
 
-### Streaming Playback
+- `HomeScreen`: hero content, continue watching, trending rows, curated rows, companies/networks, and top navigation.
+- `MoviesScreen`: movie browsing.
+- `TvShowsScreen`: TV browsing.
+- `MyListScreen`: saved movies, TV shows, companies, networks, and cast shortcuts.
+- `LiveTvScreen`: Live TV, Schedule, and My Channels tabs.
+- `SearchScreen`: movie and TV search.
+- `MovieDetailScreen`: metadata, cast, crew, recommendations, company navigation, and play entry.
+- `TvShowDetailScreen`: show metadata, seasons, episodes, networks, cast, and play entry.
+- `SeasonEpisodesScreen`: episode browsing and playback entry.
+- `StreamLinksScreen`: provider selection before WebView playback.
+- `MediaListScreen`: movies by company or TV shows by network.
+- `CastDetailScreen`, `CastImagesScreen`, `ImageSliderScreen`: cast filmography and profile-image browsing.
+- `SettingsScreen`: providers, cache, sync, updates, Live TV data, ads setting, and Trakt entry.
+- `TraktProfileScreen`: Trakt profile, watch history, collection, and watchlist views.
 
-The application supports multiple playback mechanisms for diverse content types. Media3 ExoPlayer handles HLS adaptive bitrate streaming with intelligent quality selection based on network conditions. YouTube videos play natively through the YouTube Android Player library, while WebView-based playback serves as a fallback for embedded content from various sources. The stream links screen aggregates available sources for content that may be distributed across multiple providers.
+### Mobile Screens
 
-### Personalization
+- `MobileHomeScreen`, `MobileMoviesScreen`, `MobileTvShowsScreen`, `MobileMyListScreen`.
+- `MobileLiveTvScreen`.
+- `MobileSearchScreen`.
+- `MobileMovieDetailScreen`, `MobileTvShowDetailScreen`, `MobileSeasonEpisodesScreen`, `MobileStreamLinksScreen`.
+- `MobileGenresScreen`, `MobileGenreContentScreen`, `SeeAllScreen`.
+- `MobileMediaListScreen`.
+- `MobileCastDetailScreen`.
+- `MobileSettingsScreen`, `MobileTraktProfileScreen`.
 
-User personalization features include watch history tracking with automatic position restoration for seamless continuation of interrupted viewing sessions. The My List feature enables users to save favorites for quick access, with data persisted locally using Room database and synchronized to Firebase for signed-in users. Watch history enrichment automatically updates metadata from TMDB to ensure even historical items display current poster images and complete information.
+## Playback
 
-### Modern Architecture
+### WebView Playback
 
-The application implements Clean Architecture principles with clear separation between UI, business logic, and data layers. The MVVM pattern with Kotlin Flow manages reactive state updates, while the Repository pattern provides centralized data access with intelligent caching strategies. Room database enables offline-first functionality with configurable cache expiration periods.
+`PlayerActivity` handles movie and TV stream playback using a WebView. It:
 
----
+- Receives TMDB ID, media type, season/episode, metadata, and optional stream URL/iframe HTML.
+- Resolves provider HTML through `StreamProviderManager`.
+- Uses `AdBlockerWebViewClient`.
+- Blocks popups in `WebChromeClient.onCreateWindow`.
+- Tracks watch progress every 15 seconds.
+- Stores playback position in local watch history.
+- Uses a TV/Fire TV cursor overlay for D-pad navigation when appropriate.
+- Uses mobile/tablet behavior without the cursor.
+
+### Stream Providers
+
+`StreamProviderManager` contains local fallback provider templates and can load provider configuration from Firebase Realtime Database path:
+
+`app_config/stream_providers_Configuration`
+
+Providers define movie and TV URL templates, iframe attributes, provider parameters, and phone-only flags. The manager can generate iframe HTML or direct provider URLs.
+
+### IPTV Playback
+
+`IptvPlayerActivity` plays selected Live TV channels with channel metadata such as name, stream URL, logo, TVG ID/name, and group.
+
+### Schedule Playback
+
+`SchedulePlayerActivity` plays scheduled channels. It:
+
+- Receives channel ID, channel name, event title, optional direct iframe URLs, and selected player index.
+- Fetches `ChannelWatchPage` data through `ScheduleRepository`.
+- Shows a top server/source selector.
+- Uses `AdBlockerWebViewClient` as its base WebView client.
+- Adds schedule-specific autoplay/unmute HTML injection for nested frames.
+- Suppresses overlays and ad iframes that appear after page load.
+- Falls back to the next available player/server on main-frame errors.
+- Provides TV cursor support and a top bar with back/source controls.
+
+### YouTube Playback
+
+`YouTubePlayerActivity` is available for YouTube video playback through the Android YouTube Player dependency.
+
+## Live TV And Schedule
+
+`LiveTvScreen` contains three tabs:
+
+- `Live TV`: category list, channel grid, search, and playback.
+- `Schedule`: event schedule grouped by day/category; expanding an event exposes available channel chips that open `SchedulePlayerActivity`.
+- `My Channels`: favorite IPTV channels.
+
+`LiveTvViewModel` handles:
+
+- Loading and caching the M3U playlist.
+- Loading EPG data.
+- Category selection.
+- Channel search.
+- Favorite channels in local SharedPreferences.
+- Two-way favorite channel sync with Firebase.
+
+`IptvRepository` handles:
+
+- Remote M3U playlist URL:
+  `https://raw.githubusercontent.com/abusaeeidx/IPTV-Scraper-Zilla/main/combined-playlist.m3u`
+- Remote XMLTV EPG URL:
+  `https://raw.githubusercontent.com/JulioCesarXY/EPG-LG-Channels/refs/heads/main/lg_epg_us.xml`
+- Six-hour playlist/EPG cache.
+- Streaming M3U parsing.
+- Channel-to-EPG matching by `tvg-id`, `tvg-name`, or channel name.
+
+`ScheduleRepository` handles:
+
+- Schedule fetching and cache.
+- Upcoming-event helpers.
+- Category/event filtering.
+- Channel watch-page fetching.
+- Iframe HTML generation for scheduled streams.
+
+`ChannelScraper` supports scraping `dlhd.pk` 24/7 channel pages, extracting watch-page URLs and stream iframe/server URLs.
+
+## Data, Sync, And Storage
+
+### TMDB
+
+`TmdbRepository` handles:
+
+- Trending, popular, top-rated, and now-playing movies/TV.
+- Movie, TV, season, and episode details.
+- Genres.
+- Search and multi-search.
+- Recommendations.
+- Companies and networks.
+- Collections.
+- Cast, crew, person details, person credits, and person images.
+- GitHub-hosted curated movie/TV lists.
+- Local watch history and continue-watching flows.
+- Playback position updates.
+- Expired cache cleanup.
+
+### Room
+
+`AppDatabase` version `2` contains:
+
+- `SavedMediaEntity`
+- `WatchHistoryEntity`
+- `CachedMovieEntity`
+- `CachedTvShowEntity`
+- `CachedMovieDetailEntity`
+- `CachedTvShowDetailEntity`
+- `GenreEntity`
+
+DAOs are grouped under `data/local/dao`.
+
+### My List
+
+`MyListManager` and `SavedMediaDao` provide local saved-media persistence. Detail screens use `DetailViewModel.toggleMyList(...)` to add/remove movies and TV shows.
+
+### Firebase
+
+Firebase is used for:
+
+- Analytics.
+- Auth and persisted sign-in state.
+- Realtime Database sync.
+- Firestore dependency support.
+- Cloud Messaging dependency support.
+
+`FirebaseSyncManager` syncs:
+
+- My List.
+- Companies.
+- Networks.
+- Casts.
+- Watch history.
+- Favorite Live TV channels.
+- Default stream provider.
+
+It exposes sync state, progress, and messages through `StateFlow`.
+
+### Trakt
+
+`TraktAuthManager` supports:
+
+- OAuth URL generation.
+- Code exchange.
+- Token persistence.
+- Token refresh.
+- Valid-token retrieval.
+- User settings/profile fetch.
+- Sign out.
+
+`TraktRepository` supports:
+
+- User settings.
+- Watch history.
+- Collection.
+- Watchlist.
+- Recommendations.
+- Movie and episode scrobbling.
+- Watchlist add/remove helpers.
+
+`TraktSyncManager` contains a full-sync workflow for watch history, collection, and watchlist.
+
+## Ads And Consent
+
+Ads are initialized only after UMP consent resolves in `SplashActivity`.
+
+Initialization order:
+
+1. StartApp
+2. AdMob
+3. Wortise
+4. Unity
+
+The core fallback dispatcher is `AdFallbackDispatcher`.
+
+Core ad priority:
+
+`StartApp -> AdMob -> Wortise -> Unity`
+
+Supported formats:
+
+- Banners
+- Interstitials
+- Rewarded ads
+- StartApp splash helper
+- Wortise app-open ads
+
+Important classes:
+
+- `StartAppAdManager`
+- `AdManager` for AdMob
+- `WortiseAdManager`
+- `UnityAdManager`
+- `AdFallbackDispatcher`
+- `TvInterstitialManager`
+- `AppOpenAdObserver`
+- `ConsentManager`
+
+Generic TV/mobile banner surfaces now prefer StartApp. Explicitly named banner composables such as `WortiseBannerAdView` and `UnityBannerAdView` remain network-specific.
+
+Users can disable ads through settings, and ad managers check that preference before loading or showing ads.
+
+## Network And Protection
+
+### Connectivity Monitoring
+
+`NetworkConnectivityChecker` continuously monitors connectivity using:
+
+- `ConnectivityManager.NetworkCallback`
+- Periodic reachability checks
+- Active test hosts
+- Network diagnostics
+
+Diagnostics include:
+
+- Network type
+- DNS servers
+- VPN state
+- Proxy state
+- Metered state
+
+The app detects ad-blocking DNS, VPN, and proxy conditions and can show `NetworkStateDialog` from the root UI. The explicit DNS allowlist currently permits:
+
+- `192.168.100.1`
+- `8.8.8.8`
+
+### WebView Ad Blocking
+
+`AdBlockerWebViewClient` blocks common ad domains and injects CSS/DOM cleanup after page load.
+
+Additional supporting pieces:
+
+- `AdvancedAdBlocker`
+- `FilterListUpdater`
+- `DomainTrie`
+- bundled `easylist.txt`, `easyprivacy.txt`, and `custom_filters.txt`
+
+`PlayerActivity` and `SchedulePlayerActivity` both use `AdBlockerWebViewClient`.
 
 ## Tech Stack
 
-| Category | Technology | Version |
-|----------|------------|---------|
-| Language | Kotlin | 1.9.24 |
-| UI Framework | Jetpack Compose | BOM 2024.12.01 |
-| Design System | Material Design 3 | Latest |
-| Navigation | Navigation Compose | 2.8.5 |
-| Networking | Retrofit + OkHttp | 2.11.0 / 4.12.0 |
-| JSON Parsing | Gson | 2.10.1 |
-| Image Loading | Coil + Glide | 2.7.0 / 4.16.0 |
-| Animations | Lottie Compose | 6.6.2 |
-| Database | Room | 2.6.1 |
-| Media Playback | Media3 ExoPlayer | 1.5.1 |
-| Async Operations | Kotlin Coroutines | 1.8.1 |
-| Code Generation | KSP | Latest |
-| Firebase | Analytics, Auth, Firestore, Database | Various |
-| YouTube Playback | Android YouTube Player | 13.0.0 |
-
----
-
-## Architecture
-
-KiduyuTV follows Clean Architecture principles with three distinct layers that ensure maintainability, testability, and scalability.
-
-### Data Layer
-
-The data layer handles all external and local data operations through the repository pattern. The `TmdbRepository` class coordinates API calls to The Movie Database, managing request execution, response caching, and error handling. Room database entities store cached content with expiration timestamps, enabling automatic cache invalidation and offline access. The GitHub-hosted content fetcher retrieves curated lists using a dedicated OkHttp client configured for larger payload handling with DNS-over-HTTPS support.
-
-### Domain Layer
-
-Business logic resides in ViewModels that manage UI state and coordinate between the data and presentation layers. The `HomeViewModel` orchestrates parallel loading of content from multiple sources using coroutines and async operations, while individual ViewModels handle specific features including search, detail views, and media playback. State management uses Kotlin Flow for reactive updates throughout the application.
-
-### Presentation Layer
-
-The UI layer implements screens and components using Jetpack Compose with Material Design 3 theming. Reusable composables handle common patterns including content rows with lazy loading, hero sections with dynamic backdrop transitions, and network logo displays. The navigation system uses typed routes with arguments for type-safe screen transitions, while platform-specific navigation graphs handle television and mobile interaction patterns independently.
-
----
+| Area | Implementation |
+| --- | --- |
+| Language | Kotlin |
+| Android Gradle Plugin | 8.13.2 |
+| Kotlin Gradle plugin | 2.1.10 |
+| Java target | 17 |
+| Compile SDK | 35 |
+| Min SDK | 24 |
+| Target SDK | 35 |
+| UI | Jetpack Compose, Material 3 |
+| Navigation | Navigation Compose |
+| Async | Kotlin Coroutines, StateFlow |
+| Local DB | Room 2.6.1 |
+| Networking | Retrofit 2.11.0, OkHttp 4.12.0, Volley |
+| DNS | OkHttp DNS-over-HTTPS dependency |
+| Image loading | Coil Compose, Glide |
+| Media | Media3 ExoPlayer 1.5.1 |
+| Web playback | Android WebView, AndroidX WebKit |
+| HTML parsing | Jsoup 1.18.1 |
+| Firebase | Analytics, Auth, Realtime Database, Firestore, Messaging |
+| Ads | StartApp, AdMob, Wortise, Unity, UMP |
+| Animations | Lottie Compose |
+| YouTube | Android YouTube Player |
 
 ## Project Structure
 
+```text
+KiduyuTv_final_room/
+|-- app/
+|   |-- build.gradle
+|   |-- google-services.json
+|   |-- proguard-rules.pro
+|   `-- src/main/
+|       |-- AndroidManifest.xml
+|       |-- assets/
+|       |   |-- custom_filters.txt
+|       |   |-- easylist.txt
+|       |   `-- easyprivacy.txt
+|       |-- java/com/kiduyuk/klausk/kiduyutv/
+|       |   |-- activity/
+|       |   |   |-- mainactivity/
+|       |   |   `-- splashactivity/
+|       |   |-- application/
+|       |   |-- data/
+|       |   |   |-- api/
+|       |   |   |-- local/
+|       |   |   |-- model/
+|       |   |   |-- remote/
+|       |   |   |-- repository/
+|       |   |   `-- sync/
+|       |   |-- network/
+|       |   |-- ui/
+|       |   |   |-- components/
+|       |   |   |-- navigation/
+|       |   |   |-- player/
+|       |   |   |-- screens/
+|       |   |   `-- theme/
+|       |   |-- util/
+|       |   `-- viewmodel/
+|       `-- res/
+|-- lists/
+|-- build.gradle
+|-- settings.gradle
+|-- gradle/
+|-- VERSION
+`-- README.md
 ```
-KiduyuTv_final/
-├── app/
-│   └── src/main/
-│       ├── java/com/kiduyuk/klausk/kiduyutv/
-│       │   ├── activity/
-│       │   │   ├── mainactivity/      # Main entry point with Compose setup
-│       │   │   └── splashactivity/    # Splash screen and initialization
-│       │   ├── data/
-│       │   │   ├── api/               # Retrofit API definitions
-│       │   │   ├── local/             # Room database, DAOs, entities
-│       │   │   ├── model/             # Data models and DTOs
-│       │   │   └── repository/         # Repository implementations
-│       │   ├── network/                # Network utilities and monitoring
-│       │   ├── ui/
-│       │   │   ├── components/        # Reusable Compose components
-│       │   │   │   ├── mobile/        # Phone-specific components
-│       │   │   ├── navigation/         # Navigation graphs and routes
-│       │   │   ├── player/             # Video player implementations
-│       │   │   │   ├── webview/        # WebView player activity
-│       │   │   │   └── youtube/        # YouTube player activity
-│       │   │   ├── screens/            # Screen composables
-│       │   │   │   ├── cast/           # Cast detail screens
-│       │   │   │   ├── company_network_list/
-│       │   │   │   ├── detail/         # Movie/TV detail screens
-│       │   │   │   ├── home/           # Home and browse screens
-│       │   │   │   ├── search/         # Search screens
-│       │   │   │   └── settings/       # Settings screens
-│       │   │   └── theme/              # Material 3 theming
-│       │   ├── util/                   # Utilities and helpers
-│       │   └── viewmodel/              # ViewModel classes
-│       ├── res/                        # Android resources
-│       └── assets/                     # App assets and easylist
-├── lists/                              # Curated content JSON files
-├── gradle/wrapper/                     # Gradle wrapper files
-├── build.gradle                         # Root build configuration
-└── settings.gradle                      # Project settings
-```
-
----
-
-## Getting Started
-
-### Prerequisites
-
-Before building KiduyuTV, ensure your development environment meets the following requirements:
-
-- **Android Studio** Hedgehog (2024.1.1) or later with Kotlin plugin
-- **Android SDK** 35 with build tools installed
-- **Java Development Kit** 17 or later
-- **Gradle** 8.13 (automatically managed by wrapper)
-
-### Installation Steps
-
-#### 1. Clone the Repository
-
-```bash
-git clone https://github.com/kiduyu-klaus/KiduyuTv_final.git
-cd KiduyuTv_final
-```
-
-#### 2. Configure Android SDK
-
-Update the `local.properties` file with your Android SDK path:
-
-```properties
-sdk.dir=/path/to/your/Android/sdk
-```
-
-**macOS typical path:**
-```properties
-sdk.dir=/Users/yourusername/Library/Android/sdk
-```
-
-**Linux typical path:**
-```properties
-sdk.dir=/home/yourusername/Android/Sdk
-```
-
-#### 3. Setup Gradle Wrapper
-
-The project includes a setup script to download the Gradle wrapper JAR:
-
-```bash
-chmod +x setup_gradle.sh
-./setup_gradle.sh
-```
-
-Alternatively, manually download the wrapper JAR from the Gradle releases page and place it in `gradle/wrapper/`.
-
-#### 4. Open in Android Studio
-
-1. Launch Android Studio
-2. Select **Open an existing project**
-3. Navigate to the `KiduyuTv_final` directory
-4. Wait for Gradle sync to complete
-5. The project will configure itself with the correct SDK targets and dependencies
-
-#### 5. Build the Project
-
-**Build Debug APK (both flavors):**
-```bash
-./gradlew assembleDebug
-```
-
-**Build Phone Debug APK specifically:**
-```bash
-./gradlew assemblePhoneDebug
-```
-
-**Build TV Debug APK specifically:**
-```bash
-./gradlew assembleTvDebug
-```
-
-**Build Release APK (requires signing configuration):**
-```bash
-./gradlew assembleRelease
-```
-
-Debug APKs are generated at:
-- Phone: `app/build/outputs/apk/phone/debug/`
-- TV: `app/build/outputs/apk/tv/debug/`
-
-#### 6. Running on Device or Emulator
-
-1. Connect your Android TV, Fire TV, or Android device
-2. Enable developer options and USB debugging on your device
-3. Ensure your device is detected: `adb devices`
-4. In Android Studio, select your target device
-5. Click **Run** or press `Shift + F10`
-
----
-
-## Configuration
-
-### TMDB API Setup
-
-KiduyuTV uses The Movie Database (TMDB) API for all movie and TV show data. The API configuration is managed in the `ApiClient.kt` file within the data layer. For production deployment, replace the placeholder token with your own TMDB API key obtained from [TMDB API Settings](https://www.themoviedb.org/settings/api).
-
-```kotlin
-// In ApiClient.kt
-companion object {
-    private const val TMDB_API_KEY = "your_api_key_here"
-}
-```
-
-### Firebase Configuration
-
-The app integrates with Firebase services for analytics, authentication, and data synchronization. Place your `google-services.json` file in the `app/` directory. This file is downloaded from the Firebase Console and contains your project-specific configuration including API keys and application IDs.
-
-### AdMob / Ad Manager
-
-Advertising is configured through the manifest metadata. For production, update the application ID in `AndroidManifest.xml` with your own AdMob application ID from the Google AdMob console.
-
-```xml
-<meta-data
-    android:name="com.google.android.gms.ads.APPLICATION_ID"
-    android:value="ca-app-pub-xxxxxxxx~xxxxxxxx"/>
-```
-
-### Content Lists
-
-Curated content lists are stored as JSON files in the `/lists` directory and hosted on GitHub for easy updates without app releases. Each list contains TMDB movie or TV show IDs with pre-fetched metadata for efficient batch loading.
-
-```json
-[
-  {
-    "id": 12345,
-    "title": "Movie Title",
-    "overview": "Movie description...",
-    "posterPath": "/poster.jpg",
-    "backdropPath": "/backdrop.jpg",
-    "voteAverage": 8.5,
-    "releaseDate": "2025-01-15",
-    "genreIds": [28, 12, 878],
-    "popularity": 150.234
-  }
-]
-```
-
-To create custom content lists, add JSON files to the repository under `/lists` and update the URLs in `HomeViewModel.kt`.
-
----
 
 ## Build Variants
 
-KiduyuTV uses product flavors to generate platform-optimized builds from a single codebase.
+The app uses one flavor dimension: `formfactor`.
 
-### Phone Flavor
+### Phone flavor
 
-The phone variant targets Android smartphones and tablets with touch-based interfaces. This variant includes Google AdMob integration for mobile advertising and uses the mobile navigation graph with touch-optimized layouts.
+- Application ID suffix: `.phone`
+- Version name suffix: `-phone`
+- Touch-first mobile navigation graph.
+- Mobile bottom navigation and mobile detail/search/settings screens.
 
-```gradle
-phone {
-    dimension "formfactor"
-    applicationIdSuffix ".phone"
-    versionNameSuffix "-phone"
-    resValue "string", "app_name", "KiduyuTV"
-}
+### TV flavor
+
+- Application ID suffix: `.tv`
+- Version name suffix: `-tv`
+- TV navigation graph.
+- D-pad-first focus handling.
+- TV banner overlay support.
+- Leanback/touchscreen-optional manifest support.
+
+Common default config:
+
+- `applicationId`: `com.kiduyuk.klausk.kiduyutv`
+- `versionCode`: `4`
+- `versionName`: `1.1.71`
+- `minSdk`: `24`
+- `targetSdk`: `35`
+- `compileSdk`: `35`
+- `multiDexEnabled`: `true`
+
+## Configuration
+
+### Firebase
+
+The app expects `app/google-services.json`.
+
+Firebase-related initialization happens in:
+
+- `KiduyuTvApp`
+- `AuthManager`
+- `FirebaseManager`
+- `FirebaseSyncManager`
+- `StreamProviderManager`
+
+### TMDB
+
+TMDB API access is implemented under:
+
+- `data/api/ApiClient.kt`
+- `data/api/TmdbApiService.kt`
+- `data/repository/TmdbRepository.kt`
+
+### Trakt
+
+Trakt auth and API access are implemented under:
+
+- `util/TraktAuthManager.kt`
+- `data/remote/TraktApiClient.kt`
+- `data/remote/TraktApiService.kt`
+- `data/repository/TraktRepository.kt`
+- `data/sync/TraktSyncManager.kt`
+
+### Ads
+
+Ad IDs and manifest placeholders are configured in `app/build.gradle` and `AndroidManifest.xml`.
+
+Current ad managers:
+
+- StartApp: `StartAppAdManager`
+- AdMob: `AdManager`
+- Wortise: `WortiseAdManager`
+- Unity: `UnityAdManager`
+
+### Curated Lists
+
+Curated lists live in `/lists` and are fetched from GitHub raw URLs by `HomeViewModel`.
+
+Current list files include:
+
+- `oscar_winners_2026.json`
+- `hallmark_movies.json`
+- `true_story_movies.json`
+- `best_sitcoms.json`
+- `best_classics.json`
+- `cia_mossad_spies.json`
+- `jason_statham_movies.json`
+- `time_travel_movies.json`
+- `christian_movies.json`
+- `movies_from_the_bible.json`
+- `christian_tv_shows.json`
+- `doctor_who_specials.json`
+- `companies_networks.json`
+
+## Development Notes
+
+Common Gradle tasks:
+
+```bash
+./gradlew assemblePhoneDebug
+./gradlew assembleTvDebug
+./gradlew assemblePhoneRelease
+./gradlew assembleTvRelease
 ```
 
-### TV Flavor
+Debug APK outputs:
 
-The TV variant targets Android TV, Amazon Fire TV, and other television platforms. This variant includes Google Ad Manager integration for television-appropriate advertising and uses the TV navigation graph with D-pad focus management.
-
-```gradle
-tv {
-    dimension "formfactor"
-    applicationIdSuffix ".tv"
-    versionNameSuffix "-tv"
-    resValue "string", "app_name", "KiduyuTV"
-}
+```text
+app/build/outputs/apk/phone/debug/
+app/build/outputs/apk/tv/debug/
 ```
 
-### Build Types
+Release APK outputs:
 
-**Debug:** Optimized for development with disabled code shrinking and resource shrinking for faster build times.
+```text
+app/build/outputs/apk/phone/release/
+app/build/outputs/apk/tv/release/
+```
 
-**Release:** Full optimization enabled including R8 minification, code shrinking, and resource shrinking. Requires valid signing configuration for APK generation.
+Notes:
 
----
-
-## Content Categories
-
-KiduyuTV provides the following curated content collections:
-
-| Category | Description | Content Type |
-|----------|-------------|--------------|
-| Oscar Winners 2026 | Award-winning films from recent ceremonies | Movies |
-| Hallmark Movies | Heartwarming family-friendly content | Movies |
-| Jason Statham Collection | Action-packed blockbuster movies | Movies |
-| Best Classics | Timeless cinema masterpieces | Movies |
-| Best Sitcoms | Beloved comedy series | TV Shows |
-| Spy Thrillers | CIA, Mossad, and espionage films | Movies |
-| True Stories | Documentaries and dramatizations of real events | Movies |
-| Time Travel | Science fiction adventures through time | Movies & TV Shows |
-| Christian Movies | Faith-based entertainment | Movies |
-| Christian TV Shows | Faith-based television content | TV Shows |
-| Bible Movies | Cinematic adaptations of biblical stories | Movies |
-| Doctor Who Specials | Iconic British sci-fi series content | Movies |
-
----
-
-## Troubleshooting
-
-### Gradle Sync Failed
-
-- Verify Java 17+ is installed: `java -version`
-- Ensure Android SDK is properly configured in `local.properties`
-- Clear Gradle caches: `./gradlew clean`
-- In Android Studio: **File > Invalidate Caches > Invalidate and Restart**
-
-### Build Errors
-
-- Clean the project: `./gradlew clean`
-- Rebuild: `./gradlew assembleDebug`
-- Check for dependency version conflicts in the Gradle sync output
-- Verify all required files (google-services.json) are present
-
-### API Errors
-
-- Verify your internet connection
-- Confirm the TMDB API token is valid and has not expired
-- Check Logcat for detailed error messages: `adb logcat | grep "KiduyuTV"`
-- Review network security configuration if running on restricted networks
-
-### TV Remote Navigation Issues
-
-- Ensure your device is detected as a TV device in system settings
-- Verify the device is running Android TV or Fire OS with leanback support
-- Check that focusable elements have proper focus state styling
-- Enable developer options on the TV device for additional diagnostics
-
-### Playback Issues
-
-- For HLS streaming, verify network connectivity and bandwidth
-- YouTube playback requires Google Play Services on the device
-- WebView playback may require updated Chromium on older devices
-- Check device storage if buffering issues occur frequently
-
----
-
-## Contributing
-
-Contributions are welcome and appreciated. Whether you find a bug, have a feature request, or want to improve the documentation, your input helps make KiduyuTV better for everyone.
-
-### How to Contribute
-
-1. **Fork the Repository** - Create your own copy of the project on GitHub
-2. **Create a Feature Branch** - Work on your changes in a dedicated branch
-   ```bash
-   git checkout -b feature/improvement-name
-   ```
-3. **Make Your Changes** - Implement your feature, fix the bug, or update documentation
-4. **Test Your Changes** - Build and run the app to verify your changes work correctly
-5. **Commit Your Changes** - Write clear, descriptive commit messages
-   ```bash
-   git commit -m 'Add new content category for western movies'
-   ```
-6. **Push to Your Branch** - Upload your changes to your fork
-   ```bash
-   git push origin feature/improvement-name
-   ```
-7. **Open a Pull Request** - Submit your changes for review and inclusion
-
-### Code Style
-
-- Follow Kotlin coding conventions
-- Use meaningful variable and function names
-- Add comments for complex logic
-- Keep functions focused and small
-- Use Jetpack Compose best practices
-
----
+- Release signing is configured in Gradle; use project-specific signing material for production.
+- R8 minification and resource shrinking are enabled for release.
+- The app allows cleartext traffic and uses `network_security_config.xml`.
+- The manifest declares storage/media permissions, notification permission, ad ID permission, install-packages permission, TV leanback support, and touchscreen as optional.
+- Gradle wrapper files are included.
 
 ## License
-This project is proprietary and all rights are reserved. No part of this codebase — including source code, documentation, or associated assets — may be used, copied, modified, merged, published, distributed, sublicensed, or sold without prior written authorization from the copyright holder. See the [LICENSE](LICENSE) file for details.
 
----
+This project is proprietary and all rights are reserved. No part of this codebase, documentation, or associated assets may be used, copied, modified, merged, published, distributed, sublicensed, leased, sold, or otherwise exploited without prior written permission from the copyright holder.
 
-## Acknowledgments
-
-KiduyuTV stands on the shoulders of giants. We gratefully acknowledge the following projects and organizations:
-
-- **[The Movie Database (TMDB)](https://www.themoviedb.org/)** - For providing the comprehensive movie and TV show database API that powers all content discovery in the application
-- **[Jetpack Compose Team](https://developer.android.com/compose)** - For creating the modern declarative UI toolkit that makes dual-platform development elegant and efficient
-- **[Android Media3 Team](https://developer.android.com/media/media3)** - For ExoPlayer and the media playback libraries that enable smooth streaming
-- **[Google Firebase](https://firebase.google.com/)** - For the backend services enabling analytics, authentication, and data synchronization
-- **[Airbnb](https://airbnb.io/lottie/)** - For Lottie animations that add polish and delight to the user experience
-- **[Coil](https://coil-kt.github.io/coil/)** - For the Kotlin-first image loading library with excellent Compose support
-- **[All Open Source Contributors](https://github.com/kiduyu-klaus/KiduyuTv_final/graphs/contributors)** - For their time and contributions to the project
-
----
-
-<div align="center">
-
-**Built with passion for the big screen experience**
-
-*KiduyuTV - Your gateway to premium streaming*
-
-[![GitHub Stars](https://img.shields.io/github/stars/kiduyu-klaus/KiduyuTv_final?style=social)](https://github.com/kiduyu-klaus/KiduyuTv_final)
-[![GitHub Forks](https://img.shields.io/github/forks/kiduyu-klaus/KiduyuTv_final?style=social)](https://github.com/kiduyu-klaus/KiduyuTv_final)
-[![Follow on GitHub](https://img.shields.io/github/followers/kiduyu-klaus?style=social)](https://github.com/kiduyu-klaus)
-
-</div>
+See [LICENSE](LICENSE) for details.

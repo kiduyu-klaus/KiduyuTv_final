@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="KiduyuTV - A modern Android TV and Fire TV streaming application featuring movies and TV shows">
-    <title>KiduyuTV - Premium Streaming for Android TV & Fire TV</title>
+    <meta name="description" content="KiduyuTV - A dual-form-factor Android streaming app for Android TV, Fire TV, phones, and tablets with movies, TV shows, Live TV, schedule playback, Trakt, Firebase sync, and multi-network ads">
+    <title>KiduyuTV - Android TV, Fire TV & Mobile Streaming</title>
     <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/app/src/main/res/mipmap-xxxhdpi/ic_launcher1.png">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1045,11 +1045,11 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                 <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/>
             </svg>
-            Android TV & Fire TV Optimized
+            Android TV, Fire TV & Mobile
         </div>
-        <h1 class="hero-title animate-fade-in delay-1">Your Gateway to Premium Streaming</h1>
+        <h1 class="hero-title animate-fade-in delay-1">KiduyuTV</h1>
         <p class="hero-subtitle animate-fade-in delay-2">
-            A feature-rich streaming application designed specifically for the big screen experience. Enjoy movies and TV shows with a Netflix-like interface optimized for TV remote navigation.
+            A dual-platform Android streaming app with movies, TV shows, Live TV, schedule playback, watch history, Trakt profile support, Firebase sync, and TV-first remote navigation.
         </p>
         <div class="hero-buttons animate-fade-in delay-3">
             <a href="#download" class="btn btn-primary">
@@ -1087,6 +1087,12 @@
                 </svg>
                 Android 7.0+
             </div>
+            <div class="platform-item">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm5 18a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/>
+                </svg>
+                Phone & Tablet
+            </div>
         </div>
     </div>
 </section>
@@ -1095,9 +1101,9 @@
 <section class="section" id="features">
     <div class="section-header">
         <p class="section-label">Features</p>
-        <h2 class="section-title">Built for the Big Screen</h2>
+        <h2 class="section-title">Built for TV and Mobile</h2>
         <p class="section-description">
-            Every feature is designed to deliver an immersive streaming experience on your television.
+            One codebase powers TV remote navigation, mobile touch screens, streaming providers, Live TV, sync, and playback protection.
         </p>
     </div>
     <div class="features-grid">
@@ -1109,9 +1115,9 @@
                     <path d="M12 8h.01"/>
                 </svg>
             </div>
-            <h3 class="feature-title">D-Pad Navigation</h3>
+            <h3 class="feature-title">TV and Mobile Interfaces</h3>
             <p class="feature-description">
-                Full TV remote and Fire TV controller support with intuitive focus states, scale animations, and smooth back-stack handling for seamless browsing.
+                Separate Compose navigation graphs provide D-pad-first Android TV and Fire TV screens plus touch-first phone and tablet layouts.
             </p>
         </div>
         <div class="feature-card">
@@ -1121,9 +1127,9 @@
                     <polyline points="17,2 12,7 7,2"/>
                 </svg>
             </div>
-            <h3 class="feature-title">Hero Section</h3>
+            <h3 class="feature-title">TMDB Discovery</h3>
             <p class="feature-description">
-                Dynamic backdrop carousel showcasing featured content with smooth transitions and auto-play previews for an engaging browsing experience.
+                Browse trending, popular, top-rated, genre, company, network, cast, season, episode, and recommendation data powered by TMDB.
             </p>
         </div>
         <div class="feature-card">
@@ -1133,9 +1139,9 @@
                     <path d="M21 21l-4.35-4.35"/>
                 </svg>
             </div>
-            <h3 class="feature-title">Advanced Search</h3>
+            <h3 class="feature-title">Search and Curated Rows</h3>
             <p class="feature-description">
-                Search movies and TV shows by title, genre, cast, or crew. Browse content by production company and TV network for precise discovery.
+                Search movies and TV shows, then browse curated GitHub-hosted collections such as Oscar winners, classics, sitcoms, faith content, and action lists.
             </p>
         </div>
         <div class="feature-card">
@@ -1144,9 +1150,9 @@
                     <polygon points="5,3 19,12 5,21"/>
                 </svg>
             </div>
-            <h3 class="feature-title">Multi-Format Playback</h3>
+            <h3 class="feature-title">WebView and IPTV Playback</h3>
             <p class="feature-description">
-                Support for HLS, DASH, and progressive streaming via ExoPlayer with intelligent multi-server failover for uninterrupted viewing.
+                Dedicated WebView, IPTV, schedule, and YouTube player activities handle provider iframes, M3U streams, scheduled channels, and trailers.
             </p>
         </div>
         <div class="feature-card">
@@ -1163,9 +1169,9 @@
                     <path d="M7 16h10"/>
                 </svg>
             </div>
-            <h3 class="feature-title">Subtitle Support</h3>
+            <h3 class="feature-title">Live TV and Schedule</h3>
             <p class="feature-description">
-                External subtitle fetch via Subdl supporting SRT, VTT, SSA/ASS, and TTML formats. Multiple language options for international content.
+                Load M3U channels, XMLTV EPG data, categories, search, favorite channels, and scheduled events with channel chips that open the schedule player.
             </p>
         </div>
         <div class="feature-card">
@@ -1177,7 +1183,7 @@
             </div>
             <h3 class="feature-title">Watch History</h3>
             <p class="feature-description">
-                Your progress is automatically saved and resumed per title. Pick up exactly where you left off across all your favorite shows and movies.
+                Playback progress is saved locally, enriched with TMDB metadata, and surfaced in continue-watching rows for quick resume.
             </p>
         </div>
         <div class="feature-card">
@@ -1186,9 +1192,9 @@
                     <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
                 </svg>
             </div>
-            <h3 class="feature-title">Favorites & Lists</h3>
+            <h3 class="feature-title">My List, Trakt and Firebase</h3>
             <p class="feature-description">
-                Save your favorite movies and shows for quick access. Curated content lists organized by genre, actor, and theme for easy browsing.
+                Save movies, shows, companies, networks, casts, and favorite channels locally, then sync user data through Firebase and Trakt integrations.
             </p>
         </div>
         <div class="feature-card">
@@ -1198,9 +1204,9 @@
                     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                 </svg>
             </div>
-            <h3 class="feature-title">Customizable Settings</h3>
+            <h3 class="feature-title">Ads, Consent and Protection</h3>
             <p class="feature-description">
-                Configure playback buffer duration, subtitle preferences, and other settings. All preferences are persisted for a personalized experience.
+                UMP consent gates StartApp, AdMob, Wortise, and Unity ads while WebView ad blocking, popup suppression, and network diagnostics protect playback.
             </p>
         </div>
     </div>
@@ -1211,9 +1217,9 @@
     <div class="section">
         <div class="section-header">
             <p class="section-label">Content Library</p>
-            <h2 class="section-title">Curated Categories</h2>
+            <h2 class="section-title">Curated Collections and Live Areas</h2>
             <p class="section-description">
-                Explore hand-picked collections spanning multiple genres and themes.
+                Explore hand-picked movie and TV collections alongside Live TV, EPG data, scheduled events, and saved channels.
             </p>
         </div>
         <div class="categories-grid">
@@ -1325,21 +1331,21 @@
         <p class="section-label">Technology</p>
         <h2 class="section-title">Built with Modern Tools</h2>
         <p class="section-description">
-            Leveraging the latest Android development technologies for a smooth, performant experience.
+            The current implementation combines modern Android UI, Room caching, Firebase/Trakt sync, WebView playback, IPTV parsing, and multi-network ads.
         </p>
     </div>
     <div class="tech-grid">
         <div class="tech-item">
-            <div class="tech-name">Kotlin</div>
-            <div class="tech-version">1.9.24</div>
+            <div class="tech-name">Kotlin Plugin</div>
+            <div class="tech-version">2.1.10</div>
         </div>
         <div class="tech-item">
             <div class="tech-name">Jetpack Compose</div>
             <div class="tech-version">BOM 2024.12</div>
         </div>
         <div class="tech-item">
-            <div class="tech-name">Material 3</div>
-            <div class="tech-version">Latest</div>
+            <div class="tech-name">Android Gradle</div>
+            <div class="tech-version">8.13.2</div>
         </div>
         <div class="tech-item">
             <div class="tech-name">Navigation</div>
@@ -1354,20 +1360,20 @@
             <div class="tech-version">2.6.1</div>
         </div>
         <div class="tech-item">
-            <div class="tech-name">Coil</div>
-            <div class="tech-version">2.7.0</div>
+            <div class="tech-name">Firebase</div>
+            <div class="tech-version">Auth + DB</div>
         </div>
         <div class="tech-item">
-            <div class="tech-name">Lottie</div>
-            <div class="tech-version">6.6.2</div>
+            <div class="tech-name">Ads</div>
+            <div class="tech-version">StartApp First</div>
         </div>
         <div class="tech-item">
-            <div class="tech-name">Coroutines</div>
-            <div class="tech-version">1.8.1</div>
+            <div class="tech-name">Jsoup</div>
+            <div class="tech-version">1.18.1</div>
         </div>
         <div class="tech-item">
-            <div class="tech-name">ExoPlayer</div>
-            <div class="tech-version">Media3</div>
+            <div class="tech-name">Media3</div>
+            <div class="tech-version">1.5.1</div>
         </div>
     </div>
 </section>
@@ -1438,95 +1444,86 @@
 <section class="section" id="changelog">
     <div class="section-header">
         <p class="section-label">Updates</p>
-        <h2 class="section-title">What's New</h2>
+        <h2 class="section-title">Current Implementation</h2>
         <p class="section-description">
-            Stay up to date with the latest features, improvements, and fixes in KiduyuTV.
+            A concise snapshot of the major features and systems currently implemented in KiduyuTV.
         </p>
     </div>
     <div class="changelog-section">
         <div class="changelog-content">================================================================================
-            KIDUYU TV - VERSION 1.2.1
-            WHAT'S NEW / CHANGELOG
+            KIDUYU TV - VERSION 1.1.71
+            CURRENT IMPLEMENTATION SNAPSHOT
             ================================================================================
 
-            Release Date: April 7, 2026
-
-            ================================================================================
-            NEW FEATURES
+            PLATFORM
             ================================================================================
 
-            1. ENHANCED CAST DETAIL SCREEN
-            - Added cast member biography (overview) display
-            - Biography is shown in the fixed header section for quick reference
-            - Click on biography to view the complete text in a dedicated dialog
+            - One Android app module with phone and tv product flavors
+            - Android TV and Fire TV UI uses D-pad-first Compose navigation
+            - Phone and tablet UI uses dedicated mobile Compose screens
+            - MainActivity selects the correct navigation graph at runtime
 
-            2. IMPROVED HEADER LAYOUT
-            - Header section is now fixed and does not scroll with the content
-            - Header occupies 35% of the screen height for optimal visibility
-            - Cast member profile image, name, and truncated biography are displayed
-            - Responsive design adapts to different screen sizes
-
-            3. NEW FILMOGRAPHY GRID VIEW
-            - Movies and TV shows are now displayed in a unified responsive grid
-            - Grid layout automatically adjusts columns based on screen width
-            - Media type badge (Movie/TV) is displayed on each item card
-            - Clean, consistent presentation for all filmography items
-
-            4. ENHANCED TV REMOTE NAVIGATION
-            - Full D-pad navigation support throughout the Cast Detail Screen
-            - Visual focus indicators on all interactive elements
-            - Smooth focus transitions between different sections
-            - Optimized for comfortable TV remote control usage
-
-            5. INTERACTIVE BIOGRAPHY DIALOG
-            - Truncated biography preview shows first 3 lines in header
-            - Full biography accessible via focused click
-            - Dialog has constrained height (200dp max) for better UX
-            - Scrollable content within dialog for long biographies
-
-            ================================================================================
-            IMPROVEMENTS
+            CONTENT AND DISCOVERY
             ================================================================================
 
-            - Streamlined data fetching with parallel API calls
-            - Better state management for screen transitions
-            - Improved visual hierarchy with clear content separation
-            - Enhanced error handling and loading states
-            - Optimized layout performance for large filmography lists
+            - TMDB-powered home, movie, TV, search, detail, season, episode, cast,
+              company, network, genre, and recommendation flows
+            - GitHub-hosted curated lists for Oscar winners, classics, sitcoms,
+              faith content, true stories, spy thrillers, action collections, and more
+            - My List, continue watching, watch history, and metadata enrichment
 
-            ================================================================================
-            TECHNICAL UPDATES
-            ================================================================================
-
-            - Added PersonDetail data model for person-specific API responses
-            - Extended TmdbApiService with person details endpoint
-            - Updated TmdbRepository with new data fetching method
-            - Implemented CastDetailViewModel with concurrent data loading
-            - Added focus management system for TV navigation
-
-            ================================================================================
-            KNOWN ISSUES
+            LIVE TV AND SCHEDULE
             ================================================================================
 
-            - None reported at this time
+            - M3U playlist loading and six-hour cache
+            - XMLTV EPG loading and channel program matching
+            - Live TV category browsing, search, playback, and favorite channels
+            - Schedule tab with expandable events and selectable available channels
+            - SchedulePlayerActivity fetches watch pages, exposes server switching,
+              uses AdBlockerWebViewClient, and injects autoplay/unmute support
 
+            PLAYBACK
             ================================================================================
+
+            - WebView player for movie and TV provider iframes
+            - IPTV player for Live TV channels
+            - Schedule player for scheduled channels
+            - YouTube player activity for trailers/videos
+            - TV cursor overlay for WebView navigation on TV and Fire TV devices
+            - Watch progress updates and resume support
+
+            SYNC AND ACCOUNTS
+            ================================================================================
+
+            - Room database for saved media, watch history, cached rows, detail cache,
+              and genres
+            - Firebase Auth, Analytics, Realtime Database, Firestore dependency support,
+              and Messaging dependency support
+            - FirebaseSyncManager syncs My List, companies, networks, casts, watch
+              history, favorite channels, and default provider
+            - Trakt OAuth, token refresh, profile, history, collection, watchlist,
+              recommendations, and scrobbling helpers
+
+            ADS AND PROTECTION
+            ================================================================================
+
+            - UMP consent gates ad SDK initialization
+            - Core ad priority: StartApp -> AdMob -> Wortise -> Unity
+            - Supports banners, interstitials, rewarded ads, StartApp splash helper,
+              and Wortise app-open ads
+            - WebView ad blocking, popup suppression, EasyList/EasyPrivacy assets,
+              filter updates, and network-level diagnostics
+            - Connectivity monitoring includes reachability, DNS, VPN, proxy, metered
+              network, and network-state dialogs
+
             COMPATIBILITY
             ================================================================================
 
-            - Minimum Android SDK: 24 (Android 7.0 Nougat)
-            - Target Android SDK: 35 (Android 15)
-            - Requires TV device or emulator for optimal experience
-            - Internet connection required for streaming content
-
-            ================================================================================
-            SUPPORT
-            ================================================================================
-
-            For bug reports, feature requests, or assistance, please contact the
-            development team through the official GitHub repository.
-
-            GitHub: https://github.com/kiduyu-klaus/KiduyuTv_final
+            - Minimum Android SDK: 24
+            - Target Android SDK: 35
+            - Compile SDK: 35
+            - Version code: 4
+            - Version name: 1.1.71
 
             ================================================================================
             © 2026 Kiduyu Klaus. All rights reserved.
@@ -1538,7 +1535,7 @@
 <section class="download-section" id="download">
     <h2 class="download-title">Download KiduyuTV</h2>
     <p class="download-description">
-        Get the latest version of KiduyuTV for your Android TV, Fire TV, or Mobile device. Simple installation, instant streaming.
+        Get KiduyuTV for Android TV, Fire TV, phone, or tablet. Choose the flavor that matches your device.
     </p>
     <div class="download-buttons">
         <a id="download-tv" href="#" class="btn btn-primary" target="_blank" rel="noopener noreferrer" download>
@@ -1604,7 +1601,7 @@
             KiduyuTV
         </div>
         <p class="footer-text">
-            A modern streaming application for Android TV and Fire TV.
+            A dual-form-factor streaming application for Android TV, Fire TV, phones, and tablets.
         </p>
         <div class="footer-links">
             <a href="https://github.com/kiduyu-klaus/KiduyuTv_final" target="_blank" rel="noopener noreferrer">GitHub</a>
@@ -1614,7 +1611,7 @@
             <a href="https://github.com/kiduyu-klaus/KiduyuTv_final/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">License</a>
         </div>
         <p class="footer-copyright">
-            MIT License. Built with passion for the big screen experience.
+            Proprietary software. All rights reserved.
         </p>
     </div>
 </footer>
