@@ -32,8 +32,7 @@ class SettingsManager(context: Context) {
      * Returns true if ads are disabled, false otherwise.
      */
     fun isAdsDisabled(): Boolean {
-        //return preferences.getBoolean(KEY_ADS_DISABLED, false)
-        return true;
+        return preferences.getBoolean(KEY_ADS_DISABLED, false)
     }
 
     /**

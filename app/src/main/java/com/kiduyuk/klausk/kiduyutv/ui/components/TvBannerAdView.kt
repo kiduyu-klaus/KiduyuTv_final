@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -37,13 +40,24 @@ fun TvBannerAdView(
         .background(Color(0xFF0F0F0F))
 ) {
     val context = LocalContext.current
+    val containerRef = remember { mutableStateOf<FrameLayout?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            containerRef.value?.let { container ->
+                destroyAdMobChildren(container)
+                container.removeAllViews()
+            }
+            containerRef.value = null
+        }
+    }
 
     // Respect the user's "disable ads" preference.
     if (SettingsManager(context).isAdsDisabled()) {
         Box(modifier = modifier)
         return
     }
-    val activity = context as? Activity ?: return
+    val activity = context.findActivity() ?: return
 
     AndroidView(
         modifier = modifier,
@@ -55,20 +69,23 @@ fun TvBannerAdView(
                     ViewGroup.LayoutParams.WRAP_CONTENT
                 )
             }
+            containerRef.value = container
 
-            if (activity != null) {
-                Log.i(TAG, "Loading TV banner via AdFallbackDispatcher (preferred=ADMOB)")
-                AdFallbackDispatcher.loadBanner(
-                    activity = activity,
-                    container = container,
-                    preferred = BannerNetwork.ADMOB
-                )
-            } else {
-                Log.i(TAG, "No Activity context — banner not loaded")
-            }
+            Log.i(TAG, "Loading TV banner via AdFallbackDispatcher (preferred=ADMOB)")
+            AdFallbackDispatcher.loadBanner(
+                activity = activity,
+                container = container,
+                preferred = BannerNetwork.ADMOB
+            )
             container
         }
     )
+}
+
+private fun destroyAdMobChildren(container: ViewGroup) {
+    for (index in 0 until container.childCount) {
+        (container.getChildAt(index) as? com.google.android.gms.ads.AdView)?.destroy()
+    }
 }
 
 /** Walk up the context wrapper chain looking for the hosting [Activity]. */

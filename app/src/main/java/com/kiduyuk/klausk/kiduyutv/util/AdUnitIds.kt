@@ -4,16 +4,14 @@ import com.kiduyuk.klausk.kiduyutv.BuildConfig
 
 object AdUnitIds {
 
-    // Set to true during development to use Google test ad units
-    private const val useTestIds = false
+    private val useTestIds: Boolean get() = BuildConfig.DEBUG
 
     // ── Phone (AdMob) ─────────────────────────────────────────────────────
 
     val PHONE_BANNER: String get() = if (useTestIds)
         "ca-app-pub-3940256099942544/6300978111"           // Google test banner
     else
-        "ca-app-pub-3940256099942544/6300978111"
-        //"ca-app-pub-3803477439180910/7183108212"           // AdMob banner unit
+        "ca-app-pub-3803477439180910/7183108212"           // AdMob banner unit
 
     val PHONE_INTERSTITIAL: String get() = if (useTestIds)
         "ca-app-pub-3940256099942544/1033173712"           // Google test interstitial
@@ -30,10 +28,10 @@ object AdUnitIds {
     val TV_BANNER: String get() = if (useTestIds)
         "/6499/example/banner"                             // GAM test banner
     else
-        "/6499/example/banner"            // AdMob banner unit
+        "ca-app-pub-3803477439180910/7183108212"           // AdMob banner unit
 
     val TV_INTERSTITIAL: String get() = if (useTestIds)
         "/6499/example/interstitial"                       // GAM test interstitial
     else
-        "/6499/example/interstitial"          // AdMob interstitial unit
+        "ca-app-pub-3803477439180910/5295324788"           // AdMob interstitial unit
 }

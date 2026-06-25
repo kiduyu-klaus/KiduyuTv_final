@@ -336,92 +336,10 @@ object NetworkConnectivityChecker {
 
             val dnsServers = mutableListOf<String>()
 
-            // Well-known standard public DNS servers (IPv4 + IPv6)
-            // Well-known standard public DNS servers (IPv4 + IPv6)
-            val standardPublicDns = setOf(
-                // Google
-                //"8.8.8.8", "8.8.4.4",
-                //"2001:4860:4860::8888", "2001:4860:4860::8844",
-                // Cloudflare
-                "1.1.1.1", "1.0.0.1",
-                "2606:4700:4700::1111", "2606:4700:4700::1001",
-                // Quad9
-                "9.9.9.9", "149.112.112.112",
-                "2620:fe::fe", "2620:fe::9",
-                // OpenDNS
-                "208.67.222.222", "208.67.220.220",
-                "2620:119:35::35", "2620:119:53::53",
-                // Comodo Secure DNS
-                "8.26.56.26", "8.20.247.20",
-                // Level3 / CenturyLink
-                "4.2.2.1", "4.2.2.2", "4.2.2.3", "4.2.2.4", "4.2.2.5", "4.2.2.6",
-                // Verisign
-                "64.6.64.6", "64.6.65.6",
-                "2620:74:1b::1:1", "2620:74:1c::2:2",
-                // Norton ConnectSafe (legacy, still in use on some devices)
-                "199.85.126.10", "199.85.127.10",
-                // Neustar / UltraDNS
-                "64.70.19.203", "156.154.70.1", "156.154.71.1",
-                "2610:a1:1018::1", "2610:a1:1019::1",
-                // CleanBrowsing — Security filter
-                "185.228.168.9", "185.228.169.9",
-                "2a0d:2a00:1::2", "2a0d:2a00:2::2",
-                // CleanBrowsing — Family filter
-                "185.228.168.168", "185.228.169.168",
-                "2a0d:2a00:1::", "2a0d:2a00:2::",
-                // CleanBrowsing — Adult filter
-                "185.228.168.10", "185.228.169.11",
-                "2a0d:2a00:1::1", "2a0d:2a00:2::1",
-                // AdGuard Standard
-                "94.140.14.14", "94.140.15.15",
-                "2a10:50c0::ad1:ff", "2a10:50c0::ad2:ff",
-                // AdGuard Family
-                "94.140.14.15", "94.140.15.16",
-                "2a10:50c0::bad1:ff", "2a10:50c0::bad2:ff",
-                // AdGuard Non-filtering
-                "94.140.14.140", "94.140.14.141",
-                "2a10:50c0::1:ff", "2a10:50c0::2:ff",
-                // Yandex DNS — Basic
-                "77.88.8.8", "77.88.8.1",
-                "2a02:6b8::feed:0ff", "2a02:6b8:0:1::feed:0ff",
-                // Yandex DNS — Safe
-                "77.88.8.88", "77.88.8.2",
-                "2a02:6b8::feed:bad", "2a02:6b8:0:1::feed:bad",
-                // Yandex DNS — Family
-                "77.88.8.7", "77.88.8.3",
-                "2a02:6b8::feed:a11", "2a02:6b8:0:1::feed:a11",
-                // Ali DNS (Alibaba)
-                "223.5.5.5", "223.6.6.6",
-                "2400:3200::1", "2400:3200:baba::1",
-                // Baidu DNS
-                "180.76.76.76",
-                // DNSPod / Tencent
-                "119.29.29.29", "182.254.116.116",
-                // 114DNS (China)
-                "114.114.114.114", "114.114.115.115",
-                // CNNIC SDNS (China)
-                "1.2.4.8", "210.2.4.8",
-                // Australian DNS (Telstra)
-                "139.130.4.4",
-                // DNS.WATCH
-                "84.200.69.80", "84.200.70.40",
-                "2001:1608:10:25::1c04:b12f", "2001:1608:10:25::9249:d69b",
-                // FreeDNS
-                "37.235.1.174", "37.235.1.177",
-                // Alternate DNS
-                "76.76.19.19", "76.223.122.150",
-                // NextDNS (anycast)
-                "45.90.28.0", "45.90.30.0",
-                "2a07:a8c0::", "2a07:a8c1::",
-                // Mullvad DNS — Non-blocking
-                "194.242.2.2",
-                "2a07:e340::2",
-                // Mullvad DNS — Blocking (ads + trackers)
-                "194.242.2.3",
-                "2a07:e340::3",
-                // ControlD (anycast)
-                "76.76.2.0", "76.76.10.0",
-                "2606:1a40::", "2606:1a40:1::",
+            // Only these DNS servers are allowed. Everything else is treated as custom.
+            val allowedDnsServers = setOf(
+                "192.168.100.1",
+                "8.8.8.8"
             )
 
             // Get active network link properties
@@ -448,9 +366,9 @@ object NetworkConnectivityChecker {
             }
 
             val isCustomDns = if (dnsServers.isNotEmpty()) {
-                // Check if any DNS server is NOT a known standard public DNS
+                // Check if any DNS server is NOT one of the two explicitly allowed DNS servers.
                 dnsServers.any { dns ->
-                    standardPublicDns.none { it.equals(dns, ignoreCase = true) }
+                    !isAllowedDnsServer(dns, allowedDnsServers)
                 }
             } else {
                 false
@@ -462,6 +380,10 @@ object NetworkConnectivityChecker {
             Log.e(TAG, "Error detecting DNS servers: ${e.message}")
             Pair(false, emptyList())
         }
+    }
+
+    private fun isAllowedDnsServer(dns: String, allowedDnsServers: Set<String>): Boolean {
+        return allowedDnsServers.any { it.equals(dns, ignoreCase = true) }
     }
 
     /**

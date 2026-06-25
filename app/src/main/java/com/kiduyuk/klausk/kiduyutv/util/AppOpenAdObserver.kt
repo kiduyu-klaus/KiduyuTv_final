@@ -11,19 +11,28 @@ import androidx.lifecycle.ProcessLifecycleOwner
  * Lifecycle observer that shows an app open ad when the app comes to the
  * foreground, respecting a minimum 4-hour interval between shows.
  *
- * Priority: AdMob app open → Wortise app open.
+ * Uses Wortise app-open ads. Install only after consent has resolved.
  *
- * Usage: instantiate once from [KiduyuTvApp.onCreate]:
+ * Usage: install once after consent has resolved:
  * ```kotlin
- * AppOpenAdObserver(this)
+ * AppOpenAdObserver.install(application)
  * ```
  */
-class AppOpenAdObserver(private val application: Application) :
+class AppOpenAdObserver private constructor(private val application: Application) :
     Application.ActivityLifecycleCallbacks {
 
-    private companion object {
+    companion object {
         const val TAG = "AppOpenAdObserver"
         const val MIN_APP_OPEN_INTERVAL_MS = 4 * 60 * 60 * 1000L // 4 hours
+
+        @Volatile
+        private var installed = false
+
+        fun install(application: Application) {
+            if (installed) return
+            installed = true
+            AppOpenAdObserver(application)
+        }
     }
 
     private var currentActivity: Activity? = null
@@ -46,14 +55,8 @@ class AppOpenAdObserver(private val application: Application) :
 
         currentActivity?.let { activity ->
             try {
-                // Try AdMob first, then fall back to Wortise
-                if (AdManager.isInterstitialReady) {
-                    Log.i(TAG, "Showing AdMob app open")
-                    AdManager.showInterstitial(activity) { }
-                } else {
-                    Log.i(TAG, "Falling back to Wortise app open")
-                    WortiseAdManager.showAppOpenIfAvailable(activity)
-                }
+                Log.i(TAG, "Showing Wortise app-open ad if available")
+                WortiseAdManager.showAppOpenIfAvailable(activity)
                 lastAppOpenShownAt = now
             } catch (e: Exception) {
                 Log.w(TAG, "App open show failed", e)

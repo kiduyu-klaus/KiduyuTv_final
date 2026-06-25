@@ -51,10 +51,12 @@ object StartAppAdManager {
                 .setReturnAdsEnabled(false) // Blocks annoying ads when users re-open the app
                 .init()
 
-            StartAppSDK.setUserConsent (context,
-                            "pas",
-                            System.currentTimeMillis(),
-                            true)
+            StartAppSDK.setUserConsent(
+                context,
+                "pas",
+                System.currentTimeMillis(),
+                ConsentManager.canShowPersonalizedAds(context)
+            )
 
             isInitialised = true
             Log.i(TAG, "StartApp ads pre-loaded")
@@ -128,31 +130,29 @@ object StartAppAdManager {
 
         try {
             val startAppAd = StartAppAd(activity)
-            // FIX: Exact overrides and method naming corrected to fit SDK specifications
-            startAppAd.showAd(object : AdDisplayListener {
-                override fun adDisplayed(ad: Ad?) {
-                    Log.i(TAG, "StartApp interstitial displayed")
-                }
-
-                override fun adHidden(ad: Ad?) {
-                    Log.i(TAG, "StartApp interstitial hidden")
-                    onDismissed()
-                }
-
-                override fun adClicked(ad: Ad?) {
-                    Log.i(TAG, "StartApp interstitial clicked")
-                }
-
-                override fun adNotDisplayed(ad: Ad?) {
-                    Log.w(TAG, "StartApp interstitial not displayed")
-                    onDismissed()
-                }
-            })
             startAppAd.loadAd(object : AdEventListener {
                 override fun onReceiveAd(ad: Ad) {
                     Log.i(TAG, "StartApp interstitial loaded")
-                    startAppAd.showAd()
-                    lastInterstitialShownAt = System.currentTimeMillis()
+                    startAppAd.showAd(object : AdDisplayListener {
+                        override fun adDisplayed(ad: Ad?) {
+                            Log.i(TAG, "StartApp interstitial displayed")
+                            lastInterstitialShownAt = System.currentTimeMillis()
+                        }
+
+                        override fun adHidden(ad: Ad?) {
+                            Log.i(TAG, "StartApp interstitial hidden")
+                            onDismissed()
+                        }
+
+                        override fun adClicked(ad: Ad?) {
+                            Log.i(TAG, "StartApp interstitial clicked")
+                        }
+
+                        override fun adNotDisplayed(ad: Ad?) {
+                            Log.w(TAG, "StartApp interstitial not displayed")
+                            onDismissed()
+                        }
+                    })
                 }
 
                 override fun onFailedToReceiveAd(ad: Ad?) {

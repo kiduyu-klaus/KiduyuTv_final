@@ -17,9 +17,6 @@ import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 object AdManager {
 
@@ -34,16 +31,15 @@ object AdManager {
     // ── Initialisation ────────────────────────────────────────────────────
 
     /**
-     * Initialise the Mobile Ads SDK. Call once from KiduyuTvApp.onCreate().
+     * Initialise the Mobile Ads SDK after UMP consent has resolved.
      * Safe to call multiple times — subsequent calls are no-ops.
      * Respects the ads disabled setting from SettingsManager.
      */
     fun init(context: Context) {
-        // Check if ads are disabled
-//        if (SettingsManager(context).isAdsDisabled()) {
-//            Log.i(TAG, "Ads disabled by user - skipping initialization")
-//            return
-//        }
+        if (!shouldShowAds(context)) {
+            Log.i(TAG, "Ads disabled or consent unavailable - skipping initialization")
+            return
+        }
 
         if (isInitialised) return
         MobileAds.initialize(context) { initStatus ->
@@ -63,8 +59,11 @@ object AdManager {
      * Check if ads should be shown based on user settings.
      */
     private fun shouldShowAds(context: Context): Boolean {
-        //return !SettingsManager(context).isAdsDisabled()
-        return true;
+        return try {
+            !SettingsManager(context).isAdsDisabled() && ConsentManager.canRequestAds(context)
+        } catch (e: Exception) {
+            true
+        }
     }
 
     // ── Interstitial ──────────────────────────────────────────────────────
@@ -124,6 +123,10 @@ object AdManager {
             return
         }
         ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+            override fun onAdShowedFullScreenContent() {
+                lastInterstitialShownAt = System.currentTimeMillis()
+            }
+
             override fun onAdDismissedFullScreenContent() {
                 interstitialAd = null
                 preloadInterstitial(activity)

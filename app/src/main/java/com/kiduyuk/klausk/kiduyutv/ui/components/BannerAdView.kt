@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -39,15 +41,25 @@ fun BannerAdView(
         return
     }
 
+    val adView = remember(context) {
+        AdView(context).apply {
+            setAdSize(AdSize.BANNER)
+            adUnitId = AdUnitIds.PHONE_BANNER
+        }
+    }
+
+    DisposableEffect(adView) {
+        onDispose {
+            adView.destroy()
+        }
+    }
+
     AndroidView(
         modifier = modifier,
-        factory = { ctx ->
-            AdView(ctx).apply {
-                setAdSize(AdSize.BANNER)
-                adUnitId = AdUnitIds.PHONE_BANNER
-                Log.i("BannerAdView", "Loading mobile banner ad — unit: ${AdUnitIds.PHONE_BANNER}")
-                loadAd(AdRequest.Builder().build())
-            }
+        factory = {
+            Log.i("BannerAdView", "Loading mobile banner ad — unit: ${AdUnitIds.PHONE_BANNER}")
+            adView.loadAd(AdRequest.Builder().build())
+            adView
         }
     )
 }

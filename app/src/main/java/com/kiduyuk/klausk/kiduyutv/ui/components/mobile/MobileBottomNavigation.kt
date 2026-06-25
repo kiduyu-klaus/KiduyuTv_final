@@ -13,6 +13,9 @@ import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -93,6 +96,18 @@ fun MobileBottomNavigation(
         if (BuildConfig.FLAVOR == "phone") {
             val context = LocalContext.current
             val activity = context as? Activity ?: return
+            val bannerContainer = remember { mutableStateOf<FrameLayout?>(null) }
+            DisposableEffect(Unit) {
+                onDispose {
+                    bannerContainer.value?.let { container ->
+                        for (index in 0 until container.childCount) {
+                            (container.getChildAt(index) as? com.google.android.gms.ads.AdView)?.destroy()
+                        }
+                        container.removeAllViews()
+                    }
+                    bannerContainer.value = null
+                }
+            }
             if (!SettingsManager(context).isAdsDisabled()) {
                 AndroidView(
                     modifier = Modifier
@@ -105,6 +120,7 @@ fun MobileBottomNavigation(
                                 FrameLayout.LayoutParams.MATCH_PARENT,
                                 FrameLayout.LayoutParams.WRAP_CONTENT
                             )
+                            bannerContainer.value = this
                             AdFallbackDispatcher.loadBanner(
                                 activity,
                                 this,

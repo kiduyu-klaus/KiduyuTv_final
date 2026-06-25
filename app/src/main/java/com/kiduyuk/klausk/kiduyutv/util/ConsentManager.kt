@@ -73,13 +73,12 @@ object ConsentManager {
     }
 
     /**
-     * Forwards the UMP consent decision to StartApp, Unity Ads, and Wortise.
+     * Forwards the UMP consent decision to supported secondary networks.
      * This should be called **after** UMP has resolved so each SDK knows
      * whether it may use personal data for ad targeting.
      *
      * Note on SDK API compatibility:
-     * - StartApp inapp-sdk 5.2.6 has no programmatic consent API; targeting
-     *   is controlled via the dashboard. We log only.
+     * - StartApp receives consent during SDK initialization in StartAppAdManager.
      * - Unity Ads uses the `MetaData` "gdpr.consent" / "privacy.consent" keys.
      * - Wortise SDK 1.7.2 uses the UMP integration implicitly — no manual
      *   call required. We log only.
@@ -89,9 +88,7 @@ object ConsentManager {
         Log.i(TAG, "Propagating consent to all networks: personalize=$canPersonalize")
 
         // ── StartApp ──────────────────────────────────────────────────────
-        // StartApp inapp-sdk 5.2.6 has no setUserConsent/ConsentType API.
-        // Consent must be configured from the StartApp dashboard.
-        Log.i(TAG, "StartApp: consent handled via dashboard (no SDK API).")
+        Log.i(TAG, "StartApp: consent will be applied during SDK initialization.")
 
         // ── Unity Ads ─────────────────────────────────────────────────────
         try {

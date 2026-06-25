@@ -6,12 +6,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.kiduyuk.klausk.kiduyutv.util.AdFallbackDispatcher
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
+import com.kiduyuk.klausk.kiduyutv.util.WortiseAdManager
 
 /**
  * Wortise banner ad wrapped for Jetpack Compose.
@@ -37,6 +39,12 @@ fun WortiseBannerAdView(
 
     // Skip rendering if ads are disabled
     if (SettingsManager(context).isAdsDisabled()) return
+
+    DisposableEffect(activity) {
+        onDispose {
+            WortiseAdManager.destroyBanner()
+        }
+    }
 
     AndroidView(
         modifier = modifier,

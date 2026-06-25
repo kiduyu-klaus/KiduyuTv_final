@@ -73,6 +73,9 @@ object WortiseAdManager {
     @Volatile
     private var currentBannerAd: BannerAd? = null
 
+    @Volatile
+    private var appContext: Context? = null
+
     private fun shouldShowAds(context: Context): Boolean = try {
         !SettingsManager(context).isAdsDisabled()
     } catch (e: Exception) {
@@ -108,11 +111,11 @@ object WortiseAdManager {
             Log.i(TAG, "Ads disabled - skipping Wortise preload")
             return
         }
+        appContext = context.applicationContext
         try {
             // 1. Initialize the SDK FIRST — required by every Wortise ad class.
             if (!WortiseSdk.isInitialized) {
-                //val appId = readWortiseAppId(context)
-                val appId = "844b2438-d532-423c-9ac1-523ca3bbc8c4"
+                val appId = readWortiseAppId(context)
                 if (appId.isNullOrBlank() || appId == "DEFAULT") {
                     Log.w(
                         TAG,
@@ -123,11 +126,9 @@ object WortiseAdManager {
                 }
                 Log.i(TAG, "Initializing Wortise SDK with appId=")
                 WortiseSdk.initialize(context, appId)
-                // Wait synchronously until the SDK is fully ready so the
-                // ad units we instantiate below have valid config.
-                WortiseSdk.wait { /* ready */ }
                 if (!WortiseSdk.isInitialized) {
-                    Log.w(TAG, "WortiseSdk.initialize returned but SDK not ready")
+                    Log.w(TAG, "Wortise initialization requested; SDK not ready yet")
+                    isInitialised = true
                     return
                 }
                 Log.i(TAG, "Wortise SDK initialised")
@@ -386,6 +387,7 @@ object WortiseAdManager {
     }
 
     private fun loadRewardedAd(context: Context) {
+        appContext = context.applicationContext
         if (!isInitialised || !WortiseSdk.isInitialized) return
         try {
             rewardedAd = RewardedAd(context, AD_UNIT_REWARDED).apply {
@@ -422,7 +424,8 @@ object WortiseAdManager {
 
             override fun onRewardedFailedToShow(ad: RewardedAd, error: AdError) {
                 Log.w(TAG, "Wortise rewarded failed to show: ")
-
+                rewardedAd = null
+                appContext?.let { loadRewardedAd(it) }
                 onDismissed?.invoke()
 
             }
@@ -435,6 +438,7 @@ object WortiseAdManager {
             override fun onRewardedDismissed(ad: RewardedAd) {
                 Log.i(TAG, "Wortise rewarded dismissed")
                 rewardedAd = null
+                appContext?.let { loadRewardedAd(it) }
                 onDismissed?.invoke()
             }
 

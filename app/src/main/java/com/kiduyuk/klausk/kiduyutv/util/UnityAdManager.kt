@@ -2,8 +2,10 @@ package com.kiduyuk.klausk.kiduyutv.util
 
 import android.app.Activity
 import android.content.Context
+import android.content.pm.PackageManager
 import android.util.Log
 import android.view.ViewGroup
+import com.unity3d.ads.IUnityAdsInitializationListener
 import com.unity3d.ads.IUnityAdsLoadListener
 import com.unity3d.ads.IUnityAdsShowListener
 import com.unity3d.ads.UnityAds
@@ -28,6 +30,8 @@ object UnityAdManager {
     private const val PLACEMENT_REWARDED = "Rewarded_Android"
     private const val PLACEMENT_INTERSTITIAL = "Interstitial_Android"
     private const val PLACEMENT_BANNER = "Banner_Android"
+    private const val UNITY_GAME_ID_META = "com.unity3d.ads.UNITY_ADS_GAME_ID"
+    private const val UNITY_TEST_MODE_META = "com.unity3d.ads.UNITY_ADS_TEST_MODE"
 
     @Volatile
     var isInitialised = false
@@ -81,6 +85,32 @@ object UnityAdManager {
         true
     }
 
+    private fun readUnityGameId(context: Context): String? = try {
+        val ai = context.packageManager.getApplicationInfo(
+            context.packageName,
+            PackageManager.GET_META_DATA
+        )
+        ai.metaData?.getString(UNITY_GAME_ID_META)
+    } catch (e: Exception) {
+        Log.w(TAG, "Failed to read Unity game id from manifest", e)
+        null
+    }
+
+    private fun readUnityTestMode(context: Context): Boolean = try {
+        val ai = context.packageManager.getApplicationInfo(
+            context.packageName,
+            PackageManager.GET_META_DATA
+        )
+        when (val value = ai.metaData?.get(UNITY_TEST_MODE_META)) {
+            is Boolean -> value
+            is String -> value.equals("true", ignoreCase = true)
+            else -> false
+        }
+    } catch (e: Exception) {
+        Log.w(TAG, "Failed to read Unity test mode from manifest", e)
+        false
+    }
+
     /**
      * Pre-load Unity Ads placements. Call from [KiduyuTvApp.onInitializationComplete].
      */
@@ -90,13 +120,50 @@ object UnityAdManager {
             return
         }
         try {
-            UnityAds.load(PLACEMENT_INTERSTITIAL, loadListener)
-            UnityAds.load(PLACEMENT_REWARDED, loadListener)
-            isInitialised = true
-            Log.i(TAG, "Unity Ads pre-loaded instructions sent")
+            if (UnityAds.isInitialized()) {
+                isInitialised = true
+                loadFullscreenPlacements()
+                return
+            }
+
+            val gameId = readUnityGameId(context)
+            if (gameId.isNullOrBlank()) {
+                Log.w(TAG, "Unity game id missing - skipping preload")
+                return
+            }
+
+            UnityAds.initialize(
+                context.applicationContext,
+                gameId,
+                readUnityTestMode(context),
+                object : IUnityAdsInitializationListener {
+                    override fun onInitializationComplete() {
+                        isInitialised = true
+                        Log.i(TAG, "Unity Ads initialized")
+                        loadFullscreenPlacements()
+                    }
+
+                    override fun onInitializationFailed(
+                        error: UnityAds.UnityAdsInitializationError,
+                        message: String
+                    ) {
+                        isInitialised = false
+                        _isInterstitialReady = false
+                        _isRewardedReady = false
+                        Log.w(TAG, "Unity initialization failed: $error, message: $message")
+                    }
+                }
+            )
+            Log.i(TAG, "Unity Ads initialization requested")
         } catch (e: Exception) {
             Log.e(TAG, "Unity preload failed", e)
         }
+    }
+
+    private fun loadFullscreenPlacements() {
+        UnityAds.load(PLACEMENT_INTERSTITIAL, loadListener)
+        UnityAds.load(PLACEMENT_REWARDED, loadListener)
+        Log.i(TAG, "Unity ad preload requested")
     }
 
     // ── Banner ────────────────────────────────────────────────────────────
@@ -106,6 +173,10 @@ object UnityAdManager {
      */
     fun loadBanner(activity: Activity, container: ViewGroup) {
         if (!shouldShowAds(activity)) return
+        if (!isInitialised || !UnityAds.isInitialized()) {
+            Log.w(TAG, "Unity banner skipped - SDK not initialized")
+            return
+        }
         try {
             destroyBanner()
             container.removeAllViews()
@@ -178,6 +249,12 @@ object UnityAdManager {
             onDismissed()
             return
         }
+        if (!isInitialised || !UnityAds.isInitialized()) {
+            Log.i(TAG, "Unity interstitial skipped - SDK not initialized")
+            onDismissed()
+            preloadAds(activity)
+            return
+        }
         val now = System.currentTimeMillis()
         if (now - lastInterstitialShownAt < MIN_INTERSTITIAL_INTERVAL_MS) {
             onDismissed()
@@ -245,6 +322,12 @@ object UnityAdManager {
     ) {
         if (!shouldShowAds(activity)) {
             onDismissed()
+            return
+        }
+        if (!isInitialised || !UnityAds.isInitialized()) {
+            Log.i(TAG, "Unity rewarded skipped - SDK not initialized")
+            onDismissed()
+            preloadAds(activity)
             return
         }
         if (!isRewardedReady) {

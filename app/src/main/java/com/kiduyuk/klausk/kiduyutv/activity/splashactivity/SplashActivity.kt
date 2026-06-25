@@ -58,6 +58,10 @@ import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import com.kiduyuk.klausk.kiduyutv.util.UpdateUtil
 import com.kiduyuk.klausk.kiduyutv.util.ConsentManager
 import com.kiduyuk.klausk.kiduyutv.util.AdManager
+import com.kiduyuk.klausk.kiduyutv.util.AppOpenAdObserver
+import com.kiduyuk.klausk.kiduyutv.util.StartAppAdManager
+import com.kiduyuk.klausk.kiduyutv.util.UnityAdManager
+import com.kiduyuk.klausk.kiduyutv.util.WortiseAdManager
 import io.github.cutelibs.cutedialog.CuteDialog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -81,6 +85,7 @@ class SplashActivity : ComponentActivity() {
     private var permissionHandled by mutableStateOf(false)
     private var syncCompleted by mutableStateOf(false)
     private var versionCheckHandled by mutableStateOf(false)
+    private var adsConsentHandled by mutableStateOf(false)
 
     // Remote version shown in the status chip
     private var currentRemoteVersion by mutableStateOf<String?>(null)
@@ -246,6 +251,7 @@ class SplashActivity : ComponentActivity() {
                     permissionHandled = permissionHandled,
                     remoteVersion = currentRemoteVersion,
                     syncCompleted = syncCompleted,
+                    adsConsentHandled = adsConsentHandled,
                     syncProgress = syncProgress,
                     syncMessage = syncMessage,
                     onTimeout = {
@@ -261,10 +267,14 @@ class SplashActivity : ComponentActivity() {
         startFirebaseSync()
 
         // Request GDPR consent before initializing ads
-        // AdManager will be initialized after consent is resolved
+        // All ad SDKs are initialized only after consent is resolved.
         ConsentManager.requestConsent(this) {
-            // Initialize Mobile Ads SDK (AdMob for phone, GAM for tv) after consent
             AdManager.init(this@SplashActivity)
+            StartAppAdManager.preloadAds(this@SplashActivity)
+            UnityAdManager.preloadAds(this@SplashActivity)
+            WortiseAdManager.preloadAds(this@SplashActivity)
+            AppOpenAdObserver.install(application)
+            adsConsentHandled = true
         }
 
         checkForUpdates()
@@ -438,7 +448,8 @@ class SplashActivity : ComponentActivity() {
      * Navigate to MainActivity and finish this splash screen.
      * Guards against navigation while any blocking condition is still active:
      * an update dialog is open, permissions haven't been resolved, sync is
-     * still running, or the Firebase device-version check has not completed.
+     * still running, ad consent is pending, or the Firebase device-version check
+     * has not completed.
      * The Compose layer also prevents onTimeout() from being called in those
      * states, but this is a second safety net at the Activity level so that
      * even a race-condition early call is silently dropped.
@@ -461,6 +472,10 @@ class SplashActivity : ComponentActivity() {
         }
         if (!versionCheckHandled) {
             Log.i(TAG, "Device version check still in progress — suppressing navigation")
+            return
+        }
+        if (!adsConsentHandled) {
+            Log.i(TAG, "Ad consent still in progress — suppressing navigation")
             return
         }
 
@@ -732,13 +747,13 @@ class SplashActivity : ComponentActivity() {
         permissionHandled: Boolean,
         remoteVersion: String?,
         syncCompleted: Boolean,
+        adsConsentHandled: Boolean,
         syncProgress: Int,
         syncMessage: String,
         onTimeout: () -> Unit
     ) {
-        // Progress pauses when a dialog is open, permission hasn't been resolved yet,
-        // sync hasn't completed yet, or the Firebase device-version check is still pending.
-        val isPaused = updateAvailable || !permissionHandled || !syncCompleted || !versionCheckHandled
+        // Progress pauses while startup gates are pending.
+        val isPaused = updateAvailable || !permissionHandled || !syncCompleted || !versionCheckHandled || !adsConsentHandled
 
         val barProgress = remember { Animatable(0f) }
 
@@ -910,6 +925,8 @@ class SplashActivity : ComponentActivity() {
                             "Requesting permissions…" to Color(0xFF808080)
                         !versionCheckHandled ->
                             "Verifying app version…" to Color(0xFF808080)
+                        !adsConsentHandled ->
+                            "Preparing ads..." to Color(0xFF808080)
                         !syncCompleted ->
                             "Syncing data..." to Color(0xFF808080)
                         else ->

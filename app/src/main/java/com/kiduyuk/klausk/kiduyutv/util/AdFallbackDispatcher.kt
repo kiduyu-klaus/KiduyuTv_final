@@ -32,7 +32,10 @@ object AdFallbackDispatcher {
      */
     fun showInterstitial(activity: Activity, onDismissed: () -> Unit) {
         when {
-
+            AdManager.isInterstitialReady -> {
+                Log.i(TAG, "Showing AdMob interstitial")
+                AdManager.showInterstitial(activity, onDismissed)
+            }
 
             StartAppAdManager.isInitialised -> {
                 Log.i(TAG, "Falling back to StartApp interstitial")
@@ -47,10 +50,6 @@ object AdFallbackDispatcher {
             WortiseAdManager.isInterstitialReady -> {
                 Log.i(TAG, "Falling back to Wortise interstitial")
                 WortiseAdManager.showInterstitial(activity, onDismissed)
-            }
-            AdManager.isInterstitialReady -> {
-                Log.i(TAG, "Showing AdMob interstitial")
-                AdManager.showInterstitial(activity, onDismissed)
             }
 
             else -> {

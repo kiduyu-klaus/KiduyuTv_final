@@ -30,5 +30,9 @@ object TvInterstitialManager {
         AdFallbackDispatcher.showInterstitial(activity, onDismissed)
     }
 
-    val isReady: Boolean get() = AdManager.isInterstitialReady
+    val isReady: Boolean
+        get() = AdManager.isInterstitialReady ||
+            StartAppAdManager.isInitialised ||
+            UnityAdManager.isInterstitialReady ||
+            WortiseAdManager.isInterstitialReady
 }
