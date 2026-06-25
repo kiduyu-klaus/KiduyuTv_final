@@ -85,7 +85,7 @@ fun NavGraph(navController: NavHostController) {
                 )
 
                 // Overlay a non-intrusive banner at the bottom when on TV flavour.
-                // TvBannerAdView loads via AdFallbackDispatcher (ADMOB network).
+                // TvBannerAdView loads via AdFallbackDispatcher (StartApp network).
                 if (BuildConfig.FLAVOR == "tv") {
                     TvBannerAdView(
                         modifier = Modifier
