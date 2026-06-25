@@ -40,7 +40,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.nativeKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
@@ -1013,10 +1012,9 @@ private fun ChannelChip(
                 }
             )
             .onPreviewKeyEvent { keyEvent ->
-                val keyCode = keyEvent.nativeKeyEvent.keyCode
-                val isSelectKey = keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER ||
-                    keyCode == android.view.KeyEvent.KEYCODE_ENTER ||
-                    keyCode == android.view.KeyEvent.KEYCODE_NUMPAD_ENTER
+                val isSelectKey = keyEvent.key == Key(android.view.KeyEvent.KEYCODE_DPAD_CENTER.toLong()) ||
+                    keyEvent.key == Key(android.view.KeyEvent.KEYCODE_ENTER.toLong()) ||
+                    keyEvent.key == Key(android.view.KeyEvent.KEYCODE_NUMPAD_ENTER.toLong())
 
                 if (isSelectKey && keyEvent.type == KeyEventType.KeyUp) {
                     onClick()
