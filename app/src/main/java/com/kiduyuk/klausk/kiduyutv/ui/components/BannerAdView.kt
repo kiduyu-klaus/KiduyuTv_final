@@ -1,4 +1,4 @@
-hhpackage com.kiduyuk.klausk.kiduyutv.ui.components
+package com.kiduyuk.klausk.kiduyutv.ui.components
 
 import android.util.Log
 import androidx.compose.foundation.background
