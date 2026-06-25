@@ -1011,20 +1011,12 @@ private fun ChannelChip(
                     Modifier
                 }
             )
-            .onPreviewKeyEvent { keyEvent ->
-                val isSelectKey = keyEvent.key == Key(android.view.KeyEvent.KEYCODE_DPAD_CENTER.toLong()) ||
-                    keyEvent.key == Key(android.view.KeyEvent.KEYCODE_ENTER.toLong()) ||
-                    keyEvent.key == Key(android.view.KeyEvent.KEYCODE_NUMPAD_ENTER.toLong())
-
-                if (!isSelectKey) {
-                    return@onPreviewKeyEvent false
-                }
-
-                if (keyEvent.type == KeyEventType.KeyUp) {
-                    onClick()
-                }
-                true
-            }
+            // Note: clickable() already handles DPAD_CENTER/ENTER for focused,
+            // focusable components on TV. A separate onPreviewKeyEvent handler
+            // used to call onClick() a second time for the same key event,
+            // double-firing startActivity(). The resulting race between the
+            // two launches was what made focus appear to jump to the home
+            // logo in the top bar after clicking a channel.
             .focusable(interactionSource = interactionSource)
             .clickable(
                 interactionSource = interactionSource,
@@ -1213,51 +1205,39 @@ private fun SearchContent(
     val isFireTv = remember(context) { isFireTVDevice(context) }
     val currentImeAction = if (isFireTv) ImeAction.Next else ImeAction.Search
 
-    // Track whether focus has already been moved to the first result for the
-    // current set of results. We re-arm it whenever the result list mutates
-    // (e.g. user keeps typing and the first result changes) so the first
-    // item is always focused and selected when results are (re)populated.
-    val lastFocusedResultKey = remember { mutableStateOf<String?>(null) }
-    val firstResultKey = searchResults.firstOrNull()?.id
-
     // Request focus on search field when screen opens
     LaunchedEffect(Unit) {
         searchFocusRequester.requestFocus()
     }
 
-    // Auto-focus & select the first search result whenever it changes.
-    // Runs on every recomposition where the top result's key differs from
-    // the last one we focused — this gives the user D-pad focus on the
-    // first result as soon as results populate (no need to press Search).
-    LaunchedEffect(firstResultKey) {
-        if (searchResults.isNotEmpty() && firstResultKey != null && firstResultKey != lastFocusedResultKey.value) {
-            // Small delay to ensure the grid item has been composed and is
-            // focusable. 100ms is enough for the LazyVerticalGrid to lay out
-            // its first cell.
-            delay(100)
-            try {
-                firstSearchResultFocusRequester.requestFocus()
-                lastFocusedResultKey.value = firstResultKey
-            } catch (e: Exception) {
-                // Focus requester not yet attached — ignore; the next
-                // recomposition will retry.
-            }
-        }
-    }
+    // Intentionally no auto-focus while the user is typing. Moving focus to
+    // the results grid mid-typing pulls Compose focus off the text field,
+    // which dismisses the on-screen keyboard after a single character.
+    // Focus only moves to the first result when the user explicitly submits
+    // the search (see handleImeAction below), so they can type the whole
+    // word and press Search/Next/Go on the remote.
 
-    // Handle IME action submission
+    // Handle IME action submission (Search / Next / Go / Done — see
+    // SearchInputField, which binds all of these since some platforms,
+    // like Fire TV's stock keyboard, hardcode the action button rather
+    // than respecting ImeAction.Search).
     val handleImeAction: (String) -> Unit = { query ->
-        // Trigger search when IME action is pressed
         if (query.isNotBlank()) {
-            // Already searched via onValueChange, just clear focus
+            // Query is already applied via onValueChange as the user types;
+            // submitting just dismisses the keyboard and moves focus to
+            // the first result.
             focusManager.clearFocus()
             if (searchResults.isNotEmpty()) {
                 coroutineScope.launch {
-                    delay(50)
-                    firstSearchResultFocusRequester.requestFocus()
-                    // Mark as focused so the auto-focus effect doesn't
-                    // double-fire for the same first result.
-                    lastFocusedResultKey.value = firstResultKey
+                    // Small delay to ensure the grid has laid out its first
+                    // cell and is ready to accept focus.
+                    delay(100)
+                    try {
+                        firstSearchResultFocusRequester.requestFocus()
+                    } catch (e: Exception) {
+                        // Focus requester not yet attached to a composed
+                        // node; nothing else to do for this submission.
+                    }
                 }
             }
         }
@@ -1480,8 +1460,15 @@ private fun SearchInputField(
                     autoCorrect = false
                 ),
                 keyboardActions = KeyboardActions(
+                    // Bind every IME submit callback to the same handler.
+                    // Fire TV's stock on-screen keyboard hardcodes its
+                    // bottom-right action button to "Next" or "Go" and
+                    // ignores ImeAction.Search entirely, so relying on
+                    // onSearch alone would leave Fire TV users with a
+                    // remote button that does nothing.
                     onSearch = { onImeAction(query) },
                     onNext = { onImeAction(query) },
+                    onGo = { onImeAction(query) },
                     onDone = { onImeAction(query) }
                 ),
                 interactionSource = interactionSource,
