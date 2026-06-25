@@ -38,3 +38,5 @@ app/release/baselineProfiles/0/app-release.dm
 
 *.tmp
 /docs
+test.py
+response.html

@@ -1016,12 +1016,14 @@ private fun ChannelChip(
                     keyEvent.key == Key(android.view.KeyEvent.KEYCODE_ENTER.toLong()) ||
                     keyEvent.key == Key(android.view.KeyEvent.KEYCODE_NUMPAD_ENTER.toLong())
 
-                if (isSelectKey && keyEvent.type == KeyEventType.KeyUp) {
-                    onClick()
-                    true
-                } else {
-                    false
+                if (!isSelectKey) {
+                    return@onPreviewKeyEvent false
                 }
+
+                if (keyEvent.type == KeyEventType.KeyUp) {
+                    onClick()
+                }
+                true
             }
             .focusable(interactionSource = interactionSource)
             .clickable(
