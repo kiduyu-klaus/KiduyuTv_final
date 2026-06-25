@@ -11,7 +11,7 @@ import java.io.ByteArrayInputStream
 /**
  * AdBlockerWebViewClient - Handles ad blocking and page lifecycle events
  */
-class AdBlockerWebViewClient(
+open class AdBlockerWebViewClient(
     private val onPageFinished: () -> Unit,
     private val onError: () -> Unit
 ) : WebViewClient() {

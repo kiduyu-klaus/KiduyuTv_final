@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.nativeKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
@@ -842,12 +843,6 @@ private fun CategorySection(
  * Individual event item that can be expanded to show channels.
  * Always shows available channels section when event has channels,
  * making it focusable for TV D-pad navigation even with a single channel.
- *
- * Fix: Removed redundant .focusable() from the Quick Play button Box.
- * Modifier.clickable() already registers the element in the TV focus
- * traversal system and handles KEYCODE_DPAD_CENTER / KEYCODE_ENTER
- * internally. The duplicate .focusable() was swallowing remote OK events
- * before clickable() could process them.
  */
 @Composable
 private fun EventItem(
@@ -861,16 +856,11 @@ private fun EventItem(
 
     // Focus requesters for channel navigation
     val firstChannelFocusRequester = remember { FocusRequester() }
-    val availableChannelsFocusRequester = remember { FocusRequester() }
 
-    // Request focus on Available Channels button when event is expanded
+    // Request focus on the first available channel when event is expanded.
     LaunchedEffect(isExpanded, event.channels.size) {
         if (isExpanded && event.channels.isNotEmpty()) {
-            // First try to focus on Available Channels label, then first channel
-            try {
-                availableChannelsFocusRequester.requestFocus()
-            } catch (e: Exception) {
-                // If failed, try first channel
+            runCatching {
                 firstChannelFocusRequester.requestFocus()
             }
         }
@@ -952,42 +942,29 @@ private fun EventItem(
             }
 
             // Expanded channels section - always shown when event has channels and is expanded
-            // OR always visible when event has only 1 channel (for better TV navigation)
             AnimatedVisibility(
                 visible = isExpanded && event.channels.isNotEmpty(),
                 enter = expandVertically() + fadeIn(),
                 exit = shrinkVertically() + fadeOut()
             ) {
                 Column(modifier = Modifier.padding(top = 12.dp)) {
-                    // Focusable "Available Channels" label/button
-                    val channelsInteractionSource = remember { MutableInteractionSource() }
-                    val isChannelsLabelFocused by channelsInteractionSource.collectIsFocusedAsState()
-
-                    Surface(
-                        modifier = Modifier
-                            .focusRequester(availableChannelsFocusRequester)
-                            .focusable(interactionSource = channelsInteractionSource),
-                        color = Color.Transparent,
-                        shape = RoundedCornerShape(4.dp)
+                    Row(
+                        modifier = Modifier.padding(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier.padding(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Tv,
-                                contentDescription = null,
-                                tint = if (isChannelsLabelFocused) Color(0xFF448AFF) else TextSecondary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Available Channels",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = if (isChannelsLabelFocused) Color(0xFF448AFF) else TextSecondary,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.Tv,
+                            contentDescription = null,
+                            tint = TextSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Available Channels",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = TextSecondary,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -1009,71 +986,12 @@ private fun EventItem(
                     }
                 }
             }
-
-            // Quick channel selector - shown if event has channels.
-            // FIX: Removed .focusable() — .clickable() already handles focus
-            // registration and D-pad center/enter events on its own. The prior
-            // .focusable() was creating a duplicate interaction pipeline that
-            // consumed KEYCODE_DPAD_CENTER before clickable() could fire onClick.
-            if (event.channels.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-
-                val quickPlayInteractionSource = remember { MutableInteractionSource() }
-                val isQuickPlayFocused by quickPlayInteractionSource.collectIsFocusedAsState()
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(if (isQuickPlayFocused) Color.White else PrimaryRed)
-                        .border(
-                            width = if (isQuickPlayFocused) 2.dp else 0.dp,
-                            color = if (isQuickPlayFocused) PrimaryRed else Color.Transparent,
-                            shape = RoundedCornerShape(8.dp)
-                        )
-                        // .focusable() REMOVED — clickable handles focus + D-pad natively
-                        .clickable(
-                            interactionSource = quickPlayInteractionSource,
-                            indication = null,
-                            onClick = { onChannelClick(event.channels.first()) }
-                        )
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PlayCircle,
-                            contentDescription = null,
-                            tint = if (isQuickPlayFocused) PrimaryRed else Color.White,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (event.channels.size == 1) {
-                                "Play: ${event.channels.first().name}"
-                            } else {
-                                "Play (${event.channels.size} channels available)"
-                            },
-                            style = MaterialTheme.typography.labelMedium,
-                            color = if (isQuickPlayFocused) PrimaryRed else Color.White,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            }
         }
     }
 }
 
 /**
- * Clickable channel chip — always focusable for D-pad navigation.
- *
- * Fix: Removed .focusable() before .clickable(). Modifier.clickable()
- * already makes the composable focusable and handles KEYCODE_DPAD_CENTER /
- * KEYCODE_ENTER. The prior explicit .focusable() created a second focus
- * node sharing the same MutableInteractionSource, which intercepted remote
- * OK key events and prevented onClick from firing.
+ * Clickable channel chip that supports D-pad focus and OK/Enter selection.
  */
 @Composable
 private fun ChannelChip(
@@ -1094,7 +1012,20 @@ private fun ChannelChip(
                     Modifier
                 }
             )
-            // .focusable() REMOVED — clickable handles focus + D-pad natively
+            .onPreviewKeyEvent { keyEvent ->
+                val keyCode = keyEvent.nativeKeyEvent.keyCode
+                val isSelectKey = keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER ||
+                    keyCode == android.view.KeyEvent.KEYCODE_ENTER ||
+                    keyCode == android.view.KeyEvent.KEYCODE_NUMPAD_ENTER
+
+                if (isSelectKey && keyEvent.type == KeyEventType.KeyUp) {
+                    onClick()
+                    true
+                } else {
+                    false
+                }
+            }
+            .focusable(interactionSource = interactionSource)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,

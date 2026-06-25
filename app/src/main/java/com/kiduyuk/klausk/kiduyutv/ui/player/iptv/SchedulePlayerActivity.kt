@@ -49,6 +49,7 @@ import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.data.model.ChannelWatchPage
 import com.kiduyuk.klausk.kiduyutv.data.model.PlayerOption
 import com.kiduyuk.klausk.kiduyutv.data.repository.ScheduleRepository
+import com.kiduyuk.klausk.kiduyutv.ui.player.webview.AdBlockerWebViewClient
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.MouseCursorView
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import kotlinx.coroutines.Dispatchers
@@ -489,37 +490,6 @@ class SchedulePlayerActivity : ComponentActivity() {
         }
     }
 
-    /**
-     * Returns true if the URL matches known ad networks, banner scripts, or
-     * ad iframe pages. Add new patterns here as they are encountered in logcat.
-     */
-    private fun isAdRequest(url: String): Boolean {
-        val adPatterns = listOf(
-            // Site-specific ad paths seen on dlhd.pk
-            "adbanner", "rs4k-ad", "rs4k",
-            // Ad-Asia / AA network — identified by data-aa attribute in the iframe src
-            "aa-ads", "adasia",
-            // Common ad networks
-            "doubleclick.net", "googlesyndication.com", "googletagservices.com",
-            "adservice.google", "pagead2.googlesyndication",
-            "adnxs.com", "adsrvr.org",
-            "exoclick.com", "juicyads.com", "adskeeper.com",
-            "hilltopads.net", "adsterra.com", "propellerads.com",
-            "trafficjunky.net", "trafficstars.com",
-            "popunder", "pop-up", "popcash",
-            "clickadu.com", "adcash.com", "bidvertiser.com"
-        )
-        return adPatterns.any { url.contains(it, ignoreCase = true) }
-    }
-
-    /**
-     * Returns a minimal empty 200 response used to silently swallow blocked ad requests.
-     * Using 200 (not 4xx) avoids error callbacks that might trigger player fallback logic.
-     */
-    private fun emptyResponse(): WebResourceResponse {
-        return WebResourceResponse("text/plain", "UTF-8", "".byteInputStream())
-    }
-
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupLayout() {
         rootLayout = FrameLayout(this).apply {
@@ -539,22 +509,34 @@ class SchedulePlayerActivity : ComponentActivity() {
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
-                databaseEnabled = true
+
+
+                // Fix: Media Playback User Gesture Restriction
                 mediaPlaybackRequiresUserGesture = false
                 allowFileAccess = true
                 allowContentAccess = true
+
+                // Viewport scaling
                 loadWithOverviewMode = true
                 useWideViewPort = true
-                builtInZoomControls = false
-                displayZoomControls = false
-                setSupportZoom(false)
-                // FIX: setSupportMultipleWindows(false) prevents popup-style players
-                // that open a new window and break the autoplay context
-                setSupportMultipleWindows(false)
-                javaScriptCanOpenWindowsAutomatically = false
-                mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                // FIX: disable cache so stale player configs don't interfere
-                cacheMode = WebSettings.LOAD_NO_CACHE
+
+                // FIX: Changed zoom constraints to allow video players to properly resize video layouts.
+                // We disable visual buttons (displayZoomControls) so it stays clean.
+                builtInZoomControls = false  // True on phones/tablets, False on TV (removes visual artifacts)
+                displayZoomControls = false       // Keeps UI completely clean of ugly +/- buttons
+                setSupportZoom(true)         // Allows standard devices to stretch cinematic views if needed
+
+                // FIX: Multi-window support must be TRUE for standard HTML5 video elements
+                // to scale up and trigger full-screen player states natively.
+                setSupportMultipleWindows(true)
+                javaScriptCanOpenWindowsAutomatically = true // Allows player scripts to execute properly
+
+                // Security layer bypass for http:// streaming streams running on https:// pages
+                if (Build.VERSION.SDK_INT >= 21) {
+                    mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                }
+
+                cacheMode = WebSettings.LOAD_DEFAULT // Utilizes the browser cache for buffering
             }
 
             isHorizontalScrollBarEnabled = false
@@ -568,7 +550,20 @@ class SchedulePlayerActivity : ComponentActivity() {
                 setLayerType(View.LAYER_TYPE_NONE, null)
             }
 
-            webViewClient = object : android.webkit.WebViewClient() {
+            webViewClient = object : AdBlockerWebViewClient(
+                onPageFinished = {
+                    android.util.Log.i(TAG, "[WebView] Page finished with AdBlocker")
+                    injectVideoVolumeController()
+                },
+                onError = {
+                    android.util.Log.e(TAG, "[WebView] Main frame error with AdBlocker")
+                    if (hasDirectIframeUrls) {
+                        tryNextStreamUrl()
+                    } else {
+                        tryNextPlayer()
+                    }
+                }
+            ) {
 
                 override fun shouldInterceptRequest(
                     view: android.webkit.WebView?,
@@ -578,13 +573,8 @@ class SchedulePlayerActivity : ComponentActivity() {
                         ?: return super.shouldInterceptRequest(view, request)
                     val headers = request.requestHeaders
 
-                    // ── Ad Blocker ────────────────────────────────────────────────
-                    // Block at the network level before anything loads or renders.
-                    // Covers both the iframe src request and any ad script/pixel URLs.
-                    if (isAdRequest(url)) {
-                        android.util.Log.i(TAG, "[AdBlock] Blocked: $url")
-                        return emptyResponse()
-                    }
+                    val adBlockerResponse = super.shouldInterceptRequest(view, request)
+                    if (adBlockerResponse != null) return adBlockerResponse
 
                     // ── Autoplay Injection ────────────────────────────────────────
                     // Inject autoplay/unmute script into every HTML frame response,
@@ -600,7 +590,7 @@ class SchedulePlayerActivity : ComponentActivity() {
 
                 override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
                     super.onPageFinished(view, url)
-                    android.util.Log.i(TAG, "[WebView] Page finished: $url")
+                    android.util.Log.i(TAG, "[WebView] Schedule stream page finished: $url")
 
                     // Inject CSS to suppress ad iframes and overlays that slip
                     // past the network block (e.g. JS-injected after page load).
@@ -647,24 +637,6 @@ class SchedulePlayerActivity : ComponentActivity() {
                         })();
                     """.trimIndent(), null)
 
-                    // Top-frame JS injection as a complementary fallback
-                    injectVideoVolumeController()
-                }
-
-                override fun onReceivedError(
-                    view: android.webkit.WebView?,
-                    request: android.webkit.WebResourceRequest?,
-                    error: android.webkit.WebResourceError?
-                ) {
-                    super.onReceivedError(view, request, error)
-                    if (request?.isForMainFrame == true) {
-                        android.util.Log.e(TAG, "[WebView] Error: ${error?.description}")
-                        if (hasDirectIframeUrls) {
-                            tryNextStreamUrl()
-                        } else {
-                            tryNextPlayer()
-                        }
-                    }
                 }
             }
 
