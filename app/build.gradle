@@ -65,7 +65,7 @@ android {
                 startAppAppId: "205544913",
                 unityAdsGameId: "800077880",
                 unityAdsTestMode: "false",
-                wortiseAppId: "844b2438-d532-423c-9ac1-523ca3bbc8c4",
+                wortiseAppId: "11140b29-5f3f-4bf9-b5a8-c02d86409023",
                 admobAppId: "ca-app-pub-3803477439180910~6736398964"
             ]
         }

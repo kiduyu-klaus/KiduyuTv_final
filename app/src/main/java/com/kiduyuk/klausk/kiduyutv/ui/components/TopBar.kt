@@ -53,6 +53,7 @@ import com.kiduyuk.klausk.kiduyutv.R
 fun TopBar(
     selectedRoute: String,
     onNavItemClick: (String) -> Unit,
+    onNavItemFocused: (String) -> Unit = {},
     onSearchClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onNotificationClick: (id: Int, type: String) -> Unit = { _, _ -> },
@@ -62,6 +63,8 @@ fun TopBar(
     val navItems = listOf("\uD83C\uDF7F Movies", "\uD83C\uDFAC TV Shows", "\uD83D\uDDC3\uFE0F My List", "\uD83D\uDED1 LIVE TV")
     var showNotificationDialog by remember { mutableStateOf(false) }
     val notifications by NotificationHelper.notifications.collectAsState()
+    val homeFocusRequester = remember { FocusRequester() }
+    val settingsFocusRequester = remember { FocusRequester() }
 
     if (showNotificationDialog) {
         NotificationDialog(
@@ -94,6 +97,11 @@ fun TopBar(
 
             Box(
                 modifier = Modifier
+                    .focusRequester(homeFocusRequester)
+                    .focusProperties { left = settingsFocusRequester }
+                    .onFocusChanged { focusState ->
+                        if (focusState.isFocused) onNavItemFocused("home")
+                    }
                     .size(40.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(
@@ -186,7 +194,13 @@ fun TopBar(
             FocusableIconButton(
                 icon = Icons.Default.Settings,
                 contentDescription = "Settings",
-                onClick = onSettingsClick
+                onClick = onSettingsClick,
+                modifier = Modifier
+                    .focusRequester(settingsFocusRequester)
+                    .focusProperties { right = homeFocusRequester }
+                    .onFocusChanged { focusState ->
+                        if (focusState.isFocused) onNavItemFocused("settings")
+                    }
             )
         }
     }
@@ -367,13 +381,14 @@ private fun NotificationDialog(
 private fun FocusableIconButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     contentDescription: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
     Row(
-        modifier = Modifier
+        modifier = modifier
             .height(48.dp)
             .wrapContentWidth()
             .background(

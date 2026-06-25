@@ -115,6 +115,9 @@ fun HomeScreen(
                     selectedRoute = route
                     onNavigate(route)
                 },
+                onNavItemFocused = { route ->
+                    selectedRoute = route
+                },
                 onNavigate = onNavigate,
                 onSelectItem = { viewModel.onItemSelected(it) },
                 onSetLastClickedItemId = { viewModel.onItemClicked(it ?: 0) },
@@ -256,6 +259,7 @@ private fun HomeContent(
     onSearchClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onNavItemClick: (String) -> Unit,
+    onNavItemFocused: (String) -> Unit,
     onNavigate: (String) -> Unit,
     onSelectItem: (Any?) -> Unit,
     onSetLastClickedItemId: (Int?) -> Unit = {},
@@ -667,6 +671,7 @@ private fun HomeContent(
         TopBar(
             selectedRoute = selectedRoute,
             onNavItemClick = onNavItemClick,
+            onNavItemFocused = onNavItemFocused,
             onSearchClick = onSearchClick,
             onSettingsClick = onSettingsClick,
             onNotificationClick = { id, type ->

@@ -47,6 +47,10 @@ object WortiseAdManager {
     private const val AD_UNIT_REWARDED = "f598ac5c-7b3a-4f83-93b5-60f84b07571b"
     private const val AD_UNIT_APP_OPEN = "a4e27bae-7b6a-4281-8648-c7ff875c33a4"
 
+    private const val AD_UNIT_BANNER_TV = "90713170-a74f-4ccd-becd-324bb010b89a"
+    private const val AD_UNIT_INTERSTITIAL_TV = "2c5fbdcc-a843-4540-90cf-e6f2ccbfb4e8"
+    private const val AD_UNIT_REWARDED_TV = "f598ac5c-7b3a-4f83-93b5-60f84b07571b"
+    private const val AD_UNIT_APP_OPEN_TV = "2a6f017f-7585-4ddd-8443-79d9bbb9ec0c"
     /**
      * Manifest meta-data key holding the Wortise App ID. Mirrors the entry in
      * AndroidManifest.xml:
