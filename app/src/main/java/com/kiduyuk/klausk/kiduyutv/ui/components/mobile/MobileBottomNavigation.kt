@@ -124,7 +124,7 @@ fun MobileBottomNavigation(
                             AdFallbackDispatcher.loadBanner(
                                 activity,
                                 this,
-                                AdFallbackDispatcher.BannerNetwork.ADMOB
+                                AdFallbackDispatcher.BannerNetwork.WORTISE
                             )
                         }
                     }

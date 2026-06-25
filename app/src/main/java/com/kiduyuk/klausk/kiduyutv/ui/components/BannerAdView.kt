@@ -1,4 +1,4 @@
-package com.kiduyuk.klausk.kiduyutv.ui.components
+hhpackage com.kiduyuk.klausk.kiduyutv.ui.components
 
 import android.util.Log
 import androidx.compose.foundation.background
@@ -13,9 +13,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
+import com.google.android.gms.ads.LoadAdError
 import com.kiduyuk.klausk.kiduyutv.util.AdUnitIds
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 
@@ -45,6 +47,31 @@ fun BannerAdView(
         AdView(context).apply {
             setAdSize(AdSize.BANNER)
             adUnitId = AdUnitIds.PHONE_BANNER
+            adListener = object : AdListener() {
+                override fun onAdLoaded() {
+                    Log.i("BannerAdView", "AdMob banner loaded")
+                }
+
+                override fun onAdFailedToLoad(error: LoadAdError) {
+                    Log.w("BannerAdView", "AdMob banner failed: ${error.message}")
+                }
+
+                override fun onAdOpened() {
+                    Log.i("BannerAdView", "AdMob banner opened")
+                }
+
+                override fun onAdClosed() {
+                    Log.i("BannerAdView", "AdMob banner closed")
+                }
+
+                override fun onAdClicked() {
+                    Log.i("BannerAdView", "AdMob banner clicked")
+                }
+
+                override fun onAdImpression() {
+                    Log.i("BannerAdView", "AdMob banner impression")
+                }
+            }
         }
     }
 

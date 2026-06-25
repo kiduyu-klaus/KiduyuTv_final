@@ -21,13 +21,13 @@ object ConsentManager {
 
     /**
      * Requests the latest consent information and shows a consent form if required.
-     * Call from SplashActivity before AdManager.init().
+     * Call from SplashActivity before initializing any ad SDK.
      *
      * After the user dismisses the form (or if no form is required), consent
      * flags are forwarded to StartApp, Unity Ads, and Wortise automatically.
      *
      * @param activity The calling Activity (needed to show the form).
-     * @param onComplete Fires when consent has been handled — proceed to call AdManager.init() here.
+     * @param onComplete Fires when consent has been handled — initialize ad SDKs here.
      */
     fun requestConsent(activity: Activity, onComplete: () -> Unit) {
         val params = ConsentRequestParameters.Builder()

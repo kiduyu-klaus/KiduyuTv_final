@@ -5,6 +5,7 @@ import android.content.Context
 import android.util.Log
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdSize
@@ -125,14 +126,25 @@ object AdManager {
         ad.fullScreenContentCallback = object : FullScreenContentCallback() {
             override fun onAdShowedFullScreenContent() {
                 lastInterstitialShownAt = System.currentTimeMillis()
+                Log.i(TAG, "Interstitial shown")
+            }
+
+            override fun onAdImpression() {
+                Log.i(TAG, "Interstitial impression")
+            }
+
+            override fun onAdClicked() {
+                Log.i(TAG, "Interstitial clicked")
             }
 
             override fun onAdDismissedFullScreenContent() {
+                Log.i(TAG, "Interstitial dismissed")
                 interstitialAd = null
                 preloadInterstitial(activity)
                 onDismissed()
             }
             override fun onAdFailedToShowFullScreenContent(error: AdError) {
+                Log.w(TAG, "Interstitial failed to show: ${error.message}")
                 interstitialAd = null
                 preloadInterstitial(activity)
                 onDismissed()
@@ -190,13 +202,28 @@ object AdManager {
             return
         }
         ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+            override fun onAdShowedFullScreenContent() {
+                Log.i(TAG, "Rewarded ad shown")
+            }
+
+            override fun onAdImpression() {
+                Log.i(TAG, "Rewarded ad impression")
+            }
+
+            override fun onAdClicked() {
+                Log.i(TAG, "Rewarded ad clicked")
+            }
+
             override fun onAdDismissedFullScreenContent() {
+                Log.i(TAG, "Rewarded ad dismissed")
                 rewardedAd = null
                 preloadRewarded(activity)
                 onDismissed()
             }
             override fun onAdFailedToShowFullScreenContent(error: AdError) {
+                Log.w(TAG, "Rewarded ad failed to show: ${error.message}")
                 rewardedAd = null
+                preloadRewarded(activity)
                 onDismissed()
             }
         }
@@ -235,6 +262,31 @@ object AdManager {
             val adView = AdView(activity)
             adView.adUnitId = unitId
             adView.setAdSize(AdSize.BANNER)
+            adView.adListener = object : AdListener() {
+                override fun onAdLoaded() {
+                    Log.i(TAG, "AdMob banner loaded")
+                }
+
+                override fun onAdFailedToLoad(error: LoadAdError) {
+                    Log.w(TAG, "AdMob banner failed to load: ${error.message}")
+                }
+
+                override fun onAdOpened() {
+                    Log.i(TAG, "AdMob banner opened")
+                }
+
+                override fun onAdClosed() {
+                    Log.i(TAG, "AdMob banner closed")
+                }
+
+                override fun onAdClicked() {
+                    Log.i(TAG, "AdMob banner clicked")
+                }
+
+                override fun onAdImpression() {
+                    Log.i(TAG, "AdMob banner impression")
+                }
+            }
             container.addView(
                 adView,
                 FrameLayout.LayoutParams(

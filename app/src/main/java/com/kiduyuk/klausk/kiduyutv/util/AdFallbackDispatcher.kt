@@ -10,9 +10,9 @@ import android.view.ViewGroup
  * Provides a single entry-point for showing ads across all networks.
  * The fallback chain follows the priority:
  *
- *   AdMob → StartApp → Unity Ads → Wortise
+ *   Wortise → Unity Ads → StartApp → AdMob
  *
- * For banners, a specific network can be requested; otherwise AdMob is used.
+ * For banners, a specific network can be requested; otherwise Wortise is used.
  * For interstitials and rewarded videos, the dispatcher walks the chain
  * until it finds a ready ad.
  *
@@ -27,19 +27,14 @@ object AdFallbackDispatcher {
 
     /**
      * Shows an interstitial ad using the first ready network in the chain:
-     * AdMob → StartApp → Unity Ads → Wortise.
+     * Wortise → Unity Ads → StartApp → AdMob.
      * Always calls [onDismissed] when the ad closes (or immediately if none ready).
      */
     fun showInterstitial(activity: Activity, onDismissed: () -> Unit) {
         when {
-            AdManager.isInterstitialReady -> {
-                Log.i(TAG, "Showing AdMob interstitial")
-                AdManager.showInterstitial(activity, onDismissed)
-            }
-
-            StartAppAdManager.isInitialised -> {
-                Log.i(TAG, "Falling back to StartApp interstitial")
-                StartAppAdManager.showInterstitial(activity, onDismissed)
+            WortiseAdManager.isInterstitialReady -> {
+                Log.i(TAG, "Showing Wortise interstitial")
+                WortiseAdManager.showInterstitial(activity, onDismissed)
             }
 
             UnityAdManager.isInterstitialReady -> {
@@ -47,9 +42,14 @@ object AdFallbackDispatcher {
                 UnityAdManager.showInterstitial(activity, onDismissed)
             }
 
-            WortiseAdManager.isInterstitialReady -> {
-                Log.i(TAG, "Falling back to Wortise interstitial")
-                WortiseAdManager.showInterstitial(activity, onDismissed)
+            StartAppAdManager.isInitialised -> {
+                Log.i(TAG, "Falling back to StartApp interstitial")
+                StartAppAdManager.showInterstitial(activity, onDismissed)
+            }
+
+            AdManager.isInterstitialReady -> {
+                Log.i(TAG, "Falling back to AdMob interstitial")
+                AdManager.showInterstitial(activity, onDismissed)
             }
 
             else -> {
@@ -63,7 +63,7 @@ object AdFallbackDispatcher {
 
     /**
      * Shows a rewarded video ad using the first ready network in the chain:
-     * AdMob → StartApp → Unity Ads → Wortise.
+     * Wortise → Unity Ads → StartApp → AdMob.
      *
      * [onRewarded] fires only when the user fully watches the ad.
      * [onDismissed] always fires when the ad closes.
@@ -74,9 +74,9 @@ object AdFallbackDispatcher {
         onDismissed: () -> Unit
     ) {
         when {
-            AdManager.isRewardedReady -> {
-                Log.i(TAG, "Showing AdMob rewarded")
-                AdManager.showRewarded(activity, onRewarded, onDismissed)
+            WortiseAdManager.isRewardedReady -> {
+                Log.i(TAG, "Showing Wortise rewarded")
+                WortiseAdManager.showRewarded(activity, onRewarded, onDismissed)
             }
 
             UnityAdManager.isRewardedReady -> {
@@ -89,9 +89,9 @@ object AdFallbackDispatcher {
                 StartAppAdManager.showRewarded(activity, onRewarded, onDismissed)
             }
 
-            WortiseAdManager.isRewardedReady -> {
-                Log.i(TAG, "Falling back to Wortise rewarded")
-                WortiseAdManager.showRewarded(activity, onRewarded, onDismissed)
+            AdManager.isRewardedReady -> {
+                Log.i(TAG, "Falling back to AdMob rewarded")
+                AdManager.showRewarded(activity, onRewarded, onDismissed)
             }
 
             else -> {
@@ -110,14 +110,14 @@ object AdFallbackDispatcher {
     fun loadBanner(
         activity: Activity,
         container: ViewGroup,
-        preferred: BannerNetwork = BannerNetwork.ADMOB
+        preferred: BannerNetwork = BannerNetwork.WORTISE
     ) {
         Log.i(TAG, "Loading banner from: $preferred")
         when (preferred) {
-            BannerNetwork.ADMOB -> AdManager.loadBanner(activity, container)
-            BannerNetwork.STARTAPP -> StartAppAdManager.loadBanner(activity, container)
-            BannerNetwork.UNITY -> UnityAdManager.loadBanner(activity, container)
             BannerNetwork.WORTISE -> WortiseAdManager.loadBanner(activity, container)
+            BannerNetwork.UNITY -> UnityAdManager.loadBanner(activity, container)
+            BannerNetwork.STARTAPP -> StartAppAdManager.loadBanner(activity, container)
+            BannerNetwork.ADMOB -> AdManager.loadBanner(activity, container)
         }
     }
 
@@ -125,9 +125,9 @@ object AdFallbackDispatcher {
      * Which banner network to request.
      */
     enum class BannerNetwork {
-        ADMOB,
-        STARTAPP,
+        WORTISE,
         UNITY,
-        WORTISE
+        STARTAPP,
+        ADMOB
     }
 }

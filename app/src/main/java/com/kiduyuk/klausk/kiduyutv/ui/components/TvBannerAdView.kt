@@ -26,7 +26,7 @@ import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 /**
  * TV banner ad — loaded via the unified [AdFallbackDispatcher].
  *
- * The dispatcher picks the requested banner network (AdMob for the TV flavour)
+ * The dispatcher picks the requested banner network (Wortise for the TV flavour)
  * and injects the banner into a [FrameLayout] container. A 728×90 leaderboard
  * container height keeps the layout stable while the ad loads.
  *
@@ -75,7 +75,7 @@ fun TvBannerAdView(
             AdFallbackDispatcher.loadBanner(
                 activity = activity,
                 container = container,
-                preferred = BannerNetwork.ADMOB
+                preferred = BannerNetwork.WORTISE
             )
             container
         }

@@ -120,7 +120,7 @@ object UnityAdManager {
             return
         }
         try {
-            if (UnityAds.isInitialized()) {
+            if (UnityAds.isInitialized) {
                 isInitialised = true
                 loadFullscreenPlacements()
                 return
@@ -173,7 +173,7 @@ object UnityAdManager {
      */
     fun loadBanner(activity: Activity, container: ViewGroup) {
         if (!shouldShowAds(activity)) return
-        if (!isInitialised || !UnityAds.isInitialized()) {
+        if (!isInitialised || !UnityAds.isInitialized) {
             Log.w(TAG, "Unity banner skipped - SDK not initialized")
             return
         }
@@ -249,7 +249,7 @@ object UnityAdManager {
             onDismissed()
             return
         }
-        if (!isInitialised || !UnityAds.isInitialized()) {
+        if (!isInitialised || !UnityAds.isInitialized) {
             Log.i(TAG, "Unity interstitial skipped - SDK not initialized")
             onDismissed()
             preloadAds(activity)
@@ -324,7 +324,7 @@ object UnityAdManager {
             onDismissed()
             return
         }
-        if (!isInitialised || !UnityAds.isInitialized()) {
+        if (!isInitialised || !UnityAds.isInitialized) {
             Log.i(TAG, "Unity rewarded skipped - SDK not initialized")
             onDismissed()
             preloadAds(activity)
