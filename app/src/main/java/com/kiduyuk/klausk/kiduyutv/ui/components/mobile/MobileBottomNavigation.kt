@@ -123,8 +123,7 @@ fun MobileBottomNavigation(
                             bannerContainer.value = this
                             AdFallbackDispatcher.loadBanner(
                                 activity,
-                                this,
-                                AdFallbackDispatcher.BannerNetwork.STARTAPP
+                                this
                             )
                         }
                     }

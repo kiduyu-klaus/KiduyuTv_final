@@ -5,17 +5,12 @@ import android.net.Uri
 import android.os.Build
 import androidx.annotation.OptIn
 import androidx.annotation.RequiresApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavHostController
@@ -57,42 +52,33 @@ import com.kiduyuk.klausk.kiduyutv.viewmodel.SearchViewModel
 @OptIn(UnstableApi::class)
 @Composable
 fun NavGraph(navController: NavHostController) {
-    NavHost(
-        navController = navController,
-        startDestination = Screen.Home.route
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        NavHost(
+            navController = navController,
+            startDestination = Screen.Home.route,
+            modifier = Modifier.fillMaxSize()
+        ) {
         // Home Screen: The main landing page with hero and mixed content.
         composable(Screen.Home.route) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                HomeScreen(
-                    onMovieClick = { movieId ->
-                        navController.navigate(Screen.MovieDetail.createRoute(movieId))
-                    },
-                    onTvShowClick = { tvId ->
-                        navController.navigate(Screen.TvShowDetail.createRoute(tvId))
-                    },
-                    onNavigate = { route ->
-                        if (route != Screen.Home.route) {
-                            navController.navigate(route)
-                        }
-                    },
-                    onSearchClick = {
-                        navController.navigate(Screen.Search.route)
-                    },
-                    onSettingsClick = {
-                        navController.navigate(Screen.Settings.route)
+            HomeScreen(
+                onMovieClick = { movieId ->
+                    navController.navigate(Screen.MovieDetail.createRoute(movieId))
+                },
+                onTvShowClick = { tvId ->
+                    navController.navigate(Screen.TvShowDetail.createRoute(tvId))
+                },
+                onNavigate = { route ->
+                    if (route != Screen.Home.route) {
+                        navController.navigate(route)
                     }
-                )
-
-                // Overlay a non-intrusive banner at the bottom when on TV flavour.
-                // TvBannerAdView loads via AdFallbackDispatcher (StartApp network).
-                if (BuildConfig.FLAVOR == "tv") {
-                    TvBannerAdView(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                    )
+                },
+                onSearchClick = {
+                    navController.navigate(Screen.Search.route)
+                },
+                onSettingsClick = {
+                    navController.navigate(Screen.Settings.route)
                 }
-            }
+            )
         }
 
         // Movies Screen: Dedicated screen for browsing movies.
@@ -503,6 +489,16 @@ fun NavGraph(navController: NavHostController) {
                 initialIndex = initialIndex,
                 imageUrls = imageUrls,
                 onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        }
+
+        // Overlay a non-intrusive banner at the bottom of every TV destination.
+        // TvBannerAdView loads via AdFallbackDispatcher (StartApp network).
+        if (BuildConfig.FLAVOR == "tv") {
+            TvBannerAdView(
+                modifier = Modifier.align(Alignment.BottomCenter)
             )
         }
     }

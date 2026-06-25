@@ -35,14 +35,22 @@ import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 @Composable
 fun TvBannerAdView(
     modifier: Modifier = Modifier
-        .fillMaxWidth()
-        .height(90.dp)
-        .background(Color(0xFF0F0F0F))
 ) {
     val context = LocalContext.current
     val containerRef = remember { mutableStateOf<FrameLayout?>(null) }
+    val bannerModifier = modifier
+        .fillMaxWidth()
+        .height(90.dp)
+        .background(Color(0xFF0F0F0F))
 
-    DisposableEffect(Unit) {
+    // Respect the user's "disable ads" preference.
+    if (SettingsManager(context).isAdsDisabled()) {
+        Box(modifier = bannerModifier)
+        return
+    }
+    val activity = context.findActivity() ?: return
+
+    DisposableEffect(activity) {
         onDispose {
             containerRef.value?.let { container ->
                 destroyAdMobChildren(container)
@@ -52,15 +60,8 @@ fun TvBannerAdView(
         }
     }
 
-    // Respect the user's "disable ads" preference.
-    if (SettingsManager(context).isAdsDisabled()) {
-        Box(modifier = modifier)
-        return
-    }
-    val activity = context.findActivity() ?: return
-
     AndroidView(
-        modifier = modifier,
+        modifier = bannerModifier,
         factory = { ctx ->
             // FrameLayout acts as the ViewGroup host for the dispatcher.
             val container = FrameLayout(ctx).apply {
@@ -70,15 +71,25 @@ fun TvBannerAdView(
                 )
             }
             containerRef.value = container
-
-            Log.i(TAG, "Loading TV banner via AdFallbackDispatcher (preferred=STARTAPP)")
-            AdFallbackDispatcher.loadBanner(
-                activity = activity,
-                container = container,
-                preferred = BannerNetwork.STARTAPP
-            )
+            loadPreferredBanner(activity, container)
             container
+        },
+        update = { container ->
+            containerRef.value = container
+            if (container.childCount == 0) {
+                Log.i(TAG, "TV banner host is empty; reloading banner")
+                loadPreferredBanner(activity, container)
+            }
         }
+    )
+}
+
+private fun loadPreferredBanner(activity: Activity, container: ViewGroup) {
+    Log.i(TAG, "Loading TV banner via AdFallbackDispatcher (preferred=STARTAPP)")
+    AdFallbackDispatcher.loadBanner(
+        activity = activity,
+        container = container,
+        preferred = BannerNetwork.STARTAPP
     )
 }
 

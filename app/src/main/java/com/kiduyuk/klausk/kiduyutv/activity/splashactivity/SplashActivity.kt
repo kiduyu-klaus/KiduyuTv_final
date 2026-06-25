@@ -269,8 +269,13 @@ class SplashActivity : ComponentActivity() {
         // Request GDPR consent before initializing ads
         // All ad SDKs are initialized only after consent is resolved.
         ConsentManager.requestConsent(this) {
-            StartAppAdManager.preloadAds(this@SplashActivity)
-            AdManager.init(this@SplashActivity)
+            if (BuildConfig.FLAVOR == "phone") {
+                AdManager.init(this@SplashActivity)
+                StartAppAdManager.preloadAds(this@SplashActivity)
+            } else {
+                StartAppAdManager.preloadAds(this@SplashActivity)
+                AdManager.init(this@SplashActivity)
+            }
             WortiseAdManager.preloadAds(this@SplashActivity)
             UnityAdManager.preloadAds(this@SplashActivity)
             AppOpenAdObserver.install(application)
