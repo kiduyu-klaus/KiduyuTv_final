@@ -11,7 +11,8 @@ import androidx.lifecycle.ProcessLifecycleOwner
  * Lifecycle observer that shows an app open ad when the app comes to the
  * foreground, respecting a minimum 4-hour interval between shows.
  *
- * Uses Wortise app-open ads. Install only after consent has resolved.
+ * App-open ads are currently paused because the app is using AdMob only.
+ * Install only after consent has resolved if this is re-enabled later.
  *
  * Usage: install once after consent has resolved:
  * ```kotlin
@@ -55,8 +56,7 @@ class AppOpenAdObserver private constructor(private val application: Application
 
         currentActivity?.let { activity ->
             try {
-                Log.i(TAG, "Showing Wortise app-open ad if available")
-                WortiseAdManager.showAppOpenIfAvailable(activity)
+                Log.i(TAG, "App-open ad paused for AdMob-only mode: ${activity.localClassName}")
                 lastAppOpenShownAt = now
             } catch (e: Exception) {
                 Log.w(TAG, "App open show failed", e)

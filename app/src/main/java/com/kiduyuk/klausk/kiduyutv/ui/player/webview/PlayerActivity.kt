@@ -172,9 +172,9 @@ class PlayerActivity : AppCompatActivity() {
 
             // Fix: Amazon Chromium WebView vs. System WebView
             // Enable debugging for Amazon Chromium WebView optimizations
-            if (isFireTV) {
-                WebView.setWebContentsDebuggingEnabled(true)
-            }
+            // if (isFireTV) {
+            //     WebView.setWebContentsDebuggingEnabled(true)
+            // }
 
             settings.apply {
                 javaScriptEnabled = true

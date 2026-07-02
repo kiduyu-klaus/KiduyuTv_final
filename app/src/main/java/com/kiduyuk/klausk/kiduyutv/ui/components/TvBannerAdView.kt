@@ -20,15 +20,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.kiduyuk.klausk.kiduyutv.util.AdFallbackDispatcher
-import com.kiduyuk.klausk.kiduyutv.util.AdFallbackDispatcher.BannerNetwork
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 
 /**
- * TV banner ad — loaded via the unified [AdFallbackDispatcher].
+ * TV banner ad loaded through [AdFallbackDispatcher].
  *
- * The dispatcher picks the requested banner network (StartApp for the TV flavour)
- * and injects the banner into a [FrameLayout] container. A 728×90 leaderboard
- * container height keeps the layout stable while the ad loads.
+ * The dispatcher currently routes banners to AdMob only and injects the banner
+ * into a [FrameLayout] container. A 728×90 leaderboard container height keeps
+ * the layout stable while the ad loads.
  *
  * No-op when the user has disabled ads in settings.
  */
@@ -85,11 +84,10 @@ fun TvBannerAdView(
 }
 
 private fun loadPreferredBanner(activity: Activity, container: ViewGroup) {
-    Log.i(TAG, "Loading TV banner via AdFallbackDispatcher (preferred=STARTAPP)")
+    Log.i(TAG, "Loading TV banner via AdFallbackDispatcher (AdMob only)")
     AdFallbackDispatcher.loadBanner(
         activity = activity,
-        container = container,
-        preferred = BannerNetwork.STARTAPP
+        container = container
     )
 }
 

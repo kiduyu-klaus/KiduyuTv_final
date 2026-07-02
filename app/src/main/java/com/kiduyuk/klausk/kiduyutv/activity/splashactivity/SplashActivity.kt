@@ -58,10 +58,6 @@ import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import com.kiduyuk.klausk.kiduyutv.util.UpdateUtil
 import com.kiduyuk.klausk.kiduyutv.util.ConsentManager
 import com.kiduyuk.klausk.kiduyutv.util.AdManager
-import com.kiduyuk.klausk.kiduyutv.util.AppOpenAdObserver
-import com.kiduyuk.klausk.kiduyutv.util.StartAppAdManager
-import com.kiduyuk.klausk.kiduyutv.util.UnityAdManager
-import com.kiduyuk.klausk.kiduyutv.util.WortiseAdManager
 import io.github.cutelibs.cutedialog.CuteDialog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -267,18 +263,10 @@ class SplashActivity : ComponentActivity() {
         startFirebaseSync()
 
         // Request GDPR consent before initializing ads
-        // All ad SDKs are initialized only after consent is resolved.
+        // AdMob is initialized only after consent is resolved.
+        // Other ad SDKs are currently paused.
         ConsentManager.requestConsent(this) {
-            if (BuildConfig.FLAVOR == "phone") {
-                AdManager.init(this@SplashActivity)
-                StartAppAdManager.preloadAds(this@SplashActivity)
-            } else {
-                StartAppAdManager.preloadAds(this@SplashActivity)
-                AdManager.init(this@SplashActivity)
-            }
-            WortiseAdManager.preloadAds(this@SplashActivity)
-            UnityAdManager.preloadAds(this@SplashActivity)
-            AppOpenAdObserver.install(application)
+            AdManager.init(this@SplashActivity)
             adsConsentHandled = true
         }
 

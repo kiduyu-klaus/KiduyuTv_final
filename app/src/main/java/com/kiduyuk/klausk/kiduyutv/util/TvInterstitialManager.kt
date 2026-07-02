@@ -5,8 +5,7 @@ import android.util.Log
 
 /**
  * TV interstitial facade — delegates to [AdFallbackDispatcher] which handles
- * the full fallback chain (StartApp → AdMob → Wortise → Unity) and enforces
- * the 3-minute cooldown across all networks.
+ * the active AdMob-only ad path and enforces the 3-minute cooldown.
  */
 object TvInterstitialManager {
 
@@ -31,8 +30,5 @@ object TvInterstitialManager {
     }
 
     val isReady: Boolean
-        get() = StartAppAdManager.isInitialised ||
-            AdManager.isInterstitialReady ||
-            WortiseAdManager.isInterstitialReady ||
-            UnityAdManager.isInterstitialReady
+        get() = AdManager.isInterstitialReady
 }
