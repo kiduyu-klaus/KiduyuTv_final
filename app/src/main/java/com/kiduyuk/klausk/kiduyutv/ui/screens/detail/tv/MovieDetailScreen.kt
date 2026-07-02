@@ -69,6 +69,7 @@ fun MovieDetailScreen(
     onCompanyClick: (id: Int, name: String) -> Unit = { _, _ -> },
     onPlayClick: (String) -> Unit,
     onCastClick: (Int, String, String?, String?, String?) -> Unit = { _, _, _, _, _ -> },
+    onImagesClick: (Int, String) -> Unit = { _, _ -> },
     viewModel: DetailViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -85,6 +86,9 @@ fun MovieDetailScreen(
 
     val myListInteraction = remember { MutableInteractionSource() }
     val myListFocused by myListInteraction.collectIsFocusedAsState()
+
+    val imagesInteraction = remember { MutableInteractionSource() }
+    val imagesFocused by imagesInteraction.collectIsFocusedAsState()
 
     LaunchedEffect(movieId) {
         viewModel.loadMovieDetail(context, movieId)
@@ -396,6 +400,21 @@ fun MovieDetailScreen(
                                         contentDescription = null,
                                         modifier = Modifier.size(16.dp)
                                     )
+                                }
+
+                                // Movie posters and backdrops
+                                Button(
+                                    onClick = { onImagesClick(movie.id, movie.title ?: "Movie") },
+                                    interactionSource = imagesInteraction,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (imagesFocused) DarkRed else Color.DarkGray
+                                    ),
+                                    shape = RoundedCornerShape(4.dp),
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                                ) {
+                                    Icon(Icons.Default.Image, null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Images", fontSize = 12.sp)
                                 }
                             }
                         }

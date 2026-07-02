@@ -29,6 +29,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.TvShowDetailScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.CastDetailScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.CastImagesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.ImageSliderScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.MovieImagesScreen
 import com.kiduyuk.klausk.kiduyutv.data.model.CastMember
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.HomeScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.MoviesScreen
@@ -260,6 +261,9 @@ fun NavGraph(navController: NavHostController) {
                     navController.navigate(
                         "cast_detail/$castId/${Uri.encode(castName)}/${Uri.encode(character ?: "")}/${Uri.encode(profilePath ?: "")}/${Uri.encode(knownForDepartment ?: "")}"
                     )
+                },
+                onImagesClick = { id, title ->
+                    navController.navigate(Screen.MovieImages.createRoute(id, title))
                 }
             )
         }
@@ -466,6 +470,26 @@ fun NavGraph(navController: NavHostController) {
             CastImagesScreen(
                 castId = castId,
                 castName = Uri.decode(castName),
+                onBackClick = { navController.popBackStack() },
+                onImageClick = { initialIndex, imageUrls ->
+                    navController.navigate(Screen.ImageSlider.createRoute(initialIndex, imageUrls))
+                }
+            )
+        }
+
+        // Movie Images Screen
+        composable(
+            route = Screen.MovieImages.route,
+            arguments = listOf(
+                navArgument("movieId") { type = NavType.IntType },
+                navArgument("movieTitle") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val movieId = backStackEntry.arguments?.getInt("movieId") ?: 0
+            val movieTitle = backStackEntry.arguments?.getString("movieTitle") ?: ""
+            MovieImagesScreen(
+                movieId = movieId,
+                movieTitle = Uri.decode(movieTitle),
                 onBackClick = { navController.popBackStack() },
                 onImageClick = { initialIndex, imageUrls ->
                     navController.navigate(Screen.ImageSlider.createRoute(initialIndex, imageUrls))
