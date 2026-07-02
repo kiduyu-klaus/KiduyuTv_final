@@ -33,6 +33,13 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
+      - name: Cache Gradle Wrapper
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-wrapper-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-gradle-wrapper-
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
@@ -56,21 +63,23 @@ jobs:
           # --------------------------------------------------
 
           # JVM MEMORY (Tuned for 16GB RAM runner — 14GB to JVMs, 2GB headroom for OS/AAPT/D8)
-          org.gradle.jvmargs=-Xmx10g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Dfile.encoding=UTF-8
+          org.gradle.jvmargs=-Xmx11g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+ParallelRefProcEnabled -Dfile.encoding=UTF-8
 
-          # GRADLE PERFORMANCE
+          # GRADLE PERFORMANCE (8 workers for aggressive parallelism)
           org.gradle.daemon=true
           org.gradle.parallel=true
-          org.gradle.workers.max=4
+          org.gradle.workers.max=8
+          org.gradle.parallelThreadPoolSize=8
           org.gradle.caching=true
           org.gradle.configuration-cache=true
 
-          # KOTLIN OPTIMIZATION
-          kotlin.daemon.jvm.options=-Xmx4g
+          # KOTLIN OPTIMIZATION (Parallel compilation)
+          kotlin.daemon.jvm.options=-Xmx5g
           kotlin.incremental=true
           kotlin.incremental.android=true
           kotlin.incremental.useClasspathSnapshot=true
           kotlin.compiler.execution.strategy=daemon
+          kotlin.parallel.tasks.in.project=true
 
           # ANDROID SETTINGS
           android.useAndroidX=true
@@ -129,9 +138,12 @@ jobs:
       - name: Restore keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > kiduyutv_final
 
+      - name: Pre-warm Gradle Daemon
+        run: ./gradlew help --configuration-cache
+
       # ── Release APKs ──────────────────────────────────────────
       - name: Build Phone + TV Release APKs
-        run: ./gradlew assemblePhoneRelease assembleTvRelease --build-cache --configuration-cache --parallel
+        run: ./gradlew assemblePhoneRelease assembleTvRelease --build-cache --configuration-cache --parallel -x lint -x testDebugUnitTest --build-scan
 
       - name: Rename Phone Release APK
         id: rename_phone_release
