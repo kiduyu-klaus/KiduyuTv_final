@@ -1,41 +1,40 @@
 package com.kiduyuk.klausk.kiduyutv.ui.components
 
-import android.util.Log
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.viewinterop.AndroidView
-import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
-import com.google.android.gms.ads.LoadAdError
+
 import com.kiduyuk.klausk.kiduyutv.util.AdUnitIds
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 
-/**
- * Composable banner ad for the phone flavour.
- * Renders a standard AdMob adaptive banner anchored to the bottom of the screen.
- * Respects the ads disabled setting from SettingsManager.
- *
- * Usage: place inside a Column/Box where you want the banner to appear.
- */
+
 @Composable
-fun BannerAdView(
-    modifier: Modifier = Modifier
-        .fillMaxWidth()
-        .height(60.dp)
-        .background(Color(0xFF141414))
-) {
-    val context = LocalContext.current
+fun BannerAdView(modifier: Modifier = Modifier) {
+
+    //get Banner Ad Size
+    val context: Context = LocalContext.current
+    val screenWidthPx = LocalWindowInfo.current.containerSize.width
+    val density = LocalResources.current.displayMetrics.density
+    val screenWidthDp = (screenWidthPx / density).toInt()
+    val activity = context.findActivity()
+    var adView: AdView? = null
+    val bannerAdSize = remember(screenWidthDp) {
+        activity?.let {
+            AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(it, screenWidthDp)
+        }
+    }
 
     // Check if ads are disabled - return empty box if disabled
     if (SettingsManager(context).isAdsDisabled()) {
@@ -43,50 +42,32 @@ fun BannerAdView(
         return
     }
 
-    val adView = remember(context) {
-        AdView(context).apply {
-            setAdSize(AdSize.BANNER)
-            adUnitId = AdUnitIds.PHONE_BANNER
-            adListener = object : AdListener() {
-                override fun onAdLoaded() {
-                    Log.i("BannerAdView", "AdMob banner loaded")
-                }
-
-                override fun onAdFailedToLoad(error: LoadAdError) {
-                    Log.w("BannerAdView", "AdMob banner failed: ${error.message}")
-                }
-
-                override fun onAdOpened() {
-                    Log.i("BannerAdView", "AdMob banner opened")
-                }
-
-                override fun onAdClosed() {
-                    Log.i("BannerAdView", "AdMob banner closed")
-                }
-
-                override fun onAdClicked() {
-                    Log.i("BannerAdView", "AdMob banner clicked")
-                }
-
-                override fun onAdImpression() {
-                    Log.i("BannerAdView", "AdMob banner impression")
-                }
-            }
-        }
-    }
-
-    DisposableEffect(adView) {
-        onDispose {
-            adView.destroy()
-        }
-    }
-
+    //Create Banner Ad View
     AndroidView(
         modifier = modifier,
-        factory = {
-            Log.i("BannerAdView", "Loading mobile banner ad — unit: ${AdUnitIds.PHONE_BANNER}")
-            adView.loadAd(AdRequest.Builder().build())
+        factory = { context ->
+            adView = AdView(context).apply {
+                setAdSize(bannerAdSize ?: AdSize.BANNER)
+                adUnitId = "ca-app-pub-3803477439180910/7183108212"
+                val adRequest = AdRequest.Builder().build()
+                loadAd(adRequest)
+            }
             adView
         }
     )
+
+    DisposableEffect(adView) {
+        onDispose {
+            adView?.destroy()
+        }
+    }
+
+}
+
+fun Context.findActivity(): Activity? {
+    return when (this) {
+        is Activity -> this
+        is ContextWrapper -> baseContext.findActivity()
+        else -> null
+    }
 }

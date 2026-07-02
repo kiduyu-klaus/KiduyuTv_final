@@ -4,12 +4,9 @@ import android.app.Activity
 import android.content.Context
 import android.util.Log
 import android.view.ViewGroup
-import android.widget.FrameLayout
-import com.google.android.gms.ads.AdListener
+import androidx.compose.ui.platform.ComposeView
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.AdSize
-import com.google.android.gms.ads.AdView
 import com.google.android.gms.ads.FullScreenContentCallback
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
@@ -18,6 +15,7 @@ import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
+import com.kiduyuk.klausk.kiduyutv.ui.components.BannerAdView
 
 object AdManager {
 
@@ -239,13 +237,13 @@ object AdManager {
     // ── Banner (AdMob) ────────────────────────────────────────────────────
 
     /**
-     * Loads an AdMob banner into the supplied [container].
+     * Loads a banner ad using BannerAdView Composable into the supplied [container].
      * The caller is responsible for placing the container in the layout.
      * No-op if ads are disabled by the user.
      */
     fun loadBanner(activity: Activity, container: ViewGroup) {
         if (!shouldShowAds(activity)) {
-            Log.i(TAG, "Ads disabled - skipping AdMob banner")
+            Log.i(TAG, "Ads disabled - skipping banner")
             return
         }
         if (!isInitialised) {
@@ -254,50 +252,15 @@ object AdManager {
         }
         try {
             container.removeAllViews()
-            val unitId = if (BuildConfig.FLAVOR == "tv")
-                AdUnitIds.TV_BANNER
-            else
-                AdUnitIds.PHONE_BANNER
-
-            val adView = AdView(activity)
-            adView.adUnitId = unitId
-            adView.setAdSize(AdSize.BANNER)
-            adView.adListener = object : AdListener() {
-                override fun onAdLoaded() {
-                    Log.i(TAG, "AdMob banner loaded")
-                }
-
-                override fun onAdFailedToLoad(error: LoadAdError) {
-                    Log.w(TAG, "AdMob banner failed to load: ${error.message}")
-                }
-
-                override fun onAdOpened() {
-                    Log.i(TAG, "AdMob banner opened")
-                }
-
-                override fun onAdClosed() {
-                    Log.i(TAG, "AdMob banner closed")
-                }
-
-                override fun onAdClicked() {
-                    Log.i(TAG, "AdMob banner clicked")
-                }
-
-                override fun onAdImpression() {
-                    Log.i(TAG, "AdMob banner impression")
+            val composeView = ComposeView(activity).apply {
+                setContent {
+                    BannerAdView()
                 }
             }
-            container.addView(
-                adView,
-                FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-            )
-            adView.loadAd(AdRequest.Builder().build())
-            Log.i(TAG, "AdMob banner loading")
+            container.addView(composeView)
+            Log.i(TAG, "Banner ad loading")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to load AdMob banner", e)
+            Log.e(TAG, "Failed to load banner ad", e)
         }
     }
 }

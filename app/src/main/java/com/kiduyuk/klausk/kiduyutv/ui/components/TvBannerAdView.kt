@@ -3,109 +3,61 @@ package com.kiduyuk.klausk.kiduyutv.ui.components
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
-import android.util.Log
-import android.view.ViewGroup
-import android.widget.FrameLayout
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.viewinterop.AndroidView
-import com.kiduyuk.klausk.kiduyutv.util.AdFallbackDispatcher
-import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.AdSize
+import com.google.android.gms.ads.AdView
 
-/**
- * TV banner ad loaded through [AdFallbackDispatcher].
- *
- * The dispatcher currently routes banners to AdMob only and injects the banner
- * into a [FrameLayout] container. A 728×90 leaderboard container height keeps
- * the layout stable while the ad loads.
- *
- * No-op when the user has disabled ads in settings.
- */
 @Composable
-fun TvBannerAdView(
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    val containerRef = remember { mutableStateOf<FrameLayout?>(null) }
-    val bannerModifier = modifier
-        .fillMaxWidth()
-        .height(50.dp)
-        .background(Color(0xFF0F0F0F))
+fun TvBannerAdView(modifier: Modifier = Modifier) {
 
-    // Respect the user's "disable ads" preference.
-    if (SettingsManager(context).isAdsDisabled()) {
-        Box(modifier = bannerModifier)
-        return
-    }
-    val activity = context.findActivity() ?: return
-
-    DisposableEffect(activity) {
-        onDispose {
-            containerRef.value?.let { container ->
-                destroyAdMobChildren(container)
-                container.removeAllViews()
-            }
-            containerRef.value = null
+    //get Banner Ad Size
+    val context: Context = LocalContext.current
+    val screenWidthPx = LocalWindowInfo.current.containerSize.width
+    val density = LocalResources.current.displayMetrics.density
+    val screenWidthDp = (screenWidthPx / density).toInt()
+    val activity = context.findActivity()
+    var adView: AdView? = null
+    val bannerAdSize = remember(screenWidthDp) {
+        activity?.let {
+            AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(it, screenWidthDp)
         }
     }
 
+    //Create Banner Ad View
     AndroidView(
-        modifier = bannerModifier,
-        factory = { ctx ->
-            // FrameLayout acts as the ViewGroup host for the dispatcher.
-            val container = FrameLayout(ctx).apply {
-                layoutParams = ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
+        modifier = modifier,
+        factory = { context ->
+            adView = AdView(context).apply {
+                setAdSize(bannerAdSize ?: AdSize.BANNER)
+                adUnitId = "ca-app-pub-3803477439180910/7183108212"
+                val adRequest = AdRequest.Builder().build()
+                loadAd(adRequest)
             }
-            containerRef.value = container
-            loadPreferredBanner(activity, container)
-            container
-        },
-        update = { container ->
-            containerRef.value = container
-            if (container.childCount == 0) {
-                Log.i(TAG, "TV banner host is empty; reloading banner")
-                loadPreferredBanner(activity, container)
-            }
+            adView
         }
     )
+
+    DisposableEffect(adView) {
+        onDispose {
+            adView?.destroy()
+        }
+    }
+
 }
 
-private fun loadPreferredBanner(activity: Activity, container: ViewGroup) {
-    Log.i(TAG, "Loading TV banner via AdFallbackDispatcher (AdMob only)")
-    AdFallbackDispatcher.loadBanner(
-        activity = activity,
-        container = container
-    )
-}
-
-private fun destroyAdMobChildren(container: ViewGroup) {
-    for (index in 0 until container.childCount) {
-        (container.getChildAt(index) as? com.google.android.gms.ads.AdView)?.destroy()
+fun Context.findActivity(): Activity? {
+    return when (this) {
+        is Activity -> this
+        is ContextWrapper -> baseContext.findActivity()
+        else -> null
     }
 }
-
-/** Walk up the context wrapper chain looking for the hosting [Activity]. */
-private fun Context.findActivity(): Activity? {
-    var ctx: Context? = this
-    while (ctx is ContextWrapper) {
-        if (ctx is Activity) return ctx
-        ctx = ctx.baseContext
-    }
-    return null
-}
-
-/** Log tag kept in one place for grep-ability. */
-private const val TAG = "TvBannerAdView"
