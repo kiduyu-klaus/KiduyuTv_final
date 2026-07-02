@@ -416,134 +416,134 @@ jobs:
   # ══════════════════════════════════════════════════════════════════════
   # DEPLOY TO GITHUB PAGES (after build completes)
   # ══════════════════════════════════════════════════════════════════════
-  deploy_pages:
-    name: Deploy to GitHub Pages
-    runs-on: ubuntu-latest
-    needs: [build_all, update_changelog]
+  # deploy_pages:
+  #   name: Deploy to GitHub Pages
+  #   runs-on: ubuntu-latest
+  #   needs: [build_all, update_changelog]
 
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
+  #   permissions:
+  #     contents: read
+  #     pages: write
+  #     id-token: write
 
-    concurrency:
-      group: github-pages
-      cancel-in-progress: true
+  #   concurrency:
+  #     group: github-pages
+  #     cancel-in-progress: true
 
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  #   environment:
+  #     name: github-pages
+  #     url: ${{ steps.deployment.outputs.page_url }}
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v6
 
-      - name: Download updated changelog artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: site-changelog
-          path: ./site
+  #     - name: Download updated changelog artifact
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: site-changelog
+  #         path: ./site
 
-      - name: Apply updated index.html
-        run: cp ./site/index.html ./index.html
+  #     - name: Apply updated index.html
+  #       run: cp ./site/index.html ./index.html
 
-      - name: Resolve latest release info
-        id: release_info
-        run: |
-          # Get the latest release
-          RELEASE=$(curl -s \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/releases" \
-            | jq 'first')
+  #     - name: Resolve latest release info
+  #       id: release_info
+  #       run: |
+  #         # Get the latest release
+  #         RELEASE=$(curl -s \
+  #           -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+  #           -H "Accept: application/vnd.github+json" \
+  #           "https://api.github.com/repos/${{ github.repository }}/releases" \
+  #           | jq 'first')
 
-          TAG=$(echo "$RELEASE" | jq -r '.tag_name')
-          TITLE=$(echo "$RELEASE" | jq -r '.name')
+  #         TAG=$(echo "$RELEASE" | jq -r '.tag_name')
+  #         TITLE=$(echo "$RELEASE" | jq -r '.name')
 
-          # Get TV release APK with the highest build number
-          TV_ASSET=$(echo "$RELEASE" | jq -r \
-            '[.assets[] | select(.name | test("tv-release.*\\.apk$"))] | sort_by(.name) | last')
-          TV_APK_URL=$(echo "$TV_ASSET" | jq -r '.browser_download_url')
-          TV_APK_NAME=$(echo "$TV_ASSET" | jq -r '.name')
+  #         # Get TV release APK with the highest build number
+  #         TV_ASSET=$(echo "$RELEASE" | jq -r \
+  #           '[.assets[] | select(.name | test("tv-release.*\\.apk$"))] | sort_by(.name) | last')
+  #         TV_APK_URL=$(echo "$TV_ASSET" | jq -r '.browser_download_url')
+  #         TV_APK_NAME=$(echo "$TV_ASSET" | jq -r '.name')
 
-          # Get Phone release APK with the highest build number
-          PHONE_ASSET=$(echo "$RELEASE" | jq -r \
-            '[.assets[] | select(.name | test("phone-release.*\\.apk$"))] | sort_by(.name) | last')
-          PHONE_APK_URL=$(echo "$PHONE_ASSET" | jq -r '.browser_download_url')
-          PHONE_APK_NAME=$(echo "$PHONE_ASSET" | jq -r '.name')
+  #         # Get Phone release APK with the highest build number
+  #         PHONE_ASSET=$(echo "$RELEASE" | jq -r \
+  #           '[.assets[] | select(.name | test("phone-release.*\\.apk$"))] | sort_by(.name) | last')
+  #         PHONE_APK_URL=$(echo "$PHONE_ASSET" | jq -r '.browser_download_url')
+  #         PHONE_APK_NAME=$(echo "$PHONE_ASSET" | jq -r '.name')
 
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
-          echo "title=${TITLE}" >> $GITHUB_OUTPUT
-          echo "tv_apk_url=${TV_APK_URL}" >> $GITHUB_OUTPUT
-          echo "tv_apk_name=${TV_APK_NAME}" >> $GITHUB_OUTPUT
-          echo "phone_apk_url=${PHONE_APK_URL}" >> $GITHUB_OUTPUT
-          echo "phone_apk_name=${PHONE_APK_NAME}" >> $GITHUB_OUTPUT
-          echo "Resolved: ${TV_APK_NAME} @ ${TV_APK_URL}"
+  #         echo "tag=${TAG}" >> $GITHUB_OUTPUT
+  #         echo "title=${TITLE}" >> $GITHUB_OUTPUT
+  #         echo "tv_apk_url=${TV_APK_URL}" >> $GITHUB_OUTPUT
+  #         echo "tv_apk_name=${TV_APK_NAME}" >> $GITHUB_OUTPUT
+  #         echo "phone_apk_url=${PHONE_APK_URL}" >> $GITHUB_OUTPUT
+  #         echo "phone_apk_name=${PHONE_APK_NAME}" >> $GITHUB_OUTPUT
+  #         echo "Resolved: ${TV_APK_NAME} @ ${TV_APK_URL}"
 
-      - name: Update APK download links in index.html
-        env:
-          TV_APK_URL: ${{ steps.release_info.outputs.tv_apk_url }}
-          TV_APK_NAME: ${{ steps.release_info.outputs.tv_apk_name }}
-          PHONE_APK_URL: ${{ steps.release_info.outputs.phone_apk_url }}
-          PHONE_APK_NAME: ${{ steps.release_info.outputs.phone_apk_name }}
-        run: |
-          python3 - <<'PYEOF'
-          import os, re, pathlib
+  #     - name: Update APK download links in index.html
+  #       env:
+  #         TV_APK_URL: ${{ steps.release_info.outputs.tv_apk_url }}
+  #         TV_APK_NAME: ${{ steps.release_info.outputs.tv_apk_name }}
+  #         PHONE_APK_URL: ${{ steps.release_info.outputs.phone_apk_url }}
+  #         PHONE_APK_NAME: ${{ steps.release_info.outputs.phone_apk_name }}
+  #       run: |
+  #         python3 - <<'PYEOF'
+  #         import os, re, pathlib
 
-          tv_apk_url    = os.environ["TV_APK_URL"]
-          tv_apk_name   = os.environ["TV_APK_NAME"]
-          phone_apk_url = os.environ["PHONE_APK_URL"]
-          phone_apk_name = os.environ["PHONE_APK_NAME"]
+  #         tv_apk_url    = os.environ["TV_APK_URL"]
+  #         tv_apk_name   = os.environ["TV_APK_NAME"]
+  #         phone_apk_url = os.environ["PHONE_APK_URL"]
+  #         phone_apk_name = os.environ["PHONE_APK_NAME"]
 
-          html = pathlib.Path("index.html").read_text(encoding="utf-8")
+  #         html = pathlib.Path("index.html").read_text(encoding="utf-8")
 
-          def patch_anchor(html, anchor_id, new_href, new_download):
-              """
-              Find <a> by id and update its href + download attributes,
-              regardless of attribute order in the tag.
-              """
-              def replacer(m):
-                  tag = m.group(0)
-                  # Update href value
-                  tag = re.sub(r'\bhref="[^"]*"', f'href="{new_href}"', tag)
-                  # Update download="..." if already set, else replace bare 'download'
-                  if re.search(r'\bdownload="[^"]*"', tag):
-                      tag = re.sub(r'\bdownload="[^"]*"', f'download="{new_download}"', tag)
-                  else:
-                      # Match only standalone 'download' attr (preceded by whitespace,
-                      # followed by whitespace or >) — avoids matching 'download-tv' etc.
-                      tag = re.sub(r'(?<=\s)download(?=[\s>])', f'download="{new_download}"', tag)
-                  return tag
+  #         def patch_anchor(html, anchor_id, new_href, new_download):
+  #             """
+  #             Find <a> by id and update its href + download attributes,
+  #             regardless of attribute order in the tag.
+  #             """
+  #             def replacer(m):
+  #                 tag = m.group(0)
+  #                 # Update href value
+  #                 tag = re.sub(r'\bhref="[^"]*"', f'href="{new_href}"', tag)
+  #                 # Update download="..." if already set, else replace bare 'download'
+  #                 if re.search(r'\bdownload="[^"]*"', tag):
+  #                     tag = re.sub(r'\bdownload="[^"]*"', f'download="{new_download}"', tag)
+  #                 else:
+  #                     # Match only standalone 'download' attr (preceded by whitespace,
+  #                     # followed by whitespace or >) — avoids matching 'download-tv' etc.
+  #                     tag = re.sub(r'(?<=\s)download(?=[\s>])', f'download="{new_download}"', tag)
+  #                 return tag
 
-              # Lookahead confirms anchor has the target id; match the full opening tag
-              pattern = rf'<a\b(?=[^>]*\bid="{re.escape(anchor_id)}")[^>]*>'
-              return re.sub(pattern, replacer, html, flags=re.DOTALL)
+  #             # Lookahead confirms anchor has the target id; match the full opening tag
+  #             pattern = rf'<a\b(?=[^>]*\bid="{re.escape(anchor_id)}")[^>]*>'
+  #             return re.sub(pattern, replacer, html, flags=re.DOTALL)
 
-          html = patch_anchor(html, "download-tv",     tv_apk_url,    tv_apk_name)
-          html = patch_anchor(html, "download-mobile", phone_apk_url, phone_apk_name)
+  #         html = patch_anchor(html, "download-tv",     tv_apk_url,    tv_apk_name)
+  #         html = patch_anchor(html, "download-mobile", phone_apk_url, phone_apk_name)
 
-          pathlib.Path("index.html").write_text(html, encoding="utf-8")
-          print(f"✅ Updated TV download link    → {tv_apk_name}")
-          print(f"✅ Updated Mobile download link → {phone_apk_name}")
-          PYEOF
+  #         pathlib.Path("index.html").write_text(html, encoding="utf-8")
+  #         print(f"✅ Updated TV download link    → {tv_apk_name}")
+  #         print(f"✅ Updated Mobile download link → {phone_apk_name}")
+  #         PYEOF
 
-      - name: Prepare Pages site
-        run: |
-          rm -rf _site
-          mkdir -p _site
-          cp index.html _site/index.html
-          cp privacy.html _site/privacy.html
+  #     - name: Prepare Pages site
+  #       run: |
+  #         rm -rf _site
+  #         mkdir -p _site
+  #         cp index.html _site/index.html
+  #         cp privacy.html _site/privacy.html
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: '_site'
+  #     - name: Upload Pages artifact
+  #       uses: actions/upload-pages-artifact@v3
+  #       with:
+  #         path: '_site'
 
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+  #     - name: Deploy to GitHub Pages
+  #       id: deployment
+  #       uses: actions/deploy-pages@v4
 
-  # ══════════════════════════════════════════════════════════════════════
+  # # ══════════════════════════════════════════════════════════════════════
   # CLEANUP: delete all failed workflow runs
   # ══════════════════════════════════════════════════════════════════════
   cleanup_failed_runs:
