@@ -130,6 +130,12 @@ interface TmdbApiService {
         @Path("tv_id") tvId: Int
     ): TvShowDetail
 
+    /** Fetches poster and backdrop images for a specific TV show. */
+    @GET("tv/{tv_id}/images")
+    suspend fun getTvShowImages(
+        @Path("tv_id") tvId: Int
+    ): MovieImagesResponse
+
     /** Fetches the list of seasons for a specific TV show. */
     @GET("tv/{tv_id}/seasons")
     suspend fun getTvShowSeasons(

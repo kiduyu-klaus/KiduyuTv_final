@@ -72,6 +72,7 @@ fun TvShowDetailScreen(
     onNetworkClick: (id: Int, name: String) -> Unit = { _, _ -> },
     onPlayClick: (String) -> Unit,
     onCastClick: (Int, String, String?, String?, String?) -> Unit = { _, _, _, _, _ -> },
+    onImagesClick: (Int, String) -> Unit = { _, _ -> },
     viewModel: DetailViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -91,6 +92,9 @@ fun TvShowDetailScreen(
 
     val myListInteraction = remember { MutableInteractionSource() }
     val myListFocused by myListInteraction.collectIsFocusedAsState()
+
+    val imagesInteraction = remember { MutableInteractionSource() }
+    val imagesFocused by imagesInteraction.collectIsFocusedAsState()
 
     LaunchedEffect(tvId) {
         viewModel.loadTvShowDetail(context, tvId)
@@ -449,6 +453,21 @@ fun TvShowDetailScreen(
                                         contentDescription = null,
                                         modifier = Modifier.size(16.dp)
                                     )
+                                }
+
+                                // TV show posters and backdrops
+                                Button(
+                                    onClick = { onImagesClick(tvShow.id, tvShow.name ?: "TV Show") },
+                                    interactionSource = imagesInteraction,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (imagesFocused) DarkRed else Color.DarkGray
+                                    ),
+                                    shape = RoundedCornerShape(4.dp),
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                                ) {
+                                    Icon(Icons.Default.Image, null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Images", fontSize = 12.sp)
                                 }
                             }
                         }

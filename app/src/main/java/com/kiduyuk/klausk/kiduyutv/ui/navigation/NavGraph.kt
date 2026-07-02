@@ -293,6 +293,9 @@ fun NavGraph(navController: NavHostController) {
                     navController.navigate(
                         "cast_detail/$castId/${Uri.encode(castName)}/${Uri.encode(character ?: "")}/${Uri.encode(profilePath ?: "")}/${Uri.encode(knownForDepartment ?: "")}"
                     )
+                },
+                onImagesClick = { id, title ->
+                    navController.navigate(Screen.TvShowImages.createRoute(id, title))
                 }
             )
         }
@@ -490,6 +493,27 @@ fun NavGraph(navController: NavHostController) {
             MovieImagesScreen(
                 movieId = movieId,
                 movieTitle = Uri.decode(movieTitle),
+                onBackClick = { navController.popBackStack() },
+                onImageClick = { initialIndex, imageUrls ->
+                    navController.navigate(Screen.ImageSlider.createRoute(initialIndex, imageUrls))
+                }
+            )
+        }
+
+        // TV Show Images Screen
+        composable(
+            route = Screen.TvShowImages.route,
+            arguments = listOf(
+                navArgument("tvId") { type = NavType.IntType },
+                navArgument("tvShowName") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val tvId = backStackEntry.arguments?.getInt("tvId") ?: 0
+            val tvShowName = backStackEntry.arguments?.getString("tvShowName") ?: ""
+            MovieImagesScreen(
+                movieId = tvId,
+                movieTitle = Uri.decode(tvShowName),
+                isTvShow = true,
                 onBackClick = { navController.popBackStack() },
                 onImageClick = { initialIndex, imageUrls ->
                     navController.navigate(Screen.ImageSlider.createRoute(initialIndex, imageUrls))

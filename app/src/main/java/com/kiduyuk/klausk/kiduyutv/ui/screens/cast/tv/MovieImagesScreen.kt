@@ -59,11 +59,17 @@ class MovieImagesViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(MovieImagesUiState())
     val uiState: StateFlow<MovieImagesUiState> = _uiState.asStateFlow()
 
-    fun loadMovieImages(movieId: Int) {
+    fun loadMediaImages(mediaId: Int, isTvShow: Boolean) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-            repository.getMovieImages(movieId)
+            val result = if (isTvShow) {
+                repository.getTvShowImages(mediaId)
+            } else {
+                repository.getMovieImages(mediaId)
+            }
+
+            result
                 .onSuccess { images ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
@@ -90,14 +96,15 @@ data class MovieImagesUiState(
 fun MovieImagesScreen(
     movieId: Int,
     movieTitle: String,
+    isTvShow: Boolean = false,
     onBackClick: () -> Unit,
     onImageClick: (initialIndex: Int, imageUrls: List<String>) -> Unit,
     viewModel: MovieImagesViewModel = remember { MovieImagesViewModel() }
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(movieId) {
-        viewModel.loadMovieImages(movieId)
+    LaunchedEffect(movieId, isTvShow) {
+        viewModel.loadMediaImages(movieId, isTvShow)
     }
 
     Box(

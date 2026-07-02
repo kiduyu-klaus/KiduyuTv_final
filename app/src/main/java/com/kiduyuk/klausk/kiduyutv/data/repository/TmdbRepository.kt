@@ -241,6 +241,12 @@ class TmdbRepository {
         response.posters.orEmpty() + response.backdrops.orEmpty()
     }
 
+    /** Fetches poster and backdrop images for a specific TV show. */
+    suspend fun getTvShowImages(tvId: Int): Result<List<MovieImage>> = runCatching {
+        val response = api.getTvShowImages(tvId)
+        response.posters.orEmpty() + response.backdrops.orEmpty()
+    }
+
     /** Fetches detailed information for a specific TV show. */
     suspend fun getTvShowDetail(tvId: Int): Result<TvShowDetail> = runCatching {
         api.getTvShowDetail(tvId)
