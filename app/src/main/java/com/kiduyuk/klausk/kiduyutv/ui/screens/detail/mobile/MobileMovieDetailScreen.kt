@@ -12,6 +12,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
@@ -36,7 +38,6 @@ import com.kiduyuk.klausk.kiduyutv.ui.components.CastRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
-import com.kiduyuk.klausk.kiduyutv.ui.player.youtube.YouTubePlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileCategoryRow
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
@@ -61,6 +62,8 @@ fun MobileMovieDetailScreen(
     onCastClick: (Int, String, String?, String?, String?) -> Unit,
     onNavigateToCastDetail: (String) -> Unit,
     onCompanyClick: (Int, String) -> Unit = { _, _ -> },
+    onImagesClick: (Int, String) -> Unit = { _, _ -> },
+    onVideosClick: (Int, Boolean, String) -> Unit = { _, _, _ -> },
     viewModel: DetailViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -240,29 +243,39 @@ fun MobileMovieDetailScreen(
                         }
                     }
 
-                    // Watch Trailer Button below the primary buttons
-                    if (uiState.trailerKey != null) {
-                        Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedButton(
-                            onClick = {
-                                val intent = Intent(context, YouTubePlayerActivity::class.java).apply {
-                                    putExtra("VIDEO_ID", uiState.trailerKey)
-                                    putExtra("TITLE", movie.title ?: "")
-                                }
-                                context.startActivity(intent)
-                            },
-                            modifier = Modifier.fillMaxWidth(),
+                            onClick = { onVideosClick(movie.id, false, movie.title ?: "Movie") },
+                            modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
                             shape = RoundedCornerShape(8.dp),
                             border = BorderStroke(1.dp, TextSecondary)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Star,
+                                imageVector = Icons.Default.Movie,
                                 contentDescription = null,
                                 tint = PrimaryRed
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Watch Trailer")
+                            Text("Videos")
+                        }
+
+                        OutlinedButton(
+                            onClick = { onImagesClick(movie.id, movie.title ?: "Movie") },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, TextSecondary)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Image,
+                                contentDescription = null,
+                                tint = PrimaryRed
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Images")
                         }
                     }
 

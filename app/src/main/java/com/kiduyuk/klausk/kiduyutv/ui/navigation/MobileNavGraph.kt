@@ -11,15 +11,18 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
+import com.kiduyuk.klausk.kiduyutv.ui.player.youtube.YouTubePlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.mobile.MobileCastDetailScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.CastDetailScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.CastImagesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.ImageSliderScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.company_network_list.mobile.MobileMediaListScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.mobile.MobileImagesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.mobile.MobileMovieDetailScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.mobile.MobileSeasonEpisodesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.mobile.MobileStreamLinksScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.mobile.MobileTvShowDetailScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.mobile.MobileVideosScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.SeasonEpisodesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.StreamLinksScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileGenreContentScreen
@@ -284,6 +287,12 @@ fun MobileNavGraph(navController: NavHostController) {
                 onNavigateToCastDetail = { route -> navController.navigate(route) },
                 onCompanyClick = { id, name ->
                     navController.navigate("media_list/company/$id/${Uri.encode(name)}")
+                },
+                onImagesClick = { id, title ->
+                    navController.navigate(Screen.MovieImages.createRoute(id, title))
+                },
+                onVideosClick = { id, isTv, title ->
+                    navController.navigate(Screen.Videos.createRoute(id, isTv, title))
                 }
             )
         }
@@ -328,6 +337,12 @@ fun MobileNavGraph(navController: NavHostController) {
                 onNavigateToCastDetail = { route -> navController.navigate(route) },
                 onNetworkClick = { id, name ->
                     navController.navigate("media_list/network/$id/${Uri.encode(name)}")
+                },
+                onImagesClick = { id, title ->
+                    navController.navigate(Screen.TvShowImages.createRoute(id, title))
+                },
+                onVideosClick = { id, isTv, title ->
+                    navController.navigate(Screen.Videos.createRoute(id, isTv, title))
                 }
             )
         }
@@ -533,6 +548,78 @@ fun MobileNavGraph(navController: NavHostController) {
                 onBackClick = { navController.popBackStack() },
                 onImageClick = { initialIndex, imageUrls ->
                     navController.navigate(Screen.ImageSlider.createRoute(initialIndex, imageUrls))
+                }
+            )
+        }
+
+        // Movie Images Screen
+        composable(
+            route = Screen.MovieImages.route,
+            arguments = listOf(
+                navArgument("movieId") { type = NavType.IntType },
+                navArgument("movieTitle") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val movieId = backStackEntry.arguments?.getInt("movieId") ?: 0
+            val movieTitle = backStackEntry.arguments?.getString("movieTitle") ?: ""
+            MobileImagesScreen(
+                mediaId = movieId,
+                title = Uri.decode(movieTitle),
+                isTv = false,
+                onBackClick = { navController.popBackStack() },
+                onImageClick = { initialIndex, imageUrls ->
+                    navController.navigate(Screen.ImageSlider.createRoute(initialIndex, imageUrls))
+                }
+            )
+        }
+
+        // TV Show Images Screen
+        composable(
+            route = Screen.TvShowImages.route,
+            arguments = listOf(
+                navArgument("tvId") { type = NavType.IntType },
+                navArgument("tvShowName") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val tvId = backStackEntry.arguments?.getInt("tvId") ?: 0
+            val tvShowName = backStackEntry.arguments?.getString("tvShowName") ?: ""
+            MobileImagesScreen(
+                mediaId = tvId,
+                title = Uri.decode(tvShowName),
+                isTv = true,
+                onBackClick = { navController.popBackStack() },
+                onImageClick = { initialIndex, imageUrls ->
+                    navController.navigate(Screen.ImageSlider.createRoute(initialIndex, imageUrls))
+                }
+            )
+        }
+
+        // Videos Screen
+        composable(
+            route = Screen.Videos.route,
+            arguments = listOf(
+                navArgument("mediaId") { type = NavType.IntType },
+                navArgument("isTv") { type = NavType.BoolType },
+                navArgument("title") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                }
+            )
+        ) { backStackEntry ->
+            val mediaId = backStackEntry.arguments?.getInt("mediaId") ?: 0
+            val isTv = backStackEntry.arguments?.getBoolean("isTv") ?: false
+            val title = Uri.decode(backStackEntry.arguments?.getString("title") ?: "")
+            MobileVideosScreen(
+                mediaId = mediaId,
+                isTv = isTv,
+                title = title,
+                onBackClick = { navController.popBackStack() },
+                onVideoClick = { video ->
+                    val intent = Intent(navController.context, YouTubePlayerActivity::class.java).apply {
+                        putExtra("VIDEO_ID", video.key)
+                        putExtra("TITLE", video.name)
+                    }
+                    navController.context.startActivity(intent)
                 }
             )
         }

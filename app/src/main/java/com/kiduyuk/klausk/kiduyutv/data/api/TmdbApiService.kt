@@ -121,7 +121,9 @@ interface TmdbApiService {
     /** Fetches poster and backdrop images for a specific movie. */
     @GET("movie/{movie_id}/images")
     suspend fun getMovieImages(
-        @Path("movie_id") movieId: Int
+        @Path("movie_id") movieId: Int,
+        @Query("language") language: String = "en-US",
+        @Query("include_image_language") includeImageLanguage: String = "en,null"
     ): MovieImagesResponse
 
     /** Fetches detailed information for a specific TV show. */
@@ -133,7 +135,9 @@ interface TmdbApiService {
     /** Fetches poster and backdrop images for a specific TV show. */
     @GET("tv/{tv_id}/images")
     suspend fun getTvShowImages(
-        @Path("tv_id") tvId: Int
+        @Path("tv_id") tvId: Int,
+        @Query("language") language: String = "en-US",
+        @Query("include_image_language") includeImageLanguage: String = "en,null"
     ): MovieImagesResponse
 
     /** Fetches the list of seasons for a specific TV show. */

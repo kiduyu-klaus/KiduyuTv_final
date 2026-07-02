@@ -238,13 +238,15 @@ class TmdbRepository {
     /** Fetches poster and backdrop images for a specific movie. */
     suspend fun getMovieImages(movieId: Int): Result<List<MovieImage>> = runCatching {
         val response = api.getMovieImages(movieId)
-        response.posters.orEmpty() + response.backdrops.orEmpty()
+        (response.posters.orEmpty() + response.backdrops.orEmpty())
+            .filter(::isEnglishOrLanguageNeutralImage)
     }
 
     /** Fetches poster and backdrop images for a specific TV show. */
     suspend fun getTvShowImages(tvId: Int): Result<List<MovieImage>> = runCatching {
         val response = api.getTvShowImages(tvId)
-        response.posters.orEmpty() + response.backdrops.orEmpty()
+        (response.posters.orEmpty() + response.backdrops.orEmpty())
+            .filter(::isEnglishOrLanguageNeutralImage)
     }
 
     /** Fetches detailed information for a specific TV show. */
@@ -781,6 +783,10 @@ class TmdbRepository {
      */
     fun cleanExpiredCache() {
         DatabaseManager.cleanExpiredCache()
+    }
+
+    private fun isEnglishOrLanguageNeutralImage(image: MovieImage): Boolean {
+        return image.iso6391 == null || image.iso6391.equals("en", ignoreCase = true)
     }
 
     /** Fetches images for a specific person. */
