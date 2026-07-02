@@ -422,8 +422,13 @@ jobs:
     needs: [build_all, update_changelog]
 
     permissions:
+      contents: read
       pages: write
       id-token: write
+
+    concurrency:
+      group: github-pages
+      cancel-in-progress: true
 
     environment:
       name: github-pages
@@ -441,16 +446,6 @@ jobs:
 
       - name: Apply updated index.html
         run: cp ./site/index.html ./index.html
-
-      - name: Download all APK artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./apks
-
-      - name: List downloaded APKs
-        run: |
-          echo "=== Downloaded APKs ==="
-          find ./apks -name "*.apk" -type f
 
       - name: Resolve latest release info
         id: release_info
@@ -532,10 +527,17 @@ jobs:
           print(f"✅ Updated Mobile download link → {phone_apk_name}")
           PYEOF
 
+      - name: Prepare Pages site
+        run: |
+          rm -rf _site
+          mkdir -p _site
+          cp index.html _site/index.html
+          cp privacy.html _site/privacy.html
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: '_site'
 
       - name: Deploy to GitHub Pages
         id: deployment
