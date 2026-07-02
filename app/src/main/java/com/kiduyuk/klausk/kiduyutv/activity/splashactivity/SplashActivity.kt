@@ -20,14 +20,10 @@ import androidx.activity.compose.setContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
@@ -39,9 +35,9 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Color.Companion.White
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
@@ -778,18 +774,6 @@ class SplashActivity : ComponentActivity() {
             screenAlpha.animateTo(1f, animationSpec = tween(700, easing = FastOutSlowInEasing))
         }
 
-        // Slowly pulsing background glow
-        val glowTransition = rememberInfiniteTransition(label = "glow")
-        val glowAlpha by glowTransition.animateFloat(
-            initialValue = 0.08f,
-            targetValue = 0.20f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(2400, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse
-            ),
-            label = "glow_alpha"
-        )
-
         // Lottie loading animation
         val lottieComposition by rememberLottieComposition(
             LottieCompositionSpec.RawRes(R.raw.splash_loading)
@@ -799,168 +783,220 @@ class SplashActivity : ComponentActivity() {
             iterations = LottieConstants.IterateForever
         )
 
+        val (statusLabel, statusColor) = when {
+            updateAvailable && remoteVersion != null ->
+                "Update available: v$remoteVersion" to Color(0xFFFF4D57)
+            updateAvailable ->
+                "Update available" to Color(0xFFFF4D57)
+            !permissionHandled ->
+                "Requesting permissions..." to Color(0xFFBFC6D1)
+            !versionCheckHandled ->
+                "Verifying app version..." to Color(0xFFBFC6D1)
+            !adsConsentHandled ->
+                "Preparing ads..." to Color(0xFFBFC6D1)
+            !syncCompleted ->
+                "Syncing data..." to Color(0xFFBFC6D1)
+            else ->
+                "Opening KiduyuTV" to Color(0xFFBFC6D1)
+        }
+        val syncStatus = if (!syncCompleted && syncMessage.isNotBlank()) {
+            val progress = syncProgress.coerceIn(0, 100)
+            if (progress > 0) "$syncMessage $progress%" else syncMessage
+        } else {
+            null
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF0F0F0F))
-                .alpha(screenAlpha.value)
-        ) {
-
-            // ── Soft radial glow ─────────────────────────────────────────────
-            Canvas(
-                modifier = Modifier
-                    .size(440.dp)
-                    .align(Alignment.Center)
-            ) {
-                drawCircle(
-                    brush = Brush.radialGradient(
+                .background(
+                    Brush.verticalGradient(
                         colors = listOf(
-                            Color(0xFFE50914).copy(alpha = glowAlpha),
-                            Color.Transparent
+                            Color(0xFF050505),
+                            Color(0xFF11151A),
+                            Color(0xFF050505)
                         )
                     )
                 )
+                .alpha(screenAlpha.value)
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .fillMaxHeight()
+                    .width(5.dp)
+                    .background(Color(0xFFE50914))
+            )
+
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 30.dp, vertical = 26.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color(0x331C2430))
+                        .border(
+                            width = 1.dp,
+                            color = Color.White.copy(alpha = 0.08f),
+                            shape = RoundedCornerShape(18.dp)
+                        )
+                        .padding(horizontal = 14.dp, vertical = 7.dp)
+                ) {
+                    Text(
+                        text = "v${BuildConfig.VERSION_NAME}",
+                        color = Color(0xFF9AA3AE),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
             }
 
-            // ── Centre logo block ────────────────────────────────────────────
             Column(
                 modifier = Modifier
                     .align(Alignment.Center)
+                    .fillMaxWidth()
                     .padding(horizontal = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // App icon
-                Image(
-                    painter = painterResource(id = R.mipmap.ic_launcher11),
-                    contentDescription = "KiduyuTV icon",
+                Box(
                     modifier = Modifier
-                        .size(96.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                )
+                        .size(118.dp)
+                        .clip(RoundedCornerShape(30.dp))
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color(0xFF20242B),
+                                    Color(0xFF121418)
+                                )
+                            )
+                        )
+                        .border(
+                            width = 1.dp,
+                            color = Color.White.copy(alpha = 0.10f),
+                            shape = RoundedCornerShape(30.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(id = R.mipmap.ic_launcher11),
+                        contentDescription = "KiduyuTV icon",
+                        modifier = Modifier
+                            .size(92.dp)
+                            .clip(RoundedCornerShape(24.dp))
+                    )
+                }
 
-                Spacer(Modifier.height(10.dp))
-
-                // "KiduyuTV" — white + red split
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
                         text = "Kiduyu",
-                        color = White,
-                        fontSize = 42.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = (-1.5).sp
+                        color = Color.White,
+                        fontSize = 44.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 0.sp
                     )
                     Text(
                         text = "TV",
                         color = Color(0xFFE50914),
-                        fontSize = 42.sp,
+                        fontSize = 44.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = (-1.5).sp
+                        letterSpacing = 0.sp
                     )
                 }
 
-                Spacer(Modifier.height(8.dp))
-
                 Text(
                     text = "STREAMING SIMPLIFIED",
-                    color = Color(0xFF606060),
+                    color = Color(0xFF8F98A3),
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 3.sp
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 2.sp,
+                    textAlign = TextAlign.Center
                 )
 
-                Spacer(Modifier.height(10.dp))
-
-                // Small Lottie indicator below the wordmark
                 LottieAnimation(
                     composition = lottieComposition,
                     progress = { lottieProgress },
-                    modifier = Modifier.size(72.dp)
+                    modifier = Modifier.size(84.dp)
                 )
             }
 
-            // ── Bottom: status chip + progress bar + version ─────────────────
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(horizontal = 36.dp, vertical = 44.dp),
+                    .padding(horizontal = 30.dp, vertical = 34.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Firebase Sync Status Chip
-                if (!syncCompleted && syncMessage.isNotEmpty()) {
+                syncStatus?.let { label ->
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(Color(0xFF1E1E1E))
-                            .padding(horizontal = 18.dp, vertical = 7.dp),
+                            .widthIn(max = 560.dp)
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(Color(0xFF171B21))
+                            .border(
+                                width = 1.dp,
+                                color = Color.White.copy(alpha = 0.07f),
+                                shape = RoundedCornerShape(18.dp)
+                            )
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = syncMessage,
-                            color = Color(0xFF808080),
+                            text = label,
+                            color = Color(0xFF9AA3AE),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
-                            letterSpacing = 0.3.sp
+                            letterSpacing = 0.sp,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2
                         )
                     }
                 }
 
-                // Status chip — only visible while progress is paused
-                if (isPaused) {
-                    val (chipLabel, chipColor) = when {
-                        updateAvailable && remoteVersion != null ->
-                            "Update available: v$remoteVersion" to Color(0xFFE50914)
-                        updateAvailable ->
-                            "Update available" to Color(0xFFE50914)
-                        !permissionHandled ->
-                            "Requesting permissions…" to Color(0xFF808080)
-                        !versionCheckHandled ->
-                            "Verifying app version…" to Color(0xFF808080)
-                        !adsConsentHandled ->
-                            "Preparing ads..." to Color(0xFF808080)
-                        !syncCompleted ->
-                            "Syncing data..." to Color(0xFF808080)
-                        else ->
-                            "Loading..." to Color(0xFF808080)
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(Color(0xFF1E1E1E))
-                            .padding(horizontal = 18.dp, vertical = 7.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = chipLabel,
-                            color = chipColor,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            letterSpacing = 0.3.sp
-                        )
-                    }
-                }
-
-                // Animated progress bar (2dp thin, red fill)
-                LinearProgressIndicator(
-                    progress = { barProgress.value },
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(2.dp)
-                        .clip(RoundedCornerShape(1.dp)),
-                    color = Color(0xFFE50914),
-                    trackColor = Color(0xFF2A2A2A)
-                )
+                        .widthIn(max = 560.dp)
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(Color(0xCC101318))
+                        .border(
+                            width = 1.dp,
+                            color = Color.White.copy(alpha = 0.08f),
+                            shape = RoundedCornerShape(22.dp)
+                        )
+                        .padding(horizontal = 18.dp, vertical = 14.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = statusLabel,
+                            color = statusColor,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.sp,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2
+                        )
 
-                // Version
-                Text(
-                    text = "v${BuildConfig.VERSION_NAME}",
-                    color = Color(0xFF3A3A3A),
-                    fontSize = 11.sp,
-                    letterSpacing = 0.5.sp
-                )
+                        LinearProgressIndicator(
+                            progress = { barProgress.value },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp)),
+                            color = Color(0xFFE50914),
+                            trackColor = Color(0xFF2B3037)
+                        )
+                    }
+                }
             }
         }
     }
