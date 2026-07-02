@@ -40,7 +40,6 @@ import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.MovieCard
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
-import com.kiduyuk.klausk.kiduyutv.ui.player.youtube.YouTubePlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
@@ -70,6 +69,7 @@ fun MovieDetailScreen(
     onPlayClick: (String) -> Unit,
     onCastClick: (Int, String, String?, String?, String?) -> Unit = { _, _, _, _, _ -> },
     onImagesClick: (Int, String) -> Unit = { _, _ -> },
+    onVideosClick: (Int, Boolean, String) -> Unit = { _, _, _ -> },
     viewModel: DetailViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -361,27 +361,19 @@ fun MovieDetailScreen(
                                     Text(if (uiState.watchHistoryItem != null) "Continue" else "Play", fontSize = 12.sp)
                                 }
 
-                                // Watch Trailer
-                                if (uiState.trailerKey != null) {
-                                    Button(
-                                        onClick = {
-                                            val intent = Intent(context, YouTubePlayerActivity::class.java).apply {
-                                                putExtra("VIDEO_ID", uiState.trailerKey)
-                                                putExtra("TITLE", movie.title ?: "")
-                                            }
-                                            context.startActivity(intent)
-                                        },
-                                        interactionSource = trailerInteraction,
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = if (trailerFocused) DarkRed else Color.DarkGray
-                                        ),
-                                        shape = RoundedCornerShape(4.dp),
-                                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
-                                    ) {
-                                        Icon(Icons.Default.Movie, null, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Trailer", fontSize = 12.sp)
-                                    }
+                                // Videos
+                                Button(
+                                    onClick = { onVideosClick(movie.id, false, movie.title ?: "Movie") },
+                                    interactionSource = trailerInteraction,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (trailerFocused) DarkRed else Color.DarkGray
+                                    ),
+                                    shape = RoundedCornerShape(4.dp),
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                                ) {
+                                    Icon(Icons.Default.Movie, null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Videos", fontSize = 12.sp)
                                 }
 
                                 // My List toggle

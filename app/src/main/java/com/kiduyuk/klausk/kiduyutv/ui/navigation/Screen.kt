@@ -77,6 +77,13 @@ sealed class Screen(val route: String) {
         }
     }
 
+    object Videos : Screen("videos/{mediaId}/{isTv}?title={title}") {
+        fun createRoute(mediaId: Int, isTv: Boolean, title: String): String {
+            val encodedTitle = android.net.Uri.encode(title)
+            return "videos/$mediaId/$isTv?title=$encodedTitle"
+        }
+    }
+
     object ImageSlider : Screen("image_slider/{initialIndex}?imageUrls={imageUrls}") {
         fun createRoute(initialIndex: Int, imageUrls: List<String>): String {
             val encodedUrls = android.net.Uri.encode(imageUrls.joinToString(","))

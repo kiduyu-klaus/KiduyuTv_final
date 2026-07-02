@@ -1,6 +1,7 @@
 package com.kiduyuk.klausk.kiduyutv.ui.navigation
 
 import android.app.Application
+import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import androidx.annotation.OptIn
@@ -26,10 +27,12 @@ import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.MovieDetailScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.SeasonEpisodesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.StreamLinksScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.TvShowDetailScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.VideosScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.CastDetailScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.CastImagesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.ImageSliderScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.MovieImagesScreen
+import com.kiduyuk.klausk.kiduyutv.ui.player.youtube.YouTubePlayerActivity
 import com.kiduyuk.klausk.kiduyutv.data.model.CastMember
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.HomeScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.MoviesScreen
@@ -264,6 +267,9 @@ fun NavGraph(navController: NavHostController) {
                 },
                 onImagesClick = { id, title ->
                     navController.navigate(Screen.MovieImages.createRoute(id, title))
+                },
+                onVideosClick = { id, isTv, title ->
+                    navController.navigate(Screen.Videos.createRoute(id, isTv, title))
                 }
             )
         }
@@ -296,6 +302,9 @@ fun NavGraph(navController: NavHostController) {
                 },
                 onImagesClick = { id, title ->
                     navController.navigate(Screen.TvShowImages.createRoute(id, title))
+                },
+                onVideosClick = { id, isTv, title ->
+                    navController.navigate(Screen.Videos.createRoute(id, isTv, title))
                 }
             )
         }
@@ -521,6 +530,38 @@ fun NavGraph(navController: NavHostController) {
             )
         }
 
+        // Videos Screen
+        composable(
+            route = Screen.Videos.route,
+            arguments = listOf(
+                navArgument("mediaId") { type = NavType.IntType },
+                navArgument("isTv") { type = NavType.BoolType },
+                navArgument("title") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                }
+            )
+        ) { backStackEntry ->
+            val context = LocalContext.current
+            val mediaId = backStackEntry.arguments?.getInt("mediaId") ?: 0
+            val isTv = backStackEntry.arguments?.getBoolean("isTv") ?: false
+            val title = Uri.decode(backStackEntry.arguments?.getString("title") ?: "")
+
+            VideosScreen(
+                mediaId = mediaId,
+                isTv = isTv,
+                title = title,
+                onBackClick = { navController.popBackStack() },
+                onVideoClick = { video ->
+                    val intent = Intent(context, YouTubePlayerActivity::class.java).apply {
+                        putExtra("VIDEO_ID", video.key)
+                        putExtra("TITLE", video.name)
+                    }
+                    context.startActivity(intent)
+                }
+            )
+        }
+
         // Image Slider Screen
         composable(
             route = Screen.ImageSlider.route,
@@ -532,7 +573,7 @@ fun NavGraph(navController: NavHostController) {
             val initialIndex = backStackEntry.arguments?.getInt("initialIndex") ?: 0
             val imageUrlsString = backStackEntry.arguments?.getString("imageUrls") ?: ""
             val imageUrls = Uri.decode(imageUrlsString).split(",")
-            
+
             ImageSliderScreen(
                 initialIndex = initialIndex,
                 imageUrls = imageUrls,
