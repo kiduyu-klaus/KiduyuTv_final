@@ -37,7 +37,7 @@ import com.kiduyuk.klausk.kiduyutv.network.NetworkConnectivityChecker
 import com.kiduyuk.klausk.kiduyutv.network.NetworkConnectivityObserver
 import com.kiduyuk.klausk.kiduyutv.network.NetworkState
 import com.kiduyuk.klausk.kiduyutv.network.NetworkStateDialog
-import com.kiduyuk.klausk.kiduyutv.ui.components.BannerAdView
+import com.kiduyuk.klausk.kiduyutv.ui.components.TraktAnnouncementDialog
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 
@@ -121,6 +121,16 @@ class MainActivity : ComponentActivity() {
                         NavGraph(navController = navController)
                     } else {
                         MobileNavGraph(navController = navController)
+                    }
+
+                    if (currentRoute == Screen.Home.route) {
+                        TraktAnnouncementDialog(
+                            onSettingsClick = {
+                                navController.navigate(Screen.Settings.route) {
+                                    launchSingleTop = true
+                                }
+                            }
+                        )
                     }
                 }
             }

@@ -39,7 +39,7 @@ fun TvBannerAdView(
     val containerRef = remember { mutableStateOf<FrameLayout?>(null) }
     val bannerModifier = modifier
         .fillMaxWidth()
-        .height(90.dp)
+        .height(50.dp)
         .background(Color(0xFF0F0F0F))
 
     // Respect the user's "disable ads" preference.
