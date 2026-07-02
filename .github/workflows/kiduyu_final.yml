@@ -143,7 +143,7 @@ jobs:
 
       # ── Release APKs ──────────────────────────────────────────
       - name: Build Phone + TV Release APKs
-        run: ./gradlew assemblePhoneRelease assembleTvRelease --build-cache --configuration-cache --parallel -x lint -x testDebugUnitTest --scan
+        run: ./gradlew assemblePhoneRelease assembleTvRelease --build-cache --configuration-cache --parallel -x lint -x testDebugUnitTest --warning-mode all
 
       - name: Rename Phone Release APK
         id: rename_phone_release
