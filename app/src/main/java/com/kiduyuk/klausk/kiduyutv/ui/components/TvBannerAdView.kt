@@ -15,6 +15,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
+import com.kiduyuk.klausk.kiduyutv.util.AdUnitIds
 
 @Composable
 fun TvBannerAdView(modifier: Modifier = Modifier) {
@@ -38,7 +39,7 @@ fun TvBannerAdView(modifier: Modifier = Modifier) {
         factory = { context ->
             adView = AdView(context).apply {
                 setAdSize(bannerAdSize ?: AdSize.BANNER)
-                adUnitId = "ca-app-pub-3803477439180910/7183108212"
+                adUnitId = AdUnitIds.TV_BANNER
                 val adRequest = AdRequest.Builder().build()
                 loadAd(adRequest)
             }
@@ -54,7 +55,7 @@ fun TvBannerAdView(modifier: Modifier = Modifier) {
 
 }
 
-fun Context.findActivity(): Activity? {
+private fun Context.findActivity(): Activity? {
     return when (this) {
         is Activity -> this
         is ContextWrapper -> baseContext.findActivity()

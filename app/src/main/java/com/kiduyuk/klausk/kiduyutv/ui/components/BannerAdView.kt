@@ -3,6 +3,7 @@ package com.kiduyuk.klausk.kiduyutv.ui.components
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -48,7 +49,7 @@ fun BannerAdView(modifier: Modifier = Modifier) {
         factory = { context ->
             adView = AdView(context).apply {
                 setAdSize(bannerAdSize ?: AdSize.BANNER)
-                adUnitId = "ca-app-pub-3803477439180910/7183108212"
+                adUnitId = AdUnitIds.PHONE_BANNER
                 val adRequest = AdRequest.Builder().build()
                 loadAd(adRequest)
             }
@@ -64,7 +65,7 @@ fun BannerAdView(modifier: Modifier = Modifier) {
 
 }
 
-fun Context.findActivity(): Activity? {
+private fun Context.findActivity(): Activity? {
     return when (this) {
         is Activity -> this
         is ContextWrapper -> baseContext.findActivity()
