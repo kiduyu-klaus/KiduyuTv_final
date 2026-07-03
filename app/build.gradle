@@ -230,10 +230,10 @@ dependencies {
     // ─────────────────────────────────────────────
     // Ads
     // ─────────────────────────────────────────────
-    implementation 'com.google.android.gms:play-services-ads:25.4.0'
+    implementation 'com.google.android.gms:play-services-ads:24.6.0'
 
     // ── Consent SDK (both flavours, required for EEA users) ───────────────
-    implementation 'com.google.android.ump:user-messaging-platform:4.0.0'
+    implementation 'com.google.android.ump:user-messaging-platform:3.2.0'
 
     // ─────────────────────────────────────────────
     // Ads — Secondary Networks (NEW)
