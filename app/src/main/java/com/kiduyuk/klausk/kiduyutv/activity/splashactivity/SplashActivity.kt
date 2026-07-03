@@ -225,6 +225,7 @@ class SplashActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        resetHomeDialogShownFlag()
 
         // ── First: Check if device version matches Firebase app_info ─────────────────
         checkDeviceVersionFromFirebase()
@@ -268,6 +269,13 @@ class SplashActivity : ComponentActivity() {
 
         checkForUpdates()
         checkNotificationPermission()
+    }
+
+    private fun resetHomeDialogShownFlag() {
+        val dialogPrefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+        dialogPrefs.edit()
+            .putBoolean("trakt_announcement_shown", false)
+            .apply()
     }
 
     // ── Device Version Check ────────────────────────────────────────────────────

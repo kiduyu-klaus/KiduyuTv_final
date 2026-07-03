@@ -124,13 +124,7 @@ class MainActivity : ComponentActivity() {
                     }
 
                     if (currentRoute == Screen.Home.route) {
-                        TraktAnnouncementDialog(
-                            onSettingsClick = {
-                                navController.navigate(Screen.Settings.route) {
-                                    launchSingleTop = true
-                                }
-                            }
-                        )
+                        TraktAnnouncementDialog()
                     }
                 }
             }
