@@ -1,8 +1,5 @@
 package com.kiduyuk.klausk.kiduyutv.ui.components.mobile
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -94,10 +91,12 @@ fun MobileBottomNavigation(
             }
         }
 
+        val context = LocalContext.current
+        val activity = context.findActivity()
+
         // Show banner ad only on phone flavour via AdFallbackDispatcher
-        if (BuildConfig.FLAVOR == "phone") {
-            val context = LocalContext.current
-            val activity = context.findActivity() ?: return
+        if (BuildConfig.FLAVOR == "phone" && activity != null && !SettingsManager(context).isAdsDisabled()) {
+            
             val bannerContainer = remember { mutableStateOf<FrameLayout?>(null) }
             DisposableEffect(Unit) {
                 onDispose {
@@ -110,7 +109,6 @@ fun MobileBottomNavigation(
                     bannerContainer.value = null
                 }
             }
-            if (!SettingsManager(context).isAdsDisabled()) {
                 AndroidView(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -130,16 +128,8 @@ fun MobileBottomNavigation(
                         }
                     }
                 )
-            }
+            
         }
-    }
-}
-
-private fun Context.findActivity(): Activity? {
-    return when (this) {
-        is Activity -> this
-        is ContextWrapper -> baseContext.findActivity()
-        else -> null
     }
 }
 
