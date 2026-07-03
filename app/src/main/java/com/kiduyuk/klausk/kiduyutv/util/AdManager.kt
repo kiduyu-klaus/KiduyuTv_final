@@ -293,12 +293,9 @@ object AdManager {
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to load banner ad", e)
             }
+            Unit  // Explicitly return Unit
         }
         if (!isInitialised) {
-            // Queue the request — it will be replayed from the MobileAds
-            // init callback. This is what allows the bottom-nav banner to
-            // appear even when the splash navigates away before the SDK
-            // finishes initialising.
             Log.w(TAG, "AdMob not initialised yet - queuing banner load")
             pendingBannerLoad = doLoad
             return
