@@ -282,7 +282,7 @@ class SplashActivity : ComponentActivity() {
      */
     private fun checkDeviceVersionFromFirebase() {
         val isTvDevice = UpdateUtil.isTvDevice(this)
-        val expectedVersionKey = if (isTvDevice) "tv_version" else "phone_version"
+        val expectedVersionKey = if (isTvDevice) "app_type_tv" else "app_type_phone"
 
         Log.i(TAG, "Checking device version: isTv=$isTvDevice, checking $expectedVersionKey")
 
@@ -290,7 +290,7 @@ class SplashActivity : ComponentActivity() {
             try {
                 val snapshot = withTimeoutOrNull(VERSION_CHECK_TIMEOUT_MS) {
                     FirebaseManager.getFirebaseDatabaseInstance()
-                        .getReference("app_config/app_info/$expectedVersionKey")
+                        .getReference("app_config/app_packagenames/$expectedVersionKey")
                         .get()
                         .await()
                 }
