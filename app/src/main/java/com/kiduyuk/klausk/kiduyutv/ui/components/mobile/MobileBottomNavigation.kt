@@ -3,34 +3,28 @@ package com.kiduyuk.klausk.kiduyutv.ui.components.mobile
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.LiveTv // Added this import
+import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
-import android.widget.FrameLayout
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
+import com.kiduyuk.klausk.kiduyutv.ui.components.BannerAdView
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
 import com.kiduyuk.klausk.kiduyutv.ui.theme.SurfaceDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextSecondary
-import com.kiduyuk.klausk.kiduyutv.util.AdFallbackDispatcher
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 
 data class BottomNavItem(val route: String, val icon: ImageVector, val label: String)
@@ -44,7 +38,7 @@ fun MobileBottomNavigation(
     val items = listOf(
         BottomNavItem(Screen.Home.route, Icons.Default.Home, "Home"),
         BottomNavItem(Screen.Movies.route, Icons.Default.Movie, "Movies"),
-        BottomNavItem(Screen.LiveTv.route, Icons.Default.LiveTv, "Live Tv"), // Updated icon here
+        BottomNavItem(Screen.LiveTv.route, Icons.Default.LiveTv, "Live Tv"),
         BottomNavItem(Screen.TvShows.route, Icons.Default.Tv, "TV Shows"),
         BottomNavItem(Screen.MyList.route, Icons.Default.PlaylistPlay, "My List")
     )
@@ -91,50 +85,21 @@ fun MobileBottomNavigation(
             }
         }
 
+        // Show banner ad only on phone flavour, and only if the user has not
+        // disabled ads in settings. We host BannerAdView directly inside the
+        // Compose hierarchy (no intermediate FrameLayout / ComposeView) and
+        // let it measure to its natural adaptive height — previous code
+        // clamped the container to 60.dp which clipped wider adaptive banners.
         val context = LocalContext.current
-        val activity = context.findActivity()
-
-        // Show banner ad only on phone flavour via AdFallbackDispatcher
-        if (BuildConfig.FLAVOR == "phone" && activity != null && !SettingsManager(context).isAdsDisabled()) {
-            
-            val bannerContainer = remember { mutableStateOf<FrameLayout?>(null) }
-            DisposableEffect(Unit) {
-                onDispose {
-                    bannerContainer.value?.let { container ->
-                        // The banner is hosted inside a ComposeView (added by
-                        // AdManager.loadBanner). Removing the view from the
-                        // hierarchy triggers the ComposeView's detach, which
-                        // in turn triggers BannerAdView's DisposableEffect
-                        // that calls adView.destroy(). The previous code cast
-                        // the child directly to AdView, which is the wrong
-                        // type — the cast always failed and left the banner
-                        // alive across recompositions / screen changes.
-                        container.removeAllViews()
-                    }
-                    bannerContainer.value = null
-                }
-            }
-                AndroidView(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(60.dp)
-                        .background(Color(0xFF141414)),
-                    factory = { ctx ->
-                        FrameLayout(ctx).apply {
-                            layoutParams = FrameLayout.LayoutParams(
-                                FrameLayout.LayoutParams.MATCH_PARENT,
-                                FrameLayout.LayoutParams.WRAP_CONTENT
-                            )
-                            bannerContainer.value = this
-                            AdFallbackDispatcher.loadBanner(
-                                activity,
-                                this
-                            )
-                        }
-                    }
-                )
-            
+        if (BuildConfig.FLAVOR == "phone" &&
+            !SettingsManager(context).isAdsDisabled()
+        ) {
+            BannerAdView(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight()
+                    .background(Color(0xFF141414))
+            )
         }
     }
 }
-
