@@ -173,6 +173,7 @@ dependencies {
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.7'
     implementation 'androidx.lifecycle:lifecycle-runtime-compose:2.8.7'
     implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7'
+    implementation 'androidx.lifecycle:lifecycle-process:2.8.7'
 
     // ─────────────────────────────────────────────
     // Networking (Retrofit + OkHttp)
@@ -229,10 +230,10 @@ dependencies {
     // ─────────────────────────────────────────────
     // Ads
     // ─────────────────────────────────────────────
-    implementation 'com.google.android.gms:play-services-ads:23.3.0'
+    implementation 'com.google.android.gms:play-services-ads:25.4.0'
 
     // ── Consent SDK (both flavours, required for EEA users) ───────────────
-    implementation 'com.google.android.ump:user-messaging-platform:3.0.0'
+    implementation 'com.google.android.ump:user-messaging-platform:4.0.0'
 
     // ─────────────────────────────────────────────
     // Ads — Secondary Networks (NEW)

@@ -85,6 +85,7 @@ class SplashActivity : ComponentActivity() {
     // Firebase sync state
     private var syncProgress by mutableStateOf(0)
     private var syncMessage by mutableStateOf("")
+    private var mainNavigationStarted = false
 
     // Tracks every dialog shown so onDestroy can safely dismiss them all
     private val activeDialogs = mutableListOf<Dialog>()
@@ -483,7 +484,16 @@ class SplashActivity : ComponentActivity() {
             return
         }
 
+        if (mainNavigationStarted) return
+        mainNavigationStarted = true
+
         Log.i(TAG, "Navigating to MainActivity...")
+        AdManager.showAppOpenIfAvailable(this) {
+            openMainActivity()
+        }
+    }
+
+    private fun openMainActivity() {
         val intent = Intent(this, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
         }

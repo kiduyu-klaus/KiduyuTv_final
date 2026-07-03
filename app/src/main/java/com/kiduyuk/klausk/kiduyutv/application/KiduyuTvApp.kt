@@ -19,6 +19,7 @@ import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.network.AndroidApp
 import com.kiduyuk.klausk.kiduyutv.network.NetworkConnectivityChecker
 import com.kiduyuk.klausk.kiduyutv.util.AdvancedAdBlocker
+import com.kiduyuk.klausk.kiduyutv.util.AppOpenAdObserver
 import com.kiduyuk.klausk.kiduyutv.util.AuthManager
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
 import com.kiduyuk.klausk.kiduyutv.util.NotificationHelper
@@ -90,6 +91,7 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
         AndroidApp.instance = this
 
         // Ad SDKs are initialized from SplashActivity only after UMP consent resolves.
+        AppOpenAdObserver.install(this)
 
         // Register ActivityLifecycleCallback to track current Activity for dialog display
         registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {

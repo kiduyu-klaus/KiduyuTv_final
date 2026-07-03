@@ -3,8 +3,10 @@ package com.kiduyuk.klausk.kiduyutv.util
 import android.app.Activity
 import android.content.Context
 import android.util.Log
+import com.google.android.ump.ConsentForm
 import com.google.android.ump.ConsentInformation
 import com.google.android.ump.ConsentRequestParameters
+import com.google.android.ump.FormError
 import com.google.android.ump.UserMessagingPlatform
 import com.unity3d.ads.metadata.MetaData
 
@@ -19,6 +21,10 @@ object ConsentManager {
 
     private const val TAG = "ConsentManager"
 
+    fun interface OnConsentGatheringCompleteListener {
+        fun consentGatheringComplete(error: FormError?)
+    }
+
     /**
      * Requests the latest consent information and shows a consent form if required.
      * Call from SplashActivity before initializing any ad SDK.
@@ -30,6 +36,23 @@ object ConsentManager {
      * @param onComplete Fires when consent has been handled — initialize ad SDKs here.
      */
     fun requestConsent(activity: Activity, onComplete: () -> Unit) {
+        gatherConsent(activity) { formError ->
+            if (formError != null) {
+                Log.w(TAG, "Consent gathering completed with error: ${formError.message}")
+            }
+            propagateConsentToAllNetworks(activity)
+            onComplete()
+        }
+    }
+
+    /**
+     * Requests the latest UMP consent information on every app launch, then
+     * loads and shows the consent form if Google UMP says it is required.
+     */
+    fun gatherConsent(
+        activity: Activity,
+        onConsentGatheringCompleteListener: OnConsentGatheringCompleteListener
+    ) {
         val params = ConsentRequestParameters.Builder()
             .setTagForUnderAgeOfConsent(false)
             .build()
@@ -40,36 +63,15 @@ object ConsentManager {
             activity,
             params,
             {
-                // Consent info updated successfully
-                if (consentInfo.isConsentFormAvailable) {
-                    loadAndShowConsentForm(activity, consentInfo, onComplete)
-                } else {
-                    Log.i(TAG, "Consent form not available")
-                    propagateConsentToAllNetworks(activity)
-                    onComplete()
+                UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity) { formError ->
+                    onConsentGatheringCompleteListener.consentGatheringComplete(formError)
                 }
             },
             { formError ->
                 Log.w(TAG, "Consent info update failed: ${formError.message}")
-                // Proceed even on failure — non-EEA users won't see a form
-                propagateConsentToAllNetworks(activity)
-                onComplete()
+                onConsentGatheringCompleteListener.consentGatheringComplete(formError)
             }
         )
-    }
-
-    private fun loadAndShowConsentForm(
-        activity: Activity,
-        consentInfo: ConsentInformation,
-        onComplete: () -> Unit
-    ) {
-        UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity) { formError ->
-            if (formError != null) {
-                Log.w(TAG, "Consent form error: ${formError.message}")
-            }
-            propagateConsentToAllNetworks(activity)
-            onComplete()
-        }
     }
 
     /**
@@ -117,6 +119,36 @@ object ConsentManager {
         } catch (e: Exception) {
             Log.w(TAG, "Error checking consent status: ${e.message}")
             true // Assume true if error occurs
+        }
+    }
+
+    /**
+     * Returns true when UMP requires the app to expose a privacy options entry point.
+     */
+    fun isPrivacyOptionsRequired(context: Context): Boolean {
+        return try {
+            val info = UserMessagingPlatform.getConsentInformation(context)
+            info.privacyOptionsRequirementStatus ==
+                    ConsentInformation.PrivacyOptionsRequirementStatus.REQUIRED
+        } catch (e: Exception) {
+            Log.w(TAG, "Error checking privacy options status: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Shows the Google UMP privacy options form.
+     */
+    fun showPrivacyOptionsForm(
+        activity: Activity,
+        onConsentFormDismissedListener: ConsentForm.OnConsentFormDismissedListener? = null
+    ) {
+        UserMessagingPlatform.showPrivacyOptionsForm(activity) { formError ->
+            if (formError != null) {
+                Log.w(TAG, "Privacy options form error: ${formError.message}")
+            }
+            propagateConsentToAllNetworks(activity)
+            onConsentFormDismissedListener?.onConsentFormDismissed(formError)
         }
     }
 

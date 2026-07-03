@@ -229,320 +229,320 @@ jobs:
   # ══════════════════════════════════════════════════════════════════════
   # UPDATE CHANGELOG SECTION (index.html #changelog)
   # ══════════════════════════════════════════════════════════════════════
-  # update_changelog:
-  #   name: Update Website Changelog
-  #   runs-on: ubuntu-latest
-  #   needs: [build_all]
+  update_changelog:
+    name: Update Website Changelog
+    runs-on: ubuntu-latest
+    needs: [build_all]
 
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v6
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
 
-  #     - name: Set up Python
-  #       uses: actions/setup-python@v5
-  #       with:
-  #         python-version: '3.11'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-  #     - name: Install Python dependencies
-  #       run: pip install requests
+      - name: Install Python dependencies
+        run: pip install requests
 
-  #     - name: Regenerate #changelog section
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #         GITHUB_REPOSITORY: ${{ github.repository }}
-  #       run: |
-  #         python3 - <<'PYEOF'
-  #         #!/usr/bin/env python3
-  #         """
-  #         KiduyuTV Changelog Generator
-  #         Fetches GitHub releases and updates #changelog in index.html.
-  #         """
+      - name: Regenerate #changelog section
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          python3 - <<'PYEOF'
+          #!/usr/bin/env python3
+          """
+          KiduyuTV Changelog Generator
+          Fetches GitHub releases and updates #changelog in index.html.
+          """
 
-  #         import os
-  #         import re
-  #         import html
-  #         from datetime import datetime
-  #         from pathlib import Path
-  #         import requests
+          import os
+          import re
+          import html
+          from datetime import datetime
+          from pathlib import Path
+          import requests
 
-  #         GITHUB_REPO = os.environ.get("GITHUB_REPOSITORY", "kiduyu-klaus/KiduyuTv_final")
-  #         GITHUB_API = f"https://api.github.com/repos/{GITHUB_REPO}/releases"
-  #         GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
-  #         INDEX_FILE = Path("index.html")
+          GITHUB_REPO = os.environ.get("GITHUB_REPOSITORY", "kiduyu-klaus/KiduyuTv_final")
+          GITHUB_API = f"https://api.github.com/repos/{GITHUB_REPO}/releases"
+          GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
+          INDEX_FILE = Path("index.html")
 
-  #         def fetch_github_releases() -> list[dict]:
-  #             headers = {"Accept": "application/vnd.github+json"}
-  #             if GITHUB_TOKEN:
-  #                 headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
+          def fetch_github_releases() -> list[dict]:
+              headers = {"Accept": "application/vnd.github+json"}
+              if GITHUB_TOKEN:
+                  headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
 
-  #             print(f"⬇ Fetching releases from {GITHUB_API} …")
-  #             try:
-  #                 r = requests.get(GITHUB_API, headers=headers, timeout=20)
-  #                 r.raise_for_status()
-  #                 data = r.json()
-  #                 print(f"✓ Got {len(data)} release(s) from GitHub.")
-  #                 return data if isinstance(data, list) else []
-  #             except Exception as e:
-  #                 print(f"⚠ Could not fetch releases: {e}")
-  #                 return []
+              print(f"⬇ Fetching releases from {GITHUB_API} …")
+              try:
+                  r = requests.get(GITHUB_API, headers=headers, timeout=20)
+                  r.raise_for_status()
+                  data = r.json()
+                  print(f"✓ Got {len(data)} release(s) from GitHub.")
+                  return data if isinstance(data, list) else []
+              except Exception as e:
+                  print(f"⚠ Could not fetch releases: {e}")
+                  return []
 
-  #         def inline_md(text: str) -> str:
-  #             text = html.escape(text, quote=False)
-  #             text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
-  #             text = re.sub(r"`([^`]+)`", r"<code>\1</code>", text)
-  #             return text
+          def inline_md(text: str) -> str:
+              text = html.escape(text, quote=False)
+              text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
+              text = re.sub(r"`([^`]+)`", r"<code>\1</code>", text)
+              return text
 
-  #         def md_to_html(text: str) -> str:
-  #             if not text:
-  #                 return "<p>No release notes provided.</p>"
+          def md_to_html(text: str) -> str:
+              if not text:
+                  return "<p>No release notes provided.</p>"
 
-  #             lines = text.splitlines()
-  #             out = []
-  #             in_ul = False
+              lines = text.splitlines()
+              out = []
+              in_ul = False
 
-  #             def close_ul():
-  #                 nonlocal in_ul
-  #                 if in_ul:
-  #                     out.append("</ul>")
-  #                     in_ul = False
+              def close_ul():
+                  nonlocal in_ul
+                  if in_ul:
+                      out.append("</ul>")
+                      in_ul = False
 
-  #             for raw in lines:
-  #                 line = raw.rstrip()
-  #                 if line.startswith("## "):
-  #                     close_ul()
-  #                     out.append(f"<h2>{inline_md(line[3:].strip())}</h2>")
-  #                 elif line.startswith("### "):
-  #                     close_ul()
-  #                     out.append(f"<h3>{inline_md(line[4:].strip())}</h3>")
-  #                 elif re.match(r"^[-*] ", line):
-  #                     if not in_ul:
-  #                         out.append("<ul>")
-  #                         in_ul = True
-  #                     out.append(f"<li>{inline_md(line[2:].strip())}</li>")
-  #                 elif line.strip() == "":
-  #                     close_ul()
-  #                 else:
-  #                     close_ul()
-  #                     out.append(f"<p>{inline_md(line.strip())}</p>")
+              for raw in lines:
+                  line = raw.rstrip()
+                  if line.startswith("## "):
+                      close_ul()
+                      out.append(f"<h2>{inline_md(line[3:].strip())}</h2>")
+                  elif line.startswith("### "):
+                      close_ul()
+                      out.append(f"<h3>{inline_md(line[4:].strip())}</h3>")
+                  elif re.match(r"^[-*] ", line):
+                      if not in_ul:
+                          out.append("<ul>")
+                          in_ul = True
+                      out.append(f"<li>{inline_md(line[2:].strip())}</li>")
+                  elif line.strip() == "":
+                      close_ul()
+                  else:
+                      close_ul()
+                      out.append(f"<p>{inline_md(line.strip())}</p>")
 
-  #             close_ul()
-  #             return "\n".join(out)
+              close_ul()
+              return "\n".join(out)
 
-  #         def trim_body_before_downloads(text: str) -> str:
-  #             marker = "**Branch:** `main`\n\n"
-  #             if marker in text:
-  #                 text = text[text.index(marker):]
+          def trim_body_before_downloads(text: str) -> str:
+              marker = "**Branch:** `main`\n\n"
+              if marker in text:
+                  text = text[text.index(marker):]
 
-  #             lines = text.splitlines()
-  #             trimmed = []
-  #             include_line = False
-  #             for line in lines:
-  #                 if line.strip().startswith("### Downloads"):
-  #                     break
-  #                 # Keep the branch line and everything after it
-  #                 if "**Branch:**" in line:
-  #                     include_line = True
-  #                 if include_line:
-  #                     trimmed.append(line)
-  #             return "\n".join(trimmed).strip()
+              lines = text.splitlines()
+              trimmed = []
+              include_line = False
+              for line in lines:
+                  if line.strip().startswith("### Downloads"):
+                      break
+                  # Keep the branch line and everything after it
+                  if "**Branch:**" in line:
+                      include_line = True
+                  if include_line:
+                      trimmed.append(line)
+              return "\n".join(trimmed).strip()
 
-  #         def release_badge(rel: dict) -> str:
-  #             if rel.get("prerelease"):
-  #                 return '<span class="badge pre">Pre-release</span>'
-  #             if rel.get("draft"):
-  #                 return '<span class="badge draft">Draft</span>'
-  #             return '<span class="badge stable">Stable</span>'
+          def release_badge(rel: dict) -> str:
+              if rel.get("prerelease"):
+                  return '<span class="badge pre">Pre-release</span>'
+              if rel.get("draft"):
+                  return '<span class="badge draft">Draft</span>'
+              return '<span class="badge stable">Stable</span>'
 
-  #         def format_date(iso: str) -> str:
-  #             try:
-  #                 dt = datetime.fromisoformat((iso or "").replace("Z", "+00:00"))
-  #                 return dt.strftime("%B %d, %Y")
-  #             except Exception:
-  #                 return (iso or "")[:10]
+          def format_date(iso: str) -> str:
+              try:
+                  dt = datetime.fromisoformat((iso or "").replace("Z", "+00:00"))
+                  return dt.strftime("%B %d, %Y")
+              except Exception:
+                  return (iso or "")[:10]
 
-  #         release_block = """\
-  #         <article class="release">
-  #           <div class="release-inner">
-  #             <div class="release-header">
-  #               <span class="version-tag">{tag}</span>
-  #               <span class="release-name">{name}</span>
-  #               {badge}
-  #               <span class="release-date">{date}</span>
-  #               <a class="gh-link" href="{url}" target="_blank">↗ View on GitHub</a>
-  #             </div>
-  #             <div class="release-body">
-  #               {body_html}
-  #             </div>
-  #           </div>
-  #         </article>"""
+          release_block = """\
+          <article class="release">
+            <div class="release-inner">
+              <div class="release-header">
+                <span class="version-tag">{tag}</span>
+                <span class="release-name">{name}</span>
+                {badge}
+                <span class="release-date">{date}</span>
+                <a class="gh-link" href="{url}" target="_blank">↗ View on GitHub</a>
+              </div>
+              <div class="release-body">
+                {body_html}
+              </div>
+            </div>
+          </article>"""
 
-  #         releases = fetch_github_releases()
-  #         blocks = []
-  #         for rel in releases:
-  #             body_md = trim_body_before_downloads(rel.get("body") or "")
-  #             body_html = md_to_html(body_md)
-  #             indented = "\n".join("        " + line for line in body_html.splitlines())
-  #             blocks.append(release_block.format(
-  #                 tag=html.escape(rel.get("tag_name", "unknown")),
-  #                 name=html.escape(rel.get("name") or rel.get("tag_name", "")),
-  #                 badge=release_badge(rel),
-  #                 date=html.escape(format_date(rel.get("published_at", ""))),
-  #                 url=html.escape(rel.get("html_url", f"https://github.com/{GITHUB_REPO}")),
-  #                 body_html=indented
-  #             ))
+          releases = fetch_github_releases()
+          blocks = []
+          for rel in releases:
+              body_md = trim_body_before_downloads(rel.get("body") or "")
+              body_html = md_to_html(body_md)
+              indented = "\n".join("        " + line for line in body_html.splitlines())
+              blocks.append(release_block.format(
+                  tag=html.escape(rel.get("tag_name", "unknown")),
+                  name=html.escape(rel.get("name") or rel.get("tag_name", "")),
+                  badge=release_badge(rel),
+                  date=html.escape(format_date(rel.get("published_at", ""))),
+                  url=html.escape(rel.get("html_url", f"https://github.com/{GITHUB_REPO}")),
+                  body_html=indented
+              ))
 
-  #         if not blocks:
-  #             blocks = ['<div class="empty">No releases found.</div>']
+          if not blocks:
+              blocks = ['<div class="empty">No releases found.</div>']
 
-  #         content_html = "\n".join(blocks)
-  #         index_html = INDEX_FILE.read_text(encoding="utf-8")
+          content_html = "\n".join(blocks)
+          index_html = INDEX_FILE.read_text(encoding="utf-8")
 
-  #         pattern = r'(<div class="changelog-content">)(.*?)(</div>\s*</div>\s*</section>)'
-  #         replacement = r"\1\n" + content_html + r"\n        \3"
-  #         updated_html, count = re.subn(pattern, replacement, index_html, flags=re.DOTALL)
+          pattern = r'(<div class="changelog-content">)(.*?)(</div>\s*</div>\s*</section>)'
+          replacement = r"\1\n" + content_html + r"\n        \3"
+          updated_html, count = re.subn(pattern, replacement, index_html, flags=re.DOTALL)
 
-  #         if count == 0:
-  #             raise RuntimeError("Could not find #changelog content block in index.html")
+          if count == 0:
+              raise RuntimeError("Could not find #changelog content block in index.html")
 
-  #         INDEX_FILE.write_text(updated_html, encoding="utf-8")
-  #         print(f"✓ Updated changelog with {len(blocks)} release block(s).")
-  #         PYEOF
+          INDEX_FILE.write_text(updated_html, encoding="utf-8")
+          print(f"✓ Updated changelog with {len(blocks)} release block(s).")
+          PYEOF
 
-  #     - name: Upload updated index artifact
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: site-changelog
-  #         path: index.html
+      - name: Upload updated index artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-changelog
+          path: index.html
 
   # # ══════════════════════════════════════════════════════════════════════
   # DEPLOY TO GITHUB PAGES (after build completes)
   # ══════════════════════════════════════════════════════════════════════
-  # deploy_pages:
-  #   name: Deploy to GitHub Pages
-  #   runs-on: ubuntu-latest
-  #   needs: [build_all, update_changelog]
+  deploy_pages:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: [build_all, update_changelog]
 
-  #   permissions:
-  #     contents: read
-  #     pages: write
-  #     id-token: write
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
 
-  #   concurrency:
-  #     group: github-pages
-  #     cancel-in-progress: true
+    concurrency:
+      group: github-pages
+      cancel-in-progress: true
 
-  #   environment:
-  #     name: github-pages
-  #     url: ${{ steps.deployment.outputs.page_url }}
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v6
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
 
-  #     - name: Download updated changelog artifact
-  #       uses: actions/download-artifact@v4
-  #       with:
-  #         name: site-changelog
-  #         path: ./site
+      - name: Download updated changelog artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: site-changelog
+          path: ./site
 
-  #     - name: Apply updated index.html
-  #       run: cp ./site/index.html ./index.html
+      - name: Apply updated index.html
+        run: cp ./site/index.html ./index.html
 
-  #     - name: Resolve latest release info
-  #       id: release_info
-  #       run: |
-  #         # Get the latest release
-  #         RELEASE=$(curl -s \
-  #           -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-  #           -H "Accept: application/vnd.github+json" \
-  #           "https://api.github.com/repos/${{ github.repository }}/releases" \
-  #           | jq 'first')
+      - name: Resolve latest release info
+        id: release_info
+        run: |
+          # Get the latest release
+          RELEASE=$(curl -s \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/releases" \
+            | jq 'first')
 
-  #         TAG=$(echo "$RELEASE" | jq -r '.tag_name')
-  #         TITLE=$(echo "$RELEASE" | jq -r '.name')
+          TAG=$(echo "$RELEASE" | jq -r '.tag_name')
+          TITLE=$(echo "$RELEASE" | jq -r '.name')
 
-  #         # Get TV release APK with the highest build number
-  #         TV_ASSET=$(echo "$RELEASE" | jq -r \
-  #           '[.assets[] | select(.name | test("tv-release.*\\.apk$"))] | sort_by(.name) | last')
-  #         TV_APK_URL=$(echo "$TV_ASSET" | jq -r '.browser_download_url')
-  #         TV_APK_NAME=$(echo "$TV_ASSET" | jq -r '.name')
+          # Get TV release APK with the highest build number
+          TV_ASSET=$(echo "$RELEASE" | jq -r \
+            '[.assets[] | select(.name | test("tv-release.*\\.apk$"))] | sort_by(.name) | last')
+          TV_APK_URL=$(echo "$TV_ASSET" | jq -r '.browser_download_url')
+          TV_APK_NAME=$(echo "$TV_ASSET" | jq -r '.name')
 
-  #         # Get Phone release APK with the highest build number
-  #         PHONE_ASSET=$(echo "$RELEASE" | jq -r \
-  #           '[.assets[] | select(.name | test("phone-release.*\\.apk$"))] | sort_by(.name) | last')
-  #         PHONE_APK_URL=$(echo "$PHONE_ASSET" | jq -r '.browser_download_url')
-  #         PHONE_APK_NAME=$(echo "$PHONE_ASSET" | jq -r '.name')
+          # Get Phone release APK with the highest build number
+          PHONE_ASSET=$(echo "$RELEASE" | jq -r \
+            '[.assets[] | select(.name | test("phone-release.*\\.apk$"))] | sort_by(.name) | last')
+          PHONE_APK_URL=$(echo "$PHONE_ASSET" | jq -r '.browser_download_url')
+          PHONE_APK_NAME=$(echo "$PHONE_ASSET" | jq -r '.name')
 
-  #         echo "tag=${TAG}" >> $GITHUB_OUTPUT
-  #         echo "title=${TITLE}" >> $GITHUB_OUTPUT
-  #         echo "tv_apk_url=${TV_APK_URL}" >> $GITHUB_OUTPUT
-  #         echo "tv_apk_name=${TV_APK_NAME}" >> $GITHUB_OUTPUT
-  #         echo "phone_apk_url=${PHONE_APK_URL}" >> $GITHUB_OUTPUT
-  #         echo "phone_apk_name=${PHONE_APK_NAME}" >> $GITHUB_OUTPUT
-  #         echo "Resolved: ${TV_APK_NAME} @ ${TV_APK_URL}"
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "title=${TITLE}" >> $GITHUB_OUTPUT
+          echo "tv_apk_url=${TV_APK_URL}" >> $GITHUB_OUTPUT
+          echo "tv_apk_name=${TV_APK_NAME}" >> $GITHUB_OUTPUT
+          echo "phone_apk_url=${PHONE_APK_URL}" >> $GITHUB_OUTPUT
+          echo "phone_apk_name=${PHONE_APK_NAME}" >> $GITHUB_OUTPUT
+          echo "Resolved: ${TV_APK_NAME} @ ${TV_APK_URL}"
 
-  #     - name: Update APK download links in index.html
-  #       env:
-  #         TV_APK_URL: ${{ steps.release_info.outputs.tv_apk_url }}
-  #         TV_APK_NAME: ${{ steps.release_info.outputs.tv_apk_name }}
-  #         PHONE_APK_URL: ${{ steps.release_info.outputs.phone_apk_url }}
-  #         PHONE_APK_NAME: ${{ steps.release_info.outputs.phone_apk_name }}
-  #       run: |
-  #         python3 - <<'PYEOF'
-  #         import os, re, pathlib
+      - name: Update APK download links in index.html
+        env:
+          TV_APK_URL: ${{ steps.release_info.outputs.tv_apk_url }}
+          TV_APK_NAME: ${{ steps.release_info.outputs.tv_apk_name }}
+          PHONE_APK_URL: ${{ steps.release_info.outputs.phone_apk_url }}
+          PHONE_APK_NAME: ${{ steps.release_info.outputs.phone_apk_name }}
+        run: |
+          python3 - <<'PYEOF'
+          import os, re, pathlib
 
-  #         tv_apk_url    = os.environ["TV_APK_URL"]
-  #         tv_apk_name   = os.environ["TV_APK_NAME"]
-  #         phone_apk_url = os.environ["PHONE_APK_URL"]
-  #         phone_apk_name = os.environ["PHONE_APK_NAME"]
+          tv_apk_url    = os.environ["TV_APK_URL"]
+          tv_apk_name   = os.environ["TV_APK_NAME"]
+          phone_apk_url = os.environ["PHONE_APK_URL"]
+          phone_apk_name = os.environ["PHONE_APK_NAME"]
 
-  #         html = pathlib.Path("index.html").read_text(encoding="utf-8")
+          html = pathlib.Path("index.html").read_text(encoding="utf-8")
 
-  #         def patch_anchor(html, anchor_id, new_href, new_download):
-  #             """
-  #             Find <a> by id and update its href + download attributes,
-  #             regardless of attribute order in the tag.
-  #             """
-  #             def replacer(m):
-  #                 tag = m.group(0)
-  #                 # Update href value
-  #                 tag = re.sub(r'\bhref="[^"]*"', f'href="{new_href}"', tag)
-  #                 # Update download="..." if already set, else replace bare 'download'
-  #                 if re.search(r'\bdownload="[^"]*"', tag):
-  #                     tag = re.sub(r'\bdownload="[^"]*"', f'download="{new_download}"', tag)
-  #                 else:
-  #                     # Match only standalone 'download' attr (preceded by whitespace,
-  #                     # followed by whitespace or >) — avoids matching 'download-tv' etc.
-  #                     tag = re.sub(r'(?<=\s)download(?=[\s>])', f'download="{new_download}"', tag)
-  #                 return tag
+          def patch_anchor(html, anchor_id, new_href, new_download):
+              """
+              Find <a> by id and update its href + download attributes,
+              regardless of attribute order in the tag.
+              """
+              def replacer(m):
+                  tag = m.group(0)
+                  # Update href value
+                  tag = re.sub(r'\bhref="[^"]*"', f'href="{new_href}"', tag)
+                  # Update download="..." if already set, else replace bare 'download'
+                  if re.search(r'\bdownload="[^"]*"', tag):
+                      tag = re.sub(r'\bdownload="[^"]*"', f'download="{new_download}"', tag)
+                  else:
+                      # Match only standalone 'download' attr (preceded by whitespace,
+                      # followed by whitespace or >) — avoids matching 'download-tv' etc.
+                      tag = re.sub(r'(?<=\s)download(?=[\s>])', f'download="{new_download}"', tag)
+                  return tag
 
-  #             # Lookahead confirms anchor has the target id; match the full opening tag
-  #             pattern = rf'<a\b(?=[^>]*\bid="{re.escape(anchor_id)}")[^>]*>'
-  #             return re.sub(pattern, replacer, html, flags=re.DOTALL)
+              # Lookahead confirms anchor has the target id; match the full opening tag
+              pattern = rf'<a\b(?=[^>]*\bid="{re.escape(anchor_id)}")[^>]*>'
+              return re.sub(pattern, replacer, html, flags=re.DOTALL)
 
-  #         html = patch_anchor(html, "download-tv",     tv_apk_url,    tv_apk_name)
-  #         html = patch_anchor(html, "download-mobile", phone_apk_url, phone_apk_name)
+          html = patch_anchor(html, "download-tv",     tv_apk_url,    tv_apk_name)
+          html = patch_anchor(html, "download-mobile", phone_apk_url, phone_apk_name)
 
-  #         pathlib.Path("index.html").write_text(html, encoding="utf-8")
-  #         print(f"✅ Updated TV download link    → {tv_apk_name}")
-  #         print(f"✅ Updated Mobile download link → {phone_apk_name}")
-  #         PYEOF
+          pathlib.Path("index.html").write_text(html, encoding="utf-8")
+          print(f"✅ Updated TV download link    → {tv_apk_name}")
+          print(f"✅ Updated Mobile download link → {phone_apk_name}")
+          PYEOF
 
-  #     - name: Prepare Pages site
-  #       run: |
-  #         rm -rf _site
-  #         mkdir -p _site
-  #         cp index.html _site/index.html
-  #         cp privacy.html _site/privacy.html
+      - name: Prepare Pages site
+        run: |
+          rm -rf _site
+          mkdir -p _site
+          cp index.html _site/index.html
+          cp privacy.html _site/privacy.html
 
-  #     - name: Upload Pages artifact
-  #       uses: actions/upload-pages-artifact@v3
-  #       with:
-  #         path: '_site'
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '_site'
 
-  #     - name: Deploy to GitHub Pages
-  #       id: deployment
-  #       uses: actions/deploy-pages@v4
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
 
   # # ══════════════════════════════════════════════════════════════════════
   # CLEANUP: delete all failed workflow runs

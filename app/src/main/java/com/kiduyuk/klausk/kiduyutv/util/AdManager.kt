@@ -6,16 +6,28 @@ import android.util.Log
 import android.view.ViewGroup
 import androidx.compose.ui.platform.ComposeView
 import com.google.android.gms.ads.AdError
+import com.google.android.gms.ads.AdLoader
 import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.FullScreenContentCallback
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
+import com.google.android.gms.ads.OnAdInspectorClosedListener
+import com.google.android.gms.ads.RequestConfiguration
+import com.google.android.gms.ads.VideoOptions
+import com.google.android.gms.ads.appopen.AppOpenAd
 import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
+import com.google.android.gms.ads.nativead.NativeAd
+import com.google.android.gms.ads.nativead.NativeAdOptions
 import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
+import com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAd
+import com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAdLoadCallback
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.ui.components.BannerAdView
+import java.util.Date
+import java.util.concurrent.atomic.AtomicBoolean
 
 object AdManager {
 
@@ -23,9 +35,17 @@ object AdManager {
     private const val MIN_INTERSTITIAL_INTERVAL_MS = 1 * 60 * 1000L  // 3 minutes
 
     @Volatile private var isInitialised = false
+    private val isMobileAdsInitializeCalled = AtomicBoolean(false)
     @Volatile private var interstitialAd: InterstitialAd? = null
     @Volatile private var rewardedAd: RewardedAd? = null
+    @Volatile private var rewardedInterstitialAd: RewardedInterstitialAd? = null
+    @Volatile private var isRewardedInterstitialLoading = false
+    @Volatile private var appOpenAd: AppOpenAd? = null
+    @Volatile private var isAppOpenLoading = false
+    @Volatile private var appOpenShowing = false
+    @Volatile private var appOpenLoadTime = 0L
     @Volatile private var lastInterstitialShownAt = 0L
+    private val pendingInitCallbacks = mutableListOf<() -> Unit>()
 
     /**
      * Banner load requests that arrived before MobileAds finished initialising.
@@ -62,12 +82,40 @@ object AdManager {
             return
         }
 
-        if (isInitialised) {
+        var runCallbackNow = false
+        var shouldStartInitialization = false
+        synchronized(this) {
+            if (isInitialised) {
+                runCallbackNow = true
+            } else {
+                pendingInitCallbacks.add(onReady)
+                shouldStartInitialization = !isMobileAdsInitializeCalled.getAndSet(true)
+            }
+        }
+
+        if (runCallbackNow) {
             onReady()
             return
         }
-        MobileAds.initialize(context) { initStatus ->
-            isInitialised = true
+
+        if (!shouldStartInitialization) {
+            return
+        }
+
+        Log.d(TAG, "Google Mobile Ads SDK Version: ${MobileAds.getVersion()}")
+        if (BuildConfig.DEBUG) {
+            MobileAds.setRequestConfiguration(
+                RequestConfiguration.Builder()
+                    .setTestDeviceIds(listOf(AdRequest.DEVICE_ID_EMULATOR))
+                    .build()
+            )
+        }
+
+        MobileAds.initialize(context.applicationContext) { initStatus ->
+            val callbacks = synchronized(this) {
+                isInitialised = true
+                pendingInitCallbacks.toList().also { pendingInitCallbacks.clear() }
+            }
             val statuses = initStatus.adapterStatusMap.entries
                 .joinToString { "${it.key}: ${it.value.initializationState}" }
             Log.i(TAG, "MobileAds initialised — $statuses")
@@ -76,6 +124,8 @@ object AdManager {
             if (BuildConfig.FLAVOR == "phone") {
                 preloadRewarded(context)
             }
+            preloadRewardedInterstitial(context)
+            preloadAppOpen(context)
             // Drain any banner load that was requested before init completed.
             // The bottom-nav AndroidView factory may have already run while
             // we were still initialising — replay it now so the banner appears.
@@ -84,7 +134,22 @@ object AdManager {
                 Log.i(TAG, "Replaying queued banner load after init")
                 queued.invoke()
             }
-            onReady()
+            callbacks.forEach { it.invoke() }
+        }
+    }
+
+    /**
+     * Opens Google Mobile Ads Ad Inspector for debugging ad requests.
+     */
+    fun openAdInspector(
+        context: Context,
+        listener: OnAdInspectorClosedListener? = null
+    ) {
+        MobileAds.openAdInspector(context) { error ->
+            if (error != null) {
+                Log.e(TAG, "Ad Inspector error: ${error.message}")
+            }
+            listener?.onAdInspectorClosed(error)
         }
     }
 
@@ -267,6 +332,256 @@ object AdManager {
 
     val isInterstitialReady: Boolean get() = interstitialAd != null
     val isRewardedReady: Boolean get() = rewardedAd != null
+    val isRewardedInterstitialReady: Boolean get() = rewardedInterstitialAd != null
+    val isAppOpenShowing: Boolean get() = appOpenShowing
+
+    // ── Rewarded Interstitial ─────────────────────────────────────────────
+
+    fun preloadRewardedInterstitial(context: Context) {
+        if (!isInitialised) return
+        if (isRewardedInterstitialLoading || rewardedInterstitialAd != null) return
+        if (!shouldShowAds(context)) {
+            Log.i(TAG, "Ads disabled - skipping rewarded interstitial preload")
+            return
+        }
+
+        isRewardedInterstitialLoading = true
+        val unitId = if (BuildConfig.FLAVOR == "tv") {
+            AdUnitIds.TV_REWARDED_INTERSTITIAL
+        } else {
+            AdUnitIds.PHONE_REWARDED_INTERSTITIAL
+        }
+
+        RewardedInterstitialAd.load(
+            context,
+            unitId,
+            AdRequest.Builder().build(),
+            object : RewardedInterstitialAdLoadCallback() {
+                override fun onAdLoaded(ad: RewardedInterstitialAd) {
+                    rewardedInterstitialAd = ad
+                    isRewardedInterstitialLoading = false
+                    Log.i(TAG, "Rewarded interstitial loaded")
+                }
+
+                override fun onAdFailedToLoad(error: LoadAdError) {
+                    rewardedInterstitialAd = null
+                    isRewardedInterstitialLoading = false
+                    Log.w(TAG, "Rewarded interstitial failed to load: ${error.message}")
+                }
+            }
+        )
+    }
+
+    fun showRewardedInterstitial(
+        activity: Activity,
+        onRewarded: () -> Unit = {},
+        onDismissed: () -> Unit = {}
+    ) {
+        if (!shouldShowAds(activity)) {
+            Log.i(TAG, "Ads disabled - skipping rewarded interstitial show")
+            onDismissed()
+            return
+        }
+
+        val ad = rewardedInterstitialAd
+        if (ad == null) {
+            Log.i(TAG, "No rewarded interstitial ready")
+            onDismissed()
+            preloadRewardedInterstitial(activity)
+            return
+        }
+
+        ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+            override fun onAdDismissedFullScreenContent() {
+                Log.i(TAG, "Rewarded interstitial dismissed")
+                rewardedInterstitialAd = null
+                preloadRewardedInterstitial(activity)
+                onDismissed()
+            }
+
+            override fun onAdFailedToShowFullScreenContent(error: AdError) {
+                Log.w(TAG, "Rewarded interstitial failed to show: ${error.message}")
+                rewardedInterstitialAd = null
+                preloadRewardedInterstitial(activity)
+                onDismissed()
+            }
+
+            override fun onAdShowedFullScreenContent() {
+                Log.i(TAG, "Rewarded interstitial shown")
+            }
+
+            override fun onAdImpression() {
+                Log.i(TAG, "Rewarded interstitial impression")
+            }
+
+            override fun onAdClicked() {
+                Log.i(TAG, "Rewarded interstitial clicked")
+            }
+        }
+
+        ad.show(activity) { rewardItem ->
+            Log.i(TAG, "Rewarded interstitial reward: ${rewardItem.amount} ${rewardItem.type}")
+            onRewarded()
+        }
+    }
+
+    // ── App Open ──────────────────────────────────────────────────────────
+
+    fun preloadAppOpen(context: Context) {
+        if (!isInitialised) return
+        if (isAppOpenLoading || isAppOpenAdAvailable()) return
+        if (!shouldShowAds(context)) {
+            Log.i(TAG, "Ads disabled - skipping app open preload")
+            return
+        }
+
+        isAppOpenLoading = true
+        val unitId = if (BuildConfig.FLAVOR == "tv") {
+            AdUnitIds.TV_APP_OPEN
+        } else {
+            AdUnitIds.PHONE_APP_OPEN
+        }
+
+        AppOpenAd.load(
+            context,
+            unitId,
+            AdRequest.Builder().build(),
+            object : AppOpenAd.AppOpenAdLoadCallback() {
+                override fun onAdLoaded(ad: AppOpenAd) {
+                    appOpenAd = ad
+                    isAppOpenLoading = false
+                    appOpenLoadTime = Date().time
+                    Log.i(TAG, "App open ad loaded")
+                }
+
+                override fun onAdFailedToLoad(error: LoadAdError) {
+                    appOpenAd = null
+                    isAppOpenLoading = false
+                    Log.w(TAG, "App open ad failed to load: ${error.message}")
+                }
+            }
+        )
+    }
+
+    fun showAppOpenIfAvailable(
+        activity: Activity,
+        onShowAdComplete: () -> Unit = {}
+    ) {
+        if (!shouldShowAds(activity)) {
+            onShowAdComplete()
+            return
+        }
+
+        if (appOpenShowing) {
+            Log.i(TAG, "App open ad is already showing")
+            return
+        }
+
+        val ad = appOpenAd
+        if (ad == null || !isAppOpenAdAvailable()) {
+            Log.i(TAG, "App open ad is not ready")
+            onShowAdComplete()
+            preloadAppOpen(activity)
+            return
+        }
+
+        ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+            override fun onAdDismissedFullScreenContent() {
+                appOpenAd = null
+                appOpenShowing = false
+                Log.i(TAG, "App open ad dismissed")
+                onShowAdComplete()
+                preloadAppOpen(activity)
+            }
+
+            override fun onAdFailedToShowFullScreenContent(error: AdError) {
+                appOpenAd = null
+                appOpenShowing = false
+                Log.w(TAG, "App open ad failed to show: ${error.message}")
+                onShowAdComplete()
+                preloadAppOpen(activity)
+            }
+
+            override fun onAdShowedFullScreenContent() {
+                Log.i(TAG, "App open ad shown")
+            }
+
+            override fun onAdImpression() {
+                Log.i(TAG, "App open ad impression")
+            }
+
+            override fun onAdClicked() {
+                Log.i(TAG, "App open ad clicked")
+            }
+        }
+
+        appOpenShowing = true
+        ad.show(activity)
+    }
+
+    private fun isAppOpenAdAvailable(): Boolean {
+        return appOpenAd != null && wasAppOpenLoadTimeLessThanNHoursAgo(4)
+    }
+
+    private fun wasAppOpenLoadTimeLessThanNHoursAgo(numHours: Long): Boolean {
+        val dateDifference = Date().time - appOpenLoadTime
+        val millisecondsPerHour = 3_600_000L
+        return dateDifference < millisecondsPerHour * numHours
+    }
+
+    // ── Native Advanced ───────────────────────────────────────────────────
+
+    fun loadNativeAd(
+        context: Context,
+        startMuted: Boolean = true,
+        onLoaded: (NativeAd) -> Unit,
+        onFailed: (LoadAdError) -> Unit = {}
+    ) {
+        if (!isInitialised) {
+            Log.i(TAG, "AdMob not initialised yet - skipping native ad load")
+            return
+        }
+        if (!shouldShowAds(context)) {
+            Log.i(TAG, "Ads disabled - skipping native ad load")
+            return
+        }
+
+        val unitId = if (BuildConfig.FLAVOR == "tv") {
+            AdUnitIds.TV_NATIVE
+        } else {
+            AdUnitIds.PHONE_NATIVE
+        }
+
+        val adLoader = AdLoader.Builder(context, unitId)
+            .forNativeAd { nativeAd ->
+                Log.i(TAG, "Native ad loaded")
+                onLoaded(nativeAd)
+            }
+            .withNativeAdOptions(
+                NativeAdOptions.Builder()
+                    .setVideoOptions(VideoOptions.Builder().setStartMuted(startMuted).build())
+                    .build()
+            )
+            .withAdListener(
+                object : AdListener() {
+                    override fun onAdFailedToLoad(error: LoadAdError) {
+                        Log.w(TAG, "Native ad failed to load: ${error.message}")
+                        onFailed(error)
+                    }
+
+                    override fun onAdImpression() {
+                        Log.i(TAG, "Native ad impression")
+                    }
+
+                    override fun onAdClicked() {
+                        Log.i(TAG, "Native ad clicked")
+                    }
+                }
+            )
+            .build()
+
+        adLoader.loadAd(AdRequest.Builder().build())
+    }
 
     // ── Banner (AdMob) ────────────────────────────────────────────────────
 

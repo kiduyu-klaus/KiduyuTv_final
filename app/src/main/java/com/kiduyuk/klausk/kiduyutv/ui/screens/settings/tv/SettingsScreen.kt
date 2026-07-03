@@ -17,9 +17,11 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.PlaylistRemove
+import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Update
 import androidx.compose.material3.CircularProgressIndicator
@@ -46,6 +48,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import android.app.Activity
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
+import com.kiduyuk.klausk.kiduyutv.util.AdManager
+import com.kiduyuk.klausk.kiduyutv.util.ConsentManager
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.SettingsViewModel
 import com.kiduyuk.klausk.kiduyutv.viewmodel.LiveTvViewModel
@@ -2018,6 +2022,8 @@ private fun AdsSettingsContent(
     isAdsDisabled: Boolean,
     onToggleAdsDisabled: (Boolean) -> Unit
 ) {
+    val activity = context as? Activity
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -2144,6 +2150,36 @@ private fun AdsSettingsContent(
                     modifier = Modifier.padding(top = 8.dp)
                 )
             }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        if (activity != null && ConsentManager.isPrivacyOptionsRequired(context)) {
+            SettingsActionCard(
+                description = "Review or update your Google ad privacy choices.",
+                buttonLabel = "Privacy Options",
+                isLoading = false,
+                loadingLabel = "Opening...",
+                successMessage = "",
+                showSuccess = false,
+                icon = Icons.Default.PrivacyTip,
+                onClick = { ConsentManager.showPrivacyOptionsForm(activity) }
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+        }
+
+        if (BuildConfig.DEBUG) {
+            SettingsActionCard(
+                description = "Open Google Mobile Ads Inspector to debug ad requests and adapters.",
+                buttonLabel = "Ad Inspector",
+                isLoading = false,
+                loadingLabel = "Opening...",
+                successMessage = "",
+                showSuccess = false,
+                icon = Icons.Default.Info,
+                onClick = { AdManager.openAdInspector(context) }
+            )
         }
     }
 }

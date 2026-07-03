@@ -46,6 +46,18 @@ object AdFallbackDispatcher {
         AdManager.showRewarded(activity, onRewarded, onDismissed)
     }
 
+    /**
+     * Shows an AdMob rewarded interstitial ad if one is ready.
+     */
+    fun showRewardedInterstitial(
+        activity: Activity,
+        onRewarded: () -> Unit,
+        onDismissed: () -> Unit
+    ) {
+        Log.i(TAG, "Rewarded interstitial flow: AdMob only")
+        AdManager.showRewardedInterstitial(activity, onRewarded, onDismissed)
+    }
+
     // ── Banner ────────────────────────────────────────────────────────────
 
     /**

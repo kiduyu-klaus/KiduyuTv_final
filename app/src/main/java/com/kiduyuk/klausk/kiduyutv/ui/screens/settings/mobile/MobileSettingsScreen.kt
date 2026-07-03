@@ -44,6 +44,7 @@ import coil.transform.CircleCropTransformation
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
+import com.kiduyuk.klausk.kiduyutv.ui.components.AdMobNativeAdView
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.findActivity
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.rememberPhoneInterstitialBackClick
 import com.kiduyuk.klausk.kiduyutv.ui.screens.trakt.TraktAuthActivity
@@ -51,6 +52,8 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.util.AuthManager
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import com.kiduyuk.klausk.kiduyutv.util.AdFallbackDispatcher
+import com.kiduyuk.klausk.kiduyutv.util.AdManager
+import com.kiduyuk.klausk.kiduyutv.util.ConsentManager
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.SettingsViewModel
@@ -368,6 +371,45 @@ fun MobileSettingsScreen(
                         }
                     )
                 }
+
+                if (activity != null && ConsentManager.isPrivacyOptionsRequired(context)) {
+                    SettingsItem(
+                        icon = Icons.Default.PrivacyTip,
+                        title = "Privacy Options",
+                        subtitle = "Review or update your ad privacy choices",
+                        onClick = {
+                            ConsentManager.showPrivacyOptionsForm(activity) { formError ->
+                                formError?.let {
+                                    Toast.makeText(context, it.message, Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    )
+                }
+
+                if (BuildConfig.DEBUG) {
+                    SettingsItem(
+                        icon = Icons.Default.Info,
+                        title = "Ad Inspector",
+                        subtitle = "Open Google Mobile Ads debugging tools",
+                        onClick = {
+                            AdManager.openAdInspector(context) { error ->
+                                error?.let {
+                                    Toast.makeText(context, it.message, Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    )
+                }
+
+                if (!uiState.isAdsDisabled) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    AdMobNativeAdView(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -575,7 +617,7 @@ fun MobileSettingsScreen(
                         subtitle = "Support us by watching a short ad",
                         onClick = {
                             if (activity != null) {
-                                AdFallbackDispatcher.showRewarded(
+                                AdFallbackDispatcher.showRewardedInterstitial(
                                     activity = activity,
                                     onRewarded = {
                                         Toast.makeText(context, "Thank you for your support!", Toast.LENGTH_SHORT).show()
