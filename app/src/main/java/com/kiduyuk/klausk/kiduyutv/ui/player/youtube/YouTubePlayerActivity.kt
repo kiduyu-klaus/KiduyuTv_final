@@ -78,10 +78,12 @@ class YouTubePlayerActivity : AppCompatActivity() {
         val iFramePlayerOptions = IFramePlayerOptions.Builder(applicationContext)
             .controls(1)
             .fullscreen(1)
+            //.origin("https://www.youtube.com")
             //.langPref("en")      // prefer English captions
             //.ccLoadPolicy(1)     // show captions by default
             .build()
-
+            
+        iFramePlayerOptions.origin = "https://${applicationContext.packageName}"
         // we need to initialize manually in order to pass IFramePlayerOptions to the player
         youTubePlayerView.enableAutomaticInitialization = false
 
@@ -149,6 +151,8 @@ class YouTubePlayerActivity : AppCompatActivity() {
                 hideLoading()
                 openInYouTubeApp()
             }
+
+
         }, iFramePlayerOptions)
 
         lifecycle.addObserver(youTubePlayerView)
