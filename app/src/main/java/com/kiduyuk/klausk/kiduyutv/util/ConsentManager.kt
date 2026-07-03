@@ -20,6 +20,7 @@ import com.unity3d.ads.metadata.MetaData
 object ConsentManager {
 
     private const val TAG = "ConsentManager"
+    @Volatile private var publisherMisconfigured = false
 
     fun interface OnConsentGatheringCompleteListener {
         fun consentGatheringComplete(error: FormError?)
@@ -63,15 +64,26 @@ object ConsentManager {
             activity,
             params,
             {
+                publisherMisconfigured = false
                 UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity) { formError ->
+                    if (formError != null) {
+                        publisherMisconfigured = isPublisherConfigurationError(formError.message)
+                    }
                     onConsentGatheringCompleteListener.consentGatheringComplete(formError)
                 }
             },
             { formError ->
+                publisherMisconfigured = isPublisherConfigurationError(formError.message)
                 Log.w(TAG, "Consent info update failed: ${formError.message}")
                 onConsentGatheringCompleteListener.consentGatheringComplete(formError)
             }
         )
+    }
+
+    private fun isPublisherConfigurationError(message: String): Boolean {
+        return message.contains("form", ignoreCase = true) &&
+            (message.contains("configured", ignoreCase = true) ||
+                message.contains("configuration", ignoreCase = true))
     }
 
     /**
@@ -177,9 +189,19 @@ object ConsentManager {
         try {
             val info = UserMessagingPlatform.getConsentInformation(context)
             info.reset()
+            publisherMisconfigured = false
             Log.i(TAG, "Consent reset")
         } catch (e: Exception) {
             Log.w(TAG, "Error resetting consent: ${e.message}")
         }
     }
+
+    /**
+     * True when the most recent UMP request failed because the AdMob app ID
+     * has no consent form configured in the publisher console. When true,
+     * `canRequestAds()` returns false but that is *not* a user opt-out —
+     * callers should still initialize the ad SDK and serve non-personalized
+     * ads rather than blocking the app entirely.
+     */
+    fun isPublisherMisconfigured(): Boolean = publisherMisconfigured
 }

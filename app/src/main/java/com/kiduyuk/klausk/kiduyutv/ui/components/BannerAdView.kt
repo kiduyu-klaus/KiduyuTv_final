@@ -79,7 +79,9 @@ fun BannerAdView(modifier: Modifier = Modifier) {
         onPauseOrDispose { adView.pause() }
     }
 
-    DisposableEffect(adView) {
+    // Keyed on Unit so this only fires when the composable leaves the
+    // composition (not on every recomposition).
+    DisposableEffect(Unit) {
         onDispose {
             adView.destroy()
         }
