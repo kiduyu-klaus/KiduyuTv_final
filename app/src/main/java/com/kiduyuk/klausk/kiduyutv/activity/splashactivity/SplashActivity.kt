@@ -263,8 +263,15 @@ class SplashActivity : ComponentActivity() {
         // AdMob is initialized only after consent is resolved.
         // Other ad SDKs are currently paused.
         ConsentManager.requestConsent(this) {
-            AdManager.init(this@SplashActivity)
-            adsConsentHandled = true
+            // AdManager.init schedules MobileAds.initialize and returns
+            // immediately — the actual SDK-ready callback fires later.
+            // We must wait for that callback before allowing the splash
+            // to navigate, otherwise the bottom-nav banner is composed
+            // before the SDK is ready and the request is dropped (or
+            // queued for retry, see AdManager).
+            AdManager.initAndAwait(this@SplashActivity) {
+                adsConsentHandled = true
+            }
         }
 
         checkForUpdates()

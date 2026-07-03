@@ -27,6 +27,14 @@ object AdManager {
     @Volatile private var rewardedAd: RewardedAd? = null
     @Volatile private var lastInterstitialShownAt = 0L
 
+    /**
+     * Banner load requests that arrived before MobileAds finished initialising.
+     * The first queued request is fired from inside the [MobileAds.initialize]
+     * callback so the bottom-nav banner still appears even when the splash
+     * navigates away before the SDK is ready.
+     */
+    @Volatile private var pendingBannerLoad: (() -> Unit)? = null
+
     // ── Initialisation ────────────────────────────────────────────────────
 
     /**
@@ -35,12 +43,29 @@ object AdManager {
      * Respects the ads disabled setting from SettingsManager.
      */
     fun init(context: Context) {
+        initAndAwait(context) { /* fire and forget */ }
+    }
+
+    /**
+     * Initialise the Mobile Ads SDK and invoke [onReady] only after the SDK
+     * has finished initialising. Safe to call multiple times — subsequent
+     * calls are no-ops and [onReady] fires immediately if already initialised.
+     *
+     * If ads are disabled / consent unavailable, [onReady] still fires so
+     * callers (e.g. the splash screen) can proceed without blocking the
+     * user indefinitely.
+     */
+    fun initAndAwait(context: Context, onReady: () -> Unit) {
         if (!shouldShowAds(context)) {
             Log.i(TAG, "Ads disabled or consent unavailable - skipping initialization")
+            onReady()
             return
         }
 
-        if (isInitialised) return
+        if (isInitialised) {
+            onReady()
+            return
+        }
         MobileAds.initialize(context) { initStatus ->
             isInitialised = true
             val statuses = initStatus.adapterStatusMap.entries
@@ -51,6 +76,15 @@ object AdManager {
             if (BuildConfig.FLAVOR == "phone") {
                 preloadRewarded(context)
             }
+            // Drain any banner load that was requested before init completed.
+            // The bottom-nav AndroidView factory may have already run while
+            // we were still initialising — replay it now so the banner appears.
+            pendingBannerLoad?.let { queued ->
+                pendingBannerLoad = null
+                Log.i(TAG, "Replaying queued banner load after init")
+                queued.invoke()
+            }
+            onReady()
         }
     }
 
@@ -246,22 +280,30 @@ object AdManager {
             Log.i(TAG, "Ads disabled - skipping banner")
             return
         }
+        val doLoad = {
+            try {
+                container.removeAllViews()
+                val composeView = ComposeView(activity).apply {
+                    setContent {
+                        BannerAdView()
+                    }
+                }
+                container.addView(composeView)
+                Log.i(TAG, "Banner ad loading")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to load banner ad", e)
+            }
+        }
         if (!isInitialised) {
-            Log.w(TAG, "AdMob not initialised yet - skipping banner load")
+            // Queue the request — it will be replayed from the MobileAds
+            // init callback. This is what allows the bottom-nav banner to
+            // appear even when the splash navigates away before the SDK
+            // finishes initialising.
+            Log.w(TAG, "AdMob not initialised yet - queuing banner load")
+            pendingBannerLoad = doLoad
             return
         }
-        try {
-            container.removeAllViews()
-            val composeView = ComposeView(activity).apply {
-                setContent {
-                    BannerAdView()
-                }
-            }
-            container.addView(composeView)
-            Log.i(TAG, "Banner ad loading")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to load banner ad", e)
-        }
+        doLoad()
     }
 }
 

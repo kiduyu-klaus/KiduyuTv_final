@@ -101,9 +101,14 @@ fun MobileBottomNavigation(
             DisposableEffect(Unit) {
                 onDispose {
                     bannerContainer.value?.let { container ->
-                        for (index in 0 until container.childCount) {
-                            (container.getChildAt(index) as? com.google.android.gms.ads.AdView)?.destroy()
-                        }
+                        // The banner is hosted inside a ComposeView (added by
+                        // AdManager.loadBanner). Removing the view from the
+                        // hierarchy triggers the ComposeView's detach, which
+                        // in turn triggers BannerAdView's DisposableEffect
+                        // that calls adView.destroy(). The previous code cast
+                        // the child directly to AdView, which is the wrong
+                        // type — the cast always failed and left the banner
+                        // alive across recompositions / screen changes.
                         container.removeAllViews()
                     }
                     bannerContainer.value = null
