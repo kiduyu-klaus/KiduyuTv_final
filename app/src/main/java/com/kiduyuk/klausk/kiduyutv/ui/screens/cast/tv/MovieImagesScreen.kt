@@ -11,9 +11,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -37,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -102,6 +103,13 @@ fun MovieImagesScreen(
     viewModel: MovieImagesViewModel = remember { MovieImagesViewModel() }
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+    val horizontalPadding = 25.dp
+    val spacing = 10.dp
+    val availableWidth = screenWidth - (horizontalPadding * 2)
+    val minCardWidth = 100.dp
+    val actualColumns = maxOf(4, minOf(8, ((availableWidth + spacing) / (minCardWidth + spacing)).toInt()))
 
     LaunchedEffect(movieId, isTvShow) {
         viewModel.loadMediaImages(movieId, isTvShow)
@@ -166,22 +174,27 @@ fun MovieImagesScreen(
                     val imageUrls = uiState.images.map { "${TmdbApiService.IMAGE_BASE_URL}original${it.filePath}" }
 
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(4),
-                        contentPadding = PaddingValues(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        columns = GridCells.Fixed(actualColumns),
+                        contentPadding = PaddingValues(horizontalPadding),
+                        horizontalArrangement = Arrangement.spacedBy(spacing),
+                        verticalArrangement = Arrangement.spacedBy(spacing),
                         modifier = Modifier.fillMaxSize()
                     ) {
                         itemsIndexed(uiState.images) { index, image ->
-                            MovieImageItem(
-                                image = image,
-                                onClick = { onImageClick(index, imageUrls) },
-                                modifier = if (index == 0) {
-                                    Modifier.focusRequester(focusRequester)
-                                } else {
-                                    Modifier
-                                }
-                            )
+                            Box(
+                                modifier = Modifier.fillMaxWidth(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                MovieImageItem(
+                                    image = image,
+                                    onClick = { onImageClick(index, imageUrls) },
+                                    modifier = if (index == 0) {
+                                        Modifier.focusRequester(focusRequester)
+                                    } else {
+                                        Modifier
+                                    }
+                                )
+                            }
                         }
                     }
 
@@ -206,7 +219,8 @@ fun MovieImageItem(
 
     Box(
         modifier = modifier
-            .aspectRatio(2f / 3f)
+            .width(100.dp)
+            .height(180.dp)
             .clip(RoundedCornerShape(8.dp))
             .then(
                 if (isFocused) {

@@ -17,7 +17,7 @@ interface TmdbApiService {
         /** Base URL for TMDB images. */
         const val IMAGE_BASE_URL = "https://image.tmdb.org/t/p/"
         /** Standard size for poster images. */
-        const val POSTER_SIZE = "original"
+        const val POSTER_SIZE = "w500"
         /** Standard size for backdrop images. */
         const val BACKDROP_SIZE = "original"
         /** Standard size for logos. */
