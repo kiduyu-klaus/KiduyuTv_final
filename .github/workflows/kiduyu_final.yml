@@ -24,6 +24,7 @@ jobs:
       title: ${{ steps.commit_info.outputs.title }}
       short_sha: ${{ steps.commit_info.outputs.short_sha }}
       full_message: ${{ steps.commit_info.outputs.full_message }}
+      build_count: ${{ steps.commit_info.outputs.build_count }}
 
     steps:
       - name: Checkout code
@@ -42,6 +43,7 @@ jobs:
           FIRST_LINE=$(git log -1 --pretty=%B | grep -m1 '[^[:space:]]' | sed 's/[[:space:]]*$//')
           echo "title=${FIRST_LINE}" >> $GITHUB_OUTPUT
           echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "build_count=$(git rev-list --count HEAD)" >> $GITHUB_OUTPUT
 
       - name: Determine Release Tag
         id: tag
@@ -74,15 +76,20 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
+        # Shallow clone — we no longer need full history here,
+        # the build number now comes from prepare_release.
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          # This automatically restores and saves the build/config cache
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -110,7 +117,9 @@ jobs:
           org.gradle.jvmargs=-Xmx10g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Dfile.encoding=UTF-8
 
           # GRADLE PERFORMANCE
-          org.gradle.daemon=true
+          # Daemon disabled: the runner is ephemeral and dies after the job,
+          # so keeping a background daemon alive only adds startup overhead.
+          org.gradle.daemon=false
           org.gradle.parallel=true
           org.gradle.workers.max=4
           org.gradle.caching=true
@@ -150,13 +159,13 @@ jobs:
 
       # ── Release APK ──────────────────────────────────────────
       - name: Build Phone Release APK
-        run: ./gradlew assemblePhoneRelease --build-cache --configuration-cache --parallel
+        run: ./gradlew assemblePhoneRelease --build-cache --configuration-cache --parallel -x lint -x test
 
       - name: Rename Phone Release APK
         id: rename_phone_release
         run: |
           VERSION=$(grep 'versionName' app/build.gradle | sed 's/.*"\(.*\)".*/\1/' | tr -d '[:space:]')
-          BUILD=$(git rev-list --count HEAD)
+          BUILD=${{ needs.prepare_release.outputs.build_count }}
           APK=$(find app/build/outputs/apk/phone/release -name "*.apk" | head -1)
           NEW_APK_NAME="KiduyuTV-phone-release-${VERSION}-build${BUILD}.apk"
           NEW_APK_PATH="app/build/outputs/apk/phone/release/$NEW_APK_NAME"
@@ -195,15 +204,20 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
+        # Shallow clone — we no longer need full history here,
+        # the build number now comes from prepare_release.
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          # This automatically restores and saves the build/config cache
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -231,7 +245,9 @@ jobs:
           org.gradle.jvmargs=-Xmx10g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Dfile.encoding=UTF-8
 
           # GRADLE PERFORMANCE
-          org.gradle.daemon=true
+          # Daemon disabled: the runner is ephemeral and dies after the job,
+          # so keeping a background daemon alive only adds startup overhead.
+          org.gradle.daemon=false
           org.gradle.parallel=true
           org.gradle.workers.max=4
           org.gradle.caching=true
@@ -271,13 +287,13 @@ jobs:
 
       # ── Release APK ──────────────────────────────────────────
       - name: Build TV Release APK
-        run: ./gradlew assembleTvRelease --build-cache --configuration-cache --parallel
+        run: ./gradlew assembleTvRelease --build-cache --configuration-cache --parallel -x lint -x test
 
       - name: Rename TV Release APK
         id: rename_tv_release
         run: |
           VERSION=$(grep 'versionName' app/build.gradle | sed 's/.*"\(.*\)".*/\1/' | tr -d '[:space:]')
-          BUILD=$(git rev-list --count HEAD)
+          BUILD=${{ needs.prepare_release.outputs.build_count }}
           APK=$(find app/build/outputs/apk/tv/release -name "*.apk" | head -1)
           NEW_APK_NAME="KiduyuTV-tv-release-${VERSION}-build${BUILD}.apk"
           NEW_APK_PATH="app/build/outputs/apk/tv/release/$NEW_APK_NAME"
