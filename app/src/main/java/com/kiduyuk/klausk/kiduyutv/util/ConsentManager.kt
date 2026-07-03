@@ -20,6 +20,17 @@ object ConsentManager {
     private const val TAG = "ConsentManager"
 
     /**
+     * True when the last `requestConsentInfoUpdate` call failed with a
+     * publisher-side misconfiguration (typically "no forms configured for
+     * the input app ID" in the AdMob console). When this is true,
+     * `ConsentInformation.canRequestAds()` will permanently return false
+     * until consent is reset, so callers must not treat that false as a
+     * user opt-out — they should still try to serve non-personalized ads.
+     */
+    @Volatile
+    private var publisherMisconfigured = false
+
+    /**
      * Requests the latest consent information and shows a consent form if required.
      * Call from SplashActivity before initializing any ad SDK.
      *
@@ -40,7 +51,8 @@ object ConsentManager {
             activity,
             params,
             {
-                // Consent info updated successfully
+                // Consent info updated successfully — clear any prior misconfig flag.
+                publisherMisconfigured = false
                 if (consentInfo.isConsentFormAvailable) {
                     loadAndShowConsentForm(activity, consentInfo, onComplete)
                 } else {
@@ -50,8 +62,24 @@ object ConsentManager {
                 }
             },
             { formError ->
-                Log.w(TAG, "Consent info update failed: ${formError.message}")
-                // Proceed even on failure — non-EEA users won't see a form
+                // Most common cause here is the AdMob app ID not having a
+                // privacy message configured in the AdMob console. We still
+                // proceed so the app can serve (non-personalized) ads, but
+                // flag it so [canRequestAds] consumers can distinguish this
+                // from a real user opt-out.
+                val msg = formError.message.orEmpty()
+                publisherMisconfigured = msg.contains("Publisher misconfiguration", ignoreCase = true) ||
+                    msg.contains("no form", ignoreCase = true)
+                Log.w(TAG, "Consent info update failed: $msg")
+                Log.w(
+                    TAG,
+                    if (publisherMisconfigured)
+                        "AdMob consent form is not configured for this app ID. " +
+                            "Create one at https://admob.google.com (Privacy & messaging). " +
+                            "Falling back to non-personalized ads."
+                    else
+                        "Proceeding with non-personalized ads."
+                )
                 propagateConsentToAllNetworks(activity)
                 onComplete()
             }
@@ -145,9 +173,19 @@ object ConsentManager {
         try {
             val info = UserMessagingPlatform.getConsentInformation(context)
             info.reset()
+            publisherMisconfigured = false
             Log.i(TAG, "Consent reset")
         } catch (e: Exception) {
             Log.w(TAG, "Error resetting consent: ${e.message}")
         }
     }
+
+    /**
+     * True when the most recent UMP request failed because the AdMob app ID
+     * has no consent form configured in the publisher console. When true,
+     * `canRequestAds()` returns false but that is *not* a user opt-out —
+     * callers should still initialize the ad SDK and serve non-personalized
+     * ads rather than blocking the app entirely.
+     */
+    fun isPublisherMisconfigured(): Boolean = publisherMisconfigured
 }
