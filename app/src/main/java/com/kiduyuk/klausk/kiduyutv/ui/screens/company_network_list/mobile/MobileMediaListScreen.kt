@@ -15,8 +15,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.activity.compose.BackHandler
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
+import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.rememberPhoneInterstitialBackClick
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileMovieCard
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileTvShowCard
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
@@ -55,6 +57,9 @@ fun MobileMediaListScreen(
     val context = LocalContext.current
     // Tracks scroll position and powers infinite-scroll pagination.
     val listState = rememberLazyListState()
+    val handleBackClick = rememberPhoneInterstitialBackClick(onBackClick)
+
+    BackHandler(onBack = handleBackClick)
 
     // Load content when parameters change
     LaunchedEffect(type, id, name) {
@@ -113,7 +118,7 @@ fun MobileMediaListScreen(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
+                    IconButton(onClick = handleBackClick) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",

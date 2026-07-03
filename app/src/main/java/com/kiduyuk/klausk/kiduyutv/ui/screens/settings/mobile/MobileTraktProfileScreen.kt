@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.BackHandler
 import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.ApiClient
 import com.kiduyuk.klausk.kiduyutv.data.model.Movie
@@ -40,6 +41,7 @@ import com.kiduyuk.klausk.kiduyutv.data.repository.TraktRepository
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileMovieCard
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileTvShowCard
+import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.rememberPhoneInterstitialBackClick
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.MyListItem
@@ -59,6 +61,9 @@ fun MobileTraktProfileScreen(
     val context = LocalContext.current
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     val tabs = listOf("Collection", "Watchlist", "Recommended")
+    val handleBackClick = rememberPhoneInterstitialBackClick(onBackClick)
+
+    BackHandler(onBack = handleBackClick)
 
     var isLoadingProfile by remember { mutableStateOf(true) }
     var profile by remember { mutableStateOf<TraktUser?>(null) }
@@ -102,7 +107,7 @@ fun MobileTraktProfileScreen(
             TopAppBar(
                 title = { Text("Trakt Profile", color = TextPrimary, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
+                    IconButton(onClick = handleBackClick) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                     }
                 },

@@ -24,10 +24,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.activity.compose.BackHandler
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.data.model.Episode
+import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.rememberPhoneInterstitialBackClick
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
@@ -58,6 +60,9 @@ fun MobileSeasonEpisodesScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     var selectedSeason by remember { mutableIntStateOf(1) }
+    val handleBackClick = rememberPhoneInterstitialBackClick(onBackClick)
+
+    BackHandler(onBack = handleBackClick)
 
     LaunchedEffect(tvShowId, selectedSeason) {
         viewModel.loadSeasonEpisodes(tvShowId, selectedSeason)
@@ -88,7 +93,7 @@ fun MobileSeasonEpisodesScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     IconButton(
-                        onClick = onBackClick,
+                        onClick = handleBackClick,
                         modifier = Modifier.size(40.dp)
                     ) {
                         Icon(

@@ -28,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.activity.compose.BackHandler
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import coil.compose.AsyncImage
@@ -35,6 +36,7 @@ import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.data.model.MovieImage
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
+import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.rememberPhoneInterstitialBackClick
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.CardDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
@@ -93,6 +95,9 @@ fun MobileImagesScreen(
     viewModel: MobileImagesViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val handleBackClick = rememberPhoneInterstitialBackClick(onBackClick)
+
+    BackHandler(onBack = handleBackClick)
 
     LaunchedEffect(mediaId, isTv) {
         viewModel.loadImages(mediaId, isTv)
@@ -105,7 +110,7 @@ fun MobileImagesScreen(
     ) {
         MobileMediaHeader(
             title = "$title Images",
-            onBackClick = onBackClick
+            onBackClick = handleBackClick
         )
 
         when {

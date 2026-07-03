@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileSearchTopBar
+import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.rememberPhoneInterstitialBackClick
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.CardDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
@@ -34,6 +35,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.TextSecondary
 import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.net.URLEncoder
@@ -57,6 +59,9 @@ fun MobileGenresScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var isLoading by remember { mutableStateOf(true) }
+    val handleBackClick = rememberPhoneInterstitialBackClick(onBackClick)
+
+    BackHandler(onBack = handleBackClick)
 
     // Movie genres
     val movieGenres = listOf(
@@ -114,7 +119,7 @@ fun MobileGenresScreen(
                 onSearchClick = { onNavigate(Screen.Search.route) },
                 onSettingsClick = { onNavigate(Screen.Settings.route) },
                 title = title,
-                onBackClick = onBackClick
+                onBackClick = handleBackClick
             )
         }
     ) { innerPadding ->

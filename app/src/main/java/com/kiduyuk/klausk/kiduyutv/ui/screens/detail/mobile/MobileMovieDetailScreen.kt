@@ -36,6 +36,7 @@ import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.ui.components.CrewRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.CastRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
+import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.rememberPhoneInterstitialBackClick
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileCategoryRow
@@ -46,11 +47,8 @@ import android.widget.Toast
 import com.kiduyuk.klausk.kiduyutv.viewmodel.DetailViewModel
 import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamLinksViewModel
 import com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager
-import com.kiduyuk.klausk.kiduyutv.util.AdFallbackDispatcher
 import com.kiduyuk.klausk.kiduyutv.util.AdManager
-import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import androidx.activity.compose.BackHandler
-import android.app.Activity
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -80,16 +78,8 @@ fun MobileMovieDetailScreen(
     }
 
     // Override back navigation to show an interstitial (phone flavour only)
-    val activity = context as? Activity
-    BackHandler {
-        if (BuildConfig.FLAVOR == "phone" && activity != null) {
-            AdFallbackDispatcher.showInterstitial(activity) {
-                onBackClick()
-            }
-        } else {
-            onBackClick()
-        }
-    }
+    val handleBackClick = rememberPhoneInterstitialBackClick(onBackClick)
+    BackHandler(onBack = handleBackClick)
 
     Box(
         modifier = Modifier
@@ -130,7 +120,7 @@ fun MobileMovieDetailScreen(
                             )
                     )
                     IconButton(
-                        onClick = onBackClick,
+                        onClick = handleBackClick,
                         modifier = Modifier.padding(16.dp)
                     ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)

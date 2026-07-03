@@ -1,8 +1,8 @@
 package com.kiduyuk.klausk.kiduyutv.ui.screens.settings.mobile
 
-import android.app.Activity
 import android.content.Intent
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -44,6 +44,8 @@ import coil.transform.CircleCropTransformation
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
+import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.findActivity
+import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.rememberPhoneInterstitialBackClick
 import com.kiduyuk.klausk.kiduyutv.ui.screens.trakt.TraktAuthActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.util.AuthManager
@@ -69,7 +71,7 @@ fun MobileSettingsScreen(
     viewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val activity = context as? Activity
+    val activity = context.findActivity()
     val liveTvViewModel: LiveTvViewModel = viewModel()
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
@@ -88,6 +90,9 @@ fun MobileSettingsScreen(
     // TV Login state
     var tvCodeInput by remember { mutableStateOf("") }
     var isAuthorizingTv by remember { mutableStateOf(false) }
+    val handleBackClick = rememberPhoneInterstitialBackClick(onBackClick)
+
+    BackHandler(onBack = handleBackClick)
 
     // Google Sign-In launcher
     val googleSignInLauncher = rememberLauncherForActivityResult(
@@ -192,7 +197,7 @@ fun MobileSettingsScreen(
             TopAppBar(
                 title = { Text("Settings", color = TextPrimary, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
+                    IconButton(onClick = handleBackClick) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                     }
                 },

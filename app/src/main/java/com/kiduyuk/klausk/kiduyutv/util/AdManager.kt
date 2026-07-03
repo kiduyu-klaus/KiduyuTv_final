@@ -20,7 +20,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.components.BannerAdView
 object AdManager {
 
     private const val TAG = "AdManager"
-    private const val MIN_INTERSTITIAL_INTERVAL_MS = 3 * 60 * 1000L  // 3 minutes
+    private const val MIN_INTERSTITIAL_INTERVAL_MS = 1 * 60 * 1000L  // 3 minutes
 
     @Volatile private var isInitialised = false
     @Volatile private var interstitialAd: InterstitialAd? = null

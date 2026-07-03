@@ -32,12 +32,14 @@ import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.ui.theme.*
 import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamLinksViewModel
 import androidx.compose.material3.CircularProgressIndicator
-import android.app.Activity
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.util.AdFallbackDispatcher
 import com.kiduyuk.klausk.kiduyutv.util.AdManager
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
+import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.findActivity
+import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.rememberPhoneInterstitialBackClick
 import com.kiduyuk.klausk.kiduyutv.viewmodel.StreamProviderUi
 
 /**
@@ -77,8 +79,11 @@ fun MobileStreamLinksScreen(
     viewModel: StreamLinksViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val activity = context as? Activity
+    val activity = context.findActivity()
+    val handleBackClick = rememberPhoneInterstitialBackClick(onBackClick)
     val uiState by viewModel.uiState.collectAsState()
+
+    BackHandler(onBack = handleBackClick)
 
     // Show interstitial ad once when the screen first opens (phone flavour only)
     LaunchedEffect(tmdbId) {
@@ -179,7 +184,7 @@ fun MobileStreamLinksScreen(
                         )
                 )
                 IconButton(
-                    onClick = onBackClick,
+                    onClick = handleBackClick,
                     modifier = Modifier
                         .padding(8.dp)
                         .align(Alignment.TopStart)
