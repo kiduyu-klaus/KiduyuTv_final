@@ -795,7 +795,7 @@ class SplashActivity : ComponentActivity() {
     @Preview(
         name = "Splash Screen",
         showBackground = true,
-        backgroundColor = 0xFF050505,
+        backgroundColor = 0xFF050608,
         widthDp = 412,
         heightDp = 915
     )
@@ -840,7 +840,37 @@ class SplashActivity : ComponentActivity() {
         // Fade the whole screen in on mount
         val screenAlpha = remember { Animatable(0f) }
         LaunchedEffect(Unit) {
-            screenAlpha.animateTo(1f, animationSpec = tween(700, easing = FastOutSlowInEasing))
+            screenAlpha.animateTo(1f, animationSpec = tween(800, easing = FastOutSlowInEasing))
+        }
+
+        // Pulsing scale on the brand mark — gives the splash a heartbeat
+        val brandPulse = remember { Animatable(1f) }
+        LaunchedEffect(Unit) {
+            while (true) {
+                brandPulse.animateTo(
+                    targetValue = 1.04f,
+                    animationSpec = tween(durationMillis = 1400, easing = FastOutSlowInEasing)
+                )
+                brandPulse.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(durationMillis = 1400, easing = FastOutSlowInEasing)
+                )
+            }
+        }
+
+        // Slow drift on the background orbs for subtle motion
+        val orbDrift = remember { Animatable(0f) }
+        LaunchedEffect(Unit) {
+            while (true) {
+                orbDrift.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(durationMillis = 9000, easing = LinearEasing)
+                )
+                orbDrift.animateTo(
+                    targetValue = 0f,
+                    animationSpec = tween(durationMillis = 9000, easing = LinearEasing)
+                )
+            }
         }
 
         // Lottie loading animation
@@ -854,23 +884,23 @@ class SplashActivity : ComponentActivity() {
 
         val (statusLabel, statusColor) = when {
             updateAvailable && remoteVersion != null ->
-                "Update available: v$remoteVersion" to Color(0xFFFF4D57)
+                "Update available · v$remoteVersion" to Color(0xFFFF5470)
             updateAvailable ->
-                "Update available" to Color(0xFFFF4D57)
+                "Update available" to Color(0xFFFF5470)
             !permissionHandled ->
-                "Requesting permissions..." to Color(0xFFBFC6D1)
+                "Requesting permissions…" to Color(0xFFB8C0CC)
             !versionCheckHandled ->
-                "Verifying app version..." to Color(0xFFBFC6D1)
+                "Verifying app version…" to Color(0xFFB8C0CC)
             !adsConsentHandled ->
-                "Preparing ads..." to Color(0xFFBFC6D1)
+                "Preparing ads…" to Color(0xFFB8C0CC)
             !syncCompleted ->
-                "Syncing data..." to Color(0xFFBFC6D1)
+                "Syncing data…" to Color(0xFFB8C0CC)
             else ->
-                "Opening KiduyuTV" to Color(0xFFBFC6D1)
+                "Opening KiduyuTV" to Color(0xFFB8C0CC)
         }
         val syncStatus = if (!syncCompleted && syncMessage.isNotBlank()) {
             val progress = syncProgress.coerceIn(0, 100)
-            if (progress >= 0) "$syncMessage $progress%" else syncMessage
+            if (progress >= 0) "$syncMessage · $progress%" else syncMessage
         } else {
             null
         }
@@ -878,147 +908,265 @@ class SplashActivity : ComponentActivity() {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0xFF050505),
-                            Color(0xFF11151A),
-                            Color(0xFF050505)
-                        )
-                    )
-                )
+                .background(Color(0xFF050608))
                 .alpha(screenAlpha.value)
         ) {
+            // ── Layer 1: animated gradient orbs (depth + motion) ───────────────
+            val drift = orbDrift.value
             Box(
                 modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .fillMaxHeight()
-                    .width(5.dp)
-                    .background(Color(0xFFE50914))
+                    .fillMaxSize()
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                Color(0xFFE50914).copy(alpha = 0.32f),
+                                Color.Transparent
+                            ),
+                            center = androidx.compose.ui.geometry.Offset(
+                                x = 120f + drift * 60f,
+                                y = 260f + drift * 40f
+                            ),
+                            radius = 520f
+                        )
+                    )
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.radialGradient(
+                            colors = listOf(
+                                Color(0xFF7A1AE0).copy(alpha = 0.28f),
+                                Color.Transparent
+                            ),
+                            center = androidx.compose.ui.geometry.Offset(
+                                x = 360f - drift * 40f,
+                                y = 540f - drift * 30f
+                            ),
+                            radius = 460f
+                        )
+                    )
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0x00050608),
+                                Color(0xFF0A0B10),
+                                Color(0xFF050608)
+                            )
+                        )
+                    )
             )
 
+            // ── Layer 2: top brand row + version chip ──────────────────────────
             Row(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
-                    .padding(horizontal = 30.dp, vertical = 26.dp),
-                horizontalArrangement = Arrangement.End,
+                    .padding(horizontal = 24.dp, vertical = 24.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(Color(0xFFE50914))
+                    )
+                    androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "KIDUYU",
+                        color = Color.White.copy(alpha = 0.55f),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 3.sp
+                    )
+                }
+
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(Color(0x331C2430))
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color.White.copy(alpha = 0.06f))
                         .border(
                             width = 1.dp,
-                            color = Color.White.copy(alpha = 0.08f),
-                            shape = RoundedCornerShape(18.dp)
+                            color = Color.White.copy(alpha = 0.10f),
+                            shape = RoundedCornerShape(20.dp)
                         )
-                        .padding(horizontal = 14.dp, vertical = 7.dp)
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Text(
                         text = "v${BuildConfig.VERSION_NAME}",
-                        color = Color(0xFF9AA3AE),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
+                        color = Color.White.copy(alpha = 0.75f),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.5.sp
                     )
                 }
             }
 
+            // ── Layer 3: brand mark + tagline (center) ─────────────────────────
             Column(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .fillMaxWidth()
                     .padding(horizontal = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(22.dp)
             ) {
+                // Glow ring + pulse halo around the icon tile
                 Box(
-                    modifier = Modifier
-                        .size(118.dp)
-                        .clip(RoundedCornerShape(30.dp))
-                        .background(
-                            Brush.verticalGradient(
-                                colors = listOf(
-                                    Color(0xFF20242B),
-                                    Color(0xFF121418)
-                                )
-                            )
-                        )
-                        .border(
-                            width = 1.dp,
-                            color = Color.White.copy(alpha = 0.10f),
-                            shape = RoundedCornerShape(30.dp)
-                        ),
+                    modifier = Modifier.size(220.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Image(
-                        painter = painterResource(id = R.mipmap.ic_launcherxxx),
-                        contentDescription = "KiduyuTV icon",
+                    Box(
                         modifier = Modifier
-                            .size(92.dp)
-                            .clip(RoundedCornerShape(24.dp))
+                            .size(220.dp)
+                            .clip(RoundedCornerShape(110.dp))
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        Color(0xFFE50914).copy(alpha = 0.18f),
+                                        Color.Transparent
+                                    )
+                                )
+                            )
                     )
+                    Box(
+                        modifier = Modifier
+                            .size(160.dp + ((brandPulse.value - 1f) * 40f).dp)
+                            .clip(RoundedCornerShape(80.dp))
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        Color(0xFFE50914).copy(alpha = 0.10f),
+                                        Color.Transparent
+                                    )
+                                )
+                            )
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(120.dp)
+                            .clip(RoundedCornerShape(34.dp))
+                            .background(
+                                Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color(0xFF1E2229),
+                                        Color(0xFF0E1014)
+                                    )
+                                )
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = Color.White.copy(alpha = 0.10f),
+                                shape = RoundedCornerShape(34.dp)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.mipmap.ic_launcherxxx),
+                            contentDescription = "KiduyuTV icon",
+                            modifier = Modifier
+                                .size(94.dp)
+                                .clip(RoundedCornerShape(26.dp))
+                        )
+                    }
                 }
 
-                Row(verticalAlignment = Alignment.Bottom) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(
+                            text = "Kiduyu",
+                            color = Color.White,
+                            fontSize = 46.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = (-1).sp
+                        )
+                        Text(
+                            text = "TV",
+                            color = Color(0xFFE50914),
+                            fontSize = 46.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = (-1).sp
+                        )
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .height(1.dp)
+                                .width(28.dp)
+                                .background(Color.White.copy(alpha = 0.25f))
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(4.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(Color(0xFFE50914))
+                        )
+                        Box(
+                            modifier = Modifier
+                                .height(1.dp)
+                                .width(28.dp)
+                                .background(Color.White.copy(alpha = 0.25f))
+                        )
+                    }
+
                     Text(
-                        text = "Kiduyu",
-                        color = Color.White,
-                        fontSize = 44.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 0.sp
-                    )
-                    Text(
-                        text = "TV",
-                        color = Color(0xFFE50914),
-                        fontSize = 44.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 0.sp
+                        text = "STREAMING · SIMPLIFIED",
+                        color = Color.White.copy(alpha = 0.55f),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 4.sp,
+                        textAlign = TextAlign.Center
                     )
                 }
-
-                Text(
-                    text = "STREAMING SIMPLIFIED",
-                    color = Color(0xFF8F98A3),
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 2.sp,
-                    textAlign = TextAlign.Center
-                )
 
                 LottieAnimation(
                     composition = lottieComposition,
                     progress = { lottieProgress },
-                    modifier = Modifier.size(84.dp)
+                    modifier = Modifier
+                        .size(64.dp)
+                        .alpha(0.85f)
                 )
             }
 
+            // ── Layer 4: bottom glass status capsule ───────────────────────────
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(horizontal = 30.dp, vertical = 34.dp),
+                    .padding(horizontal = 24.dp, vertical = 36.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 syncStatus?.let { label ->
                     Box(
                         modifier = Modifier
-                            .widthIn(max = 560.dp)
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(Color(0xFF171B21))
+                            .widthIn(max = 520.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(Color.White.copy(alpha = 0.04f))
                             .border(
                                 width = 1.dp,
-                                color = Color.White.copy(alpha = 0.07f),
-                                shape = RoundedCornerShape(18.dp)
+                                color = Color.White.copy(alpha = 0.06f),
+                                shape = RoundedCornerShape(14.dp)
                             )
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = label,
-                            color = Color(0xFF9AA3AE),
+                            color = Color.White.copy(alpha = 0.65f),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             letterSpacing = 0.sp,
@@ -1030,39 +1178,60 @@ class SplashActivity : ComponentActivity() {
 
                 Box(
                     modifier = Modifier
-                        .widthIn(max = 560.dp)
-                        .clip(RoundedCornerShape(22.dp))
-                        .background(Color(0xCC101318))
+                        .widthIn(max = 520.dp)
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(Color.White.copy(alpha = 0.06f))
                         .border(
                             width = 1.dp,
-                            color = Color.White.copy(alpha = 0.08f),
-                            shape = RoundedCornerShape(22.dp)
+                            color = Color.White.copy(alpha = 0.10f),
+                            shape = RoundedCornerShape(28.dp)
                         )
-                        .padding(horizontal = 18.dp, vertical = 14.dp)
+                        .padding(horizontal = 20.dp, vertical = 16.dp)
                 ) {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(
-                            text = statusLabel,
-                            color = statusColor,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            letterSpacing = 0.sp,
-                            textAlign = TextAlign.Center,
-                            maxLines = 2
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val dotColor = if (updateAvailable) Color(0xFFFF5470) else Color(0xFFE50914)
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(RoundedCornerShape(3.dp))
+                                    .background(dotColor)
+                            )
+                            Text(
+                                text = statusLabel,
+                                color = statusColor,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 0.2.sp,
+                                textAlign = TextAlign.Center,
+                                maxLines = 2
+                            )
+                        }
 
                         LinearProgressIndicator(
                             progress = { barProgress.value },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(4.dp)
+                                .height(3.dp)
                                 .clip(RoundedCornerShape(2.dp)),
                             color = Color(0xFFE50914),
-                            trackColor = Color(0xFF2B3037)
+                            trackColor = Color.White.copy(alpha = 0.08f)
+                        )
+
+                        Text(
+                            text = "${(barProgress.value * 100).toInt()}%",
+                            color = Color.White.copy(alpha = 0.45f),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium,
+                            letterSpacing = 1.5.sp,
+                            textAlign = TextAlign.Center
                         )
                     }
                 }
@@ -1070,5 +1239,3 @@ class SplashActivity : ComponentActivity() {
         }
     }
 }
-
-

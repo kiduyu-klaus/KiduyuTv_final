@@ -24,13 +24,17 @@ jobs:
       title: ${{ steps.commit_info.outputs.title }}
       short_sha: ${{ steps.commit_info.outputs.short_sha }}
       full_message: ${{ steps.commit_info.outputs.full_message }}
-      build_count: ${{ steps.commit_info.outputs.build_count }}
+      build_count: ${{ github.run_number }}
 
     steps:
+      # Shallow clone with tags only — we no longer need full commit
+      # history here. Build number now comes from github.run_number,
+      # and version-bump tag logic only needs tag refs, not full history.
       - name: Checkout code
         uses: actions/checkout@v6
         with:
-          fetch-depth: 0
+          fetch-depth: 1
+          fetch-tags: true
 
       - name: Get commit info
         id: commit_info
@@ -43,7 +47,6 @@ jobs:
           FIRST_LINE=$(git log -1 --pretty=%B | grep -m1 '[^[:space:]]' | sed 's/[[:space:]]*$//')
           echo "title=${FIRST_LINE}" >> $GITHUB_OUTPUT
           echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-          echo "build_count=$(git rev-list --count HEAD)" >> $GITHUB_OUTPUT
 
       - name: Determine Release Tag
         id: tag
@@ -66,12 +69,21 @@ jobs:
           echo "Release tag: ${NEW_TAG}"
 
   # ══════════════════════════════════════════════════════════════════════
-  # BUILD PHONE — runs in parallel with build_tv
+  # BUILD APK — matrix over phone/tv flavors, runs in parallel
   # ══════════════════════════════════════════════════════════════════════
-  build_phone:
-    name: Build Phone APK
+  build_apk:
+    name: Build ${{ matrix.flavor }} APK
     runs-on: ubuntu-latest
     needs: [prepare_release]
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - flavor: phone
+            flavor_task: Phone
+          - flavor: tv
+            flavor_task: Tv
 
     steps:
       - name: Checkout code
@@ -80,16 +92,16 @@ jobs:
         # the build number now comes from prepare_release.
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
 
+      # cache-read-only omitted: this workflow only runs on push to main,
+      # so setup-gradle's default (write cache on default branch) already
+      # does the right thing — the old ternary always evaluated to false.
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          # This automatically restores and saves the build/config cache
-          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -158,153 +170,25 @@ jobs:
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > kiduyutv_final
 
       # ── Release APK ──────────────────────────────────────────
-      - name: Build Phone Release APK
-        run: ./gradlew assemblePhoneRelease --build-cache --configuration-cache --parallel -x lint -x test
+      - name: Build ${{ matrix.flavor }} Release APK
+        run: ./gradlew assemble${{ matrix.flavor_task }}Release --build-cache --configuration-cache --parallel -x lint -x test
 
-      - name: Rename Phone Release APK
-        id: rename_phone_release
+      - name: Rename ${{ matrix.flavor }} Release APK
+        id: rename_release
         run: |
           VERSION=$(grep 'versionName' app/build.gradle | sed 's/.*"\(.*\)".*/\1/' | tr -d '[:space:]')
           BUILD=${{ needs.prepare_release.outputs.build_count }}
-          APK=$(find app/build/outputs/apk/phone/release -name "*.apk" | head -1)
-          NEW_APK_NAME="KiduyuTV-phone-release-${VERSION}-build${BUILD}.apk"
-          NEW_APK_PATH="app/build/outputs/apk/phone/release/$NEW_APK_NAME"
+          APK=$(find app/build/outputs/apk/${{ matrix.flavor }}/release -name "*.apk" | head -1)
+          NEW_APK_NAME="KiduyuTV-${{ matrix.flavor }}-release-${VERSION}-build${BUILD}.apk"
+          NEW_APK_PATH="app/build/outputs/apk/${{ matrix.flavor }}/release/$NEW_APK_NAME"
           mv "$APK" "$NEW_APK_PATH"
           echo "apk_path=$NEW_APK_PATH" >> $GITHUB_OUTPUT
 
-      - name: Upload Phone Release Artifact
+      - name: Upload ${{ matrix.flavor }} Release Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: phone-release
-          path: ${{ steps.rename_phone_release.outputs.apk_path }}
-
-      # ═══════════════════════════════════════════════════════════════
-      # RESTORE LOCAL GRADLE PROPERTIES (after build completes)
-      # Runs even if the build fails, ensuring local settings are preserved
-      # ═══════════════════════════════════════════════════════════════
-      - name: Restore local gradle.properties
-        if: always()
-        run: |
-          if [ -f gradle.properties.local-backup ]; then
-            cp gradle.properties.local-backup gradle.properties
-            rm gradle.properties.local-backup
-            echo "✓ Restored local gradle.properties"
-          else
-            echo "ℹ No local gradle.properties to restore"
-          fi
-
-  # ══════════════════════════════════════════════════════════════════════
-  # BUILD TV — runs in parallel with build_phone
-  # ══════════════════════════════════════════════════════════════════════
-  build_tv:
-    name: Build TV APK
-    runs-on: ubuntu-latest
-    needs: [prepare_release]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-        # Shallow clone — we no longer need full history here,
-        # the build number now comes from prepare_release.
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          # This automatically restores and saves the build/config cache
-          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
-
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
-      # ═══════════════════════════════════════════════════════════════
-      # OPTIMIZE GRADLE FOR CI (16GB Runner)
-      # Overrides local 6GB settings with 16GB-optimized values
-      # only during CI execution. Local file is restored after build.
-      # ═══════════════════════════════════════════════════════════════
-      - name: Optimize Gradle for CI (16GB)
-        run: |
-          # Backup the local properties (don't touch the file in repo)
-          if [ -f gradle.properties ]; then
-            cp gradle.properties gradle.properties.local-backup
-          fi
-
-          # Write CI-optimized gradle.properties (only modifying existing settings)
-          cat > gradle.properties << 'EOF'
-          # --------------------------------------------------
-          # CI-OPTIMIZED — GitHub Actions 16GB Runner
-          # Auto-generated, DO NOT COMMIT
-          # --------------------------------------------------
-
-          # JVM MEMORY (Tuned for 16GB RAM runner — 14GB to JVMs, 2GB headroom for OS/AAPT/D8)
-          org.gradle.jvmargs=-Xmx10g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Dfile.encoding=UTF-8
-
-          # GRADLE PERFORMANCE
-          # Daemon disabled: the runner is ephemeral and dies after the job,
-          # so keeping a background daemon alive only adds startup overhead.
-          org.gradle.daemon=false
-          org.gradle.parallel=true
-          org.gradle.workers.max=4
-          org.gradle.caching=true
-          org.gradle.configuration-cache=true
-
-          # KOTLIN OPTIMIZATION
-          kotlin.daemon.jvm.options=-Xmx4g
-          kotlin.incremental=true
-          kotlin.incremental.android=true
-          kotlin.incremental.useClasspathSnapshot=true
-          kotlin.compiler.execution.strategy=daemon
-
-          # ANDROID SETTINGS
-          android.useAndroidX=true
-          android.enableJetifier=false
-          android.nonTransitiveRClass=true
-
-          # JAVA TOOLCHAIN
-          org.gradle.java.installations.auto-detect=true
-          org.gradle.java.installations.auto-download=true
-          EOF
-
-          echo "=== CI-Optimized gradle.properties ==="
-          cat gradle.properties
-          echo "======================================="
-
-      - name: Bump versionName and VERSION file
-        run: |
-          VERSION="${{ needs.prepare_release.outputs.tag }}"
-          VERSION="${VERSION#v}"
-          sed -i "s/versionName \"[^\"]*\"/versionName \"${VERSION}\"/" app/build.gradle
-          echo "${VERSION}" > VERSION
-          echo "Version set to ${VERSION}"
-
-      - name: Restore keystore
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > kiduyutv_final
-
-      # ── Release APK ──────────────────────────────────────────
-      - name: Build TV Release APK
-        run: ./gradlew assembleTvRelease --build-cache --configuration-cache --parallel -x lint -x test
-
-      - name: Rename TV Release APK
-        id: rename_tv_release
-        run: |
-          VERSION=$(grep 'versionName' app/build.gradle | sed 's/.*"\(.*\)".*/\1/' | tr -d '[:space:]')
-          BUILD=${{ needs.prepare_release.outputs.build_count }}
-          APK=$(find app/build/outputs/apk/tv/release -name "*.apk" | head -1)
-          NEW_APK_NAME="KiduyuTV-tv-release-${VERSION}-build${BUILD}.apk"
-          NEW_APK_PATH="app/build/outputs/apk/tv/release/$NEW_APK_NAME"
-          mv "$APK" "$NEW_APK_PATH"
-          echo "apk_path=$NEW_APK_PATH" >> $GITHUB_OUTPUT
-
-      - name: Upload TV Release Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: tv-release
-          path: ${{ steps.rename_tv_release.outputs.apk_path }}
+          name: ${{ matrix.flavor }}-release
+          path: ${{ steps.rename_release.outputs.apk_path }}
 
       # ═══════════════════════════════════════════════════════════════
       # RESTORE LOCAL GRADLE PROPERTIES (after build completes)
@@ -327,7 +211,7 @@ jobs:
   create_release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [prepare_release, build_phone, build_tv]
+    needs: [prepare_release, build_apk]
 
     steps:
       - name: Download Phone APK artifact
@@ -385,12 +269,24 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ══════════════════════════════════════════════════════════════════════
-  # UPDATE CHANGELOG SECTION (index.html #changelog)
+  # UPDATE CHANGELOG + DEPLOY TO GITHUB PAGES
+  # Merged into a single job — deploy_pages always ran immediately after
+  # update_changelog anyway, so this cuts one job boot + checkout, and
+  # removes the artifact upload/download round-trip for index.html
+  # (it's just edited in place and used later in the same job).
   # ══════════════════════════════════════════════════════════════════════
   update_changelog:
-    name: Update Website Changelog
+    name: Update Changelog & Deploy to GitHub Pages
     runs-on: ubuntu-latest
     needs: [create_release]
+
+    permissions:
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout code
@@ -565,41 +461,6 @@ jobs:
           INDEX_FILE.write_text(updated_html, encoding="utf-8")
           print(f"✓ Updated changelog with {len(blocks)} release block(s).")
           PYEOF
-
-      - name: Upload updated index artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: site-changelog
-          path: index.html
-
-  # ══════════════════════════════════════════════════════════════════════
-  # DEPLOY TO GITHUB PAGES (after build completes)
-  # ══════════════════════════════════════════════════════════════════════
-  deploy_pages:
-    name: Deploy to GitHub Pages
-    runs-on: ubuntu-latest
-    needs: [create_release, update_changelog]
-
-    permissions:
-      pages: write
-      id-token: write
-
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Download updated changelog artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: site-changelog
-          path: ./site
-
-      - name: Apply updated index.html
-        run: cp ./site/index.html ./index.html
 
       - name: Download all APK artifacts
         uses: actions/download-artifact@v4
