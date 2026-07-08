@@ -46,6 +46,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileMovieCard
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileTvShowCard
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.rememberPhoneInterstitialBackClick
+import com.kiduyuk.klausk.kiduyutv.ui.components.shimmer.MobileMediaListSkeleton
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.SurfaceDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
@@ -188,12 +189,7 @@ fun MobileMediaListScreen(
             // Render state machine: initial loading -> error -> empty -> content.
             when {
                 uiState.isLoading && (uiState.movies.isEmpty() && uiState.tvShows.isEmpty()) -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        LottieLoadingView(size = 300.dp)
-                    }
+                    MobileMediaListSkeleton()
                 }
 
                 uiState.error != null && uiState.movies.isEmpty() && uiState.tvShows.isEmpty() -> {

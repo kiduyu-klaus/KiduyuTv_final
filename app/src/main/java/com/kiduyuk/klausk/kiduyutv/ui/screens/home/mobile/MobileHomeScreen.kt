@@ -53,12 +53,12 @@ import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
 import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
-import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileBottomNavigation
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileMovieCard
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileNetworkCard
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileSearchTopBar
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileTvShowCard
+import com.kiduyuk.klausk.kiduyutv.ui.components.shimmer.MobileHomeSkeleton
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
@@ -164,7 +164,7 @@ fun MobileHomeScreen(
                 .padding(innerPadding)
         ) {
             if (uiState.isLoading && uiState.trendingTvShows.isEmpty()) {
-                LoadingContent()
+                MobileHomeSkeleton()
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     // Hero Section
@@ -454,7 +454,6 @@ fun MobileHomeScreen(
         }
     }
 }
-
 @Composable
 fun MobileHeroSection(
     movie: Movie?,
@@ -581,7 +580,6 @@ fun MobileHeroSection(
         }
     }
 }
-
 @Composable
 fun <T> MobileCategoryRow(
     title: String,
@@ -629,15 +627,5 @@ fun <T> MobileCategoryRow(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun LoadingContent() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        LottieLoadingView(size = 200.dp)
     }
 }

@@ -58,8 +58,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.data.model.SearchResult
-import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.rememberPhoneInterstitialBackClick
+import com.kiduyuk.klausk.kiduyutv.ui.components.shimmer.MobileSearchGridSkeleton
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.CardDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
@@ -134,9 +134,7 @@ fun MobileSearchScreen(
         ) {
             when {
                 uiState.isLoading -> {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        LottieLoadingView(size = 150.dp)
-                    }
+                    MobileSearchGridSkeleton()
                 }
                 uiState.query.isEmpty() && uiState.recentSearches.isNotEmpty() -> {
                     RecentSearches(

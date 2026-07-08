@@ -56,8 +56,8 @@ import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager
 import com.kiduyuk.klausk.kiduyutv.ui.components.CastRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.CrewRow
-import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.rememberPhoneInterstitialBackClick
+import com.kiduyuk.klausk.kiduyutv.ui.components.shimmer.MobileMovieDetailSkeleton
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileCategoryRow
@@ -103,9 +103,7 @@ fun MobileTvShowDetailScreen(
             .background(BackgroundDark)
     ) {
         if (uiState.isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                LottieLoadingView(size = 200.dp)
-            }
+            MobileMovieDetailSkeleton()
         } else if (uiState.tvShowDetail != null) {
             val tvShow = uiState.tvShowDetail!!
 

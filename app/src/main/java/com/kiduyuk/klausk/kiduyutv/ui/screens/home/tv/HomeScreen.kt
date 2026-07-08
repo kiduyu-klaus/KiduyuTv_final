@@ -34,11 +34,11 @@ import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
 import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
 import com.kiduyuk.klausk.kiduyutv.ui.components.ContentRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.HeroSection
-import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.MovieCard
 import com.kiduyuk.klausk.kiduyutv.ui.components.NetworkRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.TopBar
 import com.kiduyuk.klausk.kiduyutv.ui.components.TvShowCard
+import com.kiduyuk.klausk.kiduyutv.ui.components.shimmer.TvHomeSkeleton
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
@@ -111,7 +111,7 @@ fun HomeScreen(
             .background(BackgroundDark)
     ) {
         if (uiState.isLoading && uiState.trendingTvShows.isEmpty()) {
-            LoadingContent()
+            TvHomeSkeleton()
         } else if (uiState.error != null && uiState.trendingTvShows.isEmpty()) {
             ErrorContent(error = uiState.error!!)
         } else {
@@ -234,16 +234,6 @@ fun HomeScreen(
                 }
             )
         }
-    }
-}
-
-@Composable
-private fun LoadingContent() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        LottieLoadingView(size = 300.dp)
     }
 }
 

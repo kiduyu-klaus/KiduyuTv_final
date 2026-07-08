@@ -53,7 +53,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.data.model.SearchResult
-import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
+import com.kiduyuk.klausk.kiduyutv.ui.components.shimmer.TvSearchResultsSkeleton
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.CardDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.DarkRed
@@ -276,12 +276,7 @@ private fun SearchContent(
     ) {
         when {
             uiState.isLoading -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    LottieLoadingView(size = 300.dp)
-                }
+                TvSearchResultsSkeleton()
             }
 
             uiState.error != null -> {

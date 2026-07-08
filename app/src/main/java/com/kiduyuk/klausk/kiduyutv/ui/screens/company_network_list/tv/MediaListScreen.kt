@@ -45,6 +45,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.MovieCard
 import com.kiduyuk.klausk.kiduyutv.ui.components.TvShowCard
+import com.kiduyuk.klausk.kiduyutv.ui.components.shimmer.TvMediaGridSkeleton
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.SurfaceDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
@@ -170,13 +171,8 @@ fun MediaListScreen(
             }
 
             // Main Content: Responsive Grid of items
-            if (uiState.isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    LottieLoadingView(size = 300.dp)
-                }
+            if (uiState.isLoading && uiState.movies.isEmpty() && uiState.tvShows.isEmpty()) {
+                TvMediaGridSkeleton(columns = actualColumns)
             } else if (uiState.error != null) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
