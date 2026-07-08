@@ -4,17 +4,19 @@ import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.app.Dialog
 import android.content.Intent
-import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -22,28 +24,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -53,36 +38,29 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
-import androidx.core.content.edit
-import androidx.core.graphics.toColorInt
-import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
-import com.airbnb.lottie.compose.LottieAnimation
-import com.airbnb.lottie.compose.LottieCompositionSpec
-import com.airbnb.lottie.compose.LottieConstants
-import com.airbnb.lottie.compose.animateLottieCompositionAsState
-import com.airbnb.lottie.compose.rememberLottieComposition
+import com.airbnb.lottie.compose.*
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.activity.mainactivity.MainActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
-import com.kiduyuk.klausk.kiduyutv.util.AdManager
 import com.kiduyuk.klausk.kiduyutv.util.ApkInfo
 import com.kiduyuk.klausk.kiduyutv.util.AuthManager
-import com.kiduyuk.klausk.kiduyutv.util.ConsentManager
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseSyncManager
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import com.kiduyuk.klausk.kiduyutv.util.UpdateUtil
+import com.kiduyuk.klausk.kiduyutv.util.ConsentManager
+import com.kiduyuk.klausk.kiduyutv.util.AdManager
+import io.github.cutelibs.cutedialog.CuteDialog
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
-import kotlin.time.Duration.Companion.milliseconds
+import androidx.core.net.toUri
 
 @SuppressLint("CustomSplashScreen")
 class SplashActivity : ComponentActivity() {
@@ -105,7 +83,7 @@ class SplashActivity : ComponentActivity() {
     private var currentRemoteVersion by mutableStateOf<String?>(null)
 
     // Firebase sync state
-    private var syncProgress by mutableIntStateOf(0)
+    private var syncProgress by mutableStateOf(0)
     private var syncMessage by mutableStateOf("")
     private var mainNavigationStarted = false
 
@@ -129,7 +107,7 @@ class SplashActivity : ComponentActivity() {
             pendingVersionCode = -1
 
             // On modern Android, self-updating kills the process.
-            // If we are still here, the update either failed, was canceled,
+            // If we are still here, the update either failed, was cancelled,
             // or we are running on a version that doesn't kill the app immediately.
             // UpdateReceiver.kt handles the successful restart via ACTION_MY_PACKAGE_REPLACED.
             Log.i(TAG, "Return from installation screen. If update was successful, app will restart via UpdateReceiver.")
@@ -193,7 +171,7 @@ class SplashActivity : ComponentActivity() {
     private fun clearApkCacheMetadata() {
         try {
             val prefs = getSharedPreferences("apk_cache_meta", MODE_PRIVATE)
-            prefs.edit { clear() }
+            prefs.edit().clear().apply()
             Log.i(TAG, "APK cache metadata cleared")
         } catch (e: Exception) {
             Log.e(TAG, "Error clearing APK cache metadata", e)
@@ -304,8 +282,8 @@ class SplashActivity : ComponentActivity() {
                 // 2. Build a dummy request to verify the configuration
                 val dummyRequest = com.google.android.gms.ads.AdRequest.Builder().build()
                 val isTest = dummyRequest.isTestDevice(this@SplashActivity)
-                Log.d("AdmobTest", "Is this device configured as a test device? $isTest")
-                Log.i("AdmobTest", "Is this device configured as a test device? $isTest")
+                android.util.Log.d("AdmobTest", "Is this device configured as a test device? $isTest")
+                android.util.Log.i("AdmobTest", "Is this device configured as a test device? $isTest")
 // ─────────────────────────────────────────────────────────────────────────
                 adsConsentHandled = true
             }
@@ -317,9 +295,9 @@ class SplashActivity : ComponentActivity() {
 
     private fun resetHomeDialogShownFlag() {
         val dialogPrefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
-        dialogPrefs.edit {
-            putBoolean("trakt_announcement_shown", false)
-        }
+        dialogPrefs.edit()
+            .putBoolean("trakt_announcement_shown", false)
+            .apply()
     }
 
     // ── Device Version Check ────────────────────────────────────────────────────
@@ -340,7 +318,7 @@ class SplashActivity : ComponentActivity() {
 
         lifecycleScope.launch {
             try {
-                val snapshot = withTimeoutOrNull(VERSION_CHECK_TIMEOUT_MS.milliseconds) {
+                val snapshot = withTimeoutOrNull(VERSION_CHECK_TIMEOUT_MS) {
                     FirebaseManager.getFirebaseDatabaseInstance()
                         .getReference("app_config/app_packagenames/$expectedVersionKey")
                         .get()
@@ -423,8 +401,7 @@ class SplashActivity : ComponentActivity() {
                 versionCheckHandled = true
                 // Open GitHub releases page
                 startActivity(
-                    Intent(Intent.ACTION_VIEW,
-                        "https://github.com/kiduyu-klaus/KiduyuTv_final/releases/latest".toUri())
+                    Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/kiduyu-klaus/KiduyuTv_final/releases/latest"))
                 )
                 finish()
             }
@@ -619,7 +596,7 @@ class SplashActivity : ComponentActivity() {
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(72, 40, 72, 24)
-            setBackgroundColor("#1A1A1A".toColorInt())
+            setBackgroundColor(android.graphics.Color.parseColor("#1A1A1A"))
         }
 
         val statusText = TextView(this).apply {
@@ -792,23 +769,16 @@ class SplashActivity : ComponentActivity() {
 
     // ── Composable ────────────────────────────────────────────────────────────
 
-    @Preview(
-        name = "Splash Screen",
-        showBackground = true,
-        backgroundColor = 0xFF050608,
-        widthDp = 412,
-        heightDp = 915
-    )
     @Composable
     fun SplashScreen(
-        updateAvailable: Boolean = false,
-        permissionHandled: Boolean = true,
-        remoteVersion: String? = null,
-        syncCompleted: Boolean = true,
-        adsConsentHandled: Boolean = true,
-        syncProgress: Int = 0,
-        syncMessage: String = "",
-        onTimeout: () -> Unit = {}
+        updateAvailable: Boolean,
+        permissionHandled: Boolean,
+        remoteVersion: String?,
+        syncCompleted: Boolean,
+        adsConsentHandled: Boolean,
+        syncProgress: Int,
+        syncMessage: String,
+        onTimeout: () -> Unit
     ) {
         // Progress pauses while startup gates are pending.
         val isPaused = updateAvailable || !permissionHandled || !syncCompleted || !versionCheckHandled || !adsConsentHandled
@@ -840,37 +810,7 @@ class SplashActivity : ComponentActivity() {
         // Fade the whole screen in on mount
         val screenAlpha = remember { Animatable(0f) }
         LaunchedEffect(Unit) {
-            screenAlpha.animateTo(1f, animationSpec = tween(800, easing = FastOutSlowInEasing))
-        }
-
-        // Pulsing scale on the brand mark — gives the splash a heartbeat
-        val brandPulse = remember { Animatable(1f) }
-        LaunchedEffect(Unit) {
-            while (true) {
-                brandPulse.animateTo(
-                    targetValue = 1.04f,
-                    animationSpec = tween(durationMillis = 1400, easing = FastOutSlowInEasing)
-                )
-                brandPulse.animateTo(
-                    targetValue = 1f,
-                    animationSpec = tween(durationMillis = 1400, easing = FastOutSlowInEasing)
-                )
-            }
-        }
-
-        // Slow drift on the background orbs for subtle motion
-        val orbDrift = remember { Animatable(0f) }
-        LaunchedEffect(Unit) {
-            while (true) {
-                orbDrift.animateTo(
-                    targetValue = 1f,
-                    animationSpec = tween(durationMillis = 9000, easing = LinearEasing)
-                )
-                orbDrift.animateTo(
-                    targetValue = 0f,
-                    animationSpec = tween(durationMillis = 9000, easing = LinearEasing)
-                )
-            }
+            screenAlpha.animateTo(1f, animationSpec = tween(700, easing = FastOutSlowInEasing))
         }
 
         // Lottie loading animation
@@ -884,23 +824,23 @@ class SplashActivity : ComponentActivity() {
 
         val (statusLabel, statusColor) = when {
             updateAvailable && remoteVersion != null ->
-                "Update available · v$remoteVersion" to Color(0xFFFF5470)
+                "Update available: v$remoteVersion" to Color(0xFFFF4D57)
             updateAvailable ->
-                "Update available" to Color(0xFFFF5470)
+                "Update available" to Color(0xFFFF4D57)
             !permissionHandled ->
-                "Requesting permissions…" to Color(0xFFB8C0CC)
+                "Requesting permissions..." to Color(0xFFBFC6D1)
             !versionCheckHandled ->
-                "Verifying app version…" to Color(0xFFB8C0CC)
+                "Verifying app version..." to Color(0xFFBFC6D1)
             !adsConsentHandled ->
-                "Preparing ads…" to Color(0xFFB8C0CC)
+                "Preparing ads..." to Color(0xFFBFC6D1)
             !syncCompleted ->
-                "Syncing data…" to Color(0xFFB8C0CC)
+                "Syncing data..." to Color(0xFFBFC6D1)
             else ->
-                "Opening KiduyuTV" to Color(0xFFB8C0CC)
+                "Opening KiduyuTV" to Color(0xFFBFC6D1)
         }
         val syncStatus = if (!syncCompleted && syncMessage.isNotBlank()) {
             val progress = syncProgress.coerceIn(0, 100)
-            if (progress >= 0) "$syncMessage · $progress%" else syncMessage
+            if (progress > 0) "$syncMessage $progress%" else syncMessage
         } else {
             null
         }
@@ -908,265 +848,147 @@ class SplashActivity : ComponentActivity() {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFF050608))
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF050505),
+                            Color(0xFF11151A),
+                            Color(0xFF050505)
+                        )
+                    )
+                )
                 .alpha(screenAlpha.value)
         ) {
-            // ── Layer 1: animated gradient orbs (depth + motion) ───────────────
-            val drift = orbDrift.value
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                Color(0xFFE50914).copy(alpha = 0.32f),
-                                Color.Transparent
-                            ),
-                            center = androidx.compose.ui.geometry.Offset(
-                                x = 120f + drift * 60f,
-                                y = 260f + drift * 40f
-                            ),
-                            radius = 520f
-                        )
-                    )
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                Color(0xFF7A1AE0).copy(alpha = 0.28f),
-                                Color.Transparent
-                            ),
-                            center = androidx.compose.ui.geometry.Offset(
-                                x = 360f - drift * 40f,
-                                y = 540f - drift * 30f
-                            ),
-                            radius = 460f
-                        )
-                    )
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color(0x00050608),
-                                Color(0xFF0A0B10),
-                                Color(0xFF050608)
-                            )
-                        )
-                    )
+                    .align(Alignment.TopStart)
+                    .fillMaxHeight()
+                    .width(5.dp)
+                    .background(Color(0xFFE50914))
             )
 
-            // ── Layer 2: top brand row + version chip ──────────────────────────
             Row(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 24.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .padding(horizontal = 30.dp, vertical = 26.dp),
+                horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(Color(0xFFE50914))
-                    )
-                    androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = "KIDUYU",
-                        color = Color.White.copy(alpha = 0.55f),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 3.sp
-                    )
-                }
-
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color.White.copy(alpha = 0.06f))
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color(0x331C2430))
                         .border(
                             width = 1.dp,
-                            color = Color.White.copy(alpha = 0.10f),
-                            shape = RoundedCornerShape(20.dp)
+                            color = Color.White.copy(alpha = 0.08f),
+                            shape = RoundedCornerShape(18.dp)
                         )
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .padding(horizontal = 14.dp, vertical = 7.dp)
                 ) {
                     Text(
                         text = "v${BuildConfig.VERSION_NAME}",
-                        color = Color.White.copy(alpha = 0.75f),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 0.5.sp
+                        color = Color(0xFF9AA3AE),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }
 
-            // ── Layer 3: brand mark + tagline (center) ─────────────────────────
             Column(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .fillMaxWidth()
                     .padding(horizontal = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(22.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Glow ring + pulse halo around the icon tile
                 Box(
-                    modifier = Modifier.size(220.dp),
+                    modifier = Modifier
+                        .size(118.dp)
+                        .clip(RoundedCornerShape(30.dp))
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color(0xFF20242B),
+                                    Color(0xFF121418)
+                                )
+                            )
+                        )
+                        .border(
+                            width = 1.dp,
+                            color = Color.White.copy(alpha = 0.10f),
+                            shape = RoundedCornerShape(30.dp)
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Box(
+                    Image(
+                        painter = painterResource(id = R.mipmap.ic_launcher11),
+                        contentDescription = "KiduyuTV icon",
                         modifier = Modifier
-                            .size(220.dp)
-                            .clip(RoundedCornerShape(110.dp))
-                            .background(
-                                Brush.radialGradient(
-                                    colors = listOf(
-                                        Color(0xFFE50914).copy(alpha = 0.18f),
-                                        Color.Transparent
-                                    )
-                                )
-                            )
+                            .size(92.dp)
+                            .clip(RoundedCornerShape(24.dp))
                     )
-                    Box(
-                        modifier = Modifier
-                            .size(160.dp + ((brandPulse.value - 1f) * 40f).dp)
-                            .clip(RoundedCornerShape(80.dp))
-                            .background(
-                                Brush.radialGradient(
-                                    colors = listOf(
-                                        Color(0xFFE50914).copy(alpha = 0.10f),
-                                        Color.Transparent
-                                    )
-                                )
-                            )
-                    )
-                    Box(
-                        modifier = Modifier
-                            .size(120.dp)
-                            .clip(RoundedCornerShape(34.dp))
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color(0xFF1E2229),
-                                        Color(0xFF0E1014)
-                                    )
-                                )
-                            )
-                            .border(
-                                width = 1.dp,
-                                color = Color.White.copy(alpha = 0.10f),
-                                shape = RoundedCornerShape(34.dp)
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.mipmap.ic_launcherxxx),
-                            contentDescription = "KiduyuTV icon",
-                            modifier = Modifier
-                                .size(94.dp)
-                                .clip(RoundedCornerShape(26.dp))
-                        )
-                    }
                 }
 
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Text(
-                            text = "Kiduyu",
-                            color = Color.White,
-                            fontSize = 46.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = (-1).sp
-                        )
-                        Text(
-                            text = "TV",
-                            color = Color(0xFFE50914),
-                            fontSize = 46.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = (-1).sp
-                        )
-                    }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .height(1.dp)
-                                .width(28.dp)
-                                .background(Color.White.copy(alpha = 0.25f))
-                        )
-                        Box(
-                            modifier = Modifier
-                                .size(4.dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(Color(0xFFE50914))
-                        )
-                        Box(
-                            modifier = Modifier
-                                .height(1.dp)
-                                .width(28.dp)
-                                .background(Color.White.copy(alpha = 0.25f))
-                        )
-                    }
-
+                Row(verticalAlignment = Alignment.Bottom) {
                     Text(
-                        text = "STREAMING · SIMPLIFIED",
-                        color = Color.White.copy(alpha = 0.55f),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 4.sp,
-                        textAlign = TextAlign.Center
+                        text = "Kiduyu",
+                        color = Color.White,
+                        fontSize = 44.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 0.sp
+                    )
+                    Text(
+                        text = "TV",
+                        color = Color(0xFFE50914),
+                        fontSize = 44.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 0.sp
                     )
                 }
+
+                Text(
+                    text = "STREAMING SIMPLIFIED",
+                    color = Color(0xFF8F98A3),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 2.sp,
+                    textAlign = TextAlign.Center
+                )
 
                 LottieAnimation(
                     composition = lottieComposition,
                     progress = { lottieProgress },
-                    modifier = Modifier
-                        .size(64.dp)
-                        .alpha(0.85f)
+                    modifier = Modifier.size(84.dp)
                 )
             }
 
-            // ── Layer 4: bottom glass status capsule ───────────────────────────
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 36.dp),
+                    .padding(horizontal = 30.dp, vertical = 34.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 syncStatus?.let { label ->
                     Box(
                         modifier = Modifier
-                            .widthIn(max = 520.dp)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color.White.copy(alpha = 0.04f))
+                            .widthIn(max = 560.dp)
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(Color(0xFF171B21))
                             .border(
                                 width = 1.dp,
-                                color = Color.White.copy(alpha = 0.06f),
-                                shape = RoundedCornerShape(14.dp)
+                                color = Color.White.copy(alpha = 0.07f),
+                                shape = RoundedCornerShape(18.dp)
                             )
-                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = label,
-                            color = Color.White.copy(alpha = 0.65f),
+                            color = Color(0xFF9AA3AE),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             letterSpacing = 0.sp,
@@ -1178,60 +1000,39 @@ class SplashActivity : ComponentActivity() {
 
                 Box(
                     modifier = Modifier
-                        .widthIn(max = 520.dp)
-                        .clip(RoundedCornerShape(28.dp))
-                        .background(Color.White.copy(alpha = 0.06f))
+                        .widthIn(max = 560.dp)
+                        .clip(RoundedCornerShape(22.dp))
+                        .background(Color(0xCC101318))
                         .border(
                             width = 1.dp,
-                            color = Color.White.copy(alpha = 0.10f),
-                            shape = RoundedCornerShape(28.dp)
+                            color = Color.White.copy(alpha = 0.08f),
+                            shape = RoundedCornerShape(22.dp)
                         )
-                        .padding(horizontal = 20.dp, vertical = 16.dp)
+                        .padding(horizontal = 18.dp, vertical = 14.dp)
                 ) {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            val dotColor = if (updateAvailable) Color(0xFFFF5470) else Color(0xFFE50914)
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .clip(RoundedCornerShape(3.dp))
-                                    .background(dotColor)
-                            )
-                            Text(
-                                text = statusLabel,
-                                color = statusColor,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 0.2.sp,
-                                textAlign = TextAlign.Center,
-                                maxLines = 2
-                            )
-                        }
+                        Text(
+                            text = statusLabel,
+                            color = statusColor,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 0.sp,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2
+                        )
 
                         LinearProgressIndicator(
                             progress = { barProgress.value },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(3.dp)
+                                .height(4.dp)
                                 .clip(RoundedCornerShape(2.dp)),
                             color = Color(0xFFE50914),
-                            trackColor = Color.White.copy(alpha = 0.08f)
-                        )
-
-                        Text(
-                            text = "${(barProgress.value * 100).toInt()}%",
-                            color = Color.White.copy(alpha = 0.45f),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Medium,
-                            letterSpacing = 1.5.sp,
-                            textAlign = TextAlign.Center
+                            trackColor = Color(0xFF2B3037)
                         )
                     }
                 }
