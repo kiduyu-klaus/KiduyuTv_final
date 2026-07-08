@@ -8,6 +8,14 @@ object AdUnitIds {
     private const val PHONE_APP_OPEN_UNIT = "ca-app-pub-3803477439180910/9694976435"
     private const val PHONE_NATIVE_UNIT = "ca-app-pub-3803477439180910/5035465131"
 
+    // Google AdMob sample IDs kept for phone until production units are provided.
+    private const val TEST_PHONE_ADAPTIVE_BANNER = "ca-app-pub-3940256099942544/9214589741"
+    private const val TEST_PHONE_INTERSTITIAL_UNIT = "ca-app-pub-3940256099942544/1033173712"
+    private const val TEST_PHONE_REWARDED_UNIT = "ca-app-pub-3940256099942544/5224354917"
+    private const val TEST_PHONE_REWARDED_INTERSTITIAL_UNIT = "ca-app-pub-3940256099942544/5354046379"
+    private const val TEST_PHONE_APP_OPEN_UNIT = "ca-app-pub-3940256099942544/9257395921"
+    private const val TEST_PHONE_NATIVE_UNIT = "ca-app-pub-3940256099942544/2247696110"
+
     // Google AdMob sample IDs kept for TV until production TV units are provided.
     private const val TEST_APP_OPEN = "ca-app-pub-3940256099942544/9257395921"
     private const val TEST_ADAPTIVE_BANNER = "ca-app-pub-3940256099942544/9214589741"

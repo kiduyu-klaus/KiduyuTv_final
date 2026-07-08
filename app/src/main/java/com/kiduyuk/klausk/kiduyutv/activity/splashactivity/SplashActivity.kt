@@ -271,6 +271,20 @@ class SplashActivity : ComponentActivity() {
             // before the SDK is ready and the request is dropped (or
             // queued for retry, see AdManager).
             AdManager.initAndAwait(this@SplashActivity) {
+
+                // ── ADD TEST DEVICE CONFIGURATION HERE ───────────────────────────────────
+                val testDeviceIds = listOf("D766D45CB08288501275F03EF6344980")
+                val configuration = com.google.android.gms.ads.RequestConfiguration.Builder()
+                    .setTestDeviceIds(testDeviceIds)
+                    .build()
+                com.google.android.gms.ads.MobileAds.setRequestConfiguration(configuration)
+
+                // 2. Build a dummy request to verify the configuration
+                val dummyRequest = com.google.android.gms.ads.AdRequest.Builder().build()
+                val isTest = dummyRequest.isTestDevice(this@SplashActivity)
+                android.util.Log.d("AdmobTest", "Is this device configured as a test device? $isTest")
+                android.util.Log.i("AdmobTest", "Is this device configured as a test device? $isTest")
+// ─────────────────────────────────────────────────────────────────────────
                 adsConsentHandled = true
             }
         }
