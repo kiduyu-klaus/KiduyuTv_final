@@ -1,12 +1,13 @@
 package com.kiduyuk.klausk.kiduyutv.data.repository
 
 import android.content.Context
-import android.content.SharedPreferences
 import android.util.Log
 import com.kiduyuk.klausk.kiduyutv.data.api.ScheduleApiService
-import com.kiduyuk.klausk.kiduyutv.data.model.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.kiduyuk.klausk.kiduyutv.data.model.ChannelWatchPage
+import com.kiduyuk.klausk.kiduyutv.data.model.ScheduleCategory
+import com.kiduyuk.klausk.kiduyutv.data.model.ScheduleChannel
+import com.kiduyuk.klausk.kiduyutv.data.model.ScheduleDay
+import com.kiduyuk.klausk.kiduyutv.data.model.ScheduleEvent
 
 /**
  * Repository for managing schedule data from dlhd.pk

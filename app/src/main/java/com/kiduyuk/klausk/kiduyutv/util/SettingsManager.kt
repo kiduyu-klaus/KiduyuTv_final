@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.provider.Settings
 import com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager
+import com.kiduyuk.klausk.kiduyutv.util.SettingsManager.Companion.AUTO
 import java.util.UUID
 
 class SettingsManager(context: Context) {

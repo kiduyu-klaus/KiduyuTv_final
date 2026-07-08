@@ -3,28 +3,22 @@ package com.kiduyuk.klausk.kiduyutv.viewmodel
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Base64
-import org.json.JSONArray
-import org.json.JSONObject
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.kiduyuk.klausk.kiduyutv.data.model.ChannelProgramInfo
 import com.kiduyuk.klausk.kiduyutv.data.model.EpgProgram
 import com.kiduyuk.klausk.kiduyutv.data.model.IptvChannel
 import com.kiduyuk.klausk.kiduyutv.data.model.IptvPlaylist
 import com.kiduyuk.klausk.kiduyutv.data.repository.IptvRepository
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * UI State for the Live TV screen.

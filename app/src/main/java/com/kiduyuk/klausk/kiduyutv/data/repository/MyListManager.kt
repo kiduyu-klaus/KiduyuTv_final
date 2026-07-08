@@ -3,9 +3,8 @@ package com.kiduyuk.klausk.kiduyutv.data.repository
 import android.content.Context
 import android.util.Log
 import com.kiduyuk.klausk.kiduyutv.data.local.database.DatabaseManager
-import com.kiduyuk.klausk.kiduyutv.data.local.entity.SavedMediaEntity
-import com.kiduyuk.klausk.kiduyutv.viewmodel.MyListItem
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
+import com.kiduyuk.klausk.kiduyutv.viewmodel.MyListItem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -13,7 +12,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**

@@ -4,19 +4,17 @@ import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.app.Dialog
 import android.content.Intent
-import android.net.Uri
-import android.os.Build
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.ContextCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -24,11 +22,28 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -41,27 +56,33 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.core.content.edit
+import androidx.core.graphics.toColorInt
+import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
-import com.airbnb.lottie.compose.*
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.animateLottieCompositionAsState
+import com.airbnb.lottie.compose.rememberLottieComposition
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.activity.mainactivity.MainActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
+import com.kiduyuk.klausk.kiduyutv.util.AdManager
 import com.kiduyuk.klausk.kiduyutv.util.ApkInfo
 import com.kiduyuk.klausk.kiduyutv.util.AuthManager
+import com.kiduyuk.klausk.kiduyutv.util.ConsentManager
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseSyncManager
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import com.kiduyuk.klausk.kiduyutv.util.UpdateUtil
-import com.kiduyuk.klausk.kiduyutv.util.ConsentManager
-import com.kiduyuk.klausk.kiduyutv.util.AdManager
-import io.github.cutelibs.cutedialog.CuteDialog
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
-import androidx.core.net.toUri
+import kotlin.time.Duration.Companion.milliseconds
 
 @SuppressLint("CustomSplashScreen")
 class SplashActivity : ComponentActivity() {
@@ -84,7 +105,7 @@ class SplashActivity : ComponentActivity() {
     private var currentRemoteVersion by mutableStateOf<String?>(null)
 
     // Firebase sync state
-    private var syncProgress by mutableStateOf(0)
+    private var syncProgress by mutableIntStateOf(0)
     private var syncMessage by mutableStateOf("")
     private var mainNavigationStarted = false
 
@@ -108,7 +129,7 @@ class SplashActivity : ComponentActivity() {
             pendingVersionCode = -1
 
             // On modern Android, self-updating kills the process.
-            // If we are still here, the update either failed, was cancelled,
+            // If we are still here, the update either failed, was canceled,
             // or we are running on a version that doesn't kill the app immediately.
             // UpdateReceiver.kt handles the successful restart via ACTION_MY_PACKAGE_REPLACED.
             Log.i(TAG, "Return from installation screen. If update was successful, app will restart via UpdateReceiver.")
@@ -172,7 +193,7 @@ class SplashActivity : ComponentActivity() {
     private fun clearApkCacheMetadata() {
         try {
             val prefs = getSharedPreferences("apk_cache_meta", MODE_PRIVATE)
-            prefs.edit().clear().apply()
+            prefs.edit { clear() }
             Log.i(TAG, "APK cache metadata cleared")
         } catch (e: Exception) {
             Log.e(TAG, "Error clearing APK cache metadata", e)
@@ -283,8 +304,8 @@ class SplashActivity : ComponentActivity() {
                 // 2. Build a dummy request to verify the configuration
                 val dummyRequest = com.google.android.gms.ads.AdRequest.Builder().build()
                 val isTest = dummyRequest.isTestDevice(this@SplashActivity)
-                android.util.Log.d("AdmobTest", "Is this device configured as a test device? $isTest")
-                android.util.Log.i("AdmobTest", "Is this device configured as a test device? $isTest")
+                Log.d("AdmobTest", "Is this device configured as a test device? $isTest")
+                Log.i("AdmobTest", "Is this device configured as a test device? $isTest")
 // ─────────────────────────────────────────────────────────────────────────
                 adsConsentHandled = true
             }
@@ -296,9 +317,9 @@ class SplashActivity : ComponentActivity() {
 
     private fun resetHomeDialogShownFlag() {
         val dialogPrefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
-        dialogPrefs.edit()
-            .putBoolean("trakt_announcement_shown", false)
-            .apply()
+        dialogPrefs.edit {
+            putBoolean("trakt_announcement_shown", false)
+        }
     }
 
     // ── Device Version Check ────────────────────────────────────────────────────
@@ -319,7 +340,7 @@ class SplashActivity : ComponentActivity() {
 
         lifecycleScope.launch {
             try {
-                val snapshot = withTimeoutOrNull(VERSION_CHECK_TIMEOUT_MS) {
+                val snapshot = withTimeoutOrNull(VERSION_CHECK_TIMEOUT_MS.milliseconds) {
                     FirebaseManager.getFirebaseDatabaseInstance()
                         .getReference("app_config/app_packagenames/$expectedVersionKey")
                         .get()
@@ -402,7 +423,8 @@ class SplashActivity : ComponentActivity() {
                 versionCheckHandled = true
                 // Open GitHub releases page
                 startActivity(
-                    Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/kiduyu-klaus/KiduyuTv_final/releases/latest"))
+                    Intent(Intent.ACTION_VIEW,
+                        "https://github.com/kiduyu-klaus/KiduyuTv_final/releases/latest".toUri())
                 )
                 finish()
             }
@@ -597,7 +619,7 @@ class SplashActivity : ComponentActivity() {
         val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(72, 40, 72, 24)
-            setBackgroundColor(android.graphics.Color.parseColor("#1A1A1A"))
+            setBackgroundColor("#1A1A1A".toColorInt())
         }
 
         val statusText = TextView(this).apply {
@@ -848,7 +870,7 @@ class SplashActivity : ComponentActivity() {
         }
         val syncStatus = if (!syncCompleted && syncMessage.isNotBlank()) {
             val progress = syncProgress.coerceIn(0, 100)
-            if (progress > 0) "$syncMessage $progress%" else syncMessage
+            if (progress >= 0) "$syncMessage $progress%" else syncMessage
         } else {
             null
         }
@@ -931,7 +953,7 @@ class SplashActivity : ComponentActivity() {
                     contentAlignment = Alignment.Center
                 ) {
                     Image(
-                        painter = painterResource(id = R.mipmap.ic_launcher11),
+                        painter = painterResource(id = R.mipmap.ic_launcherxxx),
                         contentDescription = "KiduyuTV icon",
                         modifier = Modifier
                             .size(92.dp)

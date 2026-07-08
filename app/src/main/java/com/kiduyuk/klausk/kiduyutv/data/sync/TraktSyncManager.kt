@@ -2,8 +2,8 @@ package com.kiduyuk.klausk.kiduyutv.data.sync
 
 import android.content.Context
 import android.content.SharedPreferences
-import com.kiduyuk.klausk.kiduyutv.data.repository.TraktRepository
 import com.google.gson.Gson
+import com.kiduyuk.klausk.kiduyutv.data.repository.TraktRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

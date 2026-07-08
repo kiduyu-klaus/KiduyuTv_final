@@ -1,6 +1,17 @@
 package com.kiduyuk.klausk.kiduyutv.data.repository
 
-import com.kiduyuk.klausk.kiduyutv.data.model.trakt.*
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktCollectionItem
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktIds
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktRecommendation
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktScrobbleEpisode
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktScrobbleMovie
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktScrobbleRequest
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktScrobbleResponse
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktSettings
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktSyncItems
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktSyncMovie
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktWatchHistoryResponse
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktWatchlistItem
 import com.kiduyuk.klausk.kiduyutv.data.remote.TraktApiService
 import com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager
 import kotlinx.coroutines.flow.Flow

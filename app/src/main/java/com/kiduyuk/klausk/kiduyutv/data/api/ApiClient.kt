@@ -2,6 +2,7 @@ package com.kiduyuk.klausk.kiduyutv.data.api
 
 import android.content.Context
 import android.util.Log
+import com.kiduyuk.klausk.kiduyutv.util.SingletonDnsResolver
 import okhttp3.Cache
 import okhttp3.CacheControl
 import okhttp3.Interceptor
@@ -13,7 +14,6 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.io.File
 import java.io.IOException
 import java.net.SocketTimeoutException
-import com.kiduyuk.klausk.kiduyutv.util.SingletonDnsResolver
 import java.util.concurrent.TimeUnit
 
 object ApiClient {

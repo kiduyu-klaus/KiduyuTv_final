@@ -1,7 +1,10 @@
 package com.kiduyuk.klausk.kiduyutv.activity.mainactivity
 
 import android.Manifest
+import android.app.UiModeManager
+import android.content.Context
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -11,7 +14,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.OptIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -24,22 +26,18 @@ import androidx.core.content.ContextCompat
 import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
-import com.kiduyuk.klausk.kiduyutv.ui.navigation.NavGraph
-import com.kiduyuk.klausk.kiduyutv.ui.navigation.MobileNavGraph
-import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
-import android.app.UiModeManager
-import android.content.Context
-import android.content.res.Configuration
-import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
-import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
 import com.kiduyuk.klausk.kiduyutv.network.AndroidApp
 import com.kiduyuk.klausk.kiduyutv.network.NetworkConnectivityChecker
 import com.kiduyuk.klausk.kiduyutv.network.NetworkConnectivityObserver
 import com.kiduyuk.klausk.kiduyutv.network.NetworkState
 import com.kiduyuk.klausk.kiduyutv.network.NetworkStateDialog
 import com.kiduyuk.klausk.kiduyutv.ui.components.TraktAnnouncementDialog
+import com.kiduyuk.klausk.kiduyutv.ui.navigation.MobileNavGraph
+import com.kiduyuk.klausk.kiduyutv.ui.navigation.NavGraph
+import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
+import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
+import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
-import com.kiduyuk.klausk.kiduyutv.BuildConfig
 
 class MainActivity : ComponentActivity() {
 

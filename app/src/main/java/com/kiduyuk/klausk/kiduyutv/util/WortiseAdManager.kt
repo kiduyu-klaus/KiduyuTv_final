@@ -1,18 +1,19 @@
 ﻿package com.kiduyuk.klausk.kiduyutv.util
 
+// import com.wortise.ads.Reward
 import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
 import android.util.Log
 import android.view.ViewGroup
+import com.kiduyuk.klausk.kiduyutv.util.WortiseAdManager.MIN_INTERSTITIAL_INTERVAL_MS
 import com.wortise.ads.AdError
+import com.wortise.ads.AdSize
 import com.wortise.ads.RevenueData
 import com.wortise.ads.WortiseSdk
 import com.wortise.ads.appopen.AppOpenAd
-import com.wortise.ads.AdSize
 import com.wortise.ads.banner.BannerAd
 import com.wortise.ads.interstitial.InterstitialAd
-// import com.wortise.ads.Reward
 import com.wortise.ads.rewarded.RewardedAd
 import com.wortise.ads.rewarded.models.Reward
 

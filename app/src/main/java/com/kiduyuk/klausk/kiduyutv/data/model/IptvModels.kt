@@ -1,7 +1,5 @@
 package com.kiduyuk.klausk.kiduyutv.data.model
 
-import com.google.gson.annotations.SerializedName
-
 /**
  * Represents a TV channel category from the IPTV playlist.
  *

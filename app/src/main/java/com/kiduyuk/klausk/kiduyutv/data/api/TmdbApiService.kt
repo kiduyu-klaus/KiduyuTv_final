@@ -1,6 +1,24 @@
 package com.kiduyuk.klausk.kiduyutv.data.api
 
-import com.kiduyuk.klausk.kiduyutv.data.model.*
+import com.kiduyuk.klausk.kiduyutv.data.model.CollectionDetail
+import com.kiduyuk.klausk.kiduyutv.data.model.GenreResponse
+import com.kiduyuk.klausk.kiduyutv.data.model.MovieCreditsResponse
+import com.kiduyuk.klausk.kiduyutv.data.model.MovieDetail
+import com.kiduyuk.klausk.kiduyutv.data.model.MovieImagesResponse
+import com.kiduyuk.klausk.kiduyutv.data.model.MovieResponse
+import com.kiduyuk.klausk.kiduyutv.data.model.MultiSearchResponse
+import com.kiduyuk.klausk.kiduyutv.data.model.Network
+import com.kiduyuk.klausk.kiduyutv.data.model.PersonDetail
+import com.kiduyuk.klausk.kiduyutv.data.model.PersonImagesResponse
+import com.kiduyuk.klausk.kiduyutv.data.model.PersonMovieCreditsResponse
+import com.kiduyuk.klausk.kiduyutv.data.model.PersonTvCreditsResponse
+import com.kiduyuk.klausk.kiduyutv.data.model.ProductionCompany
+import com.kiduyuk.klausk.kiduyutv.data.model.SeasonDetail
+import com.kiduyuk.klausk.kiduyutv.data.model.TvShowCreditsResponse
+import com.kiduyuk.klausk.kiduyutv.data.model.TvShowDetail
+import com.kiduyuk.klausk.kiduyutv.data.model.TvShowResponse
+import com.kiduyuk.klausk.kiduyutv.data.model.TvShowSeasonResponse
+import com.kiduyuk.klausk.kiduyutv.data.model.VideoResponse
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query

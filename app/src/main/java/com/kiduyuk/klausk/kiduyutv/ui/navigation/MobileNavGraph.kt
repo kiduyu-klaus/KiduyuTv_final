@@ -28,8 +28,8 @@ import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.StreamLinksScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileGenreContentScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileGenresScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileHomeScreen
-import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileMoviesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileLiveTvScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileMoviesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileMyListScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.MobileTvShowsScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile.SeeAllScreen

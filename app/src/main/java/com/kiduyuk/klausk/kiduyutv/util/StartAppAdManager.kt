@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
+import com.kiduyuk.klausk.kiduyutv.util.StartAppAdManager.MIN_INTERSTITIAL_INTERVAL_MS
 import com.startapp.sdk.ads.banner.Banner
 import com.startapp.sdk.ads.banner.BannerListener
 import com.startapp.sdk.adsbase.Ad

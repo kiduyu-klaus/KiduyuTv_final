@@ -3,7 +3,9 @@ package com.kiduyuk.klausk.kiduyutv.viewmodel
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.kiduyuk.klausk.kiduyutv.data.model.*
+import com.kiduyuk.klausk.kiduyutv.data.model.ScheduleChannel
+import com.kiduyuk.klausk.kiduyutv.data.model.ScheduleDay
+import com.kiduyuk.klausk.kiduyutv.data.model.ScheduleEvent
 import com.kiduyuk.klausk.kiduyutv.data.repository.ScheduleRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

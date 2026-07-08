@@ -4,6 +4,13 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.net.Uri
 import android.util.Log
+import com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager.clearTokens
+import com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager.exchangeCodeForTokens
+import com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager.getAuthorizationUrl
+import com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager.getValidAccessToken
+import com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager.init
+import com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager.prefs
+import com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager.refreshMutex
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

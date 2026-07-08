@@ -19,31 +19,31 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.kiduyuk.klausk.kiduyutv.BuildConfig
+import com.kiduyuk.klausk.kiduyutv.data.model.CastMember
+import com.kiduyuk.klausk.kiduyutv.ui.components.TvBannerAdView
+import com.kiduyuk.klausk.kiduyutv.ui.player.iptv.IptvPlayerActivity
+import com.kiduyuk.klausk.kiduyutv.ui.player.youtube.YouTubePlayerActivity
+import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.CastDetailScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.CastImagesScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.ImageSliderScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.MovieImagesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.company_network_list.tv.MediaListScreen
-import com.kiduyuk.klausk.kiduyutv.ui.screens.search.tv.SearchScreen
-import com.kiduyuk.klausk.kiduyutv.ui.screens.settings.tv.SettingsScreen
-import com.kiduyuk.klausk.kiduyutv.ui.screens.settings.tv.TraktProfileScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.MovieDetailScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.SeasonEpisodesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.StreamLinksScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.TvShowDetailScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.VideosScreen
-import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.CastDetailScreen
-import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.CastImagesScreen
-import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.ImageSliderScreen
-import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.MovieImagesScreen
-import com.kiduyuk.klausk.kiduyutv.ui.player.youtube.YouTubePlayerActivity
-import com.kiduyuk.klausk.kiduyutv.data.model.CastMember
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.HomeScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.LiveTvScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.MoviesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.MyListScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.TvShowsScreen
-import com.kiduyuk.klausk.kiduyutv.ui.player.iptv.IptvPlayerActivity
-import com.kiduyuk.klausk.kiduyutv.BuildConfig
-import com.kiduyuk.klausk.kiduyutv.ui.components.TvBannerAdView
-import com.kiduyuk.klausk.kiduyutv.ui.screens.home.tv.LiveTvScreen
-import com.kiduyuk.klausk.kiduyutv.viewmodel.SearchViewModelFactory
+import com.kiduyuk.klausk.kiduyutv.ui.screens.search.tv.SearchScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.settings.tv.SettingsScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.settings.tv.TraktProfileScreen
 import com.kiduyuk.klausk.kiduyutv.viewmodel.SearchViewModel
+import com.kiduyuk.klausk.kiduyutv.viewmodel.SearchViewModelFactory
 
 /**
  * Main navigation graph for the application.

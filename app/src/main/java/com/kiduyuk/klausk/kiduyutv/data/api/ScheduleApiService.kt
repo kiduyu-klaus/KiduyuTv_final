@@ -1,14 +1,18 @@
 package com.kiduyuk.klausk.kiduyutv.data.api
 
 import android.util.Log
-import com.kiduyuk.klausk.kiduyutv.data.model.*
+import com.kiduyuk.klausk.kiduyutv.data.model.ChannelWatchPage
+import com.kiduyuk.klausk.kiduyutv.data.model.PlayerOption
+import com.kiduyuk.klausk.kiduyutv.data.model.ScheduleCategory
+import com.kiduyuk.klausk.kiduyutv.data.model.ScheduleChannel
+import com.kiduyuk.klausk.kiduyutv.data.model.ScheduleDay
+import com.kiduyuk.klausk.kiduyutv.data.model.ScheduleEvent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
-import org.jsoup.nodes.Element
 import java.util.concurrent.TimeUnit
 
 /**

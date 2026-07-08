@@ -12,9 +12,7 @@ import com.kiduyuk.klausk.kiduyutv.data.local.dao.CachedTvShowDetailDao
 import com.kiduyuk.klausk.kiduyutv.data.local.dao.GenreDao
 import com.kiduyuk.klausk.kiduyutv.data.local.dao.SavedMediaDao
 import com.kiduyuk.klausk.kiduyutv.data.local.dao.WatchHistoryDao
-import com.kiduyuk.klausk.kiduyutv.data.local.entity.CachedMovieDetailEntity
 import com.kiduyuk.klausk.kiduyutv.data.local.entity.CachedMovieEntity
-import com.kiduyuk.klausk.kiduyutv.data.local.entity.CachedTvShowDetailEntity
 import com.kiduyuk.klausk.kiduyutv.data.local.entity.CachedTvShowEntity
 import com.kiduyuk.klausk.kiduyutv.data.local.entity.GenreEntity
 import com.kiduyuk.klausk.kiduyutv.data.local.entity.SavedMediaEntity

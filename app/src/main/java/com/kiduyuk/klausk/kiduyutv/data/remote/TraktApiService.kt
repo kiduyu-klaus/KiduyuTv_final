@@ -1,8 +1,25 @@
 package com.kiduyuk.klausk.kiduyutv.data.remote
 
-import com.kiduyuk.klausk.kiduyutv.data.model.trakt.*
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktCollectionItem
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktHistoryItem
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktPlaybackProgress
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktRecommendation
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktScrobbleRequest
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktScrobbleResponse
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktSettings
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktSyncItems
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktSyncResponse
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktUser
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktWatchedMovie
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktWatchedShow
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktWatchlistItem
 import retrofit2.Response
-import retrofit2.http.*
+import retrofit2.http.Body
+import retrofit2.http.GET
+import retrofit2.http.Header
+import retrofit2.http.POST
+import retrofit2.http.Path
+import retrofit2.http.Query
 
 /**
  * TraktApiService - Retrofit service interface for Trakt API

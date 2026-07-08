@@ -5,7 +5,6 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import androidx.room.Update
 import com.kiduyuk.klausk.kiduyutv.data.local.entity.WatchHistoryEntity
 import kotlinx.coroutines.flow.Flow
 

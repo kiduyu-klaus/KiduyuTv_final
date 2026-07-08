@@ -9,7 +9,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import com.kiduyuk.klausk.kiduyutv.network.NetworkStateDialog
 
 /**
  * Composable that observes network connectivity state.
