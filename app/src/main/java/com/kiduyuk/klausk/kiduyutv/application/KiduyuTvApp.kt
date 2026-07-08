@@ -19,6 +19,7 @@ import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.network.AndroidApp
 import com.kiduyuk.klausk.kiduyutv.network.NetworkConnectivityChecker
 import com.kiduyuk.klausk.kiduyutv.util.AdvancedAdBlocker
+import com.kiduyuk.klausk.kiduyutv.util.AdUnitIds
 import com.kiduyuk.klausk.kiduyutv.util.AppOpenAdObserver
 import com.kiduyuk.klausk.kiduyutv.util.AuthManager
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
@@ -56,6 +57,9 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
 
         // Initialize Firebase Realtime Database with persistence
         FirebaseDatabase.getInstance().setPersistenceEnabled(true)
+
+        // Load Google ad unit IDs and test-ad flag from Firebase app_config.
+        AdUnitIds.startFirebaseSync()
 
         // 1. Initialize AuthManager FIRST to restore persisted login from SharedPreferences
         // This ensures isSignedIn and currentUid are populated before Firebase services start

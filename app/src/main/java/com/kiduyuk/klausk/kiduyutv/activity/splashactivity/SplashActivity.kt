@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
@@ -769,16 +770,23 @@ class SplashActivity : ComponentActivity() {
 
     // ── Composable ────────────────────────────────────────────────────────────
 
+    @Preview(
+        name = "Splash Screen",
+        showBackground = true,
+        backgroundColor = 0xFF050505,
+        widthDp = 412,
+        heightDp = 915
+    )
     @Composable
     fun SplashScreen(
-        updateAvailable: Boolean,
-        permissionHandled: Boolean,
-        remoteVersion: String?,
-        syncCompleted: Boolean,
-        adsConsentHandled: Boolean,
-        syncProgress: Int,
-        syncMessage: String,
-        onTimeout: () -> Unit
+        updateAvailable: Boolean = false,
+        permissionHandled: Boolean = true,
+        remoteVersion: String? = null,
+        syncCompleted: Boolean = true,
+        adsConsentHandled: Boolean = true,
+        syncProgress: Int = 0,
+        syncMessage: String = "",
+        onTimeout: () -> Unit = {}
     ) {
         // Progress pauses while startup gates are pending.
         val isPaused = updateAvailable || !permissionHandled || !syncCompleted || !versionCheckHandled || !adsConsentHandled
@@ -1040,3 +1048,5 @@ class SplashActivity : ComponentActivity() {
         }
     }
 }
+
+
