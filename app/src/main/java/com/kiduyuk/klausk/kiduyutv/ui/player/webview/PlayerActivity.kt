@@ -74,7 +74,7 @@ class PlayerActivity : AppCompatActivity() {
             showErrorOverlay("Playback is taking too long. The stream may be blocked or unavailable.\n\nTap to retry.")
         }
     }
-    private val STALL_TIMEOUT_MS = 30_000L
+    private val STALL_TIMEOUT_MS = 40_000L
 
     // Watch history tracking variables
     private var currentTmdbId: Int = -1
@@ -274,7 +274,7 @@ class PlayerActivity : AppCompatActivity() {
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
-                
+                databaseEnabled = true
 
                 // Fix: Media Playback User Gesture Restriction
                 mediaPlaybackRequiresUserGesture = false
@@ -294,7 +294,7 @@ class PlayerActivity : AppCompatActivity() {
                 // FIX: Multi-window support must be TRUE for standard HTML5 video elements
                 // to scale up and trigger full-screen player states natively.
                 setSupportMultipleWindows(true)
-                javaScriptCanOpenWindowsAutomatically = true // Allows player scripts to execute properly
+                javaScriptCanOpenWindowsAutomatically = false// Allows player scripts to execute properly
 
                 // Security layer bypass for http:// streaming streams running on https:// pages
                 if (Build.VERSION.SDK_INT >= 21) {
@@ -302,6 +302,17 @@ class PlayerActivity : AppCompatActivity() {
                 }
 
                 cacheMode = WebSettings.LOAD_DEFAULT // Utilizes the browser cache for buffering
+
+                // 3. Set Custom App Cache Path (Buffers network data to app's internal directory)
+                val cacheDir = File(context.cacheDir, "webview_cache")
+                if (!cacheDir.exists()) {
+                    cacheDir.mkdirs()
+                }
+                // Deprecated in newer APIs but still utilized under-the-hood by rendering engines
+                @Suppress("DEPRECATION")
+                setAppCachePath(cacheDir.absolutePath)
+                @Suppress("DEPRECATION")
+                setAppCacheEnabled(true)
 
                 // FIX: Use the system's current WebView User-Agent instead of a hardcoded outdated one.
                 // Providers increasingly reject outdated Chrome UAs (Chrome/120 from late 2023 is now stale),
