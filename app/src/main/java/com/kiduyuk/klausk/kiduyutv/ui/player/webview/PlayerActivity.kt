@@ -33,7 +33,7 @@ import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import java.io.File
 
 class PlayerActivity : AppCompatActivity() {
 
@@ -50,13 +50,16 @@ class PlayerActivity : AppCompatActivity() {
     private var currentEpisode = 1
     private var isCursorDisabled = false
     private var isFireTV = false
+    private var isTvDevice = false
     private var currentProviderName: String = "VidLink"
+    private var hasCustomIframeHtml = false
 
     // Loading and error state for AdBlockerWebViewClient
     private var isPageLoading = true
     private var hasPageError = false
+    private var hasPlaybackStarted = false
 
-    // FIX: Loading overlay UI to give the user feedback while the iframe loads,
+    // Loading overlay UI to give the user feedback while the iframe loads,
     // and to surface errors instead of leaving a silent black screen.
     private lateinit var loadingOverlay: FrameLayout
     private lateinit var loadingProgressBar: ProgressBar
@@ -64,14 +67,17 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var errorOverlay: FrameLayout
     private lateinit var errorText: TextView
 
-    // FIX: Stall detector — if onPageFinished doesn't fire within 30s, treat as failure
-    // and offer the user a fallback UI.
+    // Playback watchdog: the provider page can finish loading while the actual
+    // video never starts. If no "playing" or progress event arrives in time,
+    // move to the next available provider.
     private val stallTimeoutHandler = Handler(Looper.getMainLooper())
     private val stallTimeoutRunnable = Runnable {
-        if (isPageLoading && !hasPageError) {
-            Log.w(TAG, "[WebView] Page load stalled after 30s — showing fallback UI")
-            hasPageError = true
-            showErrorOverlay("Playback is taking too long. The stream may be blocked or unavailable.\n\nTap to retry.")
+        if (!hasPlaybackStarted && !hasPageError) {
+            Log.w(TAG, "[WebView] Playback did not start within timeout for $currentProviderName")
+            if (!tryNextProvider("Playback did not start")) {
+                hasPageError = true
+                showErrorOverlay("Playback is taking too long. The stream may be blocked or unavailable.\n\nTap to retry.")
+            }
         }
     }
     private val STALL_TIMEOUT_MS = 40_000L
@@ -151,7 +157,9 @@ class PlayerActivity : AppCompatActivity() {
         currentVoteAverage = contentVoteAverage
         currentReleaseDate = contentReleaseDate
 
-        // Check and add to watch history, timer will be started after check completes
+        // Check and add to watch history. Progress sync starts only after
+        // playback actually starts, so buffering pages do not keep writing
+        // stale progress.
         checkAndAddToWatchHistory()
 
         val uiModeManager = getSystemService(android.content.Context.UI_MODE_SERVICE) as UiModeManager
@@ -160,9 +168,11 @@ class PlayerActivity : AppCompatActivity() {
 
         if (uiModeManager.currentModeType != Configuration.UI_MODE_TYPE_TELEVISION) {
             isCursorDisabled = true
+            isTvDevice = false
             val deviceType = if (uiModeManager.currentModeType == Configuration.UI_MODE_TYPE_NORMAL) "Mobile" else "Tablet"
             Log.i(TAG, "[Device] $deviceType detected (${deviceBrand} $deviceModel), disabling cursor")
         } else {
+            isTvDevice = true
             isFireTV = isFireTVDevice(this)
             Log.i(TAG, "[Device] TV detected (${deviceBrand} $deviceModel), cursor enabled, isFireTV=$isFireTV")
         }
@@ -173,6 +183,7 @@ class PlayerActivity : AppCompatActivity() {
             "https://vidlink.pro/movie/$tmdbId?autoplay=true"
         }
 
+        hasCustomIframeHtml = intent.getStringExtra("IFRAME_HTML") != null
         currentProviderName = WebViewUtils.detectProviderFromUrl(url)
         Log.i(TAG, "[Provider] Selected: $currentProviderName")
 
@@ -244,14 +255,7 @@ class PlayerActivity : AppCompatActivity() {
         // Tap to retry: dismiss the error and reload the iframe
         errorOverlay.setOnClickListener {
             Log.i(TAG, "[WebView] User tapped error overlay — reloading")
-            hasPageError = false
-            isPageLoading = true
-            errorOverlay.visibility = View.GONE
-            loadingOverlay.visibility = View.VISIBLE
-            loadingStatusText.text = "Retrying…"
-            stallTimeoutHandler.removeCallbacks(stallTimeoutRunnable)
-            stallTimeoutHandler.postDelayed(stallTimeoutRunnable, STALL_TIMEOUT_MS)
-            webView.reload()
+            loadProviderIntoWebView(webView, currentProviderName, "Retrying...")
         }
 
         webView = WebViewUtils.createWebView(this, isFireTV).apply {
@@ -303,16 +307,7 @@ class PlayerActivity : AppCompatActivity() {
 
                 cacheMode = WebSettings.LOAD_DEFAULT // Utilizes the browser cache for buffering
 
-                // 3. Set Custom App Cache Path (Buffers network data to app's internal directory)
-                val cacheDir = File(context.cacheDir, "webview_cache")
-                if (!cacheDir.exists()) {
-                    cacheDir.mkdirs()
-                }
-                // Deprecated in newer APIs but still utilized under-the-hood by rendering engines
-                @Suppress("DEPRECATION")
-                setAppCachePath(cacheDir.absolutePath)
-                @Suppress("DEPRECATION")
-                setAppCacheEnabled(true)
+                
 
                 // FIX: Use the system's current WebView User-Agent instead of a hardcoded outdated one.
                 // Providers increasingly reject outdated Chrome UAs (Chrome/120 from late 2023 is now stale),
@@ -351,115 +346,18 @@ class PlayerActivity : AppCompatActivity() {
                     Log.d(TAG, "[WebChrome] Load progress: $newProgress%")
                 }
             }
-
-
-            // ── Updated: Unified structure loading with generateIframeHtml ──
-            // FIX: Compute the actual iframe URL first, then derive the baseUrl from its origin.
-            // Previously baseUrl was hardcoded to the provider's movieUrlTemplate host, which
-            // didn't match the iframe's true origin when the provider serves from a different
-            // domain. That mismatch caused X-Frame-Options/CSP "frame-ancestors" to silently
-            // refuse the embed and disable postMessage tracking.
-            val iframeUrl = if (intent.getStringExtra("IFRAME_HTML") == null) {
-                StreamProviderManager.generateUrl(
-                    providerName = currentProviderName,
-                    tmdbId = currentTmdbId,
-                    isTv = currentIsTv,
-                    season = if (currentIsTv) currentSeason else null,
-                    episode = if (currentIsTv) currentEpisode else null,
-                    timestamp = currentPlaybackPosition / 1000L // Convert ms to seconds for provider URL parameters
-                )
-            } else {
-                // IFRAME_HTML supplied: derive origin from a sensible provider base
-                StreamProviderManager.getBaseUrl(currentProviderName)
-            }
-            val baseUrl = try {
-                val parsed = android.net.Uri.parse(iframeUrl)
-                val scheme = parsed.scheme ?: "https"
-                val host = parsed.host ?: StreamProviderManager.getBaseUrl(currentProviderName)
-                    .removePrefix("https://").removePrefix("http://").substringBefore("/")
-                "$scheme://$host"
-            } catch (e: Exception) {
-                Log.w(TAG, "[WebView] Failed to parse iframe origin, falling back to provider base: ${e.message}")
-                StreamProviderManager.getBaseUrl(currentProviderName)
-            }
-            Log.i(TAG, "[WebView] Loading iframe from origin: $baseUrl")
-
-            // FIX: Extract the provider host from the actual iframe URL so the WebView's
-            // ad-blocker can whitelist it (and only it). Any non-provider request will be
-            // blocked at the network layer by AdBlockerWebViewClient.
-            val providerHost: String? = try {
-                android.net.Uri.parse(iframeUrl).host?.lowercase()
-            } catch (e: Exception) {
-                null
-            }
-            val allowedHosts: Set<String> = setOfNotNull(
-                providerHost,
-                // Also allow the provider's movie-template host as a safe fallback (subdomains, etc.)
-                try {
-                    StreamProviderManager.getBaseUrl(currentProviderName)
-                        .removePrefix("https://").removePrefix("http://").substringBefore("/").lowercase()
-                } catch (e: Exception) { null }
-            )
-            Log.i(TAG, "[WebView] Provider whitelist hosts: $allowedHosts")
-
-            // FIX: Configure the WebView's ad-blocker with the provider whitelist so it
-            // only permits requests to the provider URL (and its subdomains). Every other
-            // request is intercepted and returned as an empty response, isolating the iframe
-            // from trackers, ad networks, and analytics endpoints.
-            webViewClient = AdBlockerWebViewClient(
-                allowedHosts = allowedHosts,
-                onPageFinished = {
-                    isPageLoading = false
-                    hasPageError = false
-                    stallTimeoutHandler.removeCallbacks(stallTimeoutRunnable)
-                    loadingOverlay.visibility = View.GONE
-                    errorOverlay.visibility = View.GONE
-                    Log.i(TAG, "[WebView] Page finished loading with AdBlocker")
-                },
-                onError = {
-                    hasPageError = true
-                    isPageLoading = false
-                    stallTimeoutHandler.removeCallbacks(stallTimeoutRunnable)
-                    Log.e(TAG, "[WebView] Error received with AdBlocker")
-                    showErrorOverlay("Unable to load the player.\n\nTap to retry.")
-                }
-            )
-
-            // FIX: Start the stall detector — fires after STALL_TIMEOUT_MS if the page never finishes.
-            stallTimeoutHandler.removeCallbacks(stallTimeoutRunnable)
-            stallTimeoutHandler.postDelayed(stallTimeoutRunnable, STALL_TIMEOUT_MS)
-
-            val finalHtml = intent.getStringExtra("IFRAME_HTML") ?: StreamProviderManager.generateIframeHtml(
-                providerName = currentProviderName,
-                tmdbId = currentTmdbId,
-                isTv = currentIsTv,
-                season = if (currentIsTv) currentSeason else null,
-                episode = if (currentIsTv) currentEpisode else null,
-                timestamp = currentPlaybackPosition / 1000L // Convert ms to seconds for provider URL parameters
-            )
-            loadDataWithBaseURL(baseUrl, finalHtml, "text/html", "UTF-8", null)
         }
 
         // Add JavascriptInterface bridge for player events (must be called on webView, not Activity)
         webView.addJavascriptInterface(
-            PlayerBridge { provider, positionSec, durationSec, season, episode ->
+            PlayerBridge { event ->
                 runOnUiThread {
-                    // positionSec is in seconds, convert to milliseconds for storage
-                    currentPlaybackPosition = (positionSec * 1000).toLong()
-                    // Store duration in milliseconds
-                    currentDuration = (durationSec * 1000).toLong()
-                    // Update season and episode if provided and they have changed
-                    if (currentIsTv && season != null && episode != null) {
-                        if (season != currentSeason || episode != currentEpisode) {
-                            Log.i(TAG, "[Episode] Changed S${currentSeason}E${currentEpisode} -> S${season}E${episode}")
-                            currentSeason = season
-                            currentEpisode = episode
-                        }
-                    }
+                    handlePlayerBridgeEvent(event)
                 }
             },
             "MavisInterface"
         )
+        loadProviderIntoWebView(webView, currentProviderName, "Loading...")
 
         cursorView = MouseCursorView(this).apply {
             layoutParams = FrameLayout.LayoutParams(
@@ -513,12 +411,187 @@ class PlayerActivity : AppCompatActivity() {
         ).show()
     }
 
+    private fun loadProviderIntoWebView(
+        targetWebView: WebView,
+        providerName: String,
+        statusText: String
+    ) {
+        currentProviderName = providerName
+        isPageLoading = true
+        hasPageError = false
+        hasPlaybackStarted = false
+        stopProgressUpdateTimer()
+
+        loadingStatusText.text = statusText
+        loadingOverlay.visibility = View.VISIBLE
+        errorOverlay.visibility = View.GONE
+
+        val customIframeHtml = intent.getStringExtra("IFRAME_HTML")
+        val iframeUrl = if (customIframeHtml == null) {
+            StreamProviderManager.generateUrl(
+                providerName = currentProviderName,
+                tmdbId = currentTmdbId,
+                isTv = currentIsTv,
+                season = if (currentIsTv) currentSeason else null,
+                episode = if (currentIsTv) currentEpisode else null,
+                timestamp = currentPlaybackPosition / 1000L
+            )
+        } else {
+            StreamProviderManager.getBaseUrl(currentProviderName)
+        }
+
+        val baseUrl = try {
+            val parsed = android.net.Uri.parse(iframeUrl)
+            val scheme = parsed.scheme ?: "https"
+            val host = parsed.host ?: StreamProviderManager.getBaseUrl(currentProviderName)
+                .removePrefix("https://").removePrefix("http://").substringBefore("/")
+            "$scheme://$host"
+        } catch (e: Exception) {
+            Log.w(TAG, "[WebView] Failed to parse iframe origin, falling back to provider base: ${e.message}")
+            StreamProviderManager.getBaseUrl(currentProviderName)
+        }
+
+        val providerHost = try {
+            android.net.Uri.parse(iframeUrl).host?.lowercase()
+        } catch (e: Exception) {
+            null
+        }
+        val allowedHosts = setOfNotNull(
+            providerHost,
+            try {
+                StreamProviderManager.getBaseUrl(currentProviderName)
+                    .removePrefix("https://").removePrefix("http://").substringBefore("/").lowercase()
+            } catch (e: Exception) {
+                null
+            }
+        )
+
+        Log.i(TAG, "[WebView] Loading $currentProviderName from origin: $baseUrl")
+        Log.i(TAG, "[WebView] Provider whitelist hosts: $allowedHosts")
+
+        targetWebView.webViewClient = AdBlockerWebViewClient(
+            allowedHosts = allowedHosts,
+            onPageFinished = {
+                isPageLoading = false
+                hasPageError = false
+                if (!hasPlaybackStarted) {
+                    loadingStatusText.text = "Preparing stream..."
+                    loadingOverlay.visibility = View.VISIBLE
+                }
+                errorOverlay.visibility = View.GONE
+                Log.i(TAG, "[WebView] Page finished loading for $currentProviderName; waiting for playback")
+            },
+            onError = {
+                Log.e(TAG, "[WebView] Error received for $currentProviderName")
+                if (!tryNextProvider("Provider failed to load")) {
+                    hasPageError = true
+                    isPageLoading = false
+                    stallTimeoutHandler.removeCallbacks(stallTimeoutRunnable)
+                    showErrorOverlay("Unable to load the player.\n\nTap to retry.")
+                }
+            }
+        )
+
+        stallTimeoutHandler.removeCallbacks(stallTimeoutRunnable)
+        stallTimeoutHandler.postDelayed(stallTimeoutRunnable, STALL_TIMEOUT_MS)
+
+        val finalHtml = customIframeHtml ?: StreamProviderManager.generateIframeHtml(
+            providerName = currentProviderName,
+            tmdbId = currentTmdbId,
+            isTv = currentIsTv,
+            season = if (currentIsTv) currentSeason else null,
+            episode = if (currentIsTv) currentEpisode else null,
+            timestamp = currentPlaybackPosition / 1000L
+        )
+        targetWebView.loadDataWithBaseURL(baseUrl, finalHtml, "text/html", "UTF-8", null)
+    }
+
+    private fun handlePlayerBridgeEvent(event: PlayerBridgeEvent) {
+        event.positionSec?.let { currentPlaybackPosition = (it * 1000).toLong() }
+        event.durationSec?.let { currentDuration = (it * 1000).toLong() }
+
+        if (currentIsTv && event.season != null && event.episode != null) {
+            if (event.season != currentSeason || event.episode != currentEpisode) {
+                Log.i(TAG, "[Episode] Changed S${currentSeason}E${currentEpisode} -> S${event.season}E${event.episode}")
+                currentSeason = event.season
+                currentEpisode = event.episode
+            }
+        }
+
+        when (event.event.lowercase()) {
+            "playing" -> markPlaybackStarted(event.event)
+            "canplay", "canplaythrough", "loadeddata" -> {
+                if (!hasPlaybackStarted) {
+                    loadingStatusText.text = "Starting stream..."
+                    loadingOverlay.visibility = View.VISIBLE
+                }
+                Log.i(TAG, "[WebView] Player ready event: ${event.event}")
+            }
+            "progress" -> {
+                val position = event.positionSec ?: 0.0
+                if (position > 0.0 || hasPlaybackStarted) {
+                    markPlaybackStarted("progress")
+                }
+            }
+            "waiting", "buffering", "stalled" -> {
+                if (!hasPlaybackStarted) {
+                    loadingStatusText.text = "Buffering..."
+                    loadingOverlay.visibility = View.VISIBLE
+                }
+                Log.i(TAG, "[WebView] Player buffering event: ${event.event}")
+            }
+            "error", "video-error" -> {
+                Log.w(TAG, "[WebView] Player error event from bridge")
+                if (!tryNextProvider("Player reported an error")) {
+                    hasPageError = true
+                    showErrorOverlay("This source failed. Tap to retry.")
+                }
+            }
+        }
+    }
+
+    private fun markPlaybackStarted(reason: String) {
+        if (!hasPlaybackStarted) {
+            Log.i(TAG, "[WebView] Playback started via $reason")
+            hasPlaybackStarted = true
+            isPageLoading = false
+            hasPageError = false
+            stallTimeoutHandler.removeCallbacks(stallTimeoutRunnable)
+            startProgressUpdateTimer()
+        }
+        loadingOverlay.visibility = View.GONE
+        errorOverlay.visibility = View.GONE
+    }
+
+    private fun tryNextProvider(reason: String): Boolean {
+        if (hasCustomIframeHtml || !::webView.isInitialized) {
+            return false
+        }
+
+        val availableProviders = StreamProviderManager.getProvidersForDevice(isTvDevice)
+        if (availableProviders.isEmpty()) return false
+
+        val currentIndex = availableProviders.indexOfFirst {
+            it.name.equals(currentProviderName, ignoreCase = true)
+        }
+        val nextProvider = availableProviders
+            .drop(if (currentIndex >= 0) currentIndex + 1 else 0)
+            .firstOrNull()
+            ?: return false
+
+        Log.i(TAG, "[Provider] $reason. Trying next provider: ${nextProvider.name}")
+        loadProviderIntoWebView(webView, nextProvider.name, "Trying ${nextProvider.name}...")
+        return true
+    }
+
     override fun onResume() {
         super.onResume()
+        if (!::webView.isInitialized) return
         webView.onResume()
         webView.resumeTimers()
-        // FIX: Restart the stall timeout if the page is still loading when we resume
-        if (isPageLoading && !hasPageError && ::webView.isInitialized) {
+        if (hasPlaybackStarted) {
+            startProgressUpdateTimer()
+        } else if (!hasPageError) {
             stallTimeoutHandler.removeCallbacks(stallTimeoutRunnable)
             stallTimeoutHandler.postDelayed(stallTimeoutRunnable, STALL_TIMEOUT_MS)
         }
@@ -546,7 +619,6 @@ class PlayerActivity : AppCompatActivity() {
                     webChromeClient = WebChromeClient()
                     webViewClient = WebViewClient()
                     clearHistory()
-                    clearCache(true)
                     loadUrl("about:blank")
                     onPause()
                     removeAllViews()
@@ -687,11 +759,6 @@ class PlayerActivity : AppCompatActivity() {
                     repository.saveToWatchHistory(this@PlayerActivity, watchHistoryItem)
                     Log.d(TAG, "[WatchHistory] saveToWatchHistory called successfully")
 
-                    // Start progress timer only after adding to history
-                    withContext(Dispatchers.Main) {
-                        startProgressUpdateTimer()
-                    }
-
                     com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.syncWatchHistory(
                         tmdbId = currentTmdbId,
                         isTv = currentIsTv,
@@ -707,18 +774,10 @@ class PlayerActivity : AppCompatActivity() {
                         releaseDate = currentReleaseDate
                     )
                 } else {
-                    Log.d(TAG, "[WatchHistory] Media already in watch history, starting timer anyway")
-                    // Start timer even if already in history (for resume functionality)
-                    withContext(Dispatchers.Main) {
-                        startProgressUpdateTimer()
-                    }
+                    Log.d(TAG, "[WatchHistory] Media already in watch history; progress timer waits for playback")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "[WatchHistory] Error checking/adding to watch history: ${e.message}", e)
-                // Still start timer on error to enable progress tracking
-                withContext(Dispatchers.Main) {
-                    startProgressUpdateTimer()
-                }
             }
         }
     }

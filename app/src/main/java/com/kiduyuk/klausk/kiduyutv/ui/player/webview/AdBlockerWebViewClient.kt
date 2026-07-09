@@ -303,7 +303,9 @@ open class AdBlockerWebViewClient(
                 function isAdElement(node) {
                     if (!node || node.nodeType !== 1) return false;
                     if (node.tagName === 'BODY' || node.tagName === 'HTML') return false;
+                    if (node.tagName === 'VIDEO') return false;
                     if (node.tagName === 'IFRAME') return isAdIframe(node);
+                    if (containsPlayerFrame(node)) return false;
 
                     // Direct, very-specific ad markers
                     var id  = (node.id || '').toLowerCase();
@@ -339,6 +341,9 @@ open class AdBlockerWebViewClient(
 
                 function containsPlayerFrame(node) {
                     if (!node || !node.querySelectorAll) return false;
+                    try {
+                        if (node.querySelector('video')) return true;
+                    } catch(e) {}
                     var frames = node.querySelectorAll('iframe');
                     for (var i = 0; i < frames.length; i++) {
                         if (isPlayerFrame(frames[i])) return true;
