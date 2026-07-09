@@ -16,24 +16,52 @@ open class AdBlockerWebViewClient(
     private val onError: () -> Unit
 ) : WebViewClient() {
 
+    // Ad networks
     private val adDomains = setOf(
-        "doubleclick.net", "googlesyndication.com", "googleadservices.com",
-        "adnxs.com", "advertising.com", "adsystem.com", "adserver.com",
-        "rubiconproject.com", "openx.net", "pubmatic.com", "criteo.com",
-        "moatads.com", "taboola.com", "outbrain.com", "adroll.com",
-        "imrworldwide.com", "comscore.com", "quantserve.com",
-        "popads.net", "popcash.net", "propellerads.com", "ad-maven.com",
-        "onclickads.net", "adsterra.com", "exo-click.com", "juicyads.com",
-        "trafficjunky.net", "exoclick.com", "mc.yandex.ru", "creativecdn.com",
-        "serving-sys.com", "ads.yahoo.com", "contextweb.com",
-        "adtechtraffic.com", "bet365.com", "1xbet.com", "cloud.mail.ru"
+        "doubleclick.net",
+        "googlesyndication.com",
+        "googleadservices.com",
+
+        "propellerads.com",
+        "adsterra.com",
+        "popads.net",
+        "popcash.net",
+        "onclickads.net",
+        "trafficjunky.net",
+        "juicyads.com",
+        "exoclick.com",
+        "hilltopads.net",
+        "mgid.com",
+        "taboola.com",
+        "outbrain.com",
+        "push.house",
+        "pushwelcome.com"
     )
 
-    override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
-        val url = request?.url?.toString()?.lowercase() ?: return null
+    // Analytics / tracking — blocked for privacy, not because they're ads
+    private val trackingDomains = setOf(
+        "googletagmanager.com",
+        "google-analytics.com",
+        "histats.com",
+        "s10.histats.com"
+    )
 
-        if (adDomains.any { url.contains(it) }) {
-            return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream("".toByteArray()))
+    // Push-notification prompt SDKs — blocked to suppress permission popups
+    private val notificationDomains = setOf(
+        "onesignal.com"
+    )
+
+    // NOTE: firebaseinstallations.googleapis.com is intentionally NOT blocked here.
+    // It's Google's Firebase Installations API (used by Firebase Auth, Analytics,
+    // Crashlytics, Remote Config to issue install IDs) — not an ad domain. Blocking
+    // it can silently break Firebase sync elsewhere in the app.
+    private val blockedDomains = adDomains + trackingDomains + notificationDomains
+
+    override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
+        val host = request?.url?.host?.lowercase() ?: return super.shouldInterceptRequest(view, request)
+
+        if (blockedDomains.any { host == it || host.endsWith(".$it") }) {
+            return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
         }
 
         return super.shouldInterceptRequest(view, request)
@@ -43,21 +71,23 @@ open class AdBlockerWebViewClient(
         super.onPageFinished(view, url)
         onPageFinished()
 
-        view?.evaluateJavascript(
-            """
-            (function() {
-                var style = document.createElement('style');
-                style.innerHTML = 'div[id^="ad"], div[class^="ad"], .popup, .overlay { display: none !important; }';
-                document.head.appendChild(style);
+        try {
+            view?.evaluateJavascript(
+                """
+                (function() {
+                    var style = document.createElement('style');
+                    style.innerHTML = 'div[id*="advert"], div[class*="advert"], div[id*="-ad-"], div[class*="-ad-"], .popup, .overlay { display: none !important; }';
+                    document.head.appendChild(style);
 
-                var ads = document.querySelectorAll('div[id^="ad"], div[class^="ad"], iframe[src*="doubleclick"], iframe[src*="google"]');
-                ads.forEach(function(ad) { ad.remove(); });
-            })();
-            """.trimIndent(), null
-        )
+                    var ads = document.querySelectorAll('div[id*="advert"], div[class*="advert"], iframe[src*="doubleclick"], iframe[src*="googlesyndication"]');
+                    ads.forEach(function(ad) { ad.remove(); });
+                })();
+                """.trimIndent(), null
+            )
+        } catch (e: Exception) {
+            Log.w("AdblockWebview", "evaluateJavascript failed: ${e.message}")
+        }
     }
-
-
 
     override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
         if (request?.isForMainFrame == true) {
@@ -66,4 +96,10 @@ open class AdBlockerWebViewClient(
         }
     }
 
+    override fun onReceivedHttpError(view: WebView?, request: WebResourceRequest?, errorResponse: WebResourceResponse?) {
+        if (request?.isForMainFrame == true) {
+            Log.i("AdblockWebview", "Received HTTP error: ${errorResponse?.statusCode}")
+            onError()
+        }
+    }
 }
