@@ -15,6 +15,7 @@ open class AdBlockerWebViewClient(
 ) : WebViewClient() {
 
     private val adDomains = setOf(
+        // Core Ad Networks & Common Trackers
         "doubleclick.net", "googlesyndication.com", "googleadservices.com",
         "adnxs.com", "advertising.com", "adsystem.com", "adserver.com",
         "rubiconproject.com", "openx.net", "pubmatic.com", "criteo.com",
@@ -24,7 +25,10 @@ open class AdBlockerWebViewClient(
         "onclickads.net", "adsterra.com", "exo-click.com", "juicyads.com",
         "trafficjunky.net", "exoclick.com", "mc.yandex.ru", "creativecdn.com",
         "serving-sys.com", "ads.yahoo.com", "contextweb.com",
-        "adtechtraffic.com", "bet365.com", "1xbet.com", "cloud.mail.ru"
+        "adtechtraffic.com", "bet365.com", "1xbet.com", "cloud.mail.ru",
+        
+        // Newly Identified Streaming Hijack & Analytics Domains
+        "histats.com", "oundhertobeconsist.org", "aidthewallowtoh.org", "ghabovethec.info"
     )
 
     // Schemes that should never be handed to the OS from inside a video player WebView.
@@ -42,6 +46,7 @@ open class AdBlockerWebViewClient(
         val host = request?.url?.host?.lowercase()
 
         if (hostMatchesAdDomain(host)) {
+            Log.d("AdblockWebview", "Intercepted network request to ad host: $host")
             return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream("".toByteArray()))
         }
 
@@ -54,8 +59,7 @@ open class AdBlockerWebViewClient(
         val host = uri.host?.lowercase()
 
         // Block navigations to non-http(s) schemes entirely — these are almost always
-        // malvertising redirects trying to open the Play Store, other apps, or dialers,
-        // not something the player should ever follow.
+        // malvertising redirects trying to open the Play Store, other apps, or dialers
         if (scheme != null && scheme != "http" && scheme != "https") {
             Log.i("AdblockWebview", "Blocked non-http navigation: $scheme://")
             return true
@@ -74,29 +78,65 @@ open class AdBlockerWebViewClient(
         super.onPageFinished(view, url)
         onPageFinished()
 
+        // Comprehensive DOM cleaner optimizing for Android TV D-pad focus safety
         view?.evaluateJavascript(
             """
             (function() {
+                // 1. Inject CSS standard class/id ad-hiding rules
                 var style = document.createElement('style');
                 style.innerHTML = 'div[id^="ad"], div[class^="ad"], .popup, .overlay { display: none !important; }';
                 document.head.appendChild(style);
 
-                var ads = document.querySelectorAll('div[id^="ad"], div[class^="ad"], iframe[src*="doubleclick.net"], iframe[src*="googlesyndication.com"]');
-                ads.forEach(function(ad) { ad.remove(); });
+                function cleanPlayerDOM() {
+                    // Remove typical iframe structural matches
+                    var legacyAds = document.querySelectorAll('iframe[src*="doubleclick.net"], iframe[src*="googlesyndication.com"]');
+                    legacyAds.forEach(function(ad) { ad.remove(); });
 
-                function removeOverlays() {
+                    // 2. High z-index Overlay Blanket Destroyer
                     document.querySelectorAll('div').forEach(function(el) {
-                        var s = getComputedStyle(el);
-                        if (s.position === 'fixed' && parseInt(s.zIndex || '0', 10) >= 999999) {
-                            el.remove();
+                        var s = window.getComputedStyle(el);
+                        var zIndex = parseInt(s.zIndex || '0', 10);
+                        // Upper bounds catch transparent tracking layers without breaking native wrappers 
+                        if ((s.position === 'fixed' || s.position === 'absolute') && zIndex > 9999) {
+                            // Safety Check: Never accidentally delete an element wrapping the active stream
+                            if (!el.querySelector('video')) {
+                                el.remove();
+                            }
+                        }
+                    });
+
+                    // 3. Keyword Scanner targeting Social Engineering UI Ads (Snapchat / Fake Notifications)
+                    var targetElements = document.querySelectorAll('div, a, span, section');
+                    var targetKeywords = [
+                        'snapchat', 'pending snaps', 'video call', 
+                        'missed call', 'missed video', 'join the video'
+                    ];
+
+                    targetElements.forEach(function(el) {
+                        var nodeText = (el.textContent || el.innerText || '').toLowerCase();
+                        
+                        if (targetKeywords.some(function(keyword) { return nodeText.includes(keyword); })) {
+                            var floatingContainer = el;
+                            
+                            // Traverse upstream to find the absolute/fixed block wrapping the deceptive notification
+                            while (floatingContainer.parentElement && floatingContainer.parentElement !== document.body) {
+                                var parentStyle = window.getComputedStyle(floatingContainer);
+                                if (parentStyle.position === 'fixed' || parentStyle.position === 'absolute') {
+                                    break;
+                                }
+                                floatingContainer = floatingContainer.parentElement;
+                            }
+                            floatingContainer.remove();
                         }
                     });
                 }
 
-                removeOverlays();
+                // Run structural purge immediately
+                cleanPlayerDOM();
 
+                // 4. Fallback MutationObserver to catch asynchronous or delayed ad-network payloads
                 if (!window.__kiduyuOverlayObserver) {
-                    window.__kiduyuOverlayObserver = new MutationObserver(removeOverlays);
+                    window.__kiduyuOverlayObserver = new MutationObserver(cleanPlayerDOM);
                     window.__kiduyuOverlayObserver.observe(document.documentElement, {
                         childList: true,
                         subtree: true
