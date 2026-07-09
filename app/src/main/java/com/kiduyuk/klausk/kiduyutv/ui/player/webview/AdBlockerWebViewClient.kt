@@ -1,5 +1,6 @@
 package com.kiduyuk.klausk.kiduyutv.ui.player.webview
 
+import android.graphics.Bitmap
 import android.util.Log
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -40,7 +41,13 @@ open class AdBlockerWebViewClient(
 
         if (hostMatchesAdDomain(host)) {
             Log.d("AdblockWebview", "Intercepted network request to ad host: $host")
-            return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream("".toByteArray()))
+            // Return an empty JS script comment if it's a script request to prevent script execution exceptions
+            val path = request?.url?.path?.lowercase() ?: ""
+            return if (path.endsWith(".js")) {
+                WebResourceResponse("application/javascript", "utf-8", ByteArrayInputStream("/*blocked*/".toByteArray()))
+            } else {
+                WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream("".toByteArray()))
+            }
         }
 
         return super.shouldInterceptRequest(view, request)
@@ -51,13 +58,11 @@ open class AdBlockerWebViewClient(
         val scheme = uri.scheme?.lowercase()
         val host = uri.host?.lowercase()
 
-        // Block transitions to non-http/s schemas (e.g., intent://, market://) which break focus
         if (scheme != null && scheme != "http" && scheme != "https") {
             Log.i("AdblockWebview", "Blocked non-http navigation: $scheme://")
             return true
         }
 
-        // Block top-level redirection loading attempts straight to ad networks
         if (hostMatchesAdDomain(host)) {
             Log.i("AdblockWebview", "Blocked top-level navigation to ad domain: $host")
             return true
@@ -66,21 +71,31 @@ open class AdBlockerWebViewClient(
         return false
     }
 
+    // Crucial: Run the purging engine early, the moment the page structure becomes visible
+    override fun onPageCommitVisible(view: WebView?, url: String?) {
+        super.onPageCommitVisible(view, url)
+        executeAntiAdScript(view)
+    }
+
     override fun onPageFinished(view: WebView?, url: String?) {
         super.onPageFinished(view, url)
         onPageFinished()
+        // Run again on finish to catch lazy-loaded assets
+        executeAntiAdScript(view)
+    }
 
+    private fun executeAntiAdScript(view: WebView?) {
         view?.evaluateJavascript(
             """
             (function() {
-                // 1. Inject an aggressive CSS rule to instantly blind structural ad wrappers
+                // 1. Inject CSS rules globally to keep known elements hidden
                 var style = document.createElement('style');
-                style.innerHTML = '[class*="social-bar"], [id*="social-bar"], .ad-notification, #pop-container, div[id^="ad"], div[class^="ad"], .popup, .overlay { display: none !important; pointer-events: none !important; opacity: 0 !important; width: 0px !important; height: 0px !important; }';
+                style.innerHTML = '[class*="social-bar"], [id*="social-bar"], .ad-notification, #pop-container, div[id^="ad"], div[class^="ad"], .popup, .overlay, iframe[src*="histats.com"], iframe[src*="aidthewallowtoh.org"] { display: none !important; pointer-events: none !important; opacity: 0 !important; width: 0px !important; height: 0px !important; }';
                 document.head.appendChild(style);
 
                 function cleanPlayerDOM() {
                     try {
-                        // 2. Query elements that can behave as floating view overlays
+                        var videoEl = document.querySelector('video');
                         var elements = document.querySelectorAll('div, section, iframe, aside, a, span');
                         
                         elements.forEach(function(el) {
@@ -88,36 +103,39 @@ open class AdBlockerWebViewClient(
                                 var s = window.getComputedStyle(el);
                                 var zIndex = parseInt(s.zIndex || '0', 10);
                                 
-                                // Identify viewport-relative layout blocks
+                                // Look for elements explicitly designed to float or layer over content
                                 if ((s.position === 'fixed' || s.position === 'absolute') && zIndex > 9) {
-                                    var rect = el.getBoundingClientRect();
                                     
-                                    // SIZE FILTER: If the layout element is compact (not the fullscreen stream itself),
-                                    // process it safely without risking structural harm to the core media components.
+                                    // SECURITY RULE: Never delete any element that houses the active video player stream
+                                    if (videoEl && el.contains(videoEl)) {
+                                        return;
+                                    }
+
+                                    var text = (el.textContent || el.innerText || '').toLowerCase();
+                                    var identity = (el.id + ' ' + el.className).toLowerCase();
+                                    var badKeywords = ['video call', 'missed call', 'missed video', 'join the video', 'snapchat', 'pending snaps', 'whatsapp'];
+                                    
+                                    // Match 1: Text patterns matching sneaky notifications
+                                    var hasBadText = badKeywords.some(function(k) { return text.includes(k); });
+                                    
+                                    // Match 2: Layout structural matching signatures
+                                    var hasAdIdentity = identity.includes('notification') || identity.includes('popup') || identity.includes('alert') || identity.includes('social-bar');
+                                    
+                                    // Match 3: Iframes that are clearly not the video stream container
+                                    var isAdIframe = el.tagName.toLowerCase() === 'iframe' && !identity.includes('player') && !el.src.includes('player');
+
+                                    // If any signature matches, drop the entire element tree immediately regardless of its size wrapper
+                                    if (hasBadText || hasAdIdentity || isAdIframe) {
+                                        el.remove();
+                                        return;
+                                    }
+
+                                    // Fallback Size Check: For general non-branded floating clutter
+                                    var rect = el.getBoundingClientRect();
                                     if (rect.width > 0 && rect.height > 0 && 
                                         (rect.width < window.innerWidth * 0.85 || rect.height < window.innerHeight * 0.85)) {
-                                        
-                                        // Target A: Floating cross-origin frame layers (bypasses string boundaries)
-                                        if (el.tagName.toLowerCase() === 'iframe' || el.querySelector('iframe')) {
-                                            if (!el.querySelector('video')) {
-                                                el.remove();
-                                                return;
-                                            }
-                                        }
-                                        
-                                        // Target B: Native DOM text tracking targets mimicking system alerts
-                                        var text = (el.textContent || el.innerText || '').toLowerCase();
-                                        var badKeywords = ['video call', 'missed call', 'missed video', 'join the video', 'snapchat', 'pending snaps'];
-                                        if (badKeywords.some(function(k) { return text.includes(k); })) {
+                                        if (!identity.includes('player') && !identity.includes('video') && !identity.includes('control')) {
                                             el.remove();
-                                            return;
-                                        }
-                                        
-                                        // Target C: Naming profiles matching ad layout classes
-                                        var identity = (el.id + ' ' + el.className).toLowerCase();
-                                        if (identity.includes('notification') || identity.includes('popup') || identity.includes('alert')) {
-                                            el.remove();
-                                            return;
                                         }
                                     }
                                 }
@@ -126,7 +144,7 @@ open class AdBlockerWebViewClient(
                     } catch (globalErr) {}
                 }
 
-                // Run structural purge sweep immediately on load
+                // Initial purge execution
                 cleanPlayerDOM();
 
                 // 3. Keep layout mutation traps active for dynamically injected objects

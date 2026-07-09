@@ -207,6 +207,7 @@ class PlayerActivity : AppCompatActivity() {
                 if (Build.VERSION.SDK_INT >= 21) {
                     mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                 }
+                clearCache(true)
 
                 cacheMode = WebSettings.LOAD_DEFAULT // Utilizes the browser cache for buffering
 
