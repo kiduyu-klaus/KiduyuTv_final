@@ -716,24 +716,9 @@ object StreamProviderManager {
         }
 
         val attributes = provider.iframeAttributes.toMutableMap()
-        val requiredAllowAttributes = listOf("autoplay", "encrypted-media", "fullscreen", "picture-in-picture")
-        val mergedAllowAttributes = (attributes["allow"] ?: provider.allowAttributes)
-            .split(";")
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-            .toMutableSet()
-            .apply { addAll(requiredAllowAttributes) }
-            .joinToString("; ")
-        attributes["allow"] = mergedAllowAttributes
-        attributes.putIfAbsent("allowfullscreen", "true")
-        attributes.putIfAbsent("webkitallowfullscreen", "true")
-        attributes.putIfAbsent("mozallowfullscreen", "true")
-        attributes.putIfAbsent("referrerpolicy", "origin")
+        if (!attributes.containsKey("allow")) attributes["allow"] = provider.allowAttributes
 
         val attrString = attributes.map { "${it.key}=\"${it.value}\"" }.joinToString(" ")
-        val jsProviderName = providerName
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\"")
 
         // =============== UPDATED TRACKING SCRIPT ============================
         // Only supports: Videasy, Vidrock, Vidfast, Vidking, Vidnest
@@ -747,87 +732,17 @@ object StreamProviderManager {
                 const currentSeason = ${season ?: 1};
                 const currentEpisode = ${episode ?: 1};
 
-                function sendBridgeEvent(eventName, provider, currentTime, duration, seasonNum, episodeNum) {
+                function sendToAndroid(currentTime, duration, seasonNum, episodeNum, provider) {
                     if (typeof MavisInterface !== 'undefined' && MavisInterface.onPlayerEvent) {
                         const payload = {
-                            event: eventName || "progress",
-                            currentTime: currentTime !== null && currentTime !== undefined ? parseFloat(currentTime) : null,
-                            duration: duration !== null && duration !== undefined ? parseFloat(duration) : null,
+                            currentTime: parseFloat(currentTime),
+                            duration:    parseFloat(duration),
                             season: seasonNum ? parseInt(seasonNum, 10) : null,
                             episode: episodeNum ? parseInt(episodeNum, 10) : null,
                             provider: provider || ""
                         };
                         MavisInterface.onPlayerEvent(JSON.stringify(payload));
                     }
-                }
-
-                function sendToAndroid(currentTime, duration, seasonNum, episodeNum, provider) {
-                    sendBridgeEvent("progress", provider, currentTime, duration, seasonNum, episodeNum);
-                }
-
-                function bindVideo(video, provider) {
-                    if (!video || video.__mavisBound) return;
-                    video.__mavisBound = true;
-
-                    function report(eventName) {
-                        sendBridgeEvent(
-                            eventName,
-                            provider || "",
-                            Number.isFinite(video.currentTime) ? video.currentTime : null,
-                            Number.isFinite(video.duration) ? video.duration : null,
-                            currentIsTv ? currentSeason : null,
-                            currentIsTv ? currentEpisode : null
-                        );
-                    }
-
-                    video.addEventListener("playing", function() { report("playing"); }, true);
-                    video.addEventListener("canplay", function() { report("canplay"); }, true);
-                    video.addEventListener("loadeddata", function() { report("loadeddata"); }, true);
-                    video.addEventListener("waiting", function() { report("waiting"); }, true);
-                    video.addEventListener("stalled", function() { report("stalled"); }, true);
-                    video.addEventListener("error", function() { report("video-error"); }, true);
-                }
-
-                function bindAccessibleVideos(root, provider) {
-                    try {
-                        const videos = root.querySelectorAll ? root.querySelectorAll("video") : [];
-                        for (let i = 0; i < videos.length; i++) bindVideo(videos[i], provider);
-                    } catch (e) {}
-                }
-
-                function watchForVideos(root, provider) {
-                    bindAccessibleVideos(root, provider);
-                    try {
-                        const observer = new MutationObserver(function(mutations) {
-                            for (let i = 0; i < mutations.length; i++) {
-                                const nodes = mutations[i].addedNodes || [];
-                                for (let j = 0; j < nodes.length; j++) {
-                                    const node = nodes[j];
-                                    if (!node || node.nodeType !== 1) continue;
-                                    if (node.tagName === "VIDEO") bindVideo(node, provider);
-                                    bindAccessibleVideos(node, provider);
-                                }
-                            }
-                        });
-                        observer.observe(root.documentElement || root, { childList: true, subtree: true });
-                    } catch (e) {}
-                }
-
-                watchForVideos(document, "$jsProviderName");
-
-                const playerFrame = document.getElementById("player-frame");
-                if (playerFrame) {
-                    playerFrame.addEventListener("load", function() {
-                        sendBridgeEvent("iframe-loaded", "$jsProviderName", null, null, currentIsTv ? currentSeason : null, currentIsTv ? currentEpisode : null);
-                        try {
-                            if (playerFrame.contentDocument) {
-                                watchForVideos(playerFrame.contentDocument, "$jsProviderName");
-                            }
-                        } catch (e) {
-                            // Cross-origin frames cannot be inspected. Provider postMessage
-                            // progress events below remain the playback signal.
-                        }
-                    });
                 }
 
                 // Provider origin → name mapping
