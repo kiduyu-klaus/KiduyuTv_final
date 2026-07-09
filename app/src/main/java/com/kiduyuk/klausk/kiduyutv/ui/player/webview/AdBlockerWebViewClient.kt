@@ -51,11 +51,20 @@ open class AdBlockerWebViewClient(
         "onesignal.com"
     )
 
+    // "Social bar" / fake notification ad networks — these mimic native app
+    // notifications (Snapchat, WhatsApp, etc.) as bait to redirect to ad pages.
+    // Domain names are throwaway/rotating, so this list needs periodic upkeep.
+    private val socialBarDomains = setOf(
+        "oundhertobeconsist.org",
+        "aidthewallowtoh.org",
+        "ghabovethec.info"
+    )
+
     // NOTE: firebaseinstallations.googleapis.com is intentionally NOT blocked here.
     // It's Google's Firebase Installations API (used by Firebase Auth, Analytics,
     // Crashlytics, Remote Config to issue install IDs) — not an ad domain. Blocking
     // it can silently break Firebase sync elsewhere in the app.
-    private val blockedDomains = adDomains + trackingDomains + notificationDomains
+    private val blockedDomains = adDomains + trackingDomains + notificationDomains + socialBarDomains
 
     override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
         val host = request?.url?.host?.lowercase() ?: return super.shouldInterceptRequest(view, request)
@@ -76,7 +85,7 @@ open class AdBlockerWebViewClient(
                 """
                 (function() {
                     var style = document.createElement('style');
-                    style.innerHTML = 'div[id*="advert"], div[class*="advert"], div[id*="-ad-"], div[class*="-ad-"], .popup, .overlay { display: none !important; }';
+                    style.innerHTML = 'div[id*="advert"], div[class*="advert"], div[id*="-ad-"], div[class*="-ad-"], .popup, .overlay { display: none !important; } div[style*="2147483647"] { display: none !important; }';
                     document.head.appendChild(style);
 
                     var ads = document.querySelectorAll('div[id*="advert"], div[class*="advert"], iframe[src*="doubleclick"], iframe[src*="googlesyndication"]');
