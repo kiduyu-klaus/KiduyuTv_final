@@ -9,30 +9,43 @@ import android.webkit.WebViewClient
 import java.io.ByteArrayInputStream
 
 /**
- * AdBlockerWebViewClient - Handles ad blocking and page lifecycle events
+ * AdBlockerWebViewClient - Handles ad blocking and page lifecycle events.
+ *
+ * Uses a **whitelist** strategy: only requests whose host matches one of the
+ * configured [allowedHosts] (or is a subdomain thereof) are passed through.
+ * Every other request is intercepted and returned as an empty response, so
+ * the iframe is fully isolated from third-party trackers, ad networks, and
+ * analytics endpoints that aren't part of the provider's own infrastructure.
  */
 open class AdBlockerWebViewClient(
     private val onPageFinished: () -> Unit,
-    private val onError: () -> Unit
+    private val onError: () -> Unit,
+    private val allowedHosts: Set<String> = emptySet()
 ) : WebViewClient() {
 
-    private val adDomains = setOf(
-        "doubleclick.net", "googlesyndication.com", "googleadservices.com",
-        "adnxs.com", "advertising.com", "adsystem.com", "adserver.com",
-        "rubiconproject.com", "openx.net", "pubmatic.com", "criteo.com",
-        "moatads.com", "taboola.com", "outbrain.com", "adroll.com",
-        "imrworldwide.com", "comscore.com", "quantserve.com",
-        "popads.net", "popcash.net", "propellerads.com", "ad-maven.com",
-        "onclickads.net", "adsterra.com", "exo-click.com", "juicyads.com",
-        "trafficjunky.net", "exoclick.com", "mc.yandex.ru", "creativecdn.com",
-        "serving-sys.com", "ads.yahoo.com", "contextweb.com",
-        "adtechtraffic.com", "bet365.com", "1xbet.com", "cloud.mail.ru"
-    )
+    companion object {
+        private const val TAG = "AdBlockerWebView"
+    }
+
+    /**
+     * Returns true if [host] is exactly one of [allowedHosts] or is a subdomain
+     * of one (e.g. "cdn.vidlink.pro" is allowed when "vidlink.pro" is allowed).
+     */
+    private fun isHostAllowed(host: String): Boolean {
+        if (allowedHosts.isEmpty()) return false
+        return allowedHosts.any { allowed ->
+            host == allowed || host.endsWith(".$allowed")
+        }
+    }
 
     override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
-        val url = request?.url?.toString()?.lowercase() ?: return null
+        val host = request?.url?.host?.lowercase() ?: return null
 
-        if (adDomains.any { url.contains(it) }) {
+        // FIX: Whitelist — block every request that isn't from the provider URL
+        // (or one of its subdomains). This is far stricter than a domain blacklist
+        // and stops new ad/tracker domains the moment they appear.
+        if (!isHostAllowed(host)) {
+            Log.d(TAG, "Blocked non-provider request: $host (allowed=$allowedHosts)")
             return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream("".toByteArray()))
         }
 
@@ -61,7 +74,7 @@ open class AdBlockerWebViewClient(
 
     override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
         if (request?.isForMainFrame == true) {
-            Log.i("AdblockWebview", "Received error: ${error?.description}")
+            Log.w(TAG, "Main-frame error: ${error?.description}")
             onError()
         }
     }

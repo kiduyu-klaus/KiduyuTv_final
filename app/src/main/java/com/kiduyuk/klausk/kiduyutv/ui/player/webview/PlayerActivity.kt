@@ -21,6 +21,8 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import android.widget.ProgressBar
+import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import com.kiduyuk.klausk.kiduyutv.R
@@ -53,6 +55,26 @@ class PlayerActivity : AppCompatActivity() {
     // Loading and error state for AdBlockerWebViewClient
     private var isPageLoading = true
     private var hasPageError = false
+
+    // FIX: Loading overlay UI to give the user feedback while the iframe loads,
+    // and to surface errors instead of leaving a silent black screen.
+    private lateinit var loadingOverlay: FrameLayout
+    private lateinit var loadingProgressBar: ProgressBar
+    private lateinit var loadingStatusText: TextView
+    private lateinit var errorOverlay: FrameLayout
+    private lateinit var errorText: TextView
+
+    // FIX: Stall detector — if onPageFinished doesn't fire within 30s, treat as failure
+    // and offer the user a fallback UI.
+    private val stallTimeoutHandler = Handler(Looper.getMainLooper())
+    private val stallTimeoutRunnable = Runnable {
+        if (isPageLoading && !hasPageError) {
+            Log.w(TAG, "[WebView] Page load stalled after 30s — showing fallback UI")
+            hasPageError = true
+            showErrorOverlay("Playback is taking too long. The stream may be blocked or unavailable.\n\nTap to retry.")
+        }
+    }
+    private val STALL_TIMEOUT_MS = 30_000L
 
     // Watch history tracking variables
     private var currentTmdbId: Int = -1
@@ -161,6 +183,77 @@ class PlayerActivity : AppCompatActivity() {
             )
         }
 
+        // ── FIX: Loading overlay — shown by default, hidden when the iframe finishes loading ──
+        loadingOverlay = FrameLayout(this).apply {
+            setBackgroundColor(0xCC000000.toInt()) // semi-transparent black
+            isClickable = false
+            isFocusable = false
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        }
+        loadingProgressBar = ProgressBar(this).apply {
+            isIndeterminate = true
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                android.view.Gravity.CENTER
+            )
+        }
+        loadingStatusText = TextView(this).apply {
+            text = "Loading…"
+            setTextColor(0xFFFFFFFF.toInt())
+            textSize = 14f
+            setPadding(0, 32, 0, 0)
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                android.view.Gravity.CENTER
+            ).apply {
+                topMargin = (24 * resources.displayMetrics.density).toInt()
+            }
+        }
+        loadingOverlay.addView(loadingProgressBar)
+        loadingOverlay.addView(loadingStatusText)
+        // NOTE: loadingOverlay is added to rootLayout AFTER the WebView (below)
+        // so it stays on top of the WebView and remains visible while the iframe loads.
+
+        // ── FIX: Error overlay — shown when the iframe fails to load ──
+        // (created here; will be added to rootLayout AFTER the WebView so it stays on top)
+        errorOverlay = FrameLayout(this).apply {
+            setBackgroundColor(0xE6000000.toInt())
+            visibility = View.GONE
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        }
+        errorText = TextView(this).apply {
+            setTextColor(0xFFFFFFFF.toInt())
+            textSize = 16f
+            setPadding(48, 48, 48, 48)
+            gravity = android.view.Gravity.CENTER
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                android.view.Gravity.CENTER
+            )
+        }
+        errorOverlay.addView(errorText)
+        // Tap to retry: dismiss the error and reload the iframe
+        errorOverlay.setOnClickListener {
+            Log.i(TAG, "[WebView] User tapped error overlay — reloading")
+            hasPageError = false
+            isPageLoading = true
+            errorOverlay.visibility = View.GONE
+            loadingOverlay.visibility = View.VISIBLE
+            loadingStatusText.text = "Retrying…"
+            stallTimeoutHandler.removeCallbacks(stallTimeoutRunnable)
+            stallTimeoutHandler.postDelayed(stallTimeoutRunnable, STALL_TIMEOUT_MS)
+            webView.reload()
+        }
+
         webView = WebViewUtils.createWebView(this, isFireTV).apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -210,11 +303,10 @@ class PlayerActivity : AppCompatActivity() {
 
                 cacheMode = WebSettings.LOAD_DEFAULT // Utilizes the browser cache for buffering
 
-                userAgentString = if (isFireTV) {
-                    "Mozilla/5.0 (Linux; Android 9; AFTMM Build/PS7233) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                } else {
-                    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                }
+                // FIX: Use the system's current WebView User-Agent instead of a hardcoded outdated one.
+                // Providers increasingly reject outdated Chrome UAs (Chrome/120 from late 2023 is now stale),
+                // which results in silent infinite-loading states instead of a visible error.
+                userAgentString = WebSettings.getDefaultUserAgent(this@PlayerActivity)
             }
 
             isHorizontalScrollBarEnabled = false
@@ -222,17 +314,8 @@ class PlayerActivity : AppCompatActivity() {
             setScrollBarStyle(View.SCROLLBARS_OUTSIDE_OVERLAY)
             overScrollMode = View.OVER_SCROLL_NEVER
 
-            webViewClient = AdBlockerWebViewClient(
-                onPageFinished = {
-                    isPageLoading = false
-                    Log.i(TAG, "[WebView] Page finished loading with AdBlocker")
-                },
-                onError = {
-                    hasPageError = true
-                    isPageLoading = false
-                    Log.e(TAG, "[WebView] Error received with AdBlocker")
-                }
-            )
+            // NOTE: webViewClient is set AFTER the iframeUrl/allowedHosts computation below
+            // so the AdBlockerWebViewClient can be configured with a strict provider whitelist.
 
             webChromeClient = object : WebChromeClient() {
                 override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
@@ -260,7 +343,81 @@ class PlayerActivity : AppCompatActivity() {
 
 
             // ── Updated: Unified structure loading with generateIframeHtml ──
-            val baseUrl = StreamProviderManager.getBaseUrl(currentProviderName)
+            // FIX: Compute the actual iframe URL first, then derive the baseUrl from its origin.
+            // Previously baseUrl was hardcoded to the provider's movieUrlTemplate host, which
+            // didn't match the iframe's true origin when the provider serves from a different
+            // domain. That mismatch caused X-Frame-Options/CSP "frame-ancestors" to silently
+            // refuse the embed and disable postMessage tracking.
+            val iframeUrl = if (intent.getStringExtra("IFRAME_HTML") == null) {
+                StreamProviderManager.generateUrl(
+                    providerName = currentProviderName,
+                    tmdbId = currentTmdbId,
+                    isTv = currentIsTv,
+                    season = if (currentIsTv) currentSeason else null,
+                    episode = if (currentIsTv) currentEpisode else null,
+                    timestamp = currentPlaybackPosition / 1000L // Convert ms to seconds for provider URL parameters
+                )
+            } else {
+                // IFRAME_HTML supplied: derive origin from a sensible provider base
+                StreamProviderManager.getBaseUrl(currentProviderName)
+            }
+            val baseUrl = try {
+                val parsed = android.net.Uri.parse(iframeUrl)
+                val scheme = parsed.scheme ?: "https"
+                val host = parsed.host ?: StreamProviderManager.getBaseUrl(currentProviderName)
+                    .removePrefix("https://").removePrefix("http://").substringBefore("/")
+                "$scheme://$host"
+            } catch (e: Exception) {
+                Log.w(TAG, "[WebView] Failed to parse iframe origin, falling back to provider base: ${e.message}")
+                StreamProviderManager.getBaseUrl(currentProviderName)
+            }
+            Log.i(TAG, "[WebView] Loading iframe from origin: $baseUrl")
+
+            // FIX: Extract the provider host from the actual iframe URL so the WebView's
+            // ad-blocker can whitelist it (and only it). Any non-provider request will be
+            // blocked at the network layer by AdBlockerWebViewClient.
+            val providerHost: String? = try {
+                android.net.Uri.parse(iframeUrl).host?.lowercase()
+            } catch (e: Exception) {
+                null
+            }
+            val allowedHosts: Set<String> = setOfNotNull(
+                providerHost,
+                // Also allow the provider's movie-template host as a safe fallback (subdomains, etc.)
+                try {
+                    StreamProviderManager.getBaseUrl(currentProviderName)
+                        .removePrefix("https://").removePrefix("http://").substringBefore("/").lowercase()
+                } catch (e: Exception) { null }
+            )
+            Log.i(TAG, "[WebView] Provider whitelist hosts: $allowedHosts")
+
+            // FIX: Configure the WebView's ad-blocker with the provider whitelist so it
+            // only permits requests to the provider URL (and its subdomains). Every other
+            // request is intercepted and returned as an empty response, isolating the iframe
+            // from trackers, ad networks, and analytics endpoints.
+            webViewClient = AdBlockerWebViewClient(
+                allowedHosts = allowedHosts,
+                onPageFinished = {
+                    isPageLoading = false
+                    hasPageError = false
+                    stallTimeoutHandler.removeCallbacks(stallTimeoutRunnable)
+                    loadingOverlay.visibility = View.GONE
+                    errorOverlay.visibility = View.GONE
+                    Log.i(TAG, "[WebView] Page finished loading with AdBlocker")
+                },
+                onError = {
+                    hasPageError = true
+                    isPageLoading = false
+                    stallTimeoutHandler.removeCallbacks(stallTimeoutRunnable)
+                    Log.e(TAG, "[WebView] Error received with AdBlocker")
+                    showErrorOverlay("Unable to load the player.\n\nTap to retry.")
+                }
+            )
+
+            // FIX: Start the stall detector — fires after STALL_TIMEOUT_MS if the page never finishes.
+            stallTimeoutHandler.removeCallbacks(stallTimeoutRunnable)
+            stallTimeoutHandler.postDelayed(stallTimeoutRunnable, STALL_TIMEOUT_MS)
+
             val finalHtml = intent.getStringExtra("IFRAME_HTML") ?: StreamProviderManager.generateIframeHtml(
                 providerName = currentProviderName,
                 tmdbId = currentTmdbId,
@@ -301,6 +458,9 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         rootLayout.addView(webView)
+        // FIX: Add overlays AFTER the WebView so they sit on top and remain visible
+        rootLayout.addView(loadingOverlay)
+        rootLayout.addView(errorOverlay)
         if (!isCursorDisabled) {
             rootLayout.addView(cursorView)
             cursorView.bringToFront()
@@ -346,6 +506,11 @@ class PlayerActivity : AppCompatActivity() {
         super.onResume()
         webView.onResume()
         webView.resumeTimers()
+        // FIX: Restart the stall timeout if the page is still loading when we resume
+        if (isPageLoading && !hasPageError && ::webView.isInitialized) {
+            stallTimeoutHandler.removeCallbacks(stallTimeoutRunnable)
+            stallTimeoutHandler.postDelayed(stallTimeoutRunnable, STALL_TIMEOUT_MS)
+        }
     }
 
     override fun onPause() {
@@ -353,11 +518,14 @@ class PlayerActivity : AppCompatActivity() {
         webView.onPause()
         webView.pauseTimers()
         stopProgressUpdateTimer()
+        // FIX: Cancel the stall timer while paused so we don't falsely fire on resume
+        stallTimeoutHandler.removeCallbacks(stallTimeoutRunnable)
     }
 
     override fun onDestroy() {
         stopProgressUpdateTimer()
         cursorHideHandler.removeCallbacks(cursorHideRunnable)
+        stallTimeoutHandler.removeCallbacks(stallTimeoutRunnable)
 
         if (::webView.isInitialized) {
             try {
@@ -464,6 +632,18 @@ class PlayerActivity : AppCompatActivity() {
         cursorHideHandler.postDelayed(cursorHideRunnable, 5000)
     }
 
+    /**
+     * FIX: Show the error overlay with a retry-on-tap message.
+     * Called from AdBlockerWebViewClient.onError and the stall-timeout detector.
+     */
+    private fun showErrorOverlay(message: String) {
+        runOnUiThread {
+            errorText.text = message
+            errorOverlay.visibility = View.VISIBLE
+            loadingOverlay.visibility = View.GONE
+        }
+    }
+
     private fun checkAndAddToWatchHistory() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -534,7 +714,9 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun startProgressUpdateTimer() {
         progressUpdateHandler.removeCallbacks(progressUpdateRunnable)
-        progressUpdateHandler.postDelayed(progressUpdateRunnable, 15000)
+        // FIX: First sync at 5s instead of 15s for faster feedback when buffering.
+        // Subsequent syncs continue at the 15s cadence in updateWatchProgress().
+        progressUpdateHandler.postDelayed(progressUpdateRunnable, 5000)
     }
 
     private fun persistWatchProgress() {
