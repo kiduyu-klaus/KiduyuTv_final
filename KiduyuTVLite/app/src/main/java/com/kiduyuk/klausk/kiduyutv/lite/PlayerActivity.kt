@@ -8,16 +8,19 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.text.TextUtils
+import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
 import android.webkit.GeolocationPermissions
 import android.webkit.SslErrorHandler
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -40,6 +43,7 @@ class PlayerActivity : AppCompatActivity() {
     private var customViewCallback: WebChromeClient.CustomViewCallback? = null
     private var skipDirection = 0
     private var skipHoldStart = 0L
+    private var lastLoggedProgressBucket = -1
 
     private val skipTickRunnable = object : Runnable {
         override fun run() {
@@ -54,6 +58,7 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Log.i(TAG, "Player activity created")
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         makeFullscreen()
         binding = ActivityPlayerBinding.inflate(layoutInflater)
@@ -61,11 +66,13 @@ class PlayerActivity : AppCompatActivity() {
 
         val url = intent.getStringExtra(EXTRA_URL)
         if (url.isNullOrBlank() || !isAllowedPlaybackUri(Uri.parse(url))) {
+            Log.i(TAG, "Playback rejected: missing URL or host is not allowlisted")
             Toast.makeText(this, R.string.playback_link_unavailable, Toast.LENGTH_LONG).show()
             finish()
             return
         }
 
+        Log.i(TAG, "Starting playback host=${Uri.parse(url).host.orEmpty()}")
         setupWebView()
         binding.btnPlayerBack.setOnClickListener { handleBack() }
         binding.playerWebView.loadUrl(url)
@@ -73,6 +80,7 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        Log.i(TAG, "Player resumed")
         if (::binding.isInitialized) {
             binding.playerWebView.onResume()
             binding.playerWebView.resumeTimers()
@@ -81,6 +89,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        Log.i(TAG, "Player paused")
         if (::binding.isInitialized) {
             binding.playerWebView.onPause()
             binding.playerWebView.pauseTimers()
@@ -89,6 +98,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        Log.i(TAG, "Destroying player and clearing callbacks")
         stopSkipRamp()
         uiHandler.removeCallbacksAndMessages(null)
 
@@ -103,6 +113,7 @@ class PlayerActivity : AppCompatActivity() {
                 destroy()
             }
         }
+        Log.i(TAG, "Player cleanup complete")
         super.onDestroy()
     }
 
@@ -124,6 +135,7 @@ class PlayerActivity : AppCompatActivity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
+        Log.i(TAG, "Configuring hardened WebView")
         val webView = binding.playerWebView
         webView.settings.apply {
             javaScriptEnabled = true
@@ -157,10 +169,16 @@ class PlayerActivity : AppCompatActivity() {
                 request: WebResourceRequest
             ): Boolean {
                 if (!request.isForMainFrame) return false
-                return !isAllowedPlaybackUri(request.url)
+                val allowed = isAllowedPlaybackUri(request.url)
+                Log.i(
+                    TAG,
+                    "Main-frame navigation host=${request.url.host.orEmpty()} allowed=$allowed"
+                )
+                return !allowed
             }
 
             override fun onPageFinished(view: WebView, url: String) {
+                Log.i(TAG, "Provider page finished host=${Uri.parse(url).host.orEmpty()}")
                 injectTvJavascript(view)
             }
 
@@ -170,7 +188,27 @@ class PlayerActivity : AppCompatActivity() {
                 error: WebResourceError
             ) {
                 if (request.isForMainFrame) {
+                    Log.i(
+                        TAG,
+                        "Main-frame WebView error code=${error.errorCode} " +
+                            "host=${request.url.host.orEmpty()} description=${error.description}"
+                    )
                     showErrorPage(view, error.description.toString())
+                }
+            }
+
+            override fun onReceivedHttpError(
+                view: WebView,
+                request: WebResourceRequest,
+                errorResponse: WebResourceResponse
+            ) {
+                if (request.isForMainFrame) {
+                    Log.i(
+                        TAG,
+                        "Main-frame HTTP error status=${errorResponse.statusCode} " +
+                            "host=${request.url.host.orEmpty()} " +
+                            "reason=${errorResponse.reasonPhrase.orEmpty()}"
+                    )
                 }
             }
 
@@ -179,17 +217,47 @@ class PlayerActivity : AppCompatActivity() {
                 handler: SslErrorHandler,
                 error: SslError
             ) {
+                Log.i(
+                    TAG,
+                    "TLS error rejected primaryError=${error.primaryError} " +
+                        "host=${Uri.parse(error.url.orEmpty()).host.orEmpty()}"
+                )
                 handler.cancel()
                 showErrorPage(view, getString(R.string.secure_connection_error))
             }
         }
 
         webView.webChromeClient = object : WebChromeClient() {
+            override fun onProgressChanged(view: WebView, newProgress: Int) {
+                val bucket = (newProgress.coerceIn(0, 100) / 25) * 25
+                if (bucket != lastLoggedProgressBucket) {
+                    lastLoggedProgressBucket = bucket
+                    Log.i(TAG, "Provider page progress=$bucket%")
+                }
+            }
+
+            override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
+                if (
+                    consoleMessage.messageLevel() == ConsoleMessage.MessageLevel.WARNING ||
+                    consoleMessage.messageLevel() == ConsoleMessage.MessageLevel.ERROR
+                ) {
+                    Log.i(
+                        TAG,
+                        "Provider console level=${consoleMessage.messageLevel()} " +
+                            "line=${consoleMessage.lineNumber()} " +
+                            "message=${sanitizeConsoleMessage(consoleMessage.message())}"
+                    )
+                }
+                return true
+            }
+
             override fun onShowCustomView(view: View, callback: CustomViewCallback) {
                 if (customView != null) {
+                    Log.i(TAG, "Ignoring duplicate fullscreen custom view")
                     callback.onCustomViewHidden()
                     return
                 }
+                Log.i(TAG, "Entering provider fullscreen view")
                 customView = view
                 customViewCallback = callback
                 binding.fullscreenContainer.addView(
@@ -205,6 +273,7 @@ class PlayerActivity : AppCompatActivity() {
             }
 
             override fun onHideCustomView() {
+                Log.i(TAG, "Provider requested fullscreen exit")
                 exitCustomView()
             }
 
@@ -212,14 +281,17 @@ class PlayerActivity : AppCompatActivity() {
                 origin: String,
                 callback: GeolocationPermissions.Callback
             ) {
+                Log.i(TAG, "Geolocation permission denied for provider host=${Uri.parse(origin).host.orEmpty()}")
                 callback.invoke(origin, false, false)
             }
         }
 
         webView.requestFocus()
+        Log.i(TAG, "WebView configuration complete")
     }
 
     private fun showErrorPage(view: WebView, message: String) {
+        Log.i(TAG, "Showing local playback error page")
         view.loadDataWithBaseURL(
             null,
             errorHtml(message),
@@ -230,6 +302,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun injectTvJavascript(view: WebView) {
+        Log.i(TAG, "Injecting TV navigation and media controls")
         val javascript = """
             (function() {
                 if (window.__kiduyuLiteInjected) return;
@@ -332,16 +405,20 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun handleCenterKey() {
         binding.playerWebView.evaluateJavascript(
-            "window.__kiduyuLiteCenter && window.__kiduyuLiteCenter();",
-            null
-        )
+            "window.__kiduyuLiteCenter && window.__kiduyuLiteCenter();"
+        ) { result ->
+            Log.i(TAG, "Center-key JavaScript result=$result")
+        }
     }
 
     private fun fireSkip(seconds: Int) {
         binding.playerWebView.evaluateJavascript(
-            "window.__kiduyuLiteSkip && window.__kiduyuLiteSkip($seconds);",
-            null
-        )
+            "window.__kiduyuLiteSkip && window.__kiduyuLiteSkip($seconds);"
+        ) { result ->
+            if (result == "false" || result == "null") {
+                Log.i(TAG, "Skip unavailable seconds=$seconds result=$result")
+            }
+        }
         if (seconds < 0) {
             uiHandler.removeCallbacks(hideSkipBackRunnable)
             binding.skipBackSeconds.text = getString(R.string.skip_seconds, -seconds)
@@ -358,6 +435,7 @@ class PlayerActivity : AppCompatActivity() {
     private fun startSkipRamp(direction: Int) {
         if (skipDirection == direction) return
         stopSkipRamp()
+        Log.i(TAG, "Skip ramp started direction=${if (direction < 0) "back" else "forward"}")
         skipDirection = direction
         skipHoldStart = System.currentTimeMillis()
         fireSkip(direction * SKIP_SEC_MIN)
@@ -365,6 +443,9 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun stopSkipRamp() {
+        if (skipDirection != 0) {
+            Log.i(TAG, "Skip ramp stopped")
+        }
         skipDirection = 0
         uiHandler.removeCallbacks(skipTickRunnable)
     }
@@ -425,13 +506,23 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun handleBack() {
         when {
-            customView != null -> exitCustomView()
-            binding.playerWebView.canGoBack() -> binding.playerWebView.goBack()
-            else -> finish()
+            customView != null -> {
+                Log.i(TAG, "Back action: exit fullscreen")
+                exitCustomView()
+            }
+            binding.playerWebView.canGoBack() -> {
+                Log.i(TAG, "Back action: WebView history")
+                binding.playerWebView.goBack()
+            }
+            else -> {
+                Log.i(TAG, "Back action: finish player")
+                finish()
+            }
         }
     }
 
     private fun exitCustomView() {
+        Log.i(TAG, "Exiting provider fullscreen view")
         binding.fullscreenContainer.removeAllViews()
         binding.fullscreenContainer.visibility = View.GONE
         binding.playerWebView.visibility = View.VISIBLE
@@ -456,7 +547,16 @@ class PlayerActivity : AppCompatActivity() {
         """.trimIndent()
     }
 
+    private fun sanitizeConsoleMessage(message: String): String = message
+        .replace(URL_PATTERN, "<url>")
+        .replace(LONG_TOKEN_PATTERN, "<redacted>")
+        .take(MAX_CONSOLE_MESSAGE_LENGTH)
+
     companion object {
+        private const val TAG = "KiduyuLitePlayer"
+        private const val MAX_CONSOLE_MESSAGE_LENGTH = 240
+        private val URL_PATTERN = Regex("https?://\\S+", RegexOption.IGNORE_CASE)
+        private val LONG_TOKEN_PATTERN = Regex("[A-Za-z0-9_-]{40,}")
         const val EXTRA_URL = "playback_url"
 
         private const val SKIP_RAMP_DURATION_MS = 5_000L

@@ -69,6 +69,16 @@ app/src/main/java/com/kiduyuk/klausk/kiduyutv/lite/
 - Unexpected top-level WebView hosts are blocked.
 - The TMDB credential is not committed in Kotlin source.
 
+## Player diagnostics
+
+Player lifecycle, provider navigation, WebView failures, fullscreen changes, remote-control actions, and cleanup are logged at info level under `KiduyuLitePlayer`. Filter Logcat with:
+
+```text
+adb logcat -s KiduyuLitePlayer:I
+```
+
+Playback URLs are reduced to their host names. Provider console URLs and long token-like values are redacted before logging.
+
 ## Optional Firebase work
 
 Firebase is deliberately not included in the base Lite build. Before adding remote updates or configuration, register `com.kiduyuk.klausk.kiduyutv.lite.tv` as a separate Android app in Firebase and use Lite-specific database paths and APK links. Do not reuse the full app update APK.
