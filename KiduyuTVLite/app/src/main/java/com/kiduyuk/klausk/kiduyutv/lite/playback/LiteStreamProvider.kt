@@ -22,8 +22,8 @@ object LiteStreamProviders {
     val all: List<LiteStreamProvider> = listOf(
         LiteStreamProvider(
             name = "Videasy",
-            movieUrlTemplate = "https://player.videasy.net/movie/%d",
-            tvUrlTemplate = "https://player.videasy.net/tv/%d/%d/%d",
+            movieUrlTemplate = "https://player.videasy.to/movie/%d",
+            tvUrlTemplate = "https://player.videasy.to/tv/%d/%d/%d",
             iframeAttributes = mapOf(
                 "frameborder" to "0",
                 "allow" to "encrypted-media"
@@ -48,8 +48,8 @@ object LiteStreamProviders {
         ),
         LiteStreamProvider(
             name = "Vidrock",
-            movieUrlTemplate = "https://vidrock.net/movie/%d",
-            tvUrlTemplate = "https://vidrock.net/tv/%d/%d/%d",
+            movieUrlTemplate = "https://vidrock.ru/movie/%d",
+            tvUrlTemplate = "https://vidrock.ru/tv/%d/%d/%d",
             movieParameters = { _, timestamp ->
                 buildMap {
                     put("autoplay", "true")
@@ -84,8 +84,8 @@ object LiteStreamProviders {
         ),
         LiteStreamProvider(
             name = "VidFast",
-            movieUrlTemplate = "https://vidfast.pro/movie/%d",
-            tvUrlTemplate = "https://vidfast.pro/tv/%d/%d/%d",
+            movieUrlTemplate = "https://vidfast.vc/movie/%d",
+            tvUrlTemplate = "https://vidfast.vc/tv/%d/%d/%d",
             movieParameters = { _, timestamp ->
                 buildMap {
                     put("autoPlay", "true")

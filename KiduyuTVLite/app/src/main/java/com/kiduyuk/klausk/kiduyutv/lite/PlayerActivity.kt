@@ -73,6 +73,7 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         Log.i(TAG, "Starting playback host=${Uri.parse(url).host.orEmpty()}")
+        Log.i(TAG, "Starting playback host=${Uri.parse(url)}")
         setupWebView()
         binding.btnPlayerBack.setOnClickListener { handleBack() }
         binding.playerWebView.loadUrl(url)
@@ -302,7 +303,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun injectTvJavascript(view: WebView) {
-        Log.i(TAG, "Injecting TV navigation and media controls")
+        Log.i(TAG, "Injecting TV navigation, max-volume hook, and media controls")
         val javascript = """
             (function() {
                 if (window.__kiduyuLiteInjected) return;
@@ -312,14 +313,64 @@ class PlayerActivity : AppCompatActivity() {
                 style.textContent = ':focus{outline:3px solid #E50914!important;outline-offset:2px!important;}html{scroll-behavior:smooth;}';
                 if (document.head) document.head.appendChild(style);
 
+                function setMaximumVolume(video) {
+                    if (!video) return;
+                    try {
+                        video.defaultMuted = false;
+                        video.muted = false;
+                        video.volume = 1.0;
+                    } catch (ignored) {}
+                }
+
+                function hookVideoVolume(video) {
+                    if (!video || video.__kiduyuLiteVolumeHooked) return;
+                    video.__kiduyuLiteVolumeHooked = true;
+                    video.addEventListener('playing', function() {
+                        setMaximumVolume(video);
+                    }, true);
+                    if (!video.paused) setMaximumVolume(video);
+                }
+
+                function scanVideoElements(root) {
+                    if (!root || typeof root.querySelectorAll !== 'function') return;
+                    if (root.tagName === 'VIDEO') hookVideoVolume(root);
+                    root.querySelectorAll('video').forEach(hookVideoVolume);
+                }
+
+                scanVideoElements(document);
+                var volumeObserverTarget = document.documentElement || document.body;
+                if (volumeObserverTarget && typeof MutationObserver !== 'undefined') {
+                    new MutationObserver(function(mutations) {
+                        mutations.forEach(function(mutation) {
+                            mutation.addedNodes.forEach(scanVideoElements);
+                        });
+                    }).observe(volumeObserverTarget, {childList: true, subtree: true});
+                }
+
+                function scanFrameVideos() {
+                    document.querySelectorAll('iframe').forEach(function(frame) {
+                        try {
+                            scanVideoElements(frame.contentDocument);
+                        } catch (ignored) {}
+                    });
+                }
+                scanFrameVideos();
+                setInterval(scanFrameVideos, 1000);
+
                 function directVideo() {
                     var video = document.querySelector('video');
-                    if (video) return video;
+                    if (video) {
+                        hookVideoVolume(video);
+                        return video;
+                    }
                     var frames = document.querySelectorAll('iframe');
                     for (var i = 0; i < frames.length; i++) {
                         try {
                             var nested = frames[i].contentDocument.querySelector('video');
-                            if (nested) return nested;
+                            if (nested) {
+                                hookVideoVolume(nested);
+                                return nested;
+                            }
                         } catch (ignored) {}
                     }
                     return null;
