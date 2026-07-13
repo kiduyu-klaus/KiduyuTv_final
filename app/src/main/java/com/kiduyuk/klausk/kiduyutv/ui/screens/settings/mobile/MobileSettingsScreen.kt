@@ -126,7 +126,7 @@ import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MobileSettingsScreen(
+fun MobileSettingsScreen( 
     onBackClick: () -> Unit,
     onMyListClick: () -> Unit = {},
     onNavigateToTraktProfile: () -> Unit = {},

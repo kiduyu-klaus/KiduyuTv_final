@@ -125,7 +125,7 @@ import kotlinx.coroutines.tasks.await
  * @param onNavigateToTraktProfile Callback to navigate to Trakt profile screen.
  */
 @Composable
-fun SettingsScreen(
+fun SettingsScreen( 
     onBackClick: () -> Unit,
     onNavigateToTraktProfile: () -> Unit = {},
     viewModel: SettingsViewModel = viewModel()
@@ -831,35 +831,6 @@ private fun AppSettingsContent(
             icon = Icons.Default.PlaylistRemove,
             onClick = onClearLocalFavoritesClick
         )
-
-        Spacer(modifier = Modifier.height(28.dp))
-
-
-        // ── Live TV ──────────────────────────────────────────
-        SettingsSectionLabel(text = "Live TV")
-
-        LiveTvSettingsCard(
-            playlistUrl = playlistUrl,
-            epgUrl = epgUrl,
-            isUpdatingLiveTv = isUpdatingLiveTv,
-            updateSuccess = liveTvUpdateSuccess,
-            updateError = liveTvUpdateError,
-            isClearingCache = isClearingLiveTvCache,
-            clearSuccess = liveTvClearSuccess,
-            onPlaylistUrlChange = onPlaylistUrlChange,
-            onEpgUrlChange = onEpgUrlChange,
-            onUpdateClick = onUpdateLiveTvClick,
-            onClearCacheClick = onClearLiveTvCacheClick,
-            // Scrape Channels
-            isScrapingChannels = isScrapingChannels,
-            scrapeChannelsSuccess = scrapeChannelsSuccess,
-            scrapeChannelsError = scrapeChannelsError,
-            scrapedChannelsCount = scrapedChannelsCount,
-            onScrapeChannelsClick = onScrapeChannelsClick,
-            onRefreshScrapedChannelsClick = onRefreshScrapedChannelsClick
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 
