@@ -35,7 +35,6 @@ android {
         versionName = "1.0.0-lite"
 
         buildConfigField("String", "TMDB_API_KEY", buildConfigString("TMDB_API_KEY"))
-        buildConfigField("String", "PLAYER_BASE_URL", buildConfigString("LITE_PLAYER_BASE_URL"))
     }
 
     val releaseSigning = if (keystorePropertiesFile.exists()) {

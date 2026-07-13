@@ -11,7 +11,7 @@ The audited migration plan is preserved in [`docs/IMPLEMENTATION_GUIDE.md`](docs
 - TMDB trending, popular movie, and popular TV rows.
 - Movie/TV multi-search.
 - Movie details and TV season/episode selection.
-- Configurable HTTPS playback URL.
+- Detail-screen playback provider chooser for Videasy, Vidrock, VidLink, and VidFast.
 - D-pad navigation, fullscreen WebView playback, and best-effort skip controls.
 - Loading, empty, failure, and retry states.
 - Lifecycle-aware coroutines and RecyclerView-safe Coil image loading.
@@ -19,7 +19,7 @@ The audited migration plan is preserved in [`docs/IMPLEMENTATION_GUIDE.md`](docs
 
 ## Intentionally excluded
 
-The Lite edition does not include phone UI, ads, consent SDKs, authentication, Firebase user sync, Trakt, Room, Live TV, schedules, image/cast galleries, trailers, or the full application's multi-provider selection interface.
+The Lite edition does not include phone UI, ads, consent SDKs, authentication, Firebase user sync, Trakt, Room, Live TV, schedules, image/cast galleries, trailers, or the full application's remote provider-management interface.
 
 ## Application identity
 
@@ -36,19 +36,12 @@ The application ID is different from the full TV package, so both editions can b
 1. Copy `local.properties.example` to `local.properties`.
 2. Keep the `sdk.dir` path created by Android Studio for your machine.
 3. Add a rotated and restricted TMDB v3 API key or Read Access Token.
-4. Add an HTTPS playback page that you operate or are authorized to use.
 
 ```properties
 TMDB_API_KEY=your_rotated_key_or_read_access_token
-LITE_PLAYER_BASE_URL=https://your-authorized-player.example/
 ```
 
-The player URL builder appends these query parameters:
-
-```text
-Movie:   ?id={tmdbId}
-Episode: ?id={tmdbId}&s={season}&e={episode}
-```
+The detail screen lists four built-in HTTPS providers. Videasy is selected by default when the user has not chosen another provider. Movie and episode paths, autoplay options, theme parameters, and progress parameter names are generated from the selected provider's configuration.
 
 The client detects TMDB Read Access Tokens and sends them in the `Authorization` header; shorter v3 keys use the `api_key` query parameter. `local.properties` is ignored by Git. A credential compiled into an APK can still be extracted, so use provider-side restrictions or a backend proxy when stronger protection is needed.
 For CI, generate the ignored `local.properties` from repository secrets before the build, as described in the migration guide.
@@ -63,17 +56,18 @@ app/src/main/java/com/kiduyuk/klausk/kiduyutv/lite/
 ├── api/TmdbApi.kt
 ├── model/Models.kt
 ├── playback/LitePlaybackUrlBuilder.kt
+├── playback/LiteStreamProvider.kt
 └── ui/MediaAdapter.kt
 ```
 
 ## Security behavior
 
-- Only HTTPS playback configuration is accepted.
+- Only the four configured HTTPS provider domains and their subdomains are accepted.
 - Invalid TLS certificates are rejected.
 - Cleartext and mixed content are disabled.
 - File/content access and geolocation are disabled in WebView.
 - Unexpected top-level WebView hosts are blocked.
-- The TMDB key and playback URL are not committed in Kotlin source.
+- The TMDB credential is not committed in Kotlin source.
 
 ## Optional Firebase work
 

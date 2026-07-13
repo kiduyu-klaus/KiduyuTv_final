@@ -25,6 +25,7 @@ import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.kiduyuk.klausk.kiduyutv.lite.databinding.ActivityPlayerBinding
+import com.kiduyuk.klausk.kiduyutv.lite.playback.LiteStreamProviders
 
 class PlayerActivity : AppCompatActivity() {
 
@@ -118,10 +119,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun isAllowedPlaybackUri(uri: Uri): Boolean {
-        val configured = Uri.parse(BuildConfig.PLAYER_BASE_URL.trim())
-        return uri.scheme.equals("https", ignoreCase = true) &&
-            !uri.host.isNullOrBlank() &&
-            uri.host?.equals(configured.host, ignoreCase = true) == true
+        return LiteStreamProviders.isAllowedPlaybackUri(uri)
     }
 
     @SuppressLint("SetJavaScriptEnabled")

@@ -8,6 +8,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -18,6 +19,8 @@ import com.kiduyuk.klausk.kiduyutv.lite.databinding.ActivityDetailBinding
 import com.kiduyuk.klausk.kiduyutv.lite.model.Episode
 import com.kiduyuk.klausk.kiduyutv.lite.model.Season
 import com.kiduyuk.klausk.kiduyutv.lite.playback.LitePlaybackUrlBuilder
+import com.kiduyuk.klausk.kiduyutv.lite.playback.LiteStreamProvider
+import com.kiduyuk.klausk.kiduyutv.lite.playback.LiteStreamProviders
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -31,6 +34,7 @@ class DetailActivity : AppCompatActivity() {
     private var seasons: List<Season> = emptyList()
     private var seasonIndex = 0
     private var selectedEpisode = 1
+    private var selectedProvider: LiteStreamProvider = LiteStreamProviders.default
     private var seasonJob: Job? = null
     private var episodeJob: Job? = null
 
@@ -41,6 +45,9 @@ class DetailActivity : AppCompatActivity() {
 
         mediaId = intent.getIntExtra(HomeActivity.EXTRA_ID, 0)
         mediaType = intent.getStringExtra(HomeActivity.EXTRA_MEDIA_TYPE) ?: "movie"
+        selectedProvider = LiteStreamProviders.resolve(
+            savedInstanceState?.getString(STATE_PROVIDER_NAME)
+        )
         if (mediaId <= 0 || mediaType !in setOf("movie", "tv")) {
             Toast.makeText(this, R.string.empty_titles, Toast.LENGTH_LONG).show()
             finish()
@@ -48,6 +55,7 @@ class DetailActivity : AppCompatActivity() {
         }
 
         binding.btnBack.setOnClickListener { finish() }
+        setupProviderChooser()
         bindMetadata()
         if (mediaType == "movie") showMovieUi() else showTvUi()
     }
@@ -56,6 +64,11 @@ class DetailActivity : AppCompatActivity() {
         seasonJob?.cancel()
         episodeJob?.cancel()
         super.onDestroy()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(STATE_PROVIDER_NAME, selectedProvider.name)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
@@ -113,7 +126,49 @@ class DetailActivity : AppCompatActivity() {
             }
         }
 
+        binding.btnProvider.requestFocus()
         loadSeasons()
+    }
+
+    private fun setupProviderChooser() {
+        updateProviderButton()
+        binding.btnProvider.setOnClickListener { showProviderDialog() }
+        binding.btnProvider.setOnFocusChangeListener { view, hasFocus ->
+            view.animate()
+                .scaleX(if (hasFocus) 1.06f else 1f)
+                .scaleY(if (hasFocus) 1.06f else 1f)
+                .setDuration(120)
+                .start()
+        }
+    }
+
+    private fun showProviderDialog() {
+        val providers = LiteStreamProviders.all
+        val selectedIndex = providers.indexOfFirst { it.name == selectedProvider.name }
+            .coerceAtLeast(0)
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(R.string.choose_provider)
+            .setSingleChoiceItems(
+                providers.map { it.name }.toTypedArray(),
+                selectedIndex
+            ) { activeDialog, index ->
+                selectedProvider = providers[index]
+                updateProviderButton()
+                activeDialog.dismiss()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .create()
+
+        dialog.setOnDismissListener { binding.btnProvider.requestFocus() }
+        dialog.show()
+    }
+
+    private fun updateProviderButton() {
+        binding.btnProvider.text = getString(
+            R.string.provider_button_format,
+            selectedProvider.name
+        )
     }
 
     private fun loadSeasons() {
@@ -235,12 +290,17 @@ class DetailActivity : AppCompatActivity() {
 
     private fun launchPlayer() {
         val url = if (mediaType == "movie") {
-            LitePlaybackUrlBuilder.movie(mediaId)
+            LitePlaybackUrlBuilder.movie(mediaId, selectedProvider.name)
         } else {
             val season = seasons.getOrNull(seasonIndex)?.seasonNumber ?: return
-            LitePlaybackUrlBuilder.episode(mediaId, season, selectedEpisode)
+            LitePlaybackUrlBuilder.episode(
+                mediaId,
+                season,
+                selectedEpisode,
+                selectedProvider.name
+            )
         } ?: run {
-            Toast.makeText(this, R.string.playback_unconfigured, Toast.LENGTH_LONG).show()
+            Toast.makeText(this, R.string.playback_link_unavailable, Toast.LENGTH_LONG).show()
             return
         }
 
@@ -296,5 +356,9 @@ class DetailActivity : AppCompatActivity() {
                     .start()
             }
         }
+    }
+
+    companion object {
+        private const val STATE_PROVIDER_NAME = "provider_name"
     }
 }

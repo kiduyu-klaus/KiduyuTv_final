@@ -19,6 +19,9 @@
     <string name="tv_series_badge">TV SERIES</string>
     <string name="rating_format">★ %1$.1f</string>
     <string name="play_now">Play Now</string>
+    <string name="choose_provider">Choose playback provider</string>
+    <string name="provider_button_format">Provider: %1$s</string>
+    <string name="cancel">Cancel</string>
     <string name="season">Season</string>
     <string name="season_previous_symbol">‹</string>
     <string name="season_next_symbol">›</string>
@@ -26,7 +29,6 @@
     <string name="episodes">Episodes</string>
     <string name="no_description">No description available.</string>
     <string name="back">← Back</string>
-    <string name="playback_unconfigured">Playback is not configured</string>
     <string name="playback_link_unavailable">Playback link is unavailable</string>
     <string name="playback_error_title">Playback Error</string>
     <string name="secure_connection_error">A secure connection could not be established.</string>

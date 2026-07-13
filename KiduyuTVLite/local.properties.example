@@ -4,7 +4,3 @@ sdk.dir=C\:\\Path\\To\\Android\\Sdk
 # Accepts either a TMDB v3 API key or a TMDB Read Access Token.
 # Use a rotated/restricted credential and never commit the populated file.
 TMDB_API_KEY=
-
-# HTTPS page operated by, or licensed to, the application owner.
-# The app appends id, and for episodes also s and e, as query parameters.
-LITE_PLAYER_BASE_URL=https://your-authorized-player.example/
