@@ -60,10 +60,17 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
-import androidx.core.net.toUri
 
 @SuppressLint("CustomSplashScreen")
 class SplashActivity : ComponentActivity() {
+
+    private data class FirebaseAppUpdate(
+        val enabled: Boolean,
+        val version: String,
+        val updateTitle: String,
+        val message: String,
+        val downloadUrl: String
+    )
 
     companion object {
         private const val TAG = "SplashActivity"
@@ -289,7 +296,7 @@ class SplashActivity : ComponentActivity() {
             }
         }
 
-        checkForUpdates()
+        checkForUpdatesFromFirebase()
         checkNotificationPermission()
     }
 
@@ -389,7 +396,7 @@ class SplashActivity : ComponentActivity() {
             message = "This $deviceType app does not match the official version.\n\n" +
                     "Current: $packageName\n" +
                     "Required: $expectedVersion\n\n" +
-                    "Please download the official APK from GitHub.",
+                    "Please download the correct APK from the configured app update source.",
             positiveButtonText = "Download",
             negativeButtonText = "Exit",
             lottieAnimRes = R.raw.exit,
@@ -399,13 +406,25 @@ class SplashActivity : ComponentActivity() {
             },
             onYes = {
                 versionCheckHandled = true
-                // Open GitHub releases page
-                startActivity(
-                    Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/kiduyu-klaus/KiduyuTv_final/releases/latest"))
-                )
-                finish()
+                openConfiguredUpdateLinkAndExit()
             }
         ).showTracked()
+    }
+
+    private fun openConfiguredUpdateLinkAndExit() {
+        lifecycleScope.launch {
+            val update = fetchFirebaseAppUpdate()
+            if (update != null && update.downloadUrl.isNotBlank()) {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(update.downloadUrl)))
+            } else {
+                Toast.makeText(
+                    this@SplashActivity,
+                    "No download link is configured for this device.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+            finish()
+        }
     }
 
     /**
@@ -515,81 +534,118 @@ class SplashActivity : ComponentActivity() {
         finish()
     }
 
-    // ── Update check ──────────────────────────────────────────────────────────
+    // ── Firebase app update check ─────────────────────────────────────────────
 
-    private fun checkForUpdates() {
+    private fun checkForUpdatesFromFirebase() {
         lifecycleScope.launch {
-            Log.i(TAG, "Starting update check for ${getDeviceTypeString()} device...")
+            Log.i(TAG, "Fetching Firebase app_update for ${getDeviceTypeString()} device...")
 
-            var remoteVersion = UpdateUtil.fetchLatestGitHubReleaseVersion()
-            if (remoteVersion == null) {
-                Log.w(TAG, "GitHub API failed, falling back to VERSION file")
-                remoteVersion = UpdateUtil.fetchRemoteVersion()
+            val update = fetchFirebaseAppUpdate()
+            if (update == null) {
+                Log.w(TAG, "Firebase app_update is unavailable; continuing without an update dialog")
+                return@launch
             }
 
-            if (remoteVersion != null) {
-                val localVersionName = BuildConfig.VERSION_NAME
-                val isNewer = UpdateUtil.isNewerVersion(remoteVersion, localVersionName)
-                Log.i(TAG, "Remote: $remoteVersion | Local: $localVersionName | Newer: $isNewer")
-
-                if (isNewer) {
-                    currentRemoteVersion = remoteVersion
-                    updateAvailable = true       // pause progress bar BEFORE showing dialog
-                    showUpdateDialog(remoteVersion)
-                }
-            } else {
-                Log.w(TAG, "Could not fetch remote version, skipping update check")
+            if (!update.enabled) {
+                Log.i(TAG, "Firebase app_update is disabled")
+                return@launch
             }
+
+            if (update.downloadUrl.isBlank()) {
+                Log.e(TAG, "Firebase app_update is enabled but the device download link is empty")
+                return@launch
+            }
+
+            currentRemoteVersion = update.version.takeIf { it.isNotBlank() }
+            updateAvailable = true
+            showUpdateDialog(update)
+        }
+    }
+
+    private suspend fun fetchFirebaseAppUpdate(): FirebaseAppUpdate? {
+        return try {
+            val snapshot = withTimeoutOrNull(VERSION_CHECK_TIMEOUT_MS) {
+                FirebaseManager.getFirebaseDatabaseInstance()
+                    .getReference("app_config/app_update")
+                    .get()
+                    .await()
+            }
+
+            if (snapshot == null || !snapshot.exists()) {
+                Log.w(TAG, "Firebase app_config/app_update is missing or timed out")
+                return null
+            }
+
+            val isTvDevice = UpdateUtil.isTvDevice(this)
+            val downloadKey = if (isTvDevice) "download_link_tv" else "download_link_phone"
+
+            FirebaseAppUpdate(
+                enabled = snapshot.child("enabled").getValue(Boolean::class.java) ?: false,
+                version = snapshot.child("version").getValue(String::class.java).orEmpty().trim(),
+                updateTitle = snapshot.child("update_title").getValue(String::class.java).orEmpty().trim(),
+                message = snapshot.child("message").getValue(String::class.java).orEmpty().trim(),
+                downloadUrl = snapshot.child(downloadKey).getValue(String::class.java).orEmpty().trim()
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to fetch Firebase app_update", e)
+            null
         }
     }
 
     // ── Dialogs ───────────────────────────────────────────────────────────────
 
-    private fun showUpdateDialog(remoteVersion: String) {
-        lifecycleScope.launch {
-            val notes = UpdateUtil.fetchLatestReleaseAnnotated()
-            QuitDialog(
-                context = this@SplashActivity,
-                title = "v$remoteVersion Update Available",
-                message = "A newer version of Kiduyu TV (v$remoteVersion) is available for your ${getDeviceTypeString()}.\nWould you like to download it now?",
-                annotatedMessage = notes,
-                positiveButtonText = "Download",
-                negativeButtonText = "Exit",
-                lottieAnimRes = R.raw.exit,
-                onNo = { finish() },
-                onYes = {
-                    lifecycleScope.launch {
-                        val apkInfo = UpdateUtil.fetchBestApkInfo(this@SplashActivity)
-                        if (apkInfo != null) {
-                            val localFile = UpdateUtil.getLocalApkFile(this@SplashActivity)
-                            when {
-                                UpdateUtil.isLocalApkValid(this@SplashActivity, apkInfo) -> {
-                                    // Cached file is the right version, right device type, right size
-                                    Log.i(TAG, "Valid cached APK found, skipping download")
-                                    showInstallPrompt(localFile, apkInfo)
-                                }
-                                else -> {
-                                    // Stale, wrong device type, incomplete, or missing — delete and re-download
-                                    if (localFile.exists()) {
-                                        localFile.delete()
-                                        Log.i(TAG, "Deleted stale cached APK")
-                                    }
-                                    downloadAndInstallApk(apkInfo)
-                                }
-                            }
-                        } else {
-                            Log.w(TAG, "No APK found for ${getDeviceTypeString()}, opening releases page")
-                            startActivity(
-                                Intent(
-                                    Intent.ACTION_VIEW,
-                                    "https://github.com/kiduyu-klaus/KiduyuTv_final/releases/latest".toUri()
-                                )
-                            )
+    private fun showUpdateDialog(update: FirebaseAppUpdate) {
+        val dialogTitle = update.updateTitle.ifBlank {
+            update.version.takeIf { it.isNotBlank() }
+                ?.let { "v$it Update Available" }
+                ?: "Update Available"
+        }
+        val dialogMessage = update.message.ifBlank {
+            "An update is available for your ${getDeviceTypeString()}."
+        }
+        val apkInfo = createFirebaseApkInfo(update)
+
+        QuitDialog(
+            context = this,
+            title = dialogTitle,
+            message = dialogMessage,
+            positiveButtonText = "Download",
+            negativeButtonText = "Exit",
+            lottieAnimRes = R.raw.exit,
+            onNo = { finish() },
+            onYes = {
+                val localFile = UpdateUtil.getLocalApkFile(this)
+                when {
+                    UpdateUtil.isLocalApkValid(this, apkInfo) -> {
+                        Log.i(TAG, "Valid cached Firebase APK found, skipping download")
+                        showInstallPrompt(localFile, apkInfo)
+                    }
+                    else -> {
+                        if (localFile.exists()) {
+                            localFile.delete()
+                            Log.i(TAG, "Deleted stale cached APK")
                         }
+                        downloadAndInstallApk(apkInfo)
                     }
                 }
-            ).showTracked()
-        }
+            }
+        ).showTracked()
+    }
+
+    private fun createFirebaseApkInfo(update: FirebaseAppUpdate): ApkInfo {
+        val fallbackVersion = update.version.ifBlank { "latest" }
+        val deviceType = if (UpdateUtil.isTvDevice(this)) "tv" else "phone"
+        val fileName = Uri.parse(update.downloadUrl).lastPathSegment
+            ?.takeIf { it.isNotBlank() }
+            ?: "KiduyuTV-$deviceType-update-$fallbackVersion.apk"
+
+        return ApkInfo(
+            url = update.downloadUrl,
+            fileName = fileName,
+            version = update.version.takeIf { it.isNotBlank() },
+            buildNumber = extractVersionCodeFromFileName(fileName),
+            sizeBytes = -1L
+        )
     }
 
     private fun downloadAndInstallApk(apkInfo: ApkInfo) {
