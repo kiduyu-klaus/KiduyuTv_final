@@ -1,0 +1,28 @@
+# Local Android configuration and credentials
+local.properties
+keystore.properties
+*.jks
+*.keystore
+google-services.json
+
+# Gradle and build outputs
+.gradle/
+.kotlin/
+build/
+app/build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.log
+*.hprof
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+misc.xml
+deploymentTargetDropDown.xml
+render.experimental.xml
+
+# Operating system files
+.DS_Store
+Thumbs.db

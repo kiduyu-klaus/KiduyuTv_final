@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Outer wrapper: generous padding so scale animation never clips -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="165dp"
+    android:layout_height="240dp"
+    android:padding="12dp"
+    android:clipChildren="false"
+    android:clipToPadding="false"
+    android:clickable="true"
+    android:focusable="true">
+
+    <!-- Actual card: 141x216dp -->
+    <FrameLayout
+        android:id="@+id/cardRoot"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/card_bg"
+        android:clickable="false"
+        android:focusable="false"
+        android:elevation="4dp"
+        android:clipChildren="true"
+        android:clipToOutline="true">
+
+        <ImageView
+            android:id="@+id/cardPoster"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:contentDescription="@null" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="80dp"
+            android:layout_gravity="bottom"
+            android:background="@drawable/card_scrim" />
+
+        <TextView
+            android:id="@+id/cardTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="7dp"
+            android:textColor="@color/text_primary"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:shadowColor="#000000"
+            android:shadowDx="0"
+            android:shadowDy="1"
+            android:shadowRadius="3" />
+
+        <TextView
+            android:id="@+id/cardBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|start"
+            android:layout_margin="6dp"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:textColor="@color/text_primary"
+            android:textSize="9sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.06" />
+
+        <View
+            android:id="@+id/cardFocusRing"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/card_focus_ring"
+            android:visibility="invisible" />
+
+    </FrameLayout>
+</FrameLayout>

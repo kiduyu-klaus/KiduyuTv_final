@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000">
+
+    <WebView
+        android:id="@+id/playerWebView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:focusable="true"
+        android:focusableInTouchMode="true" />
+
+    <!-- Fullscreen video container -->
+    <FrameLayout
+        android:id="@+id/fullscreenContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#000000"
+        android:visibility="gone" />
+
+    <!-- ── Skip back indicator (left side) ─────────────────────────────── -->
+    <LinearLayout
+        android:id="@+id/skipBackOverlay"
+        android:layout_width="120dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:background="@drawable/skip_overlay_left"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/rewind_symbol"
+            android:contentDescription="@string/skip_back"
+            android:textColor="@color/text_primary"
+            android:textSize="28sp" />
+
+        <TextView
+            android:id="@+id/skipBackSeconds"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/skip_default_seconds"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:layout_marginTop="4dp" />
+
+    </LinearLayout>
+
+    <!-- ── Skip forward indicator (right side) ─────────────────────────── -->
+    <LinearLayout
+        android:id="@+id/skipFwdOverlay"
+        android:layout_width="120dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="end"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:background="@drawable/skip_overlay_right"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/fast_forward_symbol"
+            android:contentDescription="@string/skip_forward"
+            android:textColor="@color/text_primary"
+            android:textSize="28sp" />
+
+        <TextView
+            android:id="@+id/skipForwardSeconds"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/skip_default_seconds"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:layout_marginTop="4dp" />
+
+    </LinearLayout>
+
+    <!-- Back button — shown on key press, auto-hides -->
+    <TextView
+        android:id="@+id/btnPlayerBack"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:layout_margin="20dp"
+        android:background="@drawable/back_btn_bg"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:text="@string/back"
+        android:textColor="@color/text_primary"
+        android:textSize="13sp"
+        android:focusable="true"
+        android:clickable="true"
+        android:visibility="gone" />
+
+</FrameLayout>

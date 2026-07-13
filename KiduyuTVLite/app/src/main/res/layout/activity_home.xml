@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_dark">
+
+    <LinearLayout
+        android:id="@+id/homeContent"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:background="@color/background_dark"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="32dp"
+            android:paddingEnd="32dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:letterSpacing="0.12"
+                android:text="@string/brand_name"
+                android:textColor="@color/kiduyu_red"
+                android:textSize="26sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:letterSpacing="0.08"
+                android:text="@string/brand_suffix"
+                android:textColor="@color/text_primary"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <EditText
+                android:id="@+id/searchInput"
+                android:layout_width="280dp"
+                android:layout_height="40dp"
+                android:background="@drawable/search_bg"
+                android:focusable="true"
+                android:hint="@string/search_hint"
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:singleLine="true"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_muted"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="2dp"
+            android:background="@drawable/nav_divider" />
+
+        <ScrollView
+            android:id="@+id/rowsScroll"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:focusable="false"
+            android:focusableInTouchMode="false"
+            android:overScrollMode="never"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="28dp"
+                    android:paddingEnd="28dp">
+
+                    <View
+                        android:layout_width="3dp"
+                        android:layout_height="16dp"
+                        android:layout_marginEnd="8dp"
+                        android:background="@color/kiduyu_red" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/trending_today"
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="240dp">
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/rvTrending"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:clipChildren="false"
+                        android:clipToPadding="false"
+                        android:descendantFocusability="afterDescendants"
+                        android:focusable="false"
+                        android:paddingStart="16dp"
+                        android:paddingEnd="16dp" />
+
+                    <TextView
+                        android:id="@+id/statusTrending"
+                        style="@style/LiteRowStatus"
+                        android:text="@string/loading_titles" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="28dp"
+                    android:paddingEnd="28dp">
+
+                    <View
+                        android:layout_width="3dp"
+                        android:layout_height="16dp"
+                        android:layout_marginEnd="8dp"
+                        android:background="@color/kiduyu_red" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/popular_movies"
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="240dp">
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/rvMovies"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:clipChildren="false"
+                        android:clipToPadding="false"
+                        android:descendantFocusability="afterDescendants"
+                        android:focusable="false"
+                        android:paddingStart="16dp"
+                        android:paddingEnd="16dp" />
+
+                    <TextView
+                        android:id="@+id/statusMovies"
+                        style="@style/LiteRowStatus"
+                        android:text="@string/loading_titles" />
+                </FrameLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="28dp"
+                    android:paddingEnd="28dp">
+
+                    <View
+                        android:layout_width="3dp"
+                        android:layout_height="16dp"
+                        android:layout_marginEnd="8dp"
+                        android:background="@color/kiduyu_red" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/popular_tv"
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="240dp">
+
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/rvTv"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:clipChildren="false"
+                        android:clipToPadding="false"
+                        android:descendantFocusability="afterDescendants"
+                        android:focusable="false"
+                        android:paddingStart="16dp"
+                        android:paddingEnd="16dp" />
+
+                    <TextView
+                        android:id="@+id/statusTv"
+                        style="@style/LiteRowStatus"
+                        android:text="@string/loading_titles" />
+                </FrameLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="24dp" />
+            </LinearLayout>
+        </ScrollView>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/searchOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#F2141414"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="32dp"
+            android:paddingEnd="32dp">
+
+            <TextView
+                android:id="@+id/btnSearchClose"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="20dp"
+                android:background="@drawable/back_btn_bg"
+                android:clickable="true"
+                android:focusable="true"
+                android:paddingStart="14dp"
+                android:paddingTop="7dp"
+                android:paddingEnd="14dp"
+                android:paddingBottom="7dp"
+                android:text="@string/back"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp" />
+
+            <View
+                android:layout_width="3dp"
+                android:layout_height="18dp"
+                android:layout_marginEnd="8dp"
+                android:background="@color/kiduyu_red" />
+
+            <TextView
+                android:id="@+id/labelSearchQuery"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="2dp"
+            android:background="@drawable/nav_divider" />
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvSearchOverlay"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipChildren="false"
+                android:clipToPadding="false"
+                android:descendantFocusability="afterDescendants"
+                android:focusable="true"
+                android:paddingStart="16dp"
+                android:paddingTop="12dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="12dp" />
+
+            <TextView
+                android:id="@+id/searchStatus"
+                style="@style/LiteRowStatus"
+                android:text="@string/search_loading" />
+        </FrameLayout>
+    </LinearLayout>
+</FrameLayout>

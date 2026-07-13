@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">KiduyuTV Lite</string>
+    <string name="brand_name">KIDUYU</string>
+    <string name="brand_suffix">TV LITE</string>
+    <string name="search_hint">Search movies &amp; shows…</string>
+    <string name="search_results_for">Results for “%1$s”</string>
+    <string name="search_loading">Searching…</string>
+    <string name="search_empty">No matching movies or shows. Select to return.</string>
+    <string name="search_failed">Search failed. Select to retry.</string>
+    <string name="trending_today">Trending Today</string>
+    <string name="popular_movies">Popular Movies</string>
+    <string name="popular_tv">Popular TV Shows</string>
+    <string name="loading_titles">Loading titles…</string>
+    <string name="empty_titles">No titles available</string>
+    <string name="load_failed">Unable to load. Select to retry.</string>
+    <string name="movie_badge">MOVIE</string>
+    <string name="tv_badge">TV</string>
+    <string name="tv_series_badge">TV SERIES</string>
+    <string name="rating_format">★ %1$.1f</string>
+    <string name="play_now">Play Now</string>
+    <string name="season">Season</string>
+    <string name="season_previous_symbol">‹</string>
+    <string name="season_next_symbol">›</string>
+    <string name="season_count_format">%1$d / %2$d</string>
+    <string name="episodes">Episodes</string>
+    <string name="no_description">No description available.</string>
+    <string name="back">← Back</string>
+    <string name="playback_unconfigured">Playback is not configured</string>
+    <string name="playback_link_unavailable">Playback link is unavailable</string>
+    <string name="playback_error_title">Playback Error</string>
+    <string name="secure_connection_error">A secure connection could not be established.</string>
+    <string name="skip_back">Rewind</string>
+    <string name="skip_forward">Fast forward</string>
+    <string name="rewind_symbol">◀◀</string>
+    <string name="fast_forward_symbol">▶▶</string>
+    <string name="play_symbol">▶</string>
+    <string name="skip_default_seconds">10s</string>
+    <string name="skip_seconds">%1$ds</string>
+</resources>
