@@ -154,19 +154,19 @@ class LogcatViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 
                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                    this.uri = uri
                     type = "text/plain"
+                    putExtra(Intent.EXTRA_STREAM, uri)
                     putExtra(Intent.EXTRA_SUBJECT, "KiduyuTv Log File")
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
-                
+
                 _exportIntent.value = Intent.createChooser(shareIntent, "Share Log File")
             } catch (e: Exception) {
                 _message.value = "Failed to export log: ${e.message}"
             }
         }
     }
-    
+
     /**
      * Exports a specific log file.
      */
@@ -181,10 +181,10 @@ class LogcatViewModel(application: Application) : AndroidViewModel(application) 
                         file
                     )
                 }
-                
+
                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                    this.uri = uri
                     type = "text/plain"
+                    putExtra(Intent.EXTRA_STREAM, uri)
                     putExtra(Intent.EXTRA_SUBJECT, "KiduyuTv Log File: ${file.name}")
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
