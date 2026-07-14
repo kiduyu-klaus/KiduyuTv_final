@@ -303,15 +303,161 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun injectTvJavascript(view: WebView) {
-        Log.i(TAG, "Injecting TV navigation, max-volume hook, and media controls")
+        Log.i(TAG, "Injecting overlay checker, TV navigation, max-volume hook, and media controls")
         val javascript = """
             (function() {
                 if (window.__kiduyuLiteInjected) return;
                 window.__kiduyuLiteInjected = true;
 
                 var style = document.createElement('style');
-                style.textContent = ':focus{outline:3px solid #E50914!important;outline-offset:2px!important;}html{scroll-behavior:smooth;}';
+                style.textContent = `
+                    :focus {
+                        outline: 3px solid #E50914 !important;
+                        outline-offset: 2px !important;
+                    }
+                    html { scroll-behavior: smooth; }
+                    .robot-overlay, #robot-overlay, .captcha-modal, #captcha-modal,
+                    div[class*="popup" i], div[id*="popup" i],
+                    div[class*="modal" i] img[src*="qr" i],
+                    div[id*="modal" i] img[src*="qr" i],
+                    div[class*="overlay" i] img[src*="qr" i],
+                    div[id*="overlay" i] img[src*="qr" i],
+                    canvas[class*="qr" i], canvas[id*="qr" i],
+                    img[class*="qr" i], img[id*="qr" i],
+                    div[class*="qrcode" i], div[id*="qrcode" i],
+                    div[class*="qr-code" i], div[id*="qr-code" i],
+                    div[class*="qr_code" i], div[id*="qr_code" i],
+                    div[class*="qrious" i], div[id*="qrious" i],
+                    [class*="qr-modal" i], [id*="qr-modal" i],
+                    [class*="qr-overlay" i], [id*="qr-overlay" i],
+                    [class*="qr-popup" i], [id*="qr-popup" i],
+                    [class*="qr-container" i], [id*="qr-container" i] {
+                        display: none !important;
+                        visibility: hidden !important;
+                        pointer-events: none !important;
+                    }
+                `;
                 if (document.head) document.head.appendChild(style);
+
+                function hideRobotAndQrOverlays() {
+                    var root = document.body || document.documentElement;
+                    if (!root) return;
+
+                    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+                    var node;
+                    while ((node = walker.nextNode())) {
+                        var text = (node.nodeValue || '').toLowerCase();
+                        if (
+                            text.includes('robot') ||
+                            text.includes('not a robot') ||
+                            text.includes("confirm you're") ||
+                            text.includes('scan qr') ||
+                            text.includes('scan code') ||
+                            text.includes('qr code') ||
+                            text.includes('scan to watch') ||
+                            text.includes('verify you are human') ||
+                            text.includes('click to verify')
+                        ) {
+                            var parent = node.parentElement;
+                            var topOverlay = null;
+                            while (
+                                parent &&
+                                parent !== document.body &&
+                                parent !== document.documentElement
+                            ) {
+                                var parentStyle = window.getComputedStyle(parent);
+                                if (
+                                    parentStyle.position === 'fixed' ||
+                                    parentStyle.position === 'absolute' ||
+                                    parent.style.position === 'fixed' ||
+                                    parent.style.position === 'absolute'
+                                ) {
+                                    topOverlay = parent;
+                                }
+                                var parentClass = (parent.className || '').toString().toLowerCase();
+                                var parentId = (parent.id || '').toString().toLowerCase();
+                                if (
+                                    parentClass.includes('overlay') ||
+                                    parentClass.includes('modal') ||
+                                    parentClass.includes('popup') ||
+                                    parentClass.includes('dialog') ||
+                                    parentId.includes('overlay') ||
+                                    parentId.includes('modal') ||
+                                    parentId.includes('popup') ||
+                                    parentId.includes('dialog')
+                                ) {
+                                    topOverlay = parent;
+                                }
+                                parent = parent.parentElement;
+                            }
+                            hideOverlayElement(topOverlay);
+                        }
+                    }
+
+                    document.querySelectorAll('img, canvas, svg').forEach(function(image) {
+                        var source = (image.getAttribute('src') || '').toLowerCase();
+                        var alt = (image.getAttribute('alt') || '').toLowerCase();
+                        var className = (image.className || '').toString().toLowerCase();
+                        var id = (image.id || '').toString().toLowerCase();
+                        if (
+                            source.includes('qr') ||
+                            alt.includes('qr') ||
+                            className.includes('qr') ||
+                            id.includes('qr') ||
+                            source.includes('code') ||
+                            className.includes('code') ||
+                            id.includes('code')
+                        ) {
+                            var parent = image.parentElement;
+                            var topOverlay = null;
+                            while (
+                                parent &&
+                                parent !== document.body &&
+                                parent !== document.documentElement
+                            ) {
+                                var parentStyle = window.getComputedStyle(parent);
+                                if (
+                                    parentStyle.position === 'fixed' ||
+                                    parentStyle.position === 'absolute' ||
+                                    parent.style.position === 'fixed' ||
+                                    parent.style.position === 'absolute'
+                                ) {
+                                    topOverlay = parent;
+                                }
+                                var parentClass = (parent.className || '').toString().toLowerCase();
+                                var parentId = (parent.id || '').toString().toLowerCase();
+                                if (
+                                    parentClass.includes('overlay') ||
+                                    parentClass.includes('modal') ||
+                                    parentClass.includes('popup') ||
+                                    parentClass.includes('dialog') ||
+                                    parentId.includes('overlay') ||
+                                    parentId.includes('modal') ||
+                                    parentId.includes('popup') ||
+                                    parentId.includes('dialog')
+                                ) {
+                                    topOverlay = parent;
+                                }
+                                parent = parent.parentElement;
+                            }
+                            if (topOverlay) {
+                                hideOverlayElement(topOverlay);
+                            } else if (image.parentElement) {
+                                hideOverlayElement(image.parentElement);
+                            }
+                        }
+                    });
+                }
+
+                function hideOverlayElement(element) {
+                    if (!element) return;
+                    element.style.setProperty('display', 'none', 'important');
+                    element.style.setProperty('visibility', 'hidden', 'important');
+                    element.style.setProperty('pointer-events', 'none', 'important');
+                }
+
+                hideRobotAndQrOverlays();
+                setInterval(hideRobotAndQrOverlays, 300);
 
                 function setMaximumVolume(video) {
                     if (!video) return;
@@ -518,7 +664,7 @@ class PlayerActivity : AppCompatActivity() {
                 return true
             }
 
-            KeyEvent.KEYCODE_DPAD_LEFT -> {
+            KeyEvent.KEYCODE_MEDIA_REWIND -> {
                 return when (event.action) {
                     KeyEvent.ACTION_DOWN -> {
                         startSkipRamp(-1)
@@ -532,7 +678,7 @@ class PlayerActivity : AppCompatActivity() {
                 }
             }
 
-            KeyEvent.KEYCODE_DPAD_RIGHT -> {
+            KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
                 return when (event.action) {
                     KeyEvent.ACTION_DOWN -> {
                         startSkipRamp(1)
