@@ -2209,6 +2209,17 @@ private fun LogcatContent(
     val exportIntent by logcatViewModel.exportIntent.collectAsState()
     val message by logcatViewModel.message.collectAsState()
 
+    // Track whether the full-screen log viewer dialog is open
+    var showLogcatDialog by remember { mutableStateOf(false) }
+
+    // Logcat Viewer Dialog — shows full log content in a scrollable full-screen dialog
+    if (showLogcatDialog) {
+        LogcatViewerDialog(
+            logContent = logContent,
+            onDismiss = { showLogcatDialog = false }
+        )
+    }
+
     // Handle export intent
     LaunchedEffect(exportIntent) {
         exportIntent?.let { intent ->
@@ -2330,12 +2341,12 @@ private fun LogcatContent(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // View/Refresh Button
+            // View Logcat Button
             ActionButton(
-                label = "Refresh",
-                icon = Icons.Default.Refresh,
+                label = "View Logcat",
+                icon = Icons.Default.PlayCircle,
                 isLoading = isLoading,
-                onClick = { logcatViewModel.loadLogContent() },
+                onClick = { showLogcatDialog = true },
                 modifier = Modifier.weight(1f)
             )
 
@@ -2456,60 +2467,6 @@ private fun LogcatContent(
             Spacer(modifier = Modifier.height(24.dp))
         }
 
-        // Log Content
-        SettingsSectionLabel(text = "Log Content")
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 300.dp, max = 500.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(CardDark)
-                .padding(16.dp)
-        ) {
-            if (isLoading) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(32.dp),
-                        color = PrimaryRed,
-                        strokeWidth = 3.dp
-                    )
-                }
-            } else if (logContent.isBlank()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "No logs available.\nStart capture to collect logs.",
-                        color = TextTertiary,
-                        fontSize = 14.sp,
-                        textAlign = TextAlign.Center,
-                        lineHeight = 22.sp
-                    )
-                }
-            } else {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    Text(
-                        text = logContent,
-                        color = TextSecondary,
-                        fontSize = 11.sp,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                        lineHeight = 16.sp
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
         // Info Text
         Text(
             text = "Logs are stored in the app's private directory and can be exported for debugging purposes.",
@@ -2517,6 +2474,128 @@ private fun LogcatContent(
             fontSize = 12.sp,
             lineHeight = 18.sp
         )
+    }
+}
+
+/**
+ * Full-screen scrollable dialog for viewing the complete logcat output.
+ *
+ * Displays the entire log file content in a monospace font inside a
+ * dismissable overlay dialog that takes up the full screen on TV.
+ */
+@Composable
+private fun LogcatViewerDialog(
+    logContent: String,
+    onDismiss: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.85f))
+                .padding(32.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // Header row with title and close button
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Logcat Viewer",
+                        color = TextPrimary,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    val interactionSource = remember { MutableInteractionSource() }
+                    val isFocused by interactionSource.collectIsFocusedAsState()
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isFocused) PrimaryRed.copy(alpha = 0.8f) else PrimaryRed)
+                            .border(
+                                width = if (isFocused) 2.dp else 0.dp,
+                                color = if (isFocused) Color.White.copy(alpha = 0.5f) else Color.Transparent,
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            .clickable(
+                                interactionSource = interactionSource,
+                                indication = null,
+                                onClick = onDismiss
+                            )
+                            .focusable(interactionSource = interactionSource)
+                            .padding(horizontal = 20.dp, vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Close",
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = "Close",
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+
+                // Scrollable log content area
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(CardDark)
+                        .padding(20.dp)
+                ) {
+                    if (logContent.isBlank()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "No logs available.\nStart capture to collect logs.",
+                                color = TextTertiary,
+                                fontSize = 16.sp,
+                                textAlign = TextAlign.Center,
+                                lineHeight = 24.sp
+                            )
+                        }
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            Text(
+                                text = logContent,
+                                color = TextSecondary,
+                                fontSize = 12.sp,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                lineHeight = 18.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
