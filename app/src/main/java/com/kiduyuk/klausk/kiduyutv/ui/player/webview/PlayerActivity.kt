@@ -1,6 +1,7 @@
 package com.kiduyuk.klausk.kiduyutv.ui.player.webview
 
 import android.annotation.SuppressLint
+import android.app.ProgressDialog
 import android.app.UiModeManager
 import android.content.Context
 import android.content.res.Configuration
@@ -65,6 +66,9 @@ class PlayerActivity : AppCompatActivity() {
     // Loading and error state for AdBlockerWebViewClient
     private var isPageLoading = true
     private var hasPageError = false
+
+    // Loading dialog shown while the provider page is being fetched and rendered.
+    private lateinit var loadingDialog: ProgressDialog
 
     // Watch history tracking variables
     private var currentTmdbId: Int = -1
@@ -240,11 +244,13 @@ class PlayerActivity : AppCompatActivity() {
             webViewClient = AdBlockerWebViewClient(
                 onPageFinished = {
                     isPageLoading = false
+                    dismissLoadingDialog()
                     Log.i(TAG, "[WebView] Page finished loading with AdBlocker")
                 },
                 onError = {
                     hasPageError = true
                     isPageLoading = false
+                    dismissLoadingDialog()
                     Log.e(TAG, "[WebView] Error received with AdBlocker")
                 }
             )
@@ -313,6 +319,11 @@ class PlayerActivity : AppCompatActivity() {
         rootLayout.isFocusableInTouchMode = true
         rootLayout.requestFocus()
 
+        // Show the loading dialog as soon as the activity is created. It will be dismissed
+        // when the WebView fires onPageFinished (or onError). Posting it ensures the window
+        // is fully attached before the dialog tries to show.
+        showLoadingDialog()
+
         rootLayout.post {
             screenWidth = rootLayout.width
             screenHeight = rootLayout.height
@@ -377,6 +388,7 @@ class PlayerActivity : AppCompatActivity() {
     override fun onDestroy() {
         stopProgressUpdateTimer()
         cursorHideHandler.removeCallbacks(cursorHideRunnable)
+        dismissLoadingDialog()
 
         if (::webView.isInitialized) {
             try {
@@ -651,6 +663,46 @@ class PlayerActivity : AppCompatActivity() {
                             "error=${refresh.error.orEmpty()}"
                     )
                 }
+            }
+        }
+    }
+
+    /**
+     * Builds and shows the loading dialog that covers the activity while the provider page
+     * is being fetched. Posted to the root layout so the window is attached before showing,
+     * and marked non-cancelable so accidental back presses don't tear it down early.
+     */
+    @Suppress("DEPRECATION")
+    private fun showLoadingDialog() {
+        rootLayout.post {
+            if (isFinishing || isDestroyed) return@post
+            try {
+                loadingDialog = ProgressDialog(this).apply {
+                    setMessage("Loading stream...")
+                    setCancelable(false)
+                    setCanceledOnTouchOutside(false)
+                    show()
+                }
+                Log.i(TAG, "[LoadingDialog] Shown")
+            } catch (e: Exception) {
+                Log.e(TAG, "[LoadingDialog] Failed to show: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Safely dismisses the loading dialog if it has been created and is still on screen.
+     * Safe to call from any callback because it no-ops when the dialog isn't visible.
+     */
+    private fun dismissLoadingDialog() {
+        if (::loadingDialog.isInitialized) {
+            try {
+                if (loadingDialog.isShowing) {
+                    loadingDialog.dismiss()
+                    Log.i(TAG, "[LoadingDialog] Dismissed")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "[LoadingDialog] Error dismissing: ${e.message}")
             }
         }
     }
