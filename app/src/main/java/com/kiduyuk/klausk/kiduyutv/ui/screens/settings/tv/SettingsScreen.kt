@@ -2676,6 +2676,8 @@ private fun LogcatViewerDialog(
                             }
                         }
                     }
+                }
+            }
         }
     }
 }
