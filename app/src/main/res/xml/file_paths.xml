@@ -3,4 +3,7 @@
     <external-files-path
         name="apk_downloads"
         path="." />
+    <files-path
+        name="log_files"
+        path="." />
 </paths>

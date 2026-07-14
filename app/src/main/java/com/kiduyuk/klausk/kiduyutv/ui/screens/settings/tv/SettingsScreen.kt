@@ -128,7 +128,8 @@ import kotlinx.coroutines.tasks.await
 fun SettingsScreen( 
     onBackClick: () -> Unit,
     onNavigateToTraktProfile: () -> Unit = {},
-    viewModel: SettingsViewModel = viewModel()
+    viewModel: SettingsViewModel = viewModel(),
+    logcatViewModel: LogcatViewModel = viewModel()
 ) {
     // Set initial section to ACCOUNT for focus management
     var selectedSection by remember { mutableStateOf(SettingsSection.ACCOUNT) }
@@ -456,6 +457,13 @@ fun SettingsScreen(
                         onRefreshWhatsNewClick = { viewModel.refreshWhatsNew() },
                         onCheckForUpdatesClick = { viewModel.checkForUpdates(context) },
                         onDownloadUpdateClick = { viewModel.downloadAndInstallUpdate(context) }
+                    )
+                }
+
+                SettingsSection.LOGCAT -> {
+                    LogcatContent(
+                        context = context,
+                        logcatViewModel = logcatViewModel
                     )
                 }
             }
@@ -1952,7 +1960,8 @@ private enum class SettingsSection(val title: String) {
     PLAYBACK("Playback"),
     ADS_SETTINGS("Ads Settings"),
     APP_INFORMATION("App Information"),
-    APP_VERSION("App Version")
+    APP_VERSION("App Version"),
+    LOGCAT("Logcat")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2177,6 +2186,430 @@ private fun AdsSettingsContent(
             )
         }
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Logcat Section
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Content for the Logcat section.
+ * Allows users to view, export, and clear application logs.
+ */
+@Composable
+private fun LogcatContent(
+    context: Context,
+    logcatViewModel: LogcatViewModel
+) {
+    val logContent by logcatViewModel.logContent.collectAsState()
+    val logFiles by logcatViewModel.logFiles.collectAsState()
+    val isCapturing by logcatViewModel.isCapturing.collectAsState()
+    val isLoading by logcatViewModel.isLoading.collectAsState()
+    val selectedFile by logcatViewModel.selectedFile.collectAsState()
+    val exportIntent by logcatViewModel.exportIntent.collectAsState()
+    val message by logcatViewModel.message.collectAsState()
+
+    // Handle export intent
+    LaunchedEffect(exportIntent) {
+        exportIntent?.let { intent ->
+            context.startActivity(intent)
+            logcatViewModel.clearExportIntent()
+        }
+    }
+
+    // Show snackbar/message
+    LaunchedEffect(message) {
+        message?.let {
+            // In a real app, you'd show a Snackbar here
+            logcatViewModel.clearMessage()
+        }
+    }
+
+    // Load initial data
+    LaunchedEffect(Unit) {
+        logcatViewModel.loadLogContent()
+        logcatViewModel.refreshLogFiles()
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.Top
+    ) {
+        Text(
+            text = "Logcat Viewer",
+            color = TextPrimary,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 24.dp)
+        )
+
+        // Capture Status Card
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(CardDark)
+                .padding(24.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(12.dp)
+                                .clip(CircleShape)
+                                .background(if (isCapturing) Color(0xFF4CAF50) else Color(0xFFFF6B6B))
+                        )
+                        Text(
+                            text = if (isCapturing) "Capturing" else "Not Capturing",
+                            color = TextPrimary,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    // Start/Stop Button
+                    val interactionSource = remember { MutableInteractionSource() }
+                    val isFocused by interactionSource.collectIsFocusedAsState()
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (isFocused) if (isCapturing) Color(0xFFFF6B6B).copy(alpha = 0.8f) else Color(0xFF4CAF50).copy(alpha = 0.8f) else if (isCapturing) Color(0xFFFF6B6B) else Color(0xFF4CAF50))
+                            .border(
+                                width = if (isFocused) 2.dp else 0.dp,
+                                color = if (isFocused) Color.White.copy(alpha = 0.5f) else Color.Transparent,
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                            .clickable(
+                                interactionSource = interactionSource,
+                                indication = null,
+                                onClick = {
+                                    if (isCapturing) {
+                                        logcatViewModel.stopCapture()
+                                    } else {
+                                        logcatViewModel.startCapture()
+                                    }
+                                }
+                            )
+                            .focusable(interactionSource = interactionSource)
+                            .padding(horizontal = 20.dp, vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (isCapturing) "Stop Capture" else "Start Capture",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
+                Text(
+                    text = "Logcat is ${if (isCapturing) "currently capturing" else "not capturing"} all system and app logs to a file.",
+                    color = TextSecondary,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Action Buttons
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // View/Refresh Button
+            ActionButton(
+                label = "Refresh",
+                icon = Icons.Default.Refresh,
+                isLoading = isLoading,
+                onClick = { logcatViewModel.loadLogContent() },
+                modifier = Modifier.weight(1f)
+            )
+
+            // Export Button
+            ActionButton(
+                label = "Export",
+                icon = Icons.Default.Download,
+                isLoading = false,
+                onClick = { logcatViewModel.exportLogFile() },
+                modifier = Modifier.weight(1f)
+            )
+
+            // Clear Button
+            ActionButton(
+                label = "Clear All",
+                icon = Icons.Default.Delete,
+                isLoading = false,
+                isDestructive = true,
+                onClick = {
+                    QuitDialog(
+                        context = context,
+                        title = "Clear All Logs?",
+                        message = "Are you sure you want to delete all log files? This action cannot be undone.",
+                        positiveButtonText = "Clear",
+                        negativeButtonText = "Cancel",
+                        lottieAnimRes = R.raw.exit,
+                        onNo = {},
+                        onYes = { logcatViewModel.clearAllLogs() }
+                    ).show()
+                },
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Log Files List (if multiple files exist)
+        if (logFiles.size > 1) {
+            SettingsSectionLabel(text = "Log Files (${logFiles.size})")
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(CardDark)
+                    .padding(16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    logFiles.take(5).forEach { file ->
+                        val isSelected = file == selectedFile
+                        val fileInteractionSource = remember { MutableInteractionSource() }
+                        val isFileFocused by fileInteractionSource.collectIsFocusedAsState()
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    when {
+                                        isSelected -> PrimaryRed.copy(alpha = 0.2f)
+                                        isFileFocused -> CardDark
+                                        else -> Color.Transparent
+                                    }
+                                )
+                                .border(
+                                    width = if (isFileFocused) 1.dp else 0.dp,
+                                    color = if (isFileFocused) PrimaryRed.copy(alpha = 0.5f) else Color.Transparent,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .clickable(
+                                    interactionSource = fileInteractionSource,
+                                    indication = null,
+                                    onClick = { logcatViewModel.loadLogFile(file) }
+                                )
+                                .focusable(interactionSource = fileInteractionSource)
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = file.name,
+                                    color = if (isSelected) TextPrimary else TextSecondary,
+                                    fontSize = 14.sp,
+                                    fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal
+                                )
+                                Text(
+                                    text = formatFileSize(file.length()) + " • " + formatTimestamp(file.lastModified()),
+                                    color = TextTertiary,
+                                    fontSize = 12.sp
+                                )
+                            }
+
+                            IconButton(
+                                onClick = { logcatViewModel.exportLogFile(file) }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Download,
+                                    contentDescription = "Export",
+                                    tint = TextSecondary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    if (logFiles.size > 5) {
+                        Text(
+                            text = "+${logFiles.size - 5} more files",
+                            color = TextTertiary,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+
+        // Log Content
+        SettingsSectionLabel(text = "Log Content")
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 300.dp, max = 500.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(CardDark)
+                .padding(16.dp)
+        ) {
+            if (isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(32.dp),
+                        color = PrimaryRed,
+                        strokeWidth = 3.dp
+                    )
+                }
+            } else if (logContent.isBlank()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No logs available.\nStart capture to collect logs.",
+                        color = TextTertiary,
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 22.sp
+                    )
+                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Text(
+                        text = logContent,
+                        color = TextSecondary,
+                        fontSize = 11.sp,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        lineHeight = 16.sp
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Info Text
+        Text(
+            text = "Logs are stored in the app's private directory and can be exported for debugging purposes.",
+            color = TextTertiary,
+            fontSize = 12.sp,
+            lineHeight = 18.sp
+        )
+    }
+}
+
+/**
+ * Reusable action button for the logcat section.
+ */
+@Composable
+private fun ActionButton(
+    label: String,
+    icon: ImageVector,
+    isLoading: Boolean,
+    isDestructive: Boolean = false,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
+    Box(
+        modifier = modifier
+            .height(44.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(
+                when {
+                    isDestructive && isFocused -> Color.Red.copy(alpha = 0.8f)
+                    isDestructive -> Color.Red.copy(alpha = 0.7f)
+                    isFocused -> PrimaryRed.copy(alpha = 0.8f)
+                    else -> CardDark
+                }
+            )
+            .border(
+                width = if (isFocused) 2.dp else 1.dp,
+                color = when {
+                    isFocused && isDestructive -> Color.White.copy(alpha = 0.5f)
+                    isFocused -> PrimaryRed.copy(alpha = 0.5f)
+                    isDestructive -> Color.Red.copy(alpha = 0.3f)
+                    else -> TextTertiary.copy(alpha = 0.2f)
+                },
+                shape = RoundedCornerShape(10.dp)
+            )
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+            .focusable(interactionSource = interactionSource),
+        contentAlignment = Alignment.Center
+    ) {
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                color = Color.White,
+                strokeWidth = 2.dp
+            )
+        } else {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = if (isDestructive) Color.White else TextPrimary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = label,
+                    color = if (isDestructive) Color.White else TextPrimary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Formats file size to human-readable format.
+ */
+private fun formatFileSize(bytes: Long): String {
+    return when {
+        bytes < 1024 -> "$bytes B"
+        bytes < 1024 * 1024 -> "${bytes / 1024} KB"
+        else -> String.format("%.1f MB", bytes / (1024.0 * 1024.0))
+    }
+}
+
+/**
+ * Formats timestamp to readable format.
+ */
+private fun formatTimestamp(millis: Long): String {
+    val sdf = java.text.SimpleDateFormat("MMM dd, HH:mm", java.util.Locale.getDefault())
+    return sdf.format(java.util.Date(millis))
 }
 
 @Composable

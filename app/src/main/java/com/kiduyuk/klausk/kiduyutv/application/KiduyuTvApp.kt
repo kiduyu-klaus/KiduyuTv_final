@@ -22,6 +22,7 @@ import com.kiduyuk.klausk.kiduyutv.util.AdUnitIds
 import com.kiduyuk.klausk.kiduyutv.util.AppOpenAdObserver
 import com.kiduyuk.klausk.kiduyutv.util.AuthManager
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
+import com.kiduyuk.klausk.kiduyutv.util.LogcatManager
 import com.kiduyuk.klausk.kiduyutv.util.NotificationHelper
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager
@@ -136,6 +137,9 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
 
         // Start network connectivity monitoring
         NetworkConnectivityChecker.startMonitoring(this)
+
+        // Start logcat capture for debugging purposes
+        LogcatManager.start(this)
     }
 
     override fun onTerminate() {
