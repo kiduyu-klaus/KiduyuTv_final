@@ -25,6 +25,7 @@ import android.widget.FrameLayout
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.webkit.WebViewCompat
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager
 import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
@@ -96,8 +97,53 @@ class PlayerActivity : AppCompatActivity() {
         return isFireTvHardware || isFireTvModel
     }
 
+    /**
+     * Logs the currently-active WebView provider package via [WebViewCompat]. If the active
+     * provider is not [GOOGLE_WEBVIEW_PACKAGE] (e.g. it is `com.amazon.webview.chromium` on
+     * Fire TV), a warning is emitted so the operator can install/activate the Google WebView
+     * for a more standards-compliant and bot-detection-friendly rendering pipeline.
+     */
+    private fun logWebViewProvider() {
+        try {
+            val webViewPackage = WebViewCompat.getCurrentWebViewPackage(this)
+            if (webViewPackage == null) {
+                Log.w(TAG, "[WebView] No WebView provider package could be resolved")
+                return
+            }
+
+            val packageName = webViewPackage.packageName
+            val versionName = webViewPackage.versionName ?: "unknown"
+            if (packageName == GOOGLE_WEBVIEW_PACKAGE) {
+                Log.i(TAG, "[WebView] Using Google WebView (com.google.android.webview) v$versionName")
+            } else {
+                Log.w(
+                    TAG,
+                    "[WebView] Active provider is '$packageName' v$versionName — not " +
+                        "$GOOGLE_WEBVIEW_PACKAGE. For best compatibility, install/enable " +
+                        "com.google.android.webview (e.g. on Fire TV: Settings > Applications > " +
+                        "Amazon WebView > Disable, then install Google WebView from the Play Store)."
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "[WebView] Failed to query WebView provider: ${e.message}")
+        }
+    }
+
     companion object {
         private const val TAG = "VideasyPlayer"
+
+        /** Package name of Google's official AOSP WebView provider. */
+        private const val GOOGLE_WEBVIEW_PACKAGE = "com.google.android.webview"
+
+        /**
+         * Single, modern, device-agnostic User-Agent string. The previous string explicitly
+         * declared "AFTMM" (Amazon Fire TV model) which caused Cloudflare / provider bot
+         * challenges to fire on TV devices. This one intentionally omits any device model
+         * identifier and uses a recent stable Chrome version.
+         */
+        private const val MODERN_USER_AGENT =
+            "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) " +
+                "Chrome/126.0.0.0 Safari/537.36"
     }
 
     // ── Cursor hide timer ──────────────────────────────────────────────────────
@@ -162,6 +208,10 @@ class PlayerActivity : AppCompatActivity() {
             isFireTV = isFireTVDevice(this)
             Log.i(TAG, "[Device] TV detected (${deviceBrand} $deviceModel), cursor enabled, isFireTV=$isFireTV")
         }
+
+        // Surface which WebView provider package is in use so the operator can confirm
+        // we are running on com.google.android.webview (or be told to switch to it).
+        logWebViewProvider()
 
         val url: String = intent.getStringExtra("STREAM_URL") ?: if (isTv) {
             "https://vidlink.pro/tv/$tmdbId/$currentSeason/$currentEpisode?autoplay=true"
@@ -229,11 +279,11 @@ class PlayerActivity : AppCompatActivity() {
 
                 cacheMode = WebSettings.LOAD_DEFAULT // Utilizes the browser cache for buffering
 
-                userAgentString = if (isFireTV) {
-                    "Mozilla/5.0 (Linux; Android 9; AFTMM Build/PS7233) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                } else {
-                    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                }
+                // Single, modern User-Agent for every device. The previous Fire-TV-specific
+                // string ("AFTMM Build/PS7233") caused provider / Cloudflare bot challenges
+                // on TV devices. This UA is intentionally device-agnostic so phones, tablets
+                // and TVs all negotiate the same content.
+                userAgentString = MODERN_USER_AGENT
             }
 
             isHorizontalScrollBarEnabled = false

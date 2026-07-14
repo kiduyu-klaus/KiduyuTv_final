@@ -1,9 +1,11 @@
 package com.kiduyuk.klausk.kiduyutv.ui.player.webview
 
 import android.content.Context
+import android.os.Build
 import android.util.Log
 import android.view.View
 import android.webkit.WebView
+import androidx.webkit.WebViewCompat
 import com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager
 
 object WebViewUtils {
@@ -20,7 +22,7 @@ object WebViewUtils {
             context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_HARDWARE_ACCELERATED != 0
 
         if (isFireTV) {
-            val isAmazonChromium = isAmazonChromiumAvailable()
+            val isAmazonChromium = isAmazonChromiumAvailable(context)
 
             Log.i(TAG, "[WebView] Fire TV detected")
             Log.i(TAG, "[WebView] Amazon Chromium WebView: $isAmazonChromium")
@@ -35,9 +37,9 @@ object WebViewUtils {
             }
 
             if (isAmazonChromium) {
-                Log.i(TAG, "[WebView] ✅ Running on Amazon Chromium WebView (com.amazon.webview.chromium)")
+                Log.w(TAG, "[WebView] ⚠️ Running on Amazon Chromium WebView (com.amazon.webview.chromium). For best compatibility, install/activate com.google.android.webview.")
             } else {
-                Log.w(TAG, "[WebView] ⚠️ Amazon Chromium WebView not available, using fallback WebView")
+                Log.i(TAG, "[WebView] ✅ Not using Amazon Chromium WebView")
             }
         } else {
             Log.i(TAG, "[WebView] Non-Fire TV device")
@@ -60,70 +62,70 @@ object WebViewUtils {
 
     /**
      * Checks if Amazon's Chromium-based WebView is available on this device.
+     *
+     * Uses [WebViewCompat.getCurrentWebViewPackage] which is the modern, backward-compatible
+     * replacement for the platform-level [WebView.getCurrentWebViewPackage] call (deprecated in
+     * API 26 and inaccessible on some newer WebView implementations).
      */
-    fun isAmazonChromiumAvailable(): Boolean {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            return try {
-                val webViewPackage = WebView.getCurrentWebViewPackage()
-                val isAmazon = webViewPackage?.packageName == "com.amazon.webview.chromium"
+    fun isAmazonChromiumAvailable(context: Context): Boolean {
+        return try {
+            val webViewPackage = WebViewCompat.getCurrentWebViewPackage(context)
+            val isAmazon = webViewPackage?.packageName == "com.amazon.webview.chromium"
 
-                if (isAmazon) {
-                    Log.d(TAG, "[WebView] Amazon Chromium WebView package detected")
-                } else {
-                    Log.d(TAG, "[WebView] Current WebView package: ${webViewPackage?.packageName ?: "unknown"}")
-                }
-
-                isAmazon
-            } catch (e: Exception) {
-                Log.w(TAG, "[WebView] Error checking WebView package: ${e.message}")
-                false
+            if (isAmazon) {
+                Log.d(TAG, "[WebView] Amazon Chromium WebView package detected")
+            } else {
+                Log.d(TAG, "[WebView] Current WebView package: ${webViewPackage?.packageName ?: "unknown"}")
             }
-        } else {
-            Log.w(TAG, "[WebView] SDK version ${android.os.Build.VERSION.SDK_INT} < 26, cannot detect WebView package")
-            return false
+
+            isAmazon
+        } catch (e: Exception) {
+            Log.w(TAG, "[WebView] Error checking WebView package: ${e.message}")
+            false
         }
     }
 
     /**
      * Logs comprehensive information about the current WebView implementation.
+     *
+     * Uses [WebViewCompat.getCurrentWebViewPackage] to retrieve the active WebView provider
+     * package on all supported API levels.
      */
     fun logWebViewInfo(webView: WebView) {
         try {
             val webViewClass = webView.javaClass.name
             Log.i(TAG, "[WebView] Implementation class: $webViewClass")
 
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                val webViewPackage = WebView.getCurrentWebViewPackage()
+            val webViewPackage = WebViewCompat.getCurrentWebViewPackage(webView.context)
 
-                if (webViewPackage != null) {
-                    val packageName = webViewPackage.packageName
-                    val versionName = webViewPackage.versionName ?: "unknown"
-                    val versionCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                        webViewPackage.longVersionCode.toString()
-                    } else {
-                        @Suppress("DEPRECATION")
-                        webViewPackage.versionCode.toString()
+            if (webViewPackage != null) {
+                val packageName = webViewPackage.packageName
+                val versionName = webViewPackage.versionName ?: "unknown"
+                val versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    webViewPackage.longVersionCode.toString()
+                } else {
+                    @Suppress("DEPRECATION")
+                    webViewPackage.versionCode.toString()
+                }
+
+                Log.i(TAG, "[WebView] Package: $packageName")
+                Log.i(TAG, "[WebView] Version: $versionName (code: $versionCode)")
+                Log.i(TAG, "[WebView] First installed: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date(webViewPackage.firstInstallTime))}")
+                Log.i(TAG, "[WebView] Last updated: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date(webViewPackage.lastUpdateTime))}")
+
+                // Identify the WebView provider
+                when {
+                    packageName == GOOGLE_WEBVIEW_PACKAGE -> {
+                        Log.i(TAG, "[WebView] ✅ Google WebView (com.google.android.webview) - standard AOSP implementation")
                     }
-
-                    Log.i(TAG, "[WebView] Package: $packageName")
-                    Log.i(TAG, "[WebView] Version: $versionName (code: $versionCode)")
-                    Log.i(TAG, "[WebView] First installed: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date(webViewPackage.firstInstallTime))}")
-                    Log.i(TAG, "[WebView] Last updated: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date(webViewPackage.lastUpdateTime))}")
-
-                    // Identify the WebView provider
-                    when {
-                        packageName == "com.amazon.webview.chromium" -> {
-                            Log.i(TAG, "[WebView] ✅ Amazon Chromium WebView - optimized for Fire TV/Fire tablets")
-                        }
-                        packageName == "com.google.android.webview" -> {
-                            Log.i(TAG, "[WebView] ℹ️ Google WebView - standard AOSP implementation")
-                        }
-                        packageName == "com.android.chrome" -> {
-                            Log.i(TAG, "[WebView] ℹ️ Chrome WebView - using Chrome as WebView provider")
-                        }
-                        else -> {
-                            Log.i(TAG, "[WebView] ℹ️ WebView provider: $packageName")
-                        }
+                    packageName == AMAZON_WEBVIEW_PACKAGE -> {
+                        Log.w(TAG, "[WebView] ⚠️ Amazon Chromium WebView detected. For best compatibility install com.google.android.webview and disable this package.")
+                    }
+                    packageName == CHROME_WEBVIEW_PACKAGE -> {
+                        Log.i(TAG, "[WebView] ℹ️ Chrome WebView - using Chrome as WebView provider")
+                    }
+                    else -> {
+                        Log.i(TAG, "[WebView] ℹ️ WebView provider: $packageName")
                     }
                 }
             }
@@ -131,6 +133,30 @@ object WebViewUtils {
             Log.w(TAG, "[WebView] Error logging WebView implementation details: ${e.message}")
         }
     }
+
+    /**
+     * Returns true if the active WebView provider is Google's official AOSP package.
+     * Useful for logging and for callers that need to flag non-standard WebView
+     * implementations (such as Amazon's Chromium on Fire TV).
+     */
+    fun isGoogleWebView(context: Context): Boolean {
+        return try {
+            val pkg = WebViewCompat.getCurrentWebViewPackage(context)
+            pkg?.packageName == GOOGLE_WEBVIEW_PACKAGE
+        } catch (e: Exception) {
+            Log.w(TAG, "[WebView] Error querying Google WebView: ${e.message}")
+            false
+        }
+    }
+
+    /** Package name of Google's official AOSP WebView provider. */
+    const val GOOGLE_WEBVIEW_PACKAGE = "com.google.android.webview"
+
+    /** Package name of Amazon's Chromium-based WebView (shipped on Fire TV). */
+    const val AMAZON_WEBVIEW_PACKAGE = "com.amazon.webview.chromium"
+
+    /** Package name of Chrome (used as a WebView provider on some devices). */
+    const val CHROME_WEBVIEW_PACKAGE = "com.android.chrome"
 
     /**
      * Detects the stream provider name from a given URL.

@@ -60,6 +60,17 @@ object AdvancedAdBlocker {
     private const val MAX_DOMAIN_LENGTH = 253
     private val CACHE_MAX_AGE_MS = TimeUnit.HOURS.toMillis(24)
 
+    /**
+     * Domains that are always blocked in every player WebView, independently of the EasyList
+     * snapshot. Use this for known-bad hosts the upstream filter list either does not include
+     * or risks dropping on a future refresh. The [matchesDomain] walker matches the exact host
+     * and every parent suffix, so any subdomain of a listed entry is also blocked.
+     */
+    private val MANUAL_BLOCKED_DOMAINS: Set<String> = setOf(
+        "unswung.gurlleviter.cyou",
+        "princesseileen-idohyhm.work"
+    )
+
     // The compatibility init() entry point owns application-lifetime work only.
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -184,6 +195,11 @@ object AdvancedAdBlocker {
         if (scheme != "http" && scheme != "https") return false
 
         val host = uri.host?.lowercase()?.trimEnd('.') ?: return false
+
+        // Manually-pinned hosts are checked first so they remain blocked even when the EasyList
+        // snapshot is empty (e.g. before the first download completes or after a failed refresh).
+        if (matchesDomain(MANUAL_BLOCKED_DOMAINS, host)) return true
+
         // Read once so a concurrent refresh cannot mix two snapshots in one decision.
         val currentRules = rules
         if (matchesDomain(currentRules.allowed, host)) return false
