@@ -2616,8 +2616,8 @@ private fun LogcatViewerDialog(
                         val listInteractionSource = remember { MutableInteractionSource() }
                         val isListFocused by listInteractionSource.collectIsFocusedAsState()
 
-                        LazyColumn(
-                            state = listState,
+                        // Wrap LazyColumn in a focusable Box for reliable TV scrolling
+                        Box(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .border(
@@ -2632,7 +2632,7 @@ private fun LogcatViewerDialog(
                                     when (keyEvent.key) {
                                         Key.DirectionDown -> {
                                             coroutineScope.launch {
-                                                val next = (listState.firstVisibleItemIndex + 10)
+                                                val next = (listState.firstVisibleItemIndex + 8)
                                                     .coerceAtMost(logLines.lastIndex)
                                                 listState.animateScrollToItem(next)
                                             }
@@ -2645,7 +2645,7 @@ private fun LogcatViewerDialog(
                                                 true
                                             } else {
                                                 coroutineScope.launch {
-                                                    val prev = (listState.firstVisibleItemIndex - 10)
+                                                    val prev = (listState.firstVisibleItemIndex - 8)
                                                         .coerceAtLeast(0)
                                                     listState.animateScrollToItem(prev)
                                                 }
@@ -2658,16 +2658,21 @@ private fun LogcatViewerDialog(
                                 }
                                 .focusable(interactionSource = listInteractionSource)
                         ) {
-                            items(logLines) { line ->
-                                Text(
-                                    text = line,
-                                    color = TextSecondary,
-                                    fontSize = 13.sp,
-                                    fontFamily = FontFamily.Monospace,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 12.dp, vertical = 2.dp)
-                                )
+                            LazyColumn(
+                                state = listState,
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                items(logLines) { line ->
+                                    Text(
+                                        text = line,
+                                        color = TextSecondary,
+                                        fontSize = 13.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 2.dp)
+                                    )
+                                }
                             }
                         }
                     }
