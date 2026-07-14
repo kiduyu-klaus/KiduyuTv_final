@@ -716,7 +716,25 @@ object StreamProviderManager {
         }
 
         val attributes = provider.iframeAttributes.toMutableMap()
-        if (!attributes.containsKey("allow")) attributes["allow"] = provider.allowAttributes
+
+        // Ensure the iframe always advertises the required permissions for the embedded player.
+        // We parse the existing "allow" value (if any) into individual features and make sure
+        // "autoplay" and "encrypted-media" are present. Already-present features are left as-is
+        // to preserve any extras the provider has configured (e.g. "picture-in-picture",
+        // "fullscreen"). Works the same whether iframe_attributes is empty or already populated.
+        val requiredAllowFeatures = listOf("autoplay", "encrypted-media")
+        val existingAllowFeatures = attributes["allow"]
+            ?.split(';', ' ', ',')
+            ?.map { it.trim() }
+            ?.filter { it.isNotEmpty() }
+            ?.toMutableList()
+            ?: mutableListOf()
+        for (feature in requiredAllowFeatures) {
+            if (feature !in existingAllowFeatures) {
+                existingAllowFeatures.add(feature)
+            }
+        }
+        attributes["allow"] = existingAllowFeatures.joinToString("; ")
 
         val attrString = attributes.map { "${it.key}=\"${it.value}\"" }.joinToString(" ")
 
