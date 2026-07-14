@@ -27,13 +27,20 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.kiduyuk.klausk.kiduyutv.lite.databinding.ActivityPlayerBinding
 import com.kiduyuk.klausk.kiduyutv.lite.playback.LiteStreamProviders
+import com.kiduyuk.klausk.kiduyutv.lite.playback.PlayerAdBlocker
+import kotlinx.coroutines.launch
+import java.io.ByteArrayInputStream
+import java.util.concurrent.atomic.AtomicInteger
 
 class PlayerActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityPlayerBinding
+    private lateinit var playerAdBlocker: PlayerAdBlocker
     private val uiHandler = Handler(Looper.getMainLooper())
+    private val blockedRequestCount = AtomicInteger(0)
 
     private val hideBackRunnable = Runnable { binding.btnPlayerBack.visibility = View.GONE }
     private val hideSkipBackRunnable = Runnable { binding.skipBackOverlay.visibility = View.GONE }
@@ -74,9 +81,31 @@ class PlayerActivity : AppCompatActivity() {
 
         Log.i(TAG, "Starting playback host=${Uri.parse(url).host.orEmpty()}")
         Log.i(TAG, "Starting playback host=${Uri.parse(url)}")
+        playerAdBlocker = PlayerAdBlocker(cacheDir)
         setupWebView()
         binding.btnPlayerBack.setOnClickListener { handleBack() }
-        binding.playerWebView.loadUrl(url)
+        lifecycleScope.launch {
+            val initialization = playerAdBlocker.initialize()
+            Log.i(
+                TAG,
+                "AdBlock initialized source=${initialization.source} " +
+                    "domains=${initialization.blockedDomainCount} " +
+                    "error=${initialization.error.orEmpty()}"
+            )
+            binding.playerWebView.loadUrl(url)
+
+            if (initialization.refreshRecommended) {
+                lifecycleScope.launch {
+                    val refresh = playerAdBlocker.refresh()
+                    Log.i(
+                        TAG,
+                        "AdBlock refresh source=${refresh.source} " +
+                            "domains=${refresh.blockedDomainCount} " +
+                            "error=${refresh.error.orEmpty()}"
+                    )
+                }
+            }
+        }
     }
 
     override fun onResume() {
@@ -99,7 +128,11 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        Log.i(TAG, "Destroying player and clearing callbacks")
+        Log.i(
+            TAG,
+            "Destroying player and clearing callbacks; " +
+                "blockedRequests=${blockedRequestCount.get()}"
+        )
         stopSkipRamp()
         uiHandler.removeCallbacksAndMessages(null)
 
@@ -121,13 +154,13 @@ class PlayerActivity : AppCompatActivity() {
     private fun makeFullscreen() {
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility = (
-            View.SYSTEM_UI_FLAG_FULLSCREEN or
-                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
-                View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
-                View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-            )
+                View.SYSTEM_UI_FLAG_FULLSCREEN or
+                        View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
+                        View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                        View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                        View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+                        View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                )
     }
 
     private fun isAllowedPlaybackUri(uri: Uri): Boolean {
@@ -153,7 +186,7 @@ class PlayerActivity : AppCompatActivity() {
             allowContentAccess = false
             setGeolocationEnabled(false)
             userAgentString = WebSettings.getDefaultUserAgent(this@PlayerActivity) +
-                " KiduyuTVLite/${BuildConfig.VERSION_NAME}"
+                    " KiduyuTVLite/${BuildConfig.VERSION_NAME}"
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 safeBrowsingEnabled = true
             }
@@ -165,6 +198,28 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         webView.webViewClient = object : WebViewClient() {
+            override fun shouldInterceptRequest(
+                view: WebView,
+                request: WebResourceRequest
+            ): WebResourceResponse? {
+                if (
+                    request.isForMainFrame ||
+                    LiteStreamProviders.isAllowedPlaybackUri(request.url) ||
+                    !::playerAdBlocker.isInitialized ||
+                    !playerAdBlocker.shouldBlock(request.url)
+                ) {
+                    return null
+                }
+
+                val blockedCount = blockedRequestCount.incrementAndGet()
+                Log.i(
+                    TAG,
+                    "AdBlock blocked request count=$blockedCount " +
+                        "host=${request.url.host.orEmpty()}"
+                )
+                return blockedWebResourceResponse()
+            }
+
             override fun shouldOverrideUrlLoading(
                 view: WebView,
                 request: WebResourceRequest
@@ -192,7 +247,7 @@ class PlayerActivity : AppCompatActivity() {
                     Log.i(
                         TAG,
                         "Main-frame WebView error code=${error.errorCode} " +
-                            "host=${request.url.host.orEmpty()} description=${error.description}"
+                                "host=${request.url.host.orEmpty()} description=${error.description}"
                     )
                     showErrorPage(view, error.description.toString())
                 }
@@ -207,8 +262,8 @@ class PlayerActivity : AppCompatActivity() {
                     Log.i(
                         TAG,
                         "Main-frame HTTP error status=${errorResponse.statusCode} " +
-                            "host=${request.url.host.orEmpty()} " +
-                            "reason=${errorResponse.reasonPhrase.orEmpty()}"
+                                "host=${request.url.host.orEmpty()} " +
+                                "reason=${errorResponse.reasonPhrase.orEmpty()}"
                     )
                 }
             }
@@ -221,7 +276,7 @@ class PlayerActivity : AppCompatActivity() {
                 Log.i(
                     TAG,
                     "TLS error rejected primaryError=${error.primaryError} " +
-                        "host=${Uri.parse(error.url.orEmpty()).host.orEmpty()}"
+                            "host=${Uri.parse(error.url.orEmpty()).host.orEmpty()}"
                 )
                 handler.cancel()
                 showErrorPage(view, getString(R.string.secure_connection_error))
@@ -245,8 +300,8 @@ class PlayerActivity : AppCompatActivity() {
                     Log.i(
                         TAG,
                         "Provider console level=${consoleMessage.messageLevel()} " +
-                            "line=${consoleMessage.lineNumber()} " +
-                            "message=${sanitizeConsoleMessage(consoleMessage.message())}"
+                                "line=${consoleMessage.lineNumber()} " +
+                                "message=${sanitizeConsoleMessage(consoleMessage.message())}"
                     )
                 }
                 return true
@@ -302,162 +357,25 @@ class PlayerActivity : AppCompatActivity() {
         )
     }
 
+    private fun blockedWebResourceResponse(): WebResourceResponse = WebResourceResponse(
+        "text/plain",
+        "UTF-8",
+        204,
+        "No Content",
+        mapOf("Cache-Control" to "no-store"),
+        ByteArrayInputStream(ByteArray(0))
+    )
+
     private fun injectTvJavascript(view: WebView) {
-        Log.i(TAG, "Injecting overlay checker, TV navigation, max-volume hook, and media controls")
+        Log.i(TAG, "Injecting TV navigation, max-volume hook, and media controls")
         val javascript = """
             (function() {
                 if (window.__kiduyuLiteInjected) return;
                 window.__kiduyuLiteInjected = true;
 
                 var style = document.createElement('style');
-                style.textContent = `
-                    :focus {
-                        outline: 3px solid #E50914 !important;
-                        outline-offset: 2px !important;
-                    }
-                    html { scroll-behavior: smooth; }
-                    .robot-overlay, #robot-overlay, .captcha-modal, #captcha-modal,
-                    div[class*="popup" i], div[id*="popup" i],
-                    div[class*="modal" i] img[src*="qr" i],
-                    div[id*="modal" i] img[src*="qr" i],
-                    div[class*="overlay" i] img[src*="qr" i],
-                    div[id*="overlay" i] img[src*="qr" i],
-                    canvas[class*="qr" i], canvas[id*="qr" i],
-                    img[class*="qr" i], img[id*="qr" i],
-                    div[class*="qrcode" i], div[id*="qrcode" i],
-                    div[class*="qr-code" i], div[id*="qr-code" i],
-                    div[class*="qr_code" i], div[id*="qr_code" i],
-                    div[class*="qrious" i], div[id*="qrious" i],
-                    [class*="qr-modal" i], [id*="qr-modal" i],
-                    [class*="qr-overlay" i], [id*="qr-overlay" i],
-                    [class*="qr-popup" i], [id*="qr-popup" i],
-                    [class*="qr-container" i], [id*="qr-container" i] {
-                        display: none !important;
-                        visibility: hidden !important;
-                        pointer-events: none !important;
-                    }
-                `;
+                style.textContent = ':focus{outline:3px solid #E50914!important;outline-offset:2px!important;}html{scroll-behavior:smooth;}';
                 if (document.head) document.head.appendChild(style);
-
-                function hideRobotAndQrOverlays() {
-                    var root = document.body || document.documentElement;
-                    if (!root) return;
-
-                    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-                    var node;
-                    while ((node = walker.nextNode())) {
-                        var text = (node.nodeValue || '').toLowerCase();
-                        if (
-                            text.includes('robot') ||
-                            text.includes('not a robot') ||
-                            text.includes("confirm you're") ||
-                            text.includes('scan qr') ||
-                            text.includes('scan code') ||
-                            text.includes('qr code') ||
-                            text.includes('scan to watch') ||
-                            text.includes('verify you are human') ||
-                            text.includes('click to verify')
-                        ) {
-                            var parent = node.parentElement;
-                            var topOverlay = null;
-                            while (
-                                parent &&
-                                parent !== document.body &&
-                                parent !== document.documentElement
-                            ) {
-                                var parentStyle = window.getComputedStyle(parent);
-                                if (
-                                    parentStyle.position === 'fixed' ||
-                                    parentStyle.position === 'absolute' ||
-                                    parent.style.position === 'fixed' ||
-                                    parent.style.position === 'absolute'
-                                ) {
-                                    topOverlay = parent;
-                                }
-                                var parentClass = (parent.className || '').toString().toLowerCase();
-                                var parentId = (parent.id || '').toString().toLowerCase();
-                                if (
-                                    parentClass.includes('overlay') ||
-                                    parentClass.includes('modal') ||
-                                    parentClass.includes('popup') ||
-                                    parentClass.includes('dialog') ||
-                                    parentId.includes('overlay') ||
-                                    parentId.includes('modal') ||
-                                    parentId.includes('popup') ||
-                                    parentId.includes('dialog')
-                                ) {
-                                    topOverlay = parent;
-                                }
-                                parent = parent.parentElement;
-                            }
-                            hideOverlayElement(topOverlay);
-                        }
-                    }
-
-                    document.querySelectorAll('img, canvas, svg').forEach(function(image) {
-                        var source = (image.getAttribute('src') || '').toLowerCase();
-                        var alt = (image.getAttribute('alt') || '').toLowerCase();
-                        var className = (image.className || '').toString().toLowerCase();
-                        var id = (image.id || '').toString().toLowerCase();
-                        if (
-                            source.includes('qr') ||
-                            alt.includes('qr') ||
-                            className.includes('qr') ||
-                            id.includes('qr') ||
-                            source.includes('code') ||
-                            className.includes('code') ||
-                            id.includes('code')
-                        ) {
-                            var parent = image.parentElement;
-                            var topOverlay = null;
-                            while (
-                                parent &&
-                                parent !== document.body &&
-                                parent !== document.documentElement
-                            ) {
-                                var parentStyle = window.getComputedStyle(parent);
-                                if (
-                                    parentStyle.position === 'fixed' ||
-                                    parentStyle.position === 'absolute' ||
-                                    parent.style.position === 'fixed' ||
-                                    parent.style.position === 'absolute'
-                                ) {
-                                    topOverlay = parent;
-                                }
-                                var parentClass = (parent.className || '').toString().toLowerCase();
-                                var parentId = (parent.id || '').toString().toLowerCase();
-                                if (
-                                    parentClass.includes('overlay') ||
-                                    parentClass.includes('modal') ||
-                                    parentClass.includes('popup') ||
-                                    parentClass.includes('dialog') ||
-                                    parentId.includes('overlay') ||
-                                    parentId.includes('modal') ||
-                                    parentId.includes('popup') ||
-                                    parentId.includes('dialog')
-                                ) {
-                                    topOverlay = parent;
-                                }
-                                parent = parent.parentElement;
-                            }
-                            if (topOverlay) {
-                                hideOverlayElement(topOverlay);
-                            } else if (image.parentElement) {
-                                hideOverlayElement(image.parentElement);
-                            }
-                        }
-                    });
-                }
-
-                function hideOverlayElement(element) {
-                    if (!element) return;
-                    element.style.setProperty('display', 'none', 'important');
-                    element.style.setProperty('visibility', 'hidden', 'important');
-                    element.style.setProperty('pointer-events', 'none', 'important');
-                }
-
-                hideRobotAndQrOverlays();
-                setInterval(hideRobotAndQrOverlays, 300);
 
                 function setMaximumVolume(video) {
                     if (!video) return;
@@ -664,7 +582,7 @@ class PlayerActivity : AppCompatActivity() {
                 return true
             }
 
-            KeyEvent.KEYCODE_MEDIA_REWIND -> {
+            KeyEvent.KEYCODE_DPAD_LEFT -> {
                 return when (event.action) {
                     KeyEvent.ACTION_DOWN -> {
                         startSkipRamp(-1)
@@ -678,7 +596,7 @@ class PlayerActivity : AppCompatActivity() {
                 }
             }
 
-            KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+            KeyEvent.KEYCODE_DPAD_RIGHT -> {
                 return when (event.action) {
                     KeyEvent.ACTION_DOWN -> {
                         startSkipRamp(1)

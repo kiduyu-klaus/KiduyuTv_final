@@ -77,7 +77,11 @@ Player lifecycle, provider navigation, WebView failures, fullscreen changes, rem
 adb logcat -s KiduyuLitePlayer:I
 ```
 
-Playback URLs are reduced to their host names. Provider console URLs and long token-like values are redacted before logging.
+AdBlock request logs contain only host names. Provider console URLs and long token-like values are redacted before logging.
+
+### Player-only ad blocking
+
+`PlayerActivity` downloads EasyList's `easylist_adservers.txt` into the application cache and refreshes it after 24 hours. Parsed domain and exception rules apply only to player WebView subresources; main-frame navigation and the configured provider domains are never blocked. If the filter is unavailable or invalid, playback continues without blocking.
 
 ## Optional Firebase work
 
