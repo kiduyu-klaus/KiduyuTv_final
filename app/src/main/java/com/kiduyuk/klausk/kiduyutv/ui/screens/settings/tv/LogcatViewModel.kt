@@ -148,7 +148,7 @@ class LogcatViewModel(application: Application) : AndroidViewModel(application) 
                 val uri: Uri = withContext(Dispatchers.IO) {
                     FileProvider.getUriForFile(
                         context,
-                        "${context.packageName}.fileprovider",
+                        "${context.packageName}.provider",
                         fileToExport
                     )
                 }
@@ -177,7 +177,7 @@ class LogcatViewModel(application: Application) : AndroidViewModel(application) 
                 val uri: Uri = withContext(Dispatchers.IO) {
                     FileProvider.getUriForFile(
                         context,
-                        "${context.packageName}.fileprovider",
+                        "${context.packageName}.provider",
                         file
                     )
                 }

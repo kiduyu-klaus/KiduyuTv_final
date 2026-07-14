@@ -2,7 +2,9 @@ package com.kiduyuk.klausk.kiduyutv.util
 
 import android.content.Context
 import kotlinx.coroutines.*
+import java.io.BufferedWriter
 import java.io.File
+import java.io.FileWriter
 import java.io.InputStream
 import java.text.SimpleDateFormat
 import java.util.*
@@ -57,7 +59,11 @@ object LogcatManager {
                     
                     // Ensure file is created
                     currentLogFile?.createNewFile()
-                    val fileWriter = currentLogFile?.bufferedWriter()
+                    // Open the file in append mode so existing log content is preserved
+                    // across stop/start cycles and across multiple capture sessions.
+                    val fileWriter: BufferedWriter? = currentLogFile?.let { file ->
+                        BufferedWriter(FileWriter(file, /* append = */ true))
+                    }
                     
                     fileWriter?.use { writer ->
                         bufferedReader.useLines { lines ->
