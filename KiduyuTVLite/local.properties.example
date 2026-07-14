@@ -1,6 +1,0 @@
-# Copy this file to local.properties and preserve your machine's sdk.dir value.
-sdk.dir=C\:\\Path\\To\\Android\\Sdk
-
-# Accepts either a TMDB v3 API key or a TMDB Read Access Token.
-# Use a rotated/restricted credential and never commit the populated file.
-TMDB_API_KEY=
