@@ -23,6 +23,10 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -58,6 +62,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,6 +82,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -111,6 +117,7 @@ import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.LiveTvViewModel
 import com.kiduyuk.klausk.kiduyutv.viewmodel.SettingsViewModel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1358,14 +1365,6 @@ private fun ProviderOptionItem(
             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
             textAlign = TextAlign.Center
         )
-//        if (option == SettingsManager.AUTO) {
-//            Text(
-//                text = "Ask each time",
-//                color = TextSecondary,
-//                fontSize = 11.sp,
-//                textAlign = TextAlign.Center
-//            )
-//        }
     }
 }
 
@@ -2480,8 +2479,11 @@ private fun LogcatContent(
 /**
  * Full-screen scrollable dialog for viewing the complete logcat output.
  *
- * Displays the entire log file content in a monospace font inside a
- * dismissable overlay dialog that takes up the full screen on TV.
+ * Displays the entire log file content as a line-per-item LazyColumn inside a
+ * dismissable overlay dialog that takes up the full screen on TV. The list is
+ * focusable and handles D-pad Up/Down directly so it scrolls even though the
+ * platform's default focus system has no other focusable target inside it;
+ * focus escapes back toward the Close button at the top/bottom edges of the list.
  */
 @Composable
 private fun LogcatViewerDialog(
@@ -2501,6 +2503,24 @@ private fun LogcatViewerDialog(
             Column(
                 modifier = Modifier.fillMaxSize()
             ) {
+                // Focus requesters — Close button gets initial focus; the log list
+                // requests focus once the user reaches it via D-pad Down from Close.
+                val closeFocusRequester = remember { FocusRequester() }
+                val logFocusRequester = remember { FocusRequester() }
+                val listState = rememberLazyListState()
+                val coroutineScope = rememberCoroutineScope()
+
+                // Focus management: Request focus on Close button when the dialog is shown
+                LaunchedEffect(Unit) {
+                    closeFocusRequester.requestFocus()
+                }
+
+                // Split into lines once per logContent change so the LazyColumn can
+                // lay out/scroll a bounded item count instead of one giant Text blob.
+                val logLines = remember(logContent) {
+                    if (logContent.isBlank()) emptyList() else logContent.lines()
+                }
+
                 // Header row with title and close button
                 Row(
                     modifier = Modifier
@@ -2528,11 +2548,24 @@ private fun LogcatViewerDialog(
                                 color = if (isFocused) Color.White.copy(alpha = 0.5f) else Color.Transparent,
                                 shape = RoundedCornerShape(8.dp)
                             )
+                            .focusRequester(closeFocusRequester)
                             .clickable(
                                 interactionSource = interactionSource,
                                 indication = null,
                                 onClick = onDismiss
                             )
+                            .onKeyEvent { keyEvent ->
+                                // Let Down move focus from Close into the log list.
+                                if (keyEvent.type == KeyEventType.KeyDown &&
+                                    keyEvent.key == Key.DirectionDown &&
+                                    logLines.isNotEmpty()
+                                ) {
+                                    logFocusRequester.requestFocus()
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
                             .focusable(interactionSource = interactionSource)
                             .padding(horizontal = 20.dp, vertical = 10.dp),
                         contentAlignment = Alignment.Center
@@ -2560,12 +2593,13 @@ private fun LogcatViewerDialog(
                 // Scrollable log content area
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .fillMaxWidth()
+                        .weight(1f)
                         .clip(RoundedCornerShape(12.dp))
                         .background(CardDark)
                         .padding(20.dp)
                 ) {
-                    if (logContent.isBlank()) {
+                    if (logLines.isEmpty()) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
@@ -2579,18 +2613,56 @@ private fun LogcatViewerDialog(
                             )
                         }
                     } else {
-                        Column(
+                        LazyColumn(
+                            state = listState,
                             modifier = Modifier
                                 .fillMaxSize()
-                                .verticalScroll(rememberScrollState())
+                                .focusRequester(logFocusRequester)
+                                .focusable()
+                                .onKeyEvent { keyEvent ->
+                                    if (keyEvent.type != KeyEventType.KeyDown) return@onKeyEvent false
+
+                                    when (keyEvent.key) {
+                                        Key.DirectionDown -> {
+                                            coroutineScope.launch {
+                                                val next = (listState.firstVisibleItemIndex + 8)
+                                                    .coerceAtMost(logLines.lastIndex)
+                                                listState.animateScrollToItem(next)
+                                            }
+                                            true
+                                        }
+
+                                        Key.DirectionUp -> {
+                                            // At the very top, let focus escape back to Close
+                                            // instead of swallowing the key event.
+                                            if (listState.firstVisibleItemIndex == 0 &&
+                                                listState.firstVisibleItemScrollOffset == 0
+                                            ) {
+                                                closeFocusRequester.requestFocus()
+                                                true
+                                            } else {
+                                                coroutineScope.launch {
+                                                    val prev = (listState.firstVisibleItemIndex - 8)
+                                                        .coerceAtLeast(0)
+                                                    listState.animateScrollToItem(prev)
+                                                }
+                                                true
+                                            }
+                                        }
+
+                                        else -> false
+                                    }
+                                }
                         ) {
-                            Text(
-                                text = logContent,
-                                color = TextSecondary,
-                                fontSize = 12.sp,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                lineHeight = 18.sp
-                            )
+                            items(logLines) { line ->
+                                Text(
+                                    text = line,
+                                    color = TextSecondary,
+                                    fontSize = 12.sp,
+                                    fontFamily = FontFamily.Monospace,
+                                    lineHeight = 18.sp
+                                )
+                            }
                         }
                     }
                 }
