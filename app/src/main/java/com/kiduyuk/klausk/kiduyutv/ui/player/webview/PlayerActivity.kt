@@ -23,16 +23,28 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager
 import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
+import com.kiduyuk.klausk.kiduyutv.util.AdvancedAdBlocker
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/**
+ * Hosts third-party movie and TV providers inside a fullscreen WebView.
+ *
+ * The activity configures provider playback, initializes player-only ad blocking before the
+ * first page load, exposes playback progress through [PlayerBridge], supports a virtual TV
+ * cursor, and persists watch-history progress locally and to Firebase.
+ *
+ * Required intent data includes `TMDB_ID` and `IS_TV`. Provider HTML may be supplied through
+ * `IFRAME_HTML`; otherwise [StreamProviderManager] generates it from the selected stream URL.
+ */
 class PlayerActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
@@ -73,9 +85,7 @@ class PlayerActivity : AppCompatActivity() {
     }
     private val repository = TmdbRepository()
 
-    /**
-     * Check if the device is an Amazon Fire TV or Fire Stick.
-     */
+    /** Returns true for Amazon Fire TV hardware features or known AFT model identifiers. */
     private fun isFireTVDevice(context: Context): Boolean {
         val isFireTvHardware = context.packageManager.hasSystemFeature("amazon.hardware.fire_tv")
         val isFireTvModel = Build.MODEL != null && Build.MODEL.startsWith("AFT", ignoreCase = true)
@@ -94,6 +104,10 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Validates playback metadata, builds the WebView/cursor UI, attaches native bridges, and
+     * starts playback after the ad-block rule snapshot is ready.
+     */
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -236,13 +250,12 @@ class PlayerActivity : AppCompatActivity() {
             )
 
             webChromeClient = object : WebChromeClient() {
+                /** Receives provider fullscreen requests while the transparent WebView remains active. */
                 override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
                     super.onShowCustomView(view, callback)
                     Log.i(TAG, "[WebChrome] onShowCustomView called")
                 }
-
-
-
+                /** Rejects provider-created popup windows while leaving same-window playback intact. */
                 override fun onCreateWindow(
                     view: WebView?,
                     isDialog: Boolean,
@@ -253,24 +266,12 @@ class PlayerActivity : AppCompatActivity() {
                     return false
                 }
 
+                /** Emits load progress for provider troubleshooting. */
                 override fun onProgressChanged(view: WebView?, newProgress: Int) {
                     super.onProgressChanged(view, newProgress)
                     Log.d(TAG, "[WebChrome] Load progress: $newProgress%")
                 }
             }
-
-
-            // ── Updated: Unified structure loading with generateIframeHtml ──
-            val baseUrl = StreamProviderManager.getBaseUrl(currentProviderName)
-            val finalHtml = intent.getStringExtra("IFRAME_HTML") ?: StreamProviderManager.generateIframeHtml(
-                providerName = currentProviderName,
-                tmdbId = currentTmdbId,
-                isTv = currentIsTv,
-                season = if (currentIsTv) currentSeason else null,
-                episode = if (currentIsTv) currentEpisode else null,
-                timestamp = currentPlaybackPosition / 1000L // Convert ms to seconds for provider URL parameters
-            )
-            loadDataWithBaseURL(baseUrl, finalHtml, "text/html", "UTF-8", null)
         }
 
         // Add JavascriptInterface bridge for player events (must be called on webView, not Activity)
@@ -324,12 +325,26 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            /** Routes system/remote back presses through the playback confirmation dialog. */
             override fun handleOnBackPressed() {
                 showExitConfirmationDialog()
             }
         })
+
+        // Build the provider wrapper only after all WebView clients and JavaScript bridges exist.
+        val baseUrl = StreamProviderManager.getBaseUrl(currentProviderName)
+        val finalHtml = intent.getStringExtra("IFRAME_HTML") ?: StreamProviderManager.generateIframeHtml(
+            providerName = currentProviderName,
+            tmdbId = currentTmdbId,
+            isTv = currentIsTv,
+            season = if (currentIsTv) currentSeason else null,
+            episode = if (currentIsTv) currentEpisode else null,
+            timestamp = currentPlaybackPosition / 1000L // Provider parameters use seconds.
+        )
+        initializeAdBlockerAndLoadPlayer(baseUrl, finalHtml)
     }
 
+    /** Shows a confirmation dialog so an accidental TV back press does not stop playback. */
     private fun showExitConfirmationDialog() {
         QuitDialog(
             context = this,
@@ -343,12 +358,14 @@ class PlayerActivity : AppCompatActivity() {
         ).show()
     }
 
+    /** Resumes WebView media and JavaScript timers when the activity returns to the foreground. */
     override fun onResume() {
         super.onResume()
         webView.onResume()
         webView.resumeTimers()
     }
 
+    /** Pauses WebView work and periodic progress persistence while the activity is obscured. */
     override fun onPause() {
         super.onPause()
         webView.onPause()
@@ -356,6 +373,7 @@ class PlayerActivity : AppCompatActivity() {
         stopProgressUpdateTimer()
     }
 
+    /** Stops callbacks and releases every WebView resource owned by this activity. */
     override fun onDestroy() {
         stopProgressUpdateTimer()
         cursorHideHandler.removeCallbacks(cursorHideRunnable)
@@ -381,6 +399,10 @@ class PlayerActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
+    /**
+     * Converts TV directional and select key-down events into virtual-cursor actions.
+     * Touch-oriented phones and tablets retain Android's default key dispatch.
+     */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (isCursorDisabled) return super.dispatchKeyEvent(event)
         if (event.action == KeyEvent.ACTION_DOWN) {
@@ -396,6 +418,7 @@ class PlayerActivity : AppCompatActivity() {
         return super.dispatchKeyEvent(event)
     }
 
+    /** Moves or clicks the virtual cursor for one supported remote-control key. */
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (isCursorDisabled) return super.onKeyDown(keyCode, event)
         return when (keyCode) {
@@ -432,6 +455,7 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    /** Applies the current cursor coordinates and keeps the cursor above the WebView. */
     private fun updateCursorPosition() {
         if (isCursorDisabled) return
         cursorView.x = cursorX
@@ -440,6 +464,7 @@ class PlayerActivity : AppCompatActivity() {
         cursorView.invalidate()
     }
 
+    /** Dispatches a synthetic touchscreen tap at the virtual cursor's screen coordinates. */
     private fun simulateClick(x: Float, y: Float) {
         val downTime = SystemClock.uptimeMillis()
         val eventTime = SystemClock.uptimeMillis()
@@ -457,6 +482,7 @@ class PlayerActivity : AppCompatActivity() {
         upEvent.recycle()
     }
 
+    /** Makes the TV cursor visible and restarts its five-second inactivity fade timer. */
     private fun showCursorAndResetTimer() {
         if (isCursorDisabled) return
         cursorView.animate().cancel()
@@ -465,6 +491,10 @@ class PlayerActivity : AppCompatActivity() {
         cursorHideHandler.postDelayed(cursorHideRunnable, 5000)
     }
 
+    /**
+     * Creates the watch-history row when necessary and starts periodic progress persistence.
+     * Errors are fail-soft so playback tracking can continue on the next timer cycle.
+     */
     private fun checkAndAddToWatchHistory() {
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -533,11 +563,13 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    /** Schedules the next watch-progress write fifteen seconds from now. */
     private fun startProgressUpdateTimer() {
         progressUpdateHandler.removeCallbacks(progressUpdateRunnable)
         progressUpdateHandler.postDelayed(progressUpdateRunnable, 15000)
     }
 
+    /** Persists the latest bridge-reported position, duration, and episode metadata. */
     private fun persistWatchProgress() {
         if (currentTmdbId == -1) return
 
@@ -578,13 +610,48 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    /** Performs one timer-driven progress write and schedules the following cycle. */
     private fun updateWatchProgress() {
         // Timer-based sync - uses the current position already set by PlayerBridge
         persistWatchProgress()
         progressUpdateHandler.postDelayed(progressUpdateRunnable, 15000)
     }
 
+    /** Removes any pending progress callback from the main-thread handler. */
     private fun stopProgressUpdateTimer() {
         progressUpdateHandler.removeCallbacks(progressUpdateRunnable)
+    }
+
+    /**
+     * Initializes cached/downloaded domain filters before loading provider subresources.
+     *
+     * Stale cached rules protect the initial page immediately; their replacement downloads after
+     * playback begins and is atomically visible to subsequent WebView requests.
+     */
+    private fun initializeAdBlockerAndLoadPlayer(baseUrl: String, html: String) {
+        lifecycleScope.launch {
+            val initialization = AdvancedAdBlocker.initialize(applicationContext)
+            Log.i(
+                TAG,
+                "[AdBlock] Initialized source=${initialization.source} " +
+                    "domains=${initialization.blockedDomainCount} " +
+                    "error=${initialization.error.orEmpty()}"
+            )
+
+            // The bridge and WebView clients are already attached before provider HTML executes.
+            webView.loadDataWithBaseURL(baseUrl, html, "text/html", "UTF-8", null)
+
+            if (initialization.refreshRecommended) {
+                lifecycleScope.launch {
+                    val refresh = AdvancedAdBlocker.refresh(applicationContext)
+                    Log.i(
+                        TAG,
+                        "[AdBlock] Refresh source=${refresh.source} " +
+                            "domains=${refresh.blockedDomainCount} " +
+                            "error=${refresh.error.orEmpty()}"
+                    )
+                }
+            }
+        }
     }
 }

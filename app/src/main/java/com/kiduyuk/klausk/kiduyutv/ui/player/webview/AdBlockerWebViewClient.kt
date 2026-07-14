@@ -7,6 +7,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import com.kiduyuk.klausk.kiduyutv.util.AdvancedAdBlocker
 import java.io.ByteArrayInputStream
 
 open class AdBlockerWebViewClient(
@@ -14,35 +15,14 @@ open class AdBlockerWebViewClient(
     private val onError: () -> Unit
 ) : WebViewClient() {
 
-    private val adDomains = setOf(
-        // Core Ad Networks & Common Trackers
-        "doubleclick.net", "googlesyndication.com", "googleadservices.com",
-        "adnxs.com", "advertising.com", "adsystem.com", "adserver.com",
-        "rubiconproject.com", "openx.net", "pubmatic.com", "criteo.com",
-        "moatads.com", "taboola.com", "outbrain.com", "adroll.com",
-        "imrworldwide.com", "comscore.com", "quantserve.com",
-        "popads.net", "popcash.net", "propellerads.com", "ad-maven.com",
-        "onclickads.net", "adsterra.com", "exo-click.com", "juicyads.com",
-        "trafficjunky.net", "exoclick.com", "mc.yandex.ru", "creativecdn.com",
-        "serving-sys.com", "ads.yahoo.com", "contextweb.com",
-        "adtechtraffic.com", "bet365.com", "1xbet.com", "cloud.mail.ru",
-        
-        // Streaming Hijack, Social Bar, & Analytics Tracking Nodes
-        "histats.com", "oundhertobeconsist.org", "aidthewallowtoh.org", "ghabovethec.info"
-    )
-
-    private fun hostMatchesAdDomain(host: String?): Boolean {
-        if (host.isNullOrEmpty()) return false
-        return adDomains.any { host == it || host.endsWith(".$it") }
-    }
-
     override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
-        val host = request?.url?.host?.lowercase()
+        val uri = request?.url
 
-        if (hostMatchesAdDomain(host)) {
-            Log.d("AdblockWebview", "Intercepted network request to ad host: $host")
+        // Never replace the top-level document; evaluate only player subresources.
+        if (request?.isForMainFrame != true && uri != null && AdvancedAdBlocker.shouldBlock(uri)) {
+            Log.d("AdblockWebview", "Intercepted network request to ad host: ${uri.host.orEmpty()}")
             // Return an empty JS script comment if it's a script request to prevent script execution exceptions
-            val path = request?.url?.path?.lowercase() ?: ""
+            val path = uri.path?.lowercase() ?: ""
             return if (path.endsWith(".js")) {
                 WebResourceResponse("application/javascript", "utf-8", ByteArrayInputStream("/*blocked*/".toByteArray()))
             } else {
@@ -63,7 +43,7 @@ open class AdBlockerWebViewClient(
             return true
         }
 
-        if (hostMatchesAdDomain(host)) {
+        if (AdvancedAdBlocker.shouldBlock(uri)) {
             Log.i("AdblockWebview", "Blocked top-level navigation to ad domain: $host")
             return true
         }

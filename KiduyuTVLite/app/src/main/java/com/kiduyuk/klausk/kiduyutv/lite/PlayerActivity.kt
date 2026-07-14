@@ -35,13 +35,31 @@ import kotlinx.coroutines.launch
 import java.io.ByteArrayInputStream
 import java.util.concurrent.atomic.AtomicInteger
 
+/**
+ * TV-first WebView player for the provider URL selected on the detail screen.
+ *
+ * Responsibilities are intentionally kept inside this activity:
+ * - validate every top-level URL against [LiteStreamProviders];
+ * - initialize the player-only [PlayerAdBlocker] before the first page load;
+ * - apply hardened WebView settings and reject TLS failures;
+ * - bridge remote-control actions to page video elements through injected JavaScript;
+ * - manage provider fullscreen views and release all WebView resources on destruction.
+ *
+ * The activity receives a fully constructed HTTPS URL through [EXTRA_URL]. It never constructs
+ * provider URLs itself and never falls back to an untrusted host.
+ */
 class PlayerActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityPlayerBinding
     private lateinit var playerAdBlocker: PlayerAdBlocker
+
+    // Handler callbacks only control short-lived native overlays and the held-key skip ramp.
     private val uiHandler = Handler(Looper.getMainLooper())
+
+    // WebView interception happens off the main thread, so the diagnostic count is atomic.
     private val blockedRequestCount = AtomicInteger(0)
 
+    // Each overlay owns a separate callback so repeated actions reset only the relevant timer.
     private val hideBackRunnable = Runnable { binding.btnPlayerBack.visibility = View.GONE }
     private val hideSkipBackRunnable = Runnable { binding.skipBackOverlay.visibility = View.GONE }
     private val hideSkipForwardRunnable = Runnable { binding.skipFwdOverlay.visibility = View.GONE }
@@ -52,7 +70,9 @@ class PlayerActivity : AppCompatActivity() {
     private var skipHoldStart = 0L
     private var lastLoggedProgressBucket = -1
 
+    /** Repeats seek operations while left/right remains held and ramps from 10 to 60 seconds. */
     private val skipTickRunnable = object : Runnable {
+        /** Applies one ramped seek step, then schedules the next step while the key is held. */
         override fun run() {
             if (skipDirection == 0) return
             val heldMs = System.currentTimeMillis() - skipHoldStart
@@ -63,6 +83,10 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Validates the requested provider URL, configures the player, initializes ad blocking, and
+     * starts the first page load. A filter failure is reported in Logcat but does not stop playback.
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Log.i(TAG, "Player activity created")
@@ -71,6 +95,7 @@ class PlayerActivity : AppCompatActivity() {
         binding = ActivityPlayerBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        // Reject the activity request before creating a WebView session for an untrusted URL.
         val url = intent.getStringExtra(EXTRA_URL)
         if (url.isNullOrBlank() || !isAllowedPlaybackUri(Uri.parse(url))) {
             Log.i(TAG, "Playback rejected: missing URL or host is not allowlisted")
@@ -84,6 +109,9 @@ class PlayerActivity : AppCompatActivity() {
         playerAdBlocker = PlayerAdBlocker(cacheDir)
         setupWebView()
         binding.btnPlayerBack.setOnClickListener { handleBack() }
+
+        // A cached list returns quickly. On first use, playback waits for the bounded download so
+        // the provider's initial subresource requests can be filtered as well.
         lifecycleScope.launch {
             val initialization = playerAdBlocker.initialize()
             Log.i(
@@ -95,6 +123,7 @@ class PlayerActivity : AppCompatActivity() {
             binding.playerWebView.loadUrl(url)
 
             if (initialization.refreshRecommended) {
+                // Stale cached rules already protect the active page while refresh runs.
                 lifecycleScope.launch {
                     val refresh = playerAdBlocker.refresh()
                     Log.i(
@@ -108,6 +137,7 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    /** Resumes WebView media/timers and restores immersive TV presentation. */
     override fun onResume() {
         super.onResume()
         Log.i(TAG, "Player resumed")
@@ -118,6 +148,7 @@ class PlayerActivity : AppCompatActivity() {
         makeFullscreen()
     }
 
+    /** Pauses WebView media and timers while the activity is not visible. */
     override fun onPause() {
         Log.i(TAG, "Player paused")
         if (::binding.isInitialized) {
@@ -127,6 +158,7 @@ class PlayerActivity : AppCompatActivity() {
         super.onPause()
     }
 
+    /** Cancels native callbacks, detaches the WebView, and releases its renderer resources. */
     override fun onDestroy() {
         Log.i(
             TAG,
@@ -137,6 +169,7 @@ class PlayerActivity : AppCompatActivity() {
         uiHandler.removeCallbacksAndMessages(null)
 
         if (::binding.isInitialized) {
+            // Detach the WebView before destroy() to prevent it retaining the activity hierarchy.
             binding.playerWebView.apply {
                 stopLoading()
                 loadUrl("about:blank")
@@ -151,6 +184,7 @@ class PlayerActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
+    /** Reapplies immersive flags after lifecycle and provider fullscreen transitions. */
     private fun makeFullscreen() {
         @Suppress("DEPRECATION")
         window.decorView.systemUiVisibility = (
@@ -163,17 +197,22 @@ class PlayerActivity : AppCompatActivity() {
                 )
     }
 
+    /** Delegates HTTPS host validation to the same registry used to construct playback URLs. */
     private fun isAllowedPlaybackUri(uri: Uri): Boolean {
         return LiteStreamProviders.isAllowedPlaybackUri(uri)
     }
 
+    /** Configures the WebView, navigation policy, diagnostics, and fullscreen callbacks. */
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
         Log.i(TAG, "Configuring hardened WebView")
         val webView = binding.playerWebView
         webView.settings.apply {
+            // JavaScript and DOM storage are required by the external player applications.
             javaScriptEnabled = true
             domStorageEnabled = true
+
+            // Provider pages must remain HTTPS-only and cannot read local app files/content URIs.
             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
             mediaPlaybackRequiresUserGesture = false
             loadWithOverviewMode = true
@@ -194,10 +233,15 @@ class PlayerActivity : AppCompatActivity() {
 
         CookieManager.getInstance().apply {
             setAcceptCookie(true)
+            // First-party provider state is supported without exposing third-party cookies.
             setAcceptThirdPartyCookies(webView, false)
         }
 
         webView.webViewClient = object : WebViewClient() {
+            /**
+             * Runs on a WebView worker thread. Main-frame and provider-owned traffic are exempt;
+             * only third-party subresources are evaluated against the downloaded domain set.
+             */
             override fun shouldInterceptRequest(
                 view: WebView,
                 request: WebResourceRequest
@@ -220,10 +264,12 @@ class PlayerActivity : AppCompatActivity() {
                 return blockedWebResourceResponse()
             }
 
+            /** Blocks unexpected top-level hosts while allowing normal subresource loading. */
             override fun shouldOverrideUrlLoading(
                 view: WebView,
                 request: WebResourceRequest
             ): Boolean {
+                // Subresource policy belongs to shouldInterceptRequest; this guards navigation.
                 if (!request.isForMainFrame) return false
                 val allowed = isAllowedPlaybackUri(request.url)
                 Log.i(
@@ -233,11 +279,14 @@ class PlayerActivity : AppCompatActivity() {
                 return !allowed
             }
 
+            /** Injects TV/media helpers after the provider document finishes loading. */
             override fun onPageFinished(view: WebView, url: String) {
                 Log.i(TAG, "Provider page finished host=${Uri.parse(url).host.orEmpty()}")
+                // Injection is guarded in JavaScript so duplicate completion callbacks are safe.
                 injectTvJavascript(view)
             }
 
+            /** Shows the local error surface for main-frame network failures only. */
             override fun onReceivedError(
                 view: WebView,
                 request: WebResourceRequest,
@@ -253,11 +302,13 @@ class PlayerActivity : AppCompatActivity() {
                 }
             }
 
+            /** Records main-frame HTTP status failures without replacing provider error pages. */
             override fun onReceivedHttpError(
                 view: WebView,
                 request: WebResourceRequest,
                 errorResponse: WebResourceResponse
             ) {
+                // Log main-frame HTTP failures but leave provider-rendered error handling intact.
                 if (request.isForMainFrame) {
                     Log.i(
                         TAG,
@@ -268,6 +319,7 @@ class PlayerActivity : AppCompatActivity() {
                 }
             }
 
+            /** Rejects certificate failures and replaces the page with a local secure-error view. */
             override fun onReceivedSslError(
                 view: WebView,
                 handler: SslErrorHandler,
@@ -278,13 +330,16 @@ class PlayerActivity : AppCompatActivity() {
                     "TLS error rejected primaryError=${error.primaryError} " +
                             "host=${Uri.parse(error.url.orEmpty()).host.orEmpty()}"
                 )
+                // Never bypass invalid certificates for a third-party playback page.
                 handler.cancel()
                 showErrorPage(view, getString(R.string.secure_connection_error))
             }
         }
 
         webView.webChromeClient = object : WebChromeClient() {
+            /** Emits page-load diagnostics in 25 percent buckets to limit Logcat noise. */
             override fun onProgressChanged(view: WebView, newProgress: Int) {
+                // Bucket progress to avoid one Logcat entry for every percentage point.
                 val bucket = (newProgress.coerceIn(0, 100) / 25) * 25
                 if (bucket != lastLoggedProgressBucket) {
                     lastLoggedProgressBucket = bucket
@@ -292,7 +347,9 @@ class PlayerActivity : AppCompatActivity() {
                 }
             }
 
+            /** Logs sanitized provider warnings/errors and suppresses duplicate default logging. */
             override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {
+                // Provider warnings/errors are useful, but URLs and token-like values are removed.
                 if (
                     consoleMessage.messageLevel() == ConsoleMessage.MessageLevel.WARNING ||
                     consoleMessage.messageLevel() == ConsoleMessage.MessageLevel.ERROR
@@ -307,6 +364,7 @@ class PlayerActivity : AppCompatActivity() {
                 return true
             }
 
+            /** Moves the provider's fullscreen video surface into the native overlay container. */
             override fun onShowCustomView(view: View, callback: CustomViewCallback) {
                 if (customView != null) {
                     Log.i(TAG, "Ignoring duplicate fullscreen custom view")
@@ -314,6 +372,7 @@ class PlayerActivity : AppCompatActivity() {
                     return
                 }
                 Log.i(TAG, "Entering provider fullscreen view")
+                // WebChromeClient supplies the provider's fullscreen video surface.
                 customView = view
                 customViewCallback = callback
                 binding.fullscreenContainer.addView(
@@ -328,16 +387,19 @@ class PlayerActivity : AppCompatActivity() {
                 makeFullscreen()
             }
 
+            /** Restores the normal WebView when the provider exits fullscreen. */
             override fun onHideCustomView() {
                 Log.i(TAG, "Provider requested fullscreen exit")
                 exitCustomView()
             }
 
+            /** Explicitly denies geolocation requests because playback does not require location. */
             override fun onGeolocationPermissionsShowPrompt(
                 origin: String,
                 callback: GeolocationPermissions.Callback
             ) {
                 Log.i(TAG, "Geolocation permission denied for provider host=${Uri.parse(origin).host.orEmpty()}")
+                // Playback has no legitimate need for device location.
                 callback.invoke(origin, false, false)
             }
         }
@@ -346,6 +408,7 @@ class PlayerActivity : AppCompatActivity() {
         Log.i(TAG, "WebView configuration complete")
     }
 
+    /** Replaces a failed remote page with a small, local, HTML-escaped error surface. */
     private fun showErrorPage(view: WebView, message: String) {
         Log.i(TAG, "Showing local playback error page")
         view.loadDataWithBaseURL(
@@ -357,6 +420,7 @@ class PlayerActivity : AppCompatActivity() {
         )
     }
 
+    /** Empty 204 response returned for a matched ad-server subresource. */
     private fun blockedWebResourceResponse(): WebResourceResponse = WebResourceResponse(
         "text/plain",
         "UTF-8",
@@ -366,17 +430,27 @@ class PlayerActivity : AppCompatActivity() {
         ByteArrayInputStream(ByteArray(0))
     )
 
+    /**
+     * Adds TV focus navigation and lightweight media controls to the loaded provider page.
+     *
+     * The script can inspect a nested iframe only when browser same-origin rules permit access.
+     * Cross-origin frames are caught and ignored; Android does not attempt to bypass that boundary.
+     * Repeated calls are safe because the page-global injection flag exits after the first call.
+     */
     private fun injectTvJavascript(view: WebView) {
         Log.i(TAG, "Injecting TV navigation, max-volume hook, and media controls")
         val javascript = """
             (function() {
+                // onPageFinished can fire more than once for the same document.
                 if (window.__kiduyuLiteInjected) return;
                 window.__kiduyuLiteInjected = true;
 
+                // Make the provider's currently focused control visible from TV distance.
                 var style = document.createElement('style');
                 style.textContent = ':focus{outline:3px solid #E50914!important;outline-offset:2px!important;}html{scroll-behavior:smooth;}';
                 if (document.head) document.head.appendChild(style);
 
+                // Unmute an accessible media element and request its maximum page-level volume.
                 function setMaximumVolume(video) {
                     if (!video) return;
                     try {
@@ -386,21 +460,25 @@ class PlayerActivity : AppCompatActivity() {
                     } catch (ignored) {}
                 }
 
+                // Attach the volume handler once per video element.
                 function hookVideoVolume(video) {
                     if (!video || video.__kiduyuLiteVolumeHooked) return;
                     video.__kiduyuLiteVolumeHooked = true;
+                    // `playing` is the real playback signal; readiness events can fire while paused.
                     video.addEventListener('playing', function() {
                         setMaximumVolume(video);
                     }, true);
                     if (!video.paused) setMaximumVolume(video);
                 }
 
+                // Discover videos below a document or newly added DOM node.
                 function scanVideoElements(root) {
                     if (!root || typeof root.querySelectorAll !== 'function') return;
                     if (root.tagName === 'VIDEO') hookVideoVolume(root);
                     root.querySelectorAll('video').forEach(hookVideoVolume);
                 }
 
+                // Hook existing videos and watch for players mounted later by client-side scripts.
                 scanVideoElements(document);
                 var volumeObserverTarget = document.documentElement || document.body;
                 if (volumeObserverTarget && typeof MutationObserver !== 'undefined') {
@@ -411,16 +489,20 @@ class PlayerActivity : AppCompatActivity() {
                     }).observe(volumeObserverTarget, {childList: true, subtree: true});
                 }
 
+                // Periodically discover videos inside same-origin provider frames.
                 function scanFrameVideos() {
                     document.querySelectorAll('iframe').forEach(function(frame) {
                         try {
                             scanVideoElements(frame.contentDocument);
-                        } catch (ignored) {}
+                        } catch (ignored) {
+                            // Cross-origin iframe content is intentionally inaccessible.
+                        }
                     });
                 }
                 scanFrameVideos();
                 setInterval(scanFrameVideos, 1000);
 
+                // Return the first directly accessible video used by native seek/play controls.
                 function directVideo() {
                     var video = document.querySelector('video');
                     if (video) {
@@ -435,11 +517,14 @@ class PlayerActivity : AppCompatActivity() {
                                 hookVideoVolume(nested);
                                 return nested;
                             }
-                        } catch (ignored) {}
+                        } catch (ignored) {
+                            // Cross-origin providers still receive native key events normally.
+                        }
                     }
                     return null;
                 }
 
+                // Native left/right handlers call this function through evaluateJavascript.
                 window.__kiduyuLiteSkip = function(seconds) {
                     var video = directVideo();
                     if (!video) return false;
@@ -447,6 +532,7 @@ class PlayerActivity : AppCompatActivity() {
                     return true;
                 };
 
+                // Prefer the focused page control; otherwise toggle the directly accessible video.
                 window.__kiduyuLiteCenter = function() {
                     var active = document.activeElement;
                     if (active && active !== document.body && typeof active.click === 'function') {
@@ -459,7 +545,9 @@ class PlayerActivity : AppCompatActivity() {
                     return 'toggled';
                 };
 
+                // Candidate set used by the simple vertical spatial-focus search below.
                 var selector = 'a[href],button,input,select,[tabindex]:not([tabindex="-1"]),[role="button"]';
+                // Establish a usable initial focus target after the provider UI settles.
                 function focusFirst() {
                     var element = document.querySelector('[class*="play"],[class*="hero"] button') || document.querySelector(selector);
                     if (element) {
@@ -468,6 +556,7 @@ class PlayerActivity : AppCompatActivity() {
                     }
                 }
 
+                // Move focus to the nearest visible control in the requested vertical direction.
                 function navigate(direction) {
                     var focused = document.activeElement;
                     if (!focused || focused === document.body) {
@@ -480,6 +569,7 @@ class PlayerActivity : AppCompatActivity() {
                     var best = null;
                     var bestDistance = Infinity;
 
+                    // Choose the nearest visible candidate above or below the focused element.
                     document.querySelectorAll(selector).forEach(function(element) {
                         if (element === focused) return;
                         var candidate = element.getBoundingClientRect();
@@ -502,6 +592,7 @@ class PlayerActivity : AppCompatActivity() {
                     }
                 }
 
+                // Horizontal keys remain native seek controls; only up/down is handled in-page.
                 document.addEventListener('keydown', function(event) {
                     if (event.keyCode === 38) {
                         navigate('up');
@@ -518,6 +609,7 @@ class PlayerActivity : AppCompatActivity() {
         view.evaluateJavascript(javascript, null)
     }
 
+    /** Sends Enter/DPAD-center to the focused page control or directly accessible video. */
     private fun handleCenterKey() {
         binding.playerWebView.evaluateJavascript(
             "window.__kiduyuLiteCenter && window.__kiduyuLiteCenter();"
@@ -526,6 +618,7 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    /** Performs one JavaScript seek and briefly displays the matching native overlay. */
     private fun fireSkip(seconds: Int) {
         binding.playerWebView.evaluateJavascript(
             "window.__kiduyuLiteSkip && window.__kiduyuLiteSkip($seconds);"
@@ -547,6 +640,7 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    /** Starts repeated seeking; [direction] is -1 for rewind and +1 for fast-forward. */
     private fun startSkipRamp(direction: Int) {
         if (skipDirection == direction) return
         stopSkipRamp()
@@ -557,6 +651,7 @@ class PlayerActivity : AppCompatActivity() {
         uiHandler.postDelayed(skipTickRunnable, SKIP_REPEAT_MS)
     }
 
+    /** Stops held-key seeking and removes the scheduled repeat callback. */
     private fun stopSkipRamp() {
         if (skipDirection != 0) {
             Log.i(TAG, "Skip ramp stopped")
@@ -565,6 +660,10 @@ class PlayerActivity : AppCompatActivity() {
         uiHandler.removeCallbacks(skipTickRunnable)
     }
 
+    /**
+     * Reserves left/right for seeking and center for provider activation/play-pause.
+     * Key-up must be consumed for left/right so a released remote button always stops the ramp.
+     */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         showBackButton()
         when (event.keyCode) {
@@ -613,12 +712,14 @@ class PlayerActivity : AppCompatActivity() {
         return super.dispatchKeyEvent(event)
     }
 
+    /** Shows the native back affordance and restarts its three-second hide timer. */
     private fun showBackButton() {
         uiHandler.removeCallbacks(hideBackRunnable)
         binding.btnPlayerBack.visibility = View.VISIBLE
         uiHandler.postDelayed(hideBackRunnable, 3_000)
     }
 
+    /** Handles back in visual-stack order: fullscreen, WebView history, then activity. */
     private fun handleBack() {
         when {
             customView != null -> {
@@ -636,6 +737,7 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
+    /** Restores the WebView after the provider's fullscreen surface is dismissed. */
     private fun exitCustomView() {
         Log.i(TAG, "Exiting provider fullscreen view")
         binding.fullscreenContainer.removeAllViews()
@@ -647,6 +749,7 @@ class PlayerActivity : AppCompatActivity() {
         makeFullscreen()
     }
 
+    /** Builds the local error document; all dynamic text is escaped before insertion. */
     private fun errorHtml(message: String): String {
         val safeMessage = TextUtils.htmlEncode(message)
         val safeTitle = TextUtils.htmlEncode(getString(R.string.playback_error_title))
@@ -662,12 +765,14 @@ class PlayerActivity : AppCompatActivity() {
         """.trimIndent()
     }
 
+    /** Redacts likely URLs/tokens and bounds provider-controlled Logcat output. */
     private fun sanitizeConsoleMessage(message: String): String = message
         .replace(URL_PATTERN, "<url>")
         .replace(LONG_TOKEN_PATTERN, "<redacted>")
         .take(MAX_CONSOLE_MESSAGE_LENGTH)
 
     companion object {
+        // Keep a stable tag so TV-device logs can be filtered with `adb logcat -s`.
         private const val TAG = "KiduyuLitePlayer"
         private const val MAX_CONSOLE_MESSAGE_LENGTH = 240
         private val URL_PATTERN = Regex("https?://\\S+", RegexOption.IGNORE_CASE)
