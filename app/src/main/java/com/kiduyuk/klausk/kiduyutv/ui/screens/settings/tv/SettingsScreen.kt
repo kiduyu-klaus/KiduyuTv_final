@@ -2613,19 +2613,26 @@ private fun LogcatViewerDialog(
                             )
                         }
                     } else {
+                        val listInteractionSource = remember { MutableInteractionSource() }
+                        val isListFocused by listInteractionSource.collectIsFocusedAsState()
+
                         LazyColumn(
                             state = listState,
                             modifier = Modifier
                                 .fillMaxSize()
+                                .border(
+                                    width = if (isListFocused) 2.dp else 0.dp,
+                                    color = if (isListFocused) PrimaryRed.copy(alpha = 0.5f) else Color.Transparent,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
                                 .focusRequester(logFocusRequester)
-                                .focusable()
                                 .onKeyEvent { keyEvent ->
                                     if (keyEvent.type != KeyEventType.KeyDown) return@onKeyEvent false
 
                                     when (keyEvent.key) {
                                         Key.DirectionDown -> {
                                             coroutineScope.launch {
-                                                val next = (listState.firstVisibleItemIndex + 8)
+                                                val next = (listState.firstVisibleItemIndex + 10)
                                                     .coerceAtMost(logLines.lastIndex)
                                                 listState.animateScrollToItem(next)
                                             }
@@ -2633,16 +2640,12 @@ private fun LogcatViewerDialog(
                                         }
 
                                         Key.DirectionUp -> {
-                                            // At the very top, let focus escape back to Close
-                                            // instead of swallowing the key event.
-                                            if (listState.firstVisibleItemIndex == 0 &&
-                                                listState.firstVisibleItemScrollOffset == 0
-                                            ) {
+                                            if (listState.firstVisibleItemIndex == 0) {
                                                 closeFocusRequester.requestFocus()
                                                 true
                                             } else {
                                                 coroutineScope.launch {
-                                                    val prev = (listState.firstVisibleItemIndex - 8)
+                                                    val prev = (listState.firstVisibleItemIndex - 10)
                                                         .coerceAtLeast(0)
                                                     listState.animateScrollToItem(prev)
                                                 }
@@ -2653,20 +2656,21 @@ private fun LogcatViewerDialog(
                                         else -> false
                                     }
                                 }
+                                .focusable(interactionSource = listInteractionSource)
                         ) {
                             items(logLines) { line ->
                                 Text(
                                     text = line,
                                     color = TextSecondary,
-                                    fontSize = 12.sp,
+                                    fontSize = 13.sp,
                                     fontFamily = FontFamily.Monospace,
-                                    lineHeight = 18.sp
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 2.dp)
                                 )
                             }
                         }
                     }
-                }
-            }
         }
     }
 }
