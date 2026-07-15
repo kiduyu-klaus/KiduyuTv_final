@@ -683,10 +683,15 @@ object StreamProviderManager {
     )
 
     /**
-     * Static shell of the player wrapper HTML. The four placeholders are
+     * Static shell of the player wrapper HTML. The seven placeholders are
      * replaced at runtime via [String.format] to avoid rebuilding the entire
      * document on every playback, which lets the JIT reparse the constant
      * parts and reduces GC pressure during fast scrolling through TV episodes.
+     *
+     * NOTE: any literal `%` in the template body must be escaped as `%%` so
+     * `String.format` does not interpret it as a format specifier. The CSS
+     * `width: 100%` / `height: 100%` rules below are the reason this template
+     * uses the doubling.
      */
     private const val IFRAME_HTML_TEMPLATE = """
         <!DOCTYPE html>
@@ -696,8 +701,8 @@ object StreamProviderManager {
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
             %1${'$'}s
             <style>
-                body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
-                iframe { width: 100%; height: 100%; border: none; overflow: hidden; position: absolute; top: 0; left: 0; }
+                body, html { margin: 0; padding: 0; width: 100%%; height: 100%%; overflow: hidden; background: #000; }
+                iframe { width: 100%%; height: 100%%; border: none; overflow: hidden; position: absolute; top: 0; left: 0; }
             </style>
         </head>
         <body>
