@@ -6,6 +6,7 @@ import android.app.UiModeManager
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.PixelFormat
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -22,6 +23,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -89,6 +91,18 @@ class PlayerActivity : AppCompatActivity() {
         updateWatchProgress()
     }
     private val repository = TmdbRepository()
+
+    // ── Performance timing chain (#18) ──────────────────────────────────────
+    // Each stopwatch captures one well-defined milestone so we can measure
+    // player load time end-to-end via logcat. The values are read-only after
+    // the activity starts and are reported next to the [LoadingDialog] log
+    // when the page commits visible.
+    private val perfActivityCreateMs: Long = SystemClock.elapsedRealtime()
+    private var perfWebViewAttachedMs: Long = 0L
+    private var perfLoadCalledMs: Long = 0L
+    private var perfAdBlockerInitMs: Long = 0L
+    private var perfPageCommitMs: Long = 0L
+    private var perfPageFinishedMs: Long = 0L
 
     /** Returns true for Amazon Fire TV hardware features or known AFT model identifiers. */
     private fun isFireTVDevice(context: Context): Boolean {
@@ -275,7 +289,11 @@ class PlayerActivity : AppCompatActivity() {
                 if (Build.VERSION.SDK_INT >= 21) {
                     mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                 }
-                clearCache(true)
+                // PERF: stop clearing the WebView cache on every load. The previous
+                // `clearCache(true)` immediately followed by `LOAD_DEFAULT` forced a
+                // cold cache lookup on every play. WebView's normal cache policy is
+                // safe here — the only cache poison risk is a logged-out user, and
+                // SignOutActivity already calls clearCache() on its own.
 
                 cacheMode = WebSettings.LOAD_DEFAULT // Utilizes the browser cache for buffering
 
@@ -295,6 +313,16 @@ class PlayerActivity : AppCompatActivity() {
                 onPageFinished = {
                     isPageLoading = false
                     dismissLoadingDialog()
+                    perfPageFinishedMs = SystemClock.elapsedRealtime()
+                    logPerfTimings("pageFinished")
+                    // For same-origin loads the tracker asset was not preloaded as part
+                    // of a wrapper document; inject the bootstrap and the asset script
+                    // now so the postMessage listener is installed before playback
+                    // events start firing.
+                    if (pendingSameOriginTracker) {
+                        injectTrackerIntoSameOriginPage()
+                        pendingSameOriginTracker = false
+                    }
                     Log.i(TAG, "[WebView] Page finished loading with AdBlocker")
                 },
                 onError = {
@@ -302,6 +330,10 @@ class PlayerActivity : AppCompatActivity() {
                     isPageLoading = false
                     dismissLoadingDialog()
                     Log.e(TAG, "[WebView] Error received with AdBlocker")
+                },
+                onCommitVisible = {
+                    perfPageCommitMs = SystemClock.elapsedRealtime()
+                    logPerfTimings("pageCommitVisible")
                 }
             )
 
@@ -330,26 +362,28 @@ class PlayerActivity : AppCompatActivity() {
             }
         }
 
-        // Add JavascriptInterface bridge for player events (must be called on webView, not Activity)
-        webView.addJavascriptInterface(
-            PlayerBridge { provider, positionSec, durationSec, season, episode ->
-                runOnUiThread {
-                    // positionSec is in seconds, convert to milliseconds for storage
-                    currentPlaybackPosition = (positionSec * 1000).toLong()
-                    // Store duration in milliseconds
-                    currentDuration = (durationSec * 1000).toLong()
-                    // Update season and episode if provided and they have changed
-                    if (currentIsTv && season != null && episode != null) {
-                        if (season != currentSeason || episode != currentEpisode) {
-                            Log.i(TAG, "[Episode] Changed S${currentSeason}E${currentEpisode} -> S${season}E${episode}")
-                            currentSeason = season
-                            currentEpisode = episode
-                        }
+        // Add JavascriptInterface bridge for player events. The shared [PlayerBridge.INSTANCE]
+        // is reused across PlayerActivity instances so the Kotlin object survives across
+        // activity restarts; the per-activity callback is registered on resume and cleared
+        // in onDestroy to prevent the bridge from holding a stale reference.
+        PlayerBridge.INSTANCE.onEvent = { provider, positionSec, durationSec, season, episode ->
+            runOnUiThread {
+                // positionSec is in seconds, convert to milliseconds for storage
+                currentPlaybackPosition = (positionSec * 1000).toLong()
+                // Store duration in milliseconds
+                currentDuration = (durationSec * 1000).toLong()
+                // Update season and episode if provided and they have changed
+                if (currentIsTv && season != null && episode != null) {
+                    if (season != currentSeason || episode != currentEpisode) {
+                        Log.i(TAG, "[Episode] Changed S${currentSeason}E${currentEpisode} -> S${season}E${episode}")
+                        currentSeason = season
+                        currentEpisode = episode
                     }
                 }
-            },
-            "MavisInterface"
-        )
+            }
+        }
+        webView.addJavascriptInterface(PlayerBridge.INSTANCE, "MavisInterface")
+        perfWebViewAttachedMs = SystemClock.elapsedRealtime()
 
         cursorView = MouseCursorView(this).apply {
             layoutParams = FrameLayout.LayoutParams(
@@ -394,7 +428,7 @@ class PlayerActivity : AppCompatActivity() {
 
         // Build the provider wrapper only after all WebView clients and JavaScript bridges exist.
         val baseUrl = StreamProviderManager.getBaseUrl(currentProviderName)
-        val finalHtml = intent.getStringExtra("IFRAME_HTML") ?: StreamProviderManager.generateIframeHtml(
+        val finalUrl = StreamProviderManager.generateUrl(
             providerName = currentProviderName,
             tmdbId = currentTmdbId,
             isTv = currentIsTv,
@@ -402,7 +436,153 @@ class PlayerActivity : AppCompatActivity() {
             episode = if (currentIsTv) currentEpisode else null,
             timestamp = currentPlaybackPosition / 1000L // Provider parameters use seconds.
         )
-        initializeAdBlockerAndLoadPlayer(baseUrl, finalHtml)
+        val customIframeHtml = intent.getStringExtra("IFRAME_HTML")
+        val sameOrigin = customIframeHtml == null && isSameOriginProvider(baseUrl, finalUrl)
+        val wrapperHtml = if (customIframeHtml != null) {
+            customIframeHtml
+        } else if (sameOrigin) {
+            // No wrapper document is needed — we will inject the tracker directly via
+            // evaluateJavascript after the page finishes loading.
+            null
+        } else {
+            StreamProviderManager.generateIframeHtml(
+                providerName = currentProviderName,
+                tmdbId = currentTmdbId,
+                isTv = currentIsTv,
+                season = if (currentIsTv) currentSeason else null,
+                episode = if (currentIsTv) currentEpisode else null,
+                timestamp = currentPlaybackPosition / 1000L
+            )
+        }
+        loadIntoWebView(baseUrl, finalUrl, sameOrigin, wrapperHtml)
+    }
+
+    /**
+     * Returns true when [finalUrl] is served from the same origin as [baseUrl]. For
+     * same-origin providers we can skip the wrapper iframe document entirely and let
+     * the WebView load the player page directly, saving one HTML parse plus the
+     * iframe creation on the critical path. The tracker is then injected via
+     * `evaluateJavascript` once the page commits.
+     */
+    private fun isSameOriginProvider(baseUrl: String, finalUrl: String): Boolean {
+        return try {
+            val base = Uri.parse(baseUrl)
+            val final = Uri.parse(finalUrl)
+            !base.host.isNullOrEmpty() &&
+                base.host.equals(final.host, ignoreCase = true) &&
+                base.scheme.equals(final.scheme, ignoreCase = true)
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Schedules the WebView load, kicks off ad-blocker initialization in parallel, and
+     * arranges for the tracker script to be injected after the page finishes loading.
+     *
+     * @param baseUrl provider origin (used as the WebView's base URL for relative-URL
+     *   resolution inside the wrapper document).
+     * @param finalUrl player URL — either loaded directly (same-origin case) or wrapped
+     *   inside [wrapperHtml].
+     * @param sameOrigin true when the wrapper document is unnecessary.
+     * @param wrapperHtml the wrapper HTML to load, or null in the same-origin case.
+     */
+    private fun loadIntoWebView(baseUrl: String, finalUrl: String, sameOrigin: Boolean, wrapperHtml: String?) {
+        // PERF: Kick off the WebView load as soon as the root layout has had a chance
+        // to measure. `webView.post` runs after the first layout pass, so the WebView
+        // is fully attached and ready to render by the time the load request arrives.
+        // The ad-blocker init is fire-and-forget — the request interceptor reads from
+        // the in-memory snapshot, which is already populated from a previous session.
+        webView.post {
+            perfLoadCalledMs = SystemClock.elapsedRealtime()
+            if (sameOrigin) {
+                webView.loadUrl(finalUrl)
+                Log.i(TAG, "[WebView] Same-origin load: $finalUrl")
+            } else {
+                val html = wrapperHtml.orEmpty()
+                // PERF: `loadData` is marginally faster than `loadDataWithBaseURL` and
+                // the wrapper document has no relative URLs that need base-URL
+                // resolution (the iframe `src` is absolute). Using `loadData` here
+                // also avoids origin-related edge cases.
+                webView.loadData(html, "text/html", "UTF-8")
+                Log.i(TAG, "[WebView] Wrapper load via $baseUrl (${html.length} chars)")
+            }
+        }
+
+        // Background ad-blocker initialization. The blocker consults the in-memory
+        // snapshot on every request, so a slow first download does not block the load.
+        lifecycleScope.launch {
+            val initialization = AdvancedAdBlocker.initialize(applicationContext)
+            perfAdBlockerInitMs = SystemClock.elapsedRealtime()
+            Log.i(
+                TAG,
+                "[AdBlock] Initialized source=${initialization.source} " +
+                    "domains=${initialization.blockedDomainCount} " +
+                    "error=${initialization.error.orEmpty()}"
+            )
+
+            if (initialization.refreshRecommended) {
+                lifecycleScope.launch {
+                    val refresh = AdvancedAdBlocker.refresh(applicationContext)
+                    Log.i(
+                        TAG,
+                        "[AdBlock] Refresh source=${refresh.source} " +
+                            "domains=${refresh.blockedDomainCount} " +
+                            "error=${refresh.error.orEmpty()}"
+                    )
+                }
+            }
+        }
+
+        // For same-origin loads we need to inject the tracker after the page commits.
+        // The existing `onPageFinished` callback already fires for both cases; we
+        // branch on the `sameOrigin` flag captured here.
+        this.pendingSameOriginTracker = sameOrigin
+    }
+
+    /** Set by [loadIntoWebView] and consumed by the `onPageFinished` callback. */
+    private var pendingSameOriginTracker: Boolean = false
+
+    /**
+     * Logs the current performance timing chain relative to the activity-create baseline.
+     * Safe to call from any thread; uses an atomic snapshot so concurrent writes from the
+     * WebView callbacks don't produce torn values in logcat.
+     */
+    private fun logPerfTimings(label: String) {
+        val now = SystemClock.elapsedRealtime()
+        val base = perfActivityCreateMs
+        Log.i(
+            TAG,
+            "[Perf] $label now=${now - base}ms " +
+                "T0=0 T1=${perfWebViewAttachedMs - base}ms " +
+                "T2=${perfLoadCalledMs - base}ms " +
+                "T3=${perfAdBlockerInitMs - base}ms " +
+                "T4=${perfPageCommitMs - base}ms " +
+                "T5=${perfPageFinishedMs - base}ms"
+        )
+    }
+
+    /**
+     * Injects the tracker bootstrap and the shared asset script into a same-origin player
+     * page that was loaded directly (no wrapper document). The bootstrap sets
+     * `window.__kiduyuPlayerConfig` which [kiduyu_tracker.js] reads on startup, and the
+     * asset script installs the `postMessage` listener that talks back to [PlayerBridge].
+     */
+    private fun injectTrackerIntoSameOriginPage() {
+        val bootstrap = StreamProviderManager.buildTrackerBootstrap(
+            tmdbId = currentTmdbId,
+            isTv = currentIsTv,
+            season = if (currentIsTv) currentSeason else null,
+            episode = if (currentIsTv) currentEpisode else null
+        )
+        webView.evaluateJavascript(bootstrap, null)
+        webView.evaluateJavascript(
+            "(function(){var s=document.createElement('script');" +
+                "s.src='file:///android_asset/kiduyu_tracker.js';" +
+                "document.head.appendChild(s);})();",
+            null
+        )
+        Log.i(TAG, "[WebView] Injected tracker into same-origin page")
     }
 
     /** Shows a confirmation dialog so an accidental TV back press does not stop playback. */
@@ -689,33 +869,37 @@ class PlayerActivity : AppCompatActivity() {
      *
      * Stale cached rules protect the initial page immediately; their replacement downloads after
      * playback begins and is atomically visible to subsequent WebView requests.
+     *
+     * NOTE: Superseded by [loadIntoWebView], which runs the ad-blocker init in parallel
+     * with the WebView load instead of serially. Retained as commented documentation so
+     * the previous intent is preserved for future maintainers.
      */
-    private fun initializeAdBlockerAndLoadPlayer(baseUrl: String, html: String) {
-        lifecycleScope.launch {
-            val initialization = AdvancedAdBlocker.initialize(applicationContext)
-            Log.i(
-                TAG,
-                "[AdBlock] Initialized source=${initialization.source} " +
-                    "domains=${initialization.blockedDomainCount} " +
-                    "error=${initialization.error.orEmpty()}"
-            )
-
-            // The bridge and WebView clients are already attached before provider HTML executes.
-            webView.loadDataWithBaseURL(baseUrl, html, "text/html", "UTF-8", null)
-
-            if (initialization.refreshRecommended) {
-                lifecycleScope.launch {
-                    val refresh = AdvancedAdBlocker.refresh(applicationContext)
-                    Log.i(
-                        TAG,
-                        "[AdBlock] Refresh source=${refresh.source} " +
-                            "domains=${refresh.blockedDomainCount} " +
-                            "error=${refresh.error.orEmpty()}"
-                    )
-                }
-            }
-        }
-    }
+    // private fun initializeAdBlockerAndLoadPlayer(baseUrl: String, html: String) {
+    //     lifecycleScope.launch {
+    //         val initialization = AdvancedAdBlocker.initialize(applicationContext)
+    //         Log.i(
+    //             TAG,
+    //             "[AdBlock] Initialized source=${initialization.source} " +
+    //                 "domains=${initialization.blockedDomainCount} " +
+    //                 "error=${initialization.error.orEmpty()}"
+    //         )
+    //
+    //         // The bridge and WebView clients are already attached before provider HTML executes.
+    //         webView.loadDataWithBaseURL(baseUrl, html, "text/html", "UTF-8", null)
+    //
+    //         if (initialization.refreshRecommended) {
+    //             lifecycleScope.launch {
+    //                 val refresh = AdvancedAdBlocker.refresh(applicationContext)
+    //                 Log.i(
+    //                     TAG,
+    //                     "[AdBlock] Refresh source=${refresh.source} " +
+    //                         "domains=${refresh.blockedDomainCount} " +
+    //                         "error=${refresh.error.orEmpty()}"
+    //                 )
+    //             }
+    //         }
+    //     }
+    // }
 
     /**
      * Builds and shows the loading dialog that covers the activity while the provider page

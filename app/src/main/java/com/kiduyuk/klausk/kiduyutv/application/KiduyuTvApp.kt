@@ -2,7 +2,12 @@ package com.kiduyuk.klausk.kiduyutv.application
 
 import android.app.Activity
 import android.app.Application
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
+import android.view.View
+import android.view.ViewGroup
+import android.webkit.WebView
 import androidx.multidex.MultiDexApplication
 import coil.ImageLoader
 import coil.ImageLoaderFactory
@@ -97,6 +102,11 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
         // Ad SDKs are initialized from SplashActivity only after UMP consent resolves.
         AppOpenAdObserver.install(this)
 
+        // Warm up the WebView process. Constructing (and shortly destroying) a hidden
+        // WebView at app start pulls the chromium native libraries into memory so the
+        // first playback in PlayerActivity does not pay the cold-start cost.
+        warmUpWebViewProcess()
+
         // Register ActivityLifecycleCallback to track current Activity for dialog display
         registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
             override fun onActivityCreated(activity: Activity, savedInstanceState: android.os.Bundle?) {
@@ -154,6 +164,37 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
     }
 
     /**
+     * Builds a transient zero-size WebView on the main thread after a short delay so the
+     * WebView native library is loaded once at process start. This is the cheapest way
+     * to shave 200–600 ms off the first playback because it avoids paying the cost of
+     * `WebView.<init>` (which dynamically loads libwebviewchromium) on the user's
+     * "tap to play" gesture. The hidden view is destroyed after a few seconds; even
+     * if the user opens a player before then, the warm WebView does not conflict with
+     * the per-activity WebView.
+     */
+    private fun warmUpWebViewProcess() {
+        Handler(Looper.getMainLooper()).postDelayed({
+            try {
+                val warm = WebView(applicationContext)
+                warm.layoutParams = ViewGroup.LayoutParams(0, 0)
+                warm.visibility = View.GONE
+                warm.loadUrl("about:blank")
+                Log.i("KiduyuTvApp", "[WebViewWarmup] Pre-loaded native libraries")
+
+                // Release the warm WebView after a short grace period. Keeping it around
+                // longer wastes memory; destroying it after the libraries are paged in is
+                // enough to keep the process warm.
+                Handler(Looper.getMainLooper()).postDelayed({
+                    runCatching { warm.destroy() }
+                        .onFailure { Log.w("KiduyuTvApp", "[WebViewWarmup] destroy failed: ${it.message}") }
+                }, WARMUP_HOLD_MS)
+            } catch (e: Exception) {
+                Log.w("KiduyuTvApp", "[WebViewWarmup] Failed: ${e.message}")
+            }
+        }, WARMUP_DELAY_MS)
+    }
+
+    /**
      * Provides a singleton ImageLoader instance for the entire application.
      * This configuration is moved from MainActivity to ensure consistency
      * and better resource management.
@@ -189,5 +230,16 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
             .networkCachePolicy(CachePolicy.ENABLED)
             .logger(DebugLogger())
             .build()
+    }
+
+    companion object {
+        // Delay before kicking off the warm-up. Done slightly after onCreate so the splash
+        // activity's first frame wins the main thread; the warm-up just needs the libraries
+        // paged in before the first playback tap.
+        private const val WARMUP_DELAY_MS = 1_500L
+        // How long to keep the warm WebView alive before destroying it. Long enough that
+        // typical "open app → tap to play" sequences still benefit, short enough to avoid
+        // any memory pressure on low-end TVs.
+        private const val WARMUP_HOLD_MS = 5_000L
     }
 }

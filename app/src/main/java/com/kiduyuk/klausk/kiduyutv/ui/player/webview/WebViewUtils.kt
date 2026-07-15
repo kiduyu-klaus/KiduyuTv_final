@@ -29,10 +29,18 @@ object WebViewUtils {
             Log.i(TAG, "[WebView] Hardware acceleration available: $isHardwareAccelerated")
 
             if (isHardwareAccelerated) {
-                //webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
-                Log.i(TAG, "[WebView] Fire TV: hardware acceleration enabled")
+                // Fire OS 6+ exposes a working hardware layer; older Amazon WebView builds
+                // occasionally reject the call, so guard with runCatching to keep the
+                // activity crash-free on legacy devices.
+                runCatching {
+                    webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+                }.onSuccess {
+                    Log.i(TAG, "[WebView] Fire TV: hardware acceleration enabled")
+                }.onFailure { error ->
+                    Log.w(TAG, "[WebView] Fire TV: hardware layer rejected (${error.message}); using default layer")
+                }
             } else {
-                //webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+                runCatching { webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null) }
                 Log.w(TAG, "[WebView] Fire TV: hardware acceleration unavailable, using software rendering")
             }
 

@@ -683,6 +683,32 @@ object StreamProviderManager {
     )
 
     /**
+     * Static shell of the player wrapper HTML. The four placeholders are
+     * replaced at runtime via [String.format] to avoid rebuilding the entire
+     * document on every playback, which lets the JIT reparse the constant
+     * parts and reduces GC pressure during fast scrolling through TV episodes.
+     */
+    private const val IFRAME_HTML_TEMPLATE = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+            %1${'$'}s
+            <style>
+                body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+                iframe { width: 100%; height: 100%; border: none; overflow: hidden; position: absolute; top: 0; left: 0; }
+            </style>
+        </head>
+        <body>
+            <iframe id="player-frame" src="%2${'$'}s" %3${'$'}s></iframe>
+            <script>window.__kiduyuPlayerConfig={contentId:%4${'$'}d,isTv:%5${'$'}s,season:%6${'$'}d,episode:%7${'$'}d};</script>
+            <script src="file:///android_asset/kiduyu_tracker.js"></script>
+        </body>
+        </html>
+    """
+
+    /**
      * Generate iframe HTML for a given provider
      */
     fun generateIframeHtml(
@@ -738,160 +764,61 @@ object StreamProviderManager {
 
         val attrString = attributes.map { "${it.key}=\"${it.value}\"" }.joinToString(" ")
 
-        // =============== UPDATED TRACKING SCRIPT ============================
-        // Only supports: Videasy, Vidrock, Vidfast, Vidking, Vidnest
-        // Uses postMessage to receive events from the iframe.
-        // Extracts progress (seconds), season, episode and sends to Android via MavisInterface.
-        val trackingScript = """
-            <script>
-            (function() {
-                const currentContentId = $tmdbId;
-                const currentIsTv = $isTv;
-                const currentSeason = ${season ?: 1};
-                const currentEpisode = ${episode ?: 1};
+        // Preconnect hint: pull DNS + TLS handshake for the provider's host out of
+        // the critical path. The provider origin is parsed from the final URL; if
+        // parsing fails we silently omit the hint rather than breaking the page.
+        val preconnect = try {
+            val providerUri = android.net.Uri.parse(finalUrl)
+            val scheme = providerUri.scheme
+            val host = providerUri.host
+            if (scheme != null && host != null) {
+                "<link rel=\"preconnect\" href=\"$scheme://$host\" crossorigin>" +
+                    "<link rel=\"dns-prefetch\" href=\"//$host\">"
+            } else {
+                ""
+            }
+        } catch (e: Exception) {
+            ""
+        }
 
-                function sendToAndroid(currentTime, duration, seasonNum, episodeNum, provider) {
-                    if (typeof MavisInterface !== 'undefined' && MavisInterface.onPlayerEvent) {
-                        const payload = {
-                            currentTime: parseFloat(currentTime),
-                            duration:    parseFloat(duration),
-                            season: seasonNum ? parseInt(seasonNum, 10) : null,
-                            episode: episodeNum ? parseInt(episodeNum, 10) : null,
-                            provider: provider || ""
-                        };
-                        MavisInterface.onPlayerEvent(JSON.stringify(payload));
-                    }
-                }
-
-                // Provider origin → name mapping
-                const providerMap = {
-                    'https://player.videasy.net': 'Videasy',
-                    'https://vidrock.ru': 'Vidrock',
-                    'https://vidfast.pro': 'Vidfast',
-                    'https://vidfast.in': 'Vidfast',
-                    'https://vidfast.io': 'Vidfast',
-                    'https://vidfast.me': 'Vidfast',
-                    'https://vidfast.net': 'Vidfast',
-                    'https://vidfast.pm': 'Vidfast',
-                    'https://vidfast.xyz': 'Vidfast',
-                    'https://www.vidking.net': 'Vidking',
-                    'https://vidnest.fun': 'Vidnest'
-                };
-
-                window.addEventListener('message', function(event) {
-                    const origin = event.origin || '';
-                    const provider = providerMap[origin];
-                    if (!provider) return;  // ignore other origins
-
-                    const data = event.data;
-                    if (!data) return;
-
-                    try {
-                        // ---- 1. Videasy / Vidking (JSON with timestamp/season/episode) ----
-                        if (provider === 'Videasy' || provider === 'Vidking') {
-                            if (typeof data === 'string') {
-                                const parsed = JSON.parse(data);
-                                if (parsed.timestamp !== undefined) {
-                                    const seasonVal = parsed.season !== undefined ? parsed.season : (currentIsTv ? currentSeason : null);
-                                    const episodeVal = parsed.episode !== undefined ? parsed.episode : (currentIsTv ? currentEpisode : null);
-                                    sendToAndroid(parsed.timestamp, parsed.duration || 0, seasonVal, episodeVal, provider);
-                                }
-                            }
-                            return;
-                        }
-
-                        // ---- 2. Vidrock / Vidfast / Vidnest (MEDIA_DATA) ----
-                        if (data.type === 'MEDIA_DATA' && data.data) {
-                            const mediaData = data.data;
-                            let item = null;
-
-                            // Extract the correct item based on provider's storage key pattern
-                            if (provider === 'Vidrock') {
-                                // Vidrock: array of objects with .id
-                                if (Array.isArray(mediaData)) {
-                                    item = mediaData.find(function(x) { return x && x.id == currentContentId; });
-                                }
-                            } else if (provider === 'Vidfast') {
-                                // Vidfast: keys "t{id}" for TV, "m{id}" for movies
-                                const key = (currentIsTv ? 't' : 'm') + currentContentId;
-                                item = mediaData[key] || null;
-                            } else if (provider === 'Vidnest') {
-                                // Vidnest: keys are simply the ID as string
-                                item = mediaData[String(currentContentId)] || null;
-                            }
-
-                            if (!item) return;
-
-                            // Determine progress, season, episode
-                            let watched = 0;
-                            let seasonNum = null;
-                            let episodeNum = null;
-
-                            if (currentIsTv) {
-                                // Use last_season_watched / last_episode_watched if available, else fallback to current
-                                const rawSeason = item.last_season_watched !== undefined ? parseInt(item.last_season_watched, 10) : currentSeason;
-                                const rawEpisode = item.last_episode_watched !== undefined ? parseInt(item.last_episode_watched, 10) : currentEpisode;
-                                seasonNum = rawSeason;
-                                episodeNum = rawEpisode;
-
-                                // Look for episode-specific progress
-                                const epKey = 's' + seasonNum + 'e' + episodeNum;
-                                if (item.show_progress && item.show_progress[epKey]) {
-                                    const epProgress = item.show_progress[epKey];
-                                    if (epProgress.progress && epProgress.progress.watched !== undefined) {
-                                        watched = epProgress.progress.watched;
-                                    } else if (epProgress.watched !== undefined) {
-                                        watched = epProgress.watched;
-                                    }
-                                } else if (item.progress && item.progress.watched !== undefined) {
-                                    watched = item.progress.watched;
-                                }
-                            } else {
-                                // Movie
-                                if (item.progress && item.progress.watched !== undefined) {
-                                    watched = item.progress.watched;
-                                }
-                            }
-
-                            // Duration: try to get from progress.duration or fallback to 0
-                            let duration = 0;
-                            if (item.progress && item.progress.duration !== undefined) {
-                                duration = item.progress.duration;
-                            }
-
-                            sendToAndroid(watched, duration, seasonNum, episodeNum, provider);
-                        }
-                    } catch (e) {
-                        // ignore parsing errors
-                    }
-                });
-            })();
-            </script>
-        """.trimIndent()
-        // =============== END OF UPDATED TRACKING SCRIPT ====================
-
-        return """
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-                <style>
-                    body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
-                    iframe { width: 100%; height: 100%; border: none; overflow: hidden; position: absolute; top: 0; left: 0; }
-                </style>
-            </head>
-            <body>
-                <iframe 
-                    id="player-frame"
-                    src="$finalUrl" 
-                    $attrString>
-                </iframe>
-                $trackingScript
-            </body>
-            </html>
-        """.trimIndent()
+        return IFRAME_HTML_TEMPLATE.format(
+            preconnect,             // %1$s
+            finalUrl,               // %2$s
+            attrString,             // %3$s
+            tmdbId,                 // %4$d
+            if (isTv) "true" else "false", // %5$s
+            season ?: 1,            // %6$d
+            episode ?: 1            // %7$d
+        ).trimIndent()
     }
+
+    /**
+     * Returns the JS bootstrap snippet used to inject the per-playback player
+     * configuration into a same-origin page. This is the counterpart to the
+     * inline `<script>` in [IFRAME_HTML_TEMPLATE] and is invoked from
+     * [PlayerActivity] when the player URL is loaded directly without the
+     * wrapper document.
+     */
+    fun buildTrackerBootstrap(
+        tmdbId: Int,
+        isTv: Boolean,
+        season: Int?,
+        episode: Int?
+    ): String {
+        val safeSeason = season ?: 1
+        val safeEpisode = episode ?: 1
+        return "(function(){window.__kiduyuPlayerConfig={contentId:$tmdbId," +
+            "isTv:${if (isTv) "true" else "false"}," +
+            "season:$safeSeason,episode:$safeEpisode};})();"
+    }
+
+    /**
+     * Returns the inline `<script>` tag that loads the shared tracker asset.
+     * Used both inside the wrapper template and when injecting the tracker
+     * into a same-origin player page.
+     */
+    const val TRACKER_SCRIPT_TAG: String =
+        "<script src=\"file:///android_asset/kiduyu_tracker.js\"></script>"
 
     /**
      * Extract base URL from a URL template (scheme + host)
