@@ -362,27 +362,29 @@ class PlayerActivity : AppCompatActivity() {
             }
         }
 
-        // Add JavascriptInterface bridge for player events. The shared [PlayerBridge.INSTANCE]
-        // is reused across PlayerActivity instances so the Kotlin object survives across
-        // activity restarts; the per-activity callback is registered on resume and cleared
-        // in onDestroy to prevent the bridge from holding a stale reference.
-        PlayerBridge.INSTANCE.onEvent = { provider, positionSec, durationSec, season, episode ->
-            runOnUiThread {
-                // positionSec is in seconds, convert to milliseconds for storage
-                currentPlaybackPosition = (positionSec * 1000).toLong()
-                // Store duration in milliseconds
-                currentDuration = (durationSec * 1000).toLong()
-                // Update season and episode if provided and they have changed
-                if (currentIsTv && season != null && episode != null) {
-                    if (season != currentSeason || episode != currentEpisode) {
-                        Log.i(TAG, "[Episode] Changed S${currentSeason}E${currentEpisode} -> S${season}E${episode}")
-                        currentSeason = season
-                        currentEpisode = episode
+        // Add JavascriptInterface bridge for player events. The bridge takes the
+        // callback via its constructor (matches the upstream PlayerBridge API), so
+        // each PlayerActivity creates its own PlayerBridge instance. The bridge is
+        // attached to the WebView and lives for the duration of the activity.
+        webView.addJavascriptInterface(
+            PlayerBridge { provider, positionSec, durationSec, season, episode ->
+                runOnUiThread {
+                    // positionSec is in seconds, convert to milliseconds for storage
+                    currentPlaybackPosition = (positionSec * 1000).toLong()
+                    // Store duration in milliseconds
+                    currentDuration = (durationSec * 1000).toLong()
+                    // Update season and episode if provided and they have changed
+                    if (currentIsTv && season != null && episode != null) {
+                        if (season != currentSeason || episode != currentEpisode) {
+                            Log.i(TAG, "[Episode] Changed S${currentSeason}E${currentEpisode} -> S${season}E${episode}")
+                            currentSeason = season
+                            currentEpisode = episode
+                        }
                     }
                 }
-            }
-        }
-        webView.addJavascriptInterface(PlayerBridge.INSTANCE, "MavisInterface")
+            },
+            "MavisInterface"
+        )
         perfWebViewAttachedMs = SystemClock.elapsedRealtime()
 
         cursorView = MouseCursorView(this).apply {
