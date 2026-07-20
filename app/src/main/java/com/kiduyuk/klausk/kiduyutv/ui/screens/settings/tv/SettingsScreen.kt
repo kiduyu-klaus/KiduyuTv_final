@@ -2632,7 +2632,7 @@ private fun LogcatViewerDialog(
                                     when (keyEvent.key) {
                                         Key.DirectionDown -> {
                                             coroutineScope.launch {
-                                                val next = (listState.firstVisibleItemIndex + 8)
+                                                val next = (listState.firstVisibleItemIndex + 20) //
                                                     .coerceAtMost(logLines.lastIndex)
                                                 listState.animateScrollToItem(next)
                                             }
@@ -2645,7 +2645,7 @@ private fun LogcatViewerDialog(
                                                 true
                                             } else {
                                                 coroutineScope.launch {
-                                                    val prev = (listState.firstVisibleItemIndex - 8)
+                                                    val prev = (listState.firstVisibleItemIndex - 20)
                                                         .coerceAtLeast(0)
                                                     listState.animateScrollToItem(prev)
                                                 }
