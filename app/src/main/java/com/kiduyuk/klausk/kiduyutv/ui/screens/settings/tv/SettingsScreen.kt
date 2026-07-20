@@ -2521,7 +2521,33 @@ private fun LogcatViewerDialog(
                     if (logContent.isBlank()) emptyList() else logContent.lines()
                 }
 
-                // Header row with title and close button
+                // Level filter state — null = show all, "I" = info only, "E" = error only.
+                // Mutually exclusive: clicking the active filter clears it (back to all).
+                var filterLevel by remember { mutableStateOf<String?>(null) }
+
+                // threadtime format: "MM-DD HH:MM:SS.SSS  PID  TID P TAG: ..."
+                // Anchor to the line start and capture the single-letter priority field.
+                val threadtimePriority = remember {
+                    Regex("""^\S+\s+\S+\s+\d+\s+\d+\s+([VDIWEFS])\b""")
+                }
+
+                // Apply the level filter to the parsed lines.
+                val displayedLines = remember(logLines, filterLevel) {
+                    when (filterLevel) {
+                        null -> logLines
+                        else -> logLines.filter { line ->
+                            threadtimePriority.find(line)?.groupValues?.getOrNull(1) == filterLevel
+                        }
+                    }
+                }
+
+                // When the filter changes, jump back to the top so the user sees the
+                // first match instead of wherever the previous scroll position was.
+                LaunchedEffect(filterLevel) {
+                    if (filterLevel != null) listState.scrollToItem(0)
+                }
+
+                // Header row with title, level filter buttons, and close button
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -2529,66 +2555,169 @@ private fun LogcatViewerDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Logcat Viewer",
-                        color = TextPrimary,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-
-                    val interactionSource = remember { MutableInteractionSource() }
-                    val isFocused by interactionSource.collectIsFocusedAsState()
-
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (isFocused) PrimaryRed.copy(alpha = 0.8f) else PrimaryRed)
-                            .border(
-                                width = if (isFocused) 2.dp else 0.dp,
-                                color = if (isFocused) Color.White.copy(alpha = 0.5f) else Color.Transparent,
-                                shape = RoundedCornerShape(8.dp)
-                            )
-                            .focusRequester(closeFocusRequester)
-                            .clickable(
-                                interactionSource = interactionSource,
-                                indication = null,
-                                onClick = onDismiss
-                            )
-                            .onKeyEvent { keyEvent ->
-                                // Let Down move focus from Close into the log list.
-                                if (keyEvent.type == KeyEventType.KeyDown &&
-                                    keyEvent.key == Key.DirectionDown &&
-                                    logLines.isNotEmpty()
-                                ) {
-                                    logFocusRequester.requestFocus()
-                                    true
-                                } else {
-                                    false
-                                }
-                            }
-                            .focusable(interactionSource = interactionSource)
-                            .padding(horizontal = 20.dp, vertical = 10.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Close",
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp)
-                            )
+                    Column {
+                        Text(
+                            text = "Logcat Viewer",
+                            color = TextPrimary,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (filterLevel != null) {
                             Text(
-                                text = "Close",
-                                color = Color.White,
+                                text = "Showing ${displayedLines.size} of ${logLines.size} (Log.$filterLevel)",
+                                color = TextTertiary,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // --- Log.i filter button ---
+                        val isIActive = filterLevel == "I"
+                        val infoColor = Color(0xFF2196F3)
+                        val iInteractionSource = remember { MutableInteractionSource() }
+                        val isIFocused by iInteractionSource.collectIsFocusedAsState()
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isIActive) infoColor else CardDark)
+                                .border(
+                                    width = if (isIFocused) 2.dp else 1.dp,
+                                    color = if (isIFocused) Color.White.copy(alpha = 0.5f) else infoColor.copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .clickable(
+                                    interactionSource = iInteractionSource,
+                                    indication = null,
+                                    onClick = {
+                                        filterLevel = if (isIActive) null else "I"
+                                    }
+                                )
+                                .onKeyEvent { keyEvent ->
+                                    if (keyEvent.type == KeyEventType.KeyDown &&
+                                        keyEvent.key == Key.DirectionDown &&
+                                        displayedLines.isNotEmpty()
+                                    ) {
+                                        logFocusRequester.requestFocus()
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                }
+                                .focusable(interactionSource = iInteractionSource)
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Log.i",
+                                color = if (isIActive) Color.White else infoColor,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Medium
                             )
                         }
+
+                        // --- Log.e filter button ---
+                        val isEActive = filterLevel == "E"
+                        val errorColor = Color(0xFFFF6B6B)
+                        val eInteractionSource = remember { MutableInteractionSource() }
+                        val isEFocused by eInteractionSource.collectIsFocusedAsState()
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isEActive) errorColor else CardDark)
+                                .border(
+                                    width = if (isEFocused) 2.dp else 1.dp,
+                                    color = if (isEFocused) Color.White.copy(alpha = 0.5f) else errorColor.copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .clickable(
+                                    interactionSource = eInteractionSource,
+                                    indication = null,
+                                    onClick = {
+                                        filterLevel = if (isEActive) null else "E"
+                                    }
+                                )
+                                .onKeyEvent { keyEvent ->
+                                    if (keyEvent.type == KeyEventType.KeyDown &&
+                                        keyEvent.key == Key.DirectionDown &&
+                                        displayedLines.isNotEmpty()
+                                    ) {
+                                        logFocusRequester.requestFocus()
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                }
+                                .focusable(interactionSource = eInteractionSource)
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Log.e",
+                                color = if (isEActive) Color.White else errorColor,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+
+                        // --- Close button ---
+                        val interactionSource = remember { MutableInteractionSource() }
+                        val isFocused by interactionSource.collectIsFocusedAsState()
+
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isFocused) PrimaryRed.copy(alpha = 0.8f) else PrimaryRed)
+                                .border(
+                                    width = if (isFocused) 2.dp else 0.dp,
+                                    color = if (isFocused) Color.White.copy(alpha = 0.5f) else Color.Transparent,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                .focusRequester(closeFocusRequester)
+                                .clickable(
+                                    interactionSource = interactionSource,
+                                    indication = null,
+                                    onClick = onDismiss
+                                )
+                                .onKeyEvent { keyEvent ->
+                                    // Let Down move focus from Close into the log list.
+                                    if (keyEvent.type == KeyEventType.KeyDown &&
+                                        keyEvent.key == Key.DirectionDown &&
+                                        displayedLines.isNotEmpty()
+                                    ) {
+                                        logFocusRequester.requestFocus()
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                }
+                                .focusable(interactionSource = interactionSource)
+                                .padding(horizontal = 20.dp, vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Close",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Text(
+                                    text = "Close",
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                     }
                 }
+            }
 
                 // Scrollable log content area
                 Box(
@@ -2599,79 +2728,96 @@ private fun LogcatViewerDialog(
                         .background(CardDark)
                         .padding(20.dp)
                 ) {
-                    if (logLines.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "No logs available.\nStart capture to collect logs.",
-                                color = TextTertiary,
-                                fontSize = 16.sp,
-                                textAlign = TextAlign.Center,
-                                lineHeight = 24.sp
-                            )
-                        }
-                    } else {
-                        val listInteractionSource = remember { MutableInteractionSource() }
-                        val isListFocused by listInteractionSource.collectIsFocusedAsState()
-
-                        // Wrap LazyColumn in a focusable Box for reliable TV scrolling
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .border(
-                                    width = if (isListFocused) 2.dp else 0.dp,
-                                    color = if (isListFocused) PrimaryRed.copy(alpha = 0.5f) else Color.Transparent,
-                                    shape = RoundedCornerShape(8.dp)
+                    when {
+                        logLines.isEmpty() -> {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "No logs available.\nStart capture to collect logs.",
+                                    color = TextTertiary,
+                                    fontSize = 16.sp,
+                                    textAlign = TextAlign.Center,
+                                    lineHeight = 24.sp
                                 )
-                                .focusRequester(logFocusRequester)
-                                .onKeyEvent { keyEvent ->
-                                    if (keyEvent.type != KeyEventType.KeyDown) return@onKeyEvent false
+                            }
+                        }
+                        displayedLines.isEmpty() -> {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "No Log.${filterLevel} entries in the current log.",
+                                    color = TextTertiary,
+                                    fontSize = 16.sp,
+                                    textAlign = TextAlign.Center,
+                                    lineHeight = 24.sp
+                                )
+                            }
+                        }
+                        else -> {
+                            val listInteractionSource = remember { MutableInteractionSource() }
+                            val isListFocused by listInteractionSource.collectIsFocusedAsState()
 
-                                    when (keyEvent.key) {
-                                        Key.DirectionDown -> {
-                                            coroutineScope.launch {
-                                                val next = (listState.firstVisibleItemIndex + 20) //
-                                                    .coerceAtMost(logLines.lastIndex)
-                                                listState.animateScrollToItem(next)
-                                            }
-                                            true
-                                        }
+                            // Wrap LazyColumn in a focusable Box for reliable TV scrolling
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .border(
+                                        width = if (isListFocused) 2.dp else 0.dp,
+                                        color = if (isListFocused) PrimaryRed.copy(alpha = 0.5f) else Color.Transparent,
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    .focusRequester(logFocusRequester)
+                                    .onKeyEvent { keyEvent ->
+                                        if (keyEvent.type != KeyEventType.KeyDown) return@onKeyEvent false
 
-                                        Key.DirectionUp -> {
-                                            if (listState.firstVisibleItemIndex == 0) {
-                                                closeFocusRequester.requestFocus()
-                                                true
-                                            } else {
+                                        when (keyEvent.key) {
+                                            Key.DirectionDown -> {
                                                 coroutineScope.launch {
-                                                    val prev = (listState.firstVisibleItemIndex - 20)
-                                                        .coerceAtLeast(0)
-                                                    listState.animateScrollToItem(prev)
+                                                    val next = (listState.firstVisibleItemIndex + 20) //
+                                                        .coerceAtMost(displayedLines.lastIndex)
+                                                    listState.animateScrollToItem(next)
                                                 }
                                                 true
                                             }
-                                        }
 
-                                        else -> false
+                                            Key.DirectionUp -> {
+                                                if (listState.firstVisibleItemIndex == 0) {
+                                                    closeFocusRequester.requestFocus()
+                                                    true
+                                                } else {
+                                                    coroutineScope.launch {
+                                                        val prev = (listState.firstVisibleItemIndex - 20)
+                                                            .coerceAtLeast(0)
+                                                        listState.animateScrollToItem(prev)
+                                                    }
+                                                    true
+                                                }
+                                            }
+
+                                            else -> false
+                                        }
                                     }
-                                }
-                                .focusable(interactionSource = listInteractionSource)
-                        ) {
-                            LazyColumn(
-                                state = listState,
-                                modifier = Modifier.fillMaxSize()
+                                    .focusable(interactionSource = listInteractionSource)
                             ) {
-                                items(logLines) { line ->
-                                    Text(
-                                        text = line,
-                                        color = TextSecondary,
-                                        fontSize = 13.sp,
-                                        fontFamily = FontFamily.Monospace,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 12.dp, vertical = 2.dp)
-                                    )
+                                LazyColumn(
+                                    state = listState,
+                                    modifier = Modifier.fillMaxSize()
+                                ) {
+                                    items(displayedLines) { line ->
+                                        Text(
+                                            text = line,
+                                            color = TextSecondary,
+                                            fontSize = 13.sp,
+                                            fontFamily = FontFamily.Monospace,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 12.dp, vertical = 2.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
