@@ -334,7 +334,8 @@ fun MovieDetailScreen(
                                                 isTv = false,
                                                 season = null,
                                                 episode = null,
-                                                timestamp = timestamp
+                                                timestamp = timestamp,
+                                                isTvDevice = true
                                             )
                                         } else null
 
@@ -344,7 +345,8 @@ fun MovieDetailScreen(
                                             isTv = false,
                                             season = null,
                                             episode = null,
-                                            timestamp = timestamp
+                                            timestamp = timestamp,
+                                            isTvDevice = true
                                         )
 
                                         if (directUrl != null) {

@@ -17,7 +17,9 @@ data class StreamProvider(
     val allowAttributes: String = "autoplay; encrypted-media; picture-in-picture",
     val movieParameters: (tmdbId: Int, timestamp: Long) -> Map<String, String> = { _, _ -> emptyMap() },
     val tvParameters: (tmdbId: Int, season: Int, episode: Int, timestamp: Long) -> Map<String, String> = { _, _, _, _ -> emptyMap() },
-    val isPhoneOnly: Boolean = false
+    val isPhoneOnly: Boolean = false,
+    val isPhoneEnabled: Boolean = true,
+    val isTvEnabled: Boolean = !isPhoneOnly
 )
 
 /**
@@ -572,9 +574,9 @@ object StreamProviderManager {
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val remoteProviders = parseProviders(snapshot)
-                if (remoteProviders.isNotEmpty()) {
+                if (snapshot.exists() && snapshot.hasChildren()) {
                     providers = remoteProviders
-                    Log.i(TAG, "Loaded ${remoteProviders.size} stream providers from Firebase")
+                    Log.i(TAG, "Loaded ${remoteProviders.size} enabled stream providers from Firebase")
                 } else {
                     providers = fallbackProviders
                     Log.w(TAG, "Firebase stream provider config empty; using fallback providers")
@@ -614,7 +616,7 @@ object StreamProviderManager {
     }
 
     private fun parseProvider(snapshot: DataSnapshot): StreamProvider? {
-        val enabled = snapshot.child("enabled").getValue(Boolean::class.java) ?: true
+        val enabled = snapshot.child("enabled").booleanValue() ?: true
         if (!enabled) return null
 
         val name = snapshot.child("stream_provider_name").getValue(String::class.java)
@@ -636,10 +638,20 @@ object StreamProviderManager {
             ?: "autoplay; encrypted-media; picture-in-picture"
         val movieParameterMap = snapshot.child("movie_parameters").toStringMap()
         val tvParameterMap = snapshot.child("tv_parameters").toStringMap()
-        val isPhoneOnly = snapshot.child("is_phone_only").getValue(Boolean::class.java)
-            ?: snapshot.child("phone_only").getValue(Boolean::class.java)
+        val isPhoneOnly = snapshot.child("is_phone_only").booleanValue()
+            ?: snapshot.child("phone_only").booleanValue()
             ?: matchingFallback?.isPhoneOnly
             ?: false
+        val isPhoneEnabled = snapshot.child("isphone_enabled").booleanValue()
+            ?: snapshot.child("is_phone_enabled").booleanValue()
+            ?: snapshot.child("phone_enabled").booleanValue()
+            ?: matchingFallback?.isPhoneEnabled
+            ?: true
+        val isTvEnabled = snapshot.child("istv_enabled").booleanValue()
+            ?: snapshot.child("is_tv_enabled").booleanValue()
+            ?: snapshot.child("tv_enabled").booleanValue()
+            ?: matchingFallback?.isTvEnabled
+            ?: !isPhoneOnly
 
         return StreamProvider(
             name = name,
@@ -655,8 +667,19 @@ object StreamProviderManager {
                 val fallbackParams = matchingFallback?.tvParameters?.invoke(tmdbId, season, episode, timestamp).orEmpty()
                 mergeParameterMaps(fallbackParams, tvParameterMap)
             },
-            isPhoneOnly = isPhoneOnly
+            isPhoneOnly = isPhoneOnly,
+            isPhoneEnabled = isPhoneEnabled,
+            isTvEnabled = isTvEnabled
         )
+    }
+
+    private fun DataSnapshot.booleanValue(): Boolean? {
+        return when (val rawValue = value) {
+            is Boolean -> rawValue
+            is String -> rawValue.equals("true", ignoreCase = true)
+            is Number -> rawValue.toInt() != 0
+            else -> null
+        }
     }
 
     private fun DataSnapshot.toStringMap(): Map<String, String> {
@@ -691,9 +714,20 @@ object StreamProviderManager {
         isTv: Boolean,
         season: Int?,
         episode: Int?,
-        timestamp: Long = 0L
+        timestamp: Long = 0L,
+        isTvDevice: Boolean? = null
     ): String {
-        val provider = providers.find { it.name.equals(providerName, ignoreCase = true) } ?: providers[0]
+        val deviceProviders = isTvDevice?.let { getProvidersForDevice(it) } ?: providers
+        val provider = deviceProviders.find { it.name.equals(providerName, ignoreCase = true) }
+            ?: deviceProviders.firstOrNull()
+            ?: return """
+                <!DOCTYPE html>
+                <html>
+                <body style="margin:0;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;">
+                    <p>No stream providers are enabled for this device.</p>
+                </body>
+                </html>
+            """.trimIndent()
 
         val baseUrl: String
         val params: Map<String, String>
@@ -897,7 +931,9 @@ object StreamProviderManager {
      * Extract base URL from a URL template (scheme + host)
      */
     fun getBaseUrl(providerName: String): String {
-        val provider = providers.find { it.name.equals(providerName, ignoreCase = true) } ?: providers[0]
+        val provider = providers.find { it.name.equals(providerName, ignoreCase = true) }
+            ?: providers.firstOrNull()
+            ?: return ""
         val url = provider.movieUrlTemplate
 
         return try {
@@ -933,9 +969,9 @@ object StreamProviderManager {
      */
     fun getProvidersForDevice(isTvDevice: Boolean): List<StreamProvider> {
         return if (isTvDevice) {
-            providers.filter { !it.isPhoneOnly }
+            providers.filter { it.isTvEnabled }
         } else {
-            providers
+            providers.filter { it.isPhoneEnabled }
         }
     }
 
@@ -956,9 +992,13 @@ object StreamProviderManager {
         isTv: Boolean,
         season: Int?,
         episode: Int?,
-        timestamp: Long = 0L
+        timestamp: Long = 0L,
+        isTvDevice: Boolean? = null
     ): String {
-        val provider = providers.find { it.name.equals(providerName, ignoreCase = true) } ?: providers[0]
+        val deviceProviders = isTvDevice?.let { getProvidersForDevice(it) } ?: providers
+        val provider = deviceProviders.find { it.name.equals(providerName, ignoreCase = true) }
+            ?: deviceProviders.firstOrNull()
+            ?: return "about:blank"
 
         val baseUrl: String
         val params: Map<String, String>

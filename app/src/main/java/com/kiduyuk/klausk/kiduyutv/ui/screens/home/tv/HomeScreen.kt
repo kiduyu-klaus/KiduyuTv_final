@@ -151,7 +151,8 @@ fun HomeScreen(
                                     isTv = false,
                                     season = null,
                                     episode = null,
-                                    timestamp = 0L
+                                    timestamp = 0L,
+                                    isTvDevice = true
                                 )
                             } else null
 
@@ -195,7 +196,8 @@ fun HomeScreen(
                                     isTv = true,
                                     season = 1,
                                     episode = 1,
-                                    timestamp = 0L
+                                    timestamp = 0L,
+                                    isTvDevice = true
                                 )
                             } else null
 

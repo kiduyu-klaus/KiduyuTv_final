@@ -206,7 +206,8 @@ fun StreamLinksScreen(
                                 isTv = isTv,
                                 season = season,
                                 episode = episode,
-                                timestamp = timestamp
+                                timestamp = timestamp,
+                                isTvDevice = true
                             )
 
                             val finalUrl = StreamLinksViewModel.resolveProviderUrl(
@@ -215,7 +216,8 @@ fun StreamLinksScreen(
                                 isTv = isTv,
                                 season = season,
                                 episode = episode,
-                                timestamp = timestamp
+                                timestamp = timestamp,
+                                isTvDevice = true
                             ) ?: provider.urlTemplate
 
                             val intent = Intent(context, PlayerActivity::class.java).apply {

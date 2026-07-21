@@ -184,7 +184,8 @@ fun MobileHomeScreen(
                                                 isTv = false,
                                                 season = null,
                                                 episode = null,
-                                                timestamp = 0L
+                                                timestamp = 0L,
+                                                isTvDevice = false
                                             )
                                         } else null
                                         if (directUrl != null) {
@@ -223,7 +224,8 @@ fun MobileHomeScreen(
                                                 isTv = true,
                                                 season = 1,
                                                 episode = 1,
-                                                timestamp = 0L
+                                                timestamp = 0L,
+                                                isTvDevice = false
                                             )
                                         } else null
                                         if (directUrl != null) {
@@ -266,7 +268,8 @@ fun MobileHomeScreen(
                                                 isTv = selectedItem.isTv,
                                                 season = if (selectedItem.isTv) seasonNumber else null,
                                                 episode = if (selectedItem.isTv) episodeNumber else null,
-                                                timestamp = selectedItem.playbackPosition
+                                                timestamp = selectedItem.playbackPosition,
+                                                isTvDevice = false
                                             )
                                         } else null
                                         if (directUrl != null) {

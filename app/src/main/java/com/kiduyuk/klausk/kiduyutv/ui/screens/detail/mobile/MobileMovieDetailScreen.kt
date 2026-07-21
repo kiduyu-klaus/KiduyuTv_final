@@ -182,7 +182,8 @@ fun MobileMovieDetailScreen(
                                         isTv = false,
                                         season = null,
                                         episode = null,
-                                        timestamp = uiState.watchHistoryItem?.playbackPosition ?: 0L
+                                        timestamp = uiState.watchHistoryItem?.playbackPosition ?: 0L,
+                                        isTvDevice = false
                                     )
                                 } else null
 
@@ -192,7 +193,8 @@ fun MobileMovieDetailScreen(
                                     isTv = false,
                                     season = null,
                                     episode = null,
-                                    timestamp = uiState.watchHistoryItem?.playbackPosition ?: 0L
+                                    timestamp = uiState.watchHistoryItem?.playbackPosition ?: 0L,
+                                    isTvDevice = false
                                 )
 
                                 if (directUrl != null) {
@@ -400,4 +402,3 @@ fun MobileMovieDetailScreen(
         }
     }
 }
-

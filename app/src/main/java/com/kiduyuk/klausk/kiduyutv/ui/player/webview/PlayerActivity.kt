@@ -74,6 +74,7 @@ class PlayerActivity : AppCompatActivity() {
     // Watch history tracking variables
     private var currentTmdbId: Int = -1
     private var currentIsTv: Boolean = false
+    private var currentIsTvDevice: Boolean = false
     private var currentTitle: String = "Unknown"
     private var currentOverview: String? = null
     private var currentPosterPath: String? = null
@@ -200,7 +201,9 @@ class PlayerActivity : AppCompatActivity() {
         val deviceModel = Build.MODEL
         val deviceBrand = Build.BRAND.replaceFirstChar { it.uppercase() }
 
-        if (uiModeManager.currentModeType != Configuration.UI_MODE_TYPE_TELEVISION) {
+        currentIsTvDevice = uiModeManager.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION
+
+        if (!currentIsTvDevice) {
             isCursorDisabled = true
             val deviceType = if (uiModeManager.currentModeType == Configuration.UI_MODE_TYPE_NORMAL) "Mobile" else "Tablet"
             Log.i(TAG, "[Device] $deviceType detected (${deviceBrand} $deviceModel), disabling cursor")
@@ -400,7 +403,8 @@ class PlayerActivity : AppCompatActivity() {
             isTv = currentIsTv,
             season = if (currentIsTv) currentSeason else null,
             episode = if (currentIsTv) currentEpisode else null,
-            timestamp = currentPlaybackPosition / 1000L // Provider parameters use seconds.
+            timestamp = currentPlaybackPosition / 1000L, // Provider parameters use seconds.
+            isTvDevice = currentIsTvDevice
         )
         initializeAdBlockerAndLoadPlayer(baseUrl, finalHtml)
     }

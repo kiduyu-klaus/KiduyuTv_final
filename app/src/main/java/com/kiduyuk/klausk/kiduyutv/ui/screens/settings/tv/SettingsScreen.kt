@@ -100,6 +100,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.R
+import com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager
 import com.kiduyuk.klausk.kiduyutv.ui.screens.trakt.TraktAuthActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.CardDark
@@ -1252,7 +1253,7 @@ private fun PlaybackContent(
     defaultProvider: String,
     onProviderSelect: (String) -> Unit
 ) {
-    val options = listOf(SettingsManager.AUTO) + SettingsManager.PROVIDERS
+    val options = listOf(SettingsManager.AUTO) + StreamProviderManager.getProviderNamesForDevice(isTvDevice = true)
 
     Column(
         modifier = Modifier

@@ -194,7 +194,8 @@ fun MobileTvShowDetailScreen(
                                         isTv = true,
                                         season = seasonNumber,
                                         episode = episodeNumber,
-                                        timestamp = timestamp
+                                    timestamp = timestamp,
+                                    isTvDevice = false
                                     )
                                 } else null
 
@@ -204,7 +205,8 @@ fun MobileTvShowDetailScreen(
                                         isTv = true,
                                         season = seasonNumber,
                                         episode = episodeNumber,
-                                        timestamp = timestamp
+                                        timestamp = timestamp,
+                                        isTvDevice = false
                                     )
 
                                     if (directUrl != null) {

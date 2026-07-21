@@ -196,7 +196,8 @@ fun SeasonEpisodesScreen(
                                                 tmdbId = tvShowId,
                                                 isTv = true,
                                                 season = sNum,
-                                                episode = eNum
+                                                episode = eNum,
+                                                isTvDevice = true
                                             )
                                         } else null
 

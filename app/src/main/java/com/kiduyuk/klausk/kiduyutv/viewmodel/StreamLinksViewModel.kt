@@ -65,7 +65,7 @@ class StreamLinksViewModel : ViewModel() {
         /**
          * Build a list of StreamProviderUi objects for the UI.
          * Uses StreamProviderManager to generate URLs.
-         * @param filterPhoneOnly If true, filters out providers with isPhoneOnly = true (for TV devices).
+         * @param filterPhoneOnly If true, uses the TV-enabled provider list; otherwise uses phone-enabled providers.
          */
         private fun buildStreamProviders(
             tmdbId: Int,
@@ -76,13 +76,8 @@ class StreamLinksViewModel : ViewModel() {
         ): List<StreamProviderUi> {
             val type = if (isTv) "tv" else "movie"
 
-            // Get all providers from StreamProviderManager and create UI-friendly versions
-            // Optionally filter out isPhoneOnly providers (for TV device compatibility)
-            val providers = if (filterPhoneOnly) {
-                StreamProviderManager.providers.filter { !it.isPhoneOnly }
-            } else {
-                StreamProviderManager.providers
-            }
+            // Get only the providers enabled for the current device type.
+            val providers = StreamProviderManager.getProvidersForDevice(isTvDevice = filterPhoneOnly)
 
             return providers.map { provider ->
                 val url = StreamProviderManager.generateUrl(
@@ -90,7 +85,8 @@ class StreamLinksViewModel : ViewModel() {
                     tmdbId = tmdbId,
                     isTv = isTv,
                     season = season,
-                    episode = episode
+                    episode = episode,
+                    isTvDevice = filterPhoneOnly
                 )
                 StreamProviderUi(
                     name = provider.name,
@@ -111,7 +107,8 @@ class StreamLinksViewModel : ViewModel() {
             isTv: Boolean,
             season: Int?,
             episode: Int?,
-            timestamp: Long = 0L
+            timestamp: Long = 0L,
+            isTvDevice: Boolean? = null
         ): String? {
             // Use StreamProviderManager to generate the URL
             return try {
@@ -121,7 +118,8 @@ class StreamLinksViewModel : ViewModel() {
                     isTv = isTv,
                     season = season,
                     episode = episode,
-                    timestamp = timestamp
+                    timestamp = timestamp,
+                    isTvDevice = isTvDevice
                 )
             } catch (e: Exception) {
                 Log.e(TAG, "Error resolving provider URL: ${e.message}")
@@ -133,7 +131,7 @@ class StreamLinksViewModel : ViewModel() {
     /**
      * Load stream providers and check their availability.
      * Uses buildStreamProviders() which delegates to StreamProviderManager.
-     * @param filterPhoneOnly If true, filters out providers with isPhoneOnly = true (for TV devices).
+     * @param filterPhoneOnly If true, uses the TV-enabled provider list; otherwise uses phone-enabled providers.
      */
     fun loadStreamProviders(
         tmdbId: Int,

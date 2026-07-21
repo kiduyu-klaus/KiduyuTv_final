@@ -218,7 +218,8 @@ fun MobileSeasonEpisodesScreen(
                                         tmdbId = tvShowId,
                                         isTv = true,
                                         season = season,
-                                        episode = episodeNum
+                                        episode = episodeNum,
+                                        isTvDevice = false
                                     )
                                 } else null
 

@@ -101,6 +101,7 @@ import com.android.volley.toolbox.Volley
 import com.google.firebase.auth.FirebaseAuth
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.R
+import com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.ui.components.AdMobNativeAdView
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.findActivity
@@ -814,7 +815,7 @@ fun MobileSettingsScreen(
 
     // ── Default PROVIDERSPicker Dialog ────────────────────────────────────────
     if (showProviderPicker) {
-        val options = listOf(SettingsManager.AUTO) + SettingsManager.PROVIDERS
+        val options = listOf(SettingsManager.AUTO) + StreamProviderManager.getProviderNamesForDevice(isTvDevice = false)
         AlertDialog(
             onDismissRequest = { showProviderPicker = false },
             containerColor = CardDark,
@@ -1381,4 +1382,3 @@ private fun TraktSettingsItem(
         }
     }
 }
-

@@ -129,7 +129,8 @@ fun MobileStreamLinksScreen(
                         isTv = isTv,
                         season = season,
                         episode = episode,
-                        timestamp = timestamp
+                        timestamp = timestamp,
+                        isTvDevice = false
                     )
 
                     if (url.isNullOrBlank()) {
@@ -143,7 +144,8 @@ fun MobileStreamLinksScreen(
                         isTv = isTv,
                         season = season,
                         episode = episode,
-                        timestamp = timestamp
+                        timestamp = timestamp,
+                        isTvDevice = false
                     )
 
                     val intent = Intent(context, PlayerActivity::class.java).apply {
@@ -298,7 +300,8 @@ fun MobileStreamLinksScreen(
                                     releaseDate = releaseDate,
                                     season = season,
                                     episode = episode,
-                                    timestamp = timestamp
+                                    timestamp = timestamp,
+                                    isTvDevice = false
                                 )
                             }
                         )
@@ -341,7 +344,8 @@ private fun launchPlayerWithProvider(
             isTv = isTv,
             season = season,
             episode = episode,
-            timestamp = timestamp
+            timestamp = timestamp,
+            isTvDevice = false
         )
 
         // Validate the resolved URL
@@ -363,7 +367,8 @@ private fun launchPlayerWithProvider(
             isTv = isTv,
             season = season,
             episode = episode,
-            timestamp = timestamp
+            timestamp = timestamp,
+            isTvDevice = false
         )
 
         // Launch PlayerActivity with the validated URL

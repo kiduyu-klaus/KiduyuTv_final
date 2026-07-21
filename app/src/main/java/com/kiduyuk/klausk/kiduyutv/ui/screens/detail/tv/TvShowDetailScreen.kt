@@ -366,7 +366,8 @@ fun TvShowDetailScreen(
                                                 isTv = true,
                                                 season = seasonNumber,
                                                 episode = episodeNumber,
-                                                timestamp = timestamp
+                                                timestamp = timestamp,
+                                                isTvDevice = true
                                             )
                                         } else null
 
@@ -376,7 +377,8 @@ fun TvShowDetailScreen(
                                             isTv = true,
                                             season = seasonNumber,
                                             episode = episodeNumber,
-                                            timestamp = timestamp
+                                            timestamp = timestamp,
+                                            isTvDevice = true
                                         )
 
                                         if (directUrl != null) {
