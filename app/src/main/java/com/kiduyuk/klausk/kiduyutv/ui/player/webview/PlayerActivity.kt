@@ -166,7 +166,7 @@ class PlayerActivity : AppCompatActivity() {
         // Fix: Missing Translucent Window Format
         // Fire TV's window manager often requires the Activity's window to be explicitly set
         // to a translucent format to correctly composite the video surface with the WebView UI.
-        //window.setFormat(PixelFormat.TRANSLUCENT)
+        window.setFormat(PixelFormat.TRANSLUCENT)
 
         val tmdbId = intent.getIntExtra("TMDB_ID", -1)
         val isTv = intent.getBooleanExtra("IS_TV", false)
@@ -241,7 +241,7 @@ class PlayerActivity : AppCompatActivity() {
             // Fix: Solid Background Color Overlapping Video
             // On many Fire OS versions, the video is rendered on a SurfaceView that sits behind
             // the WebView's main drawing layer. Setting a solid black background hides the video.
-            setBackgroundColor(0xFF000000.toInt())// Set to transparent
+            setBackgroundColor(0xFF000000.toInt()) // Set to transparent
 
             // Fix: Amazon Chromium WebView vs. System WebView
             // Enable debugging for Amazon Chromium WebView optimizations
@@ -271,8 +271,8 @@ class PlayerActivity : AppCompatActivity() {
 
                 // FIX: Multi-window support must be TRUE for standard HTML5 video elements
                 // to scale up and trigger full-screen player states natively.
-                setSupportMultipleWindows(false)
-                javaScriptCanOpenWindowsAutomatically = false // Allows player scripts to execute properly
+                setSupportMultipleWindows(true)
+                javaScriptCanOpenWindowsAutomatically = true // Allows player scripts to execute properly
 
                 // Security layer bypass for http:// streaming streams running on https:// pages
                 if (Build.VERSION.SDK_INT >= 21) {
