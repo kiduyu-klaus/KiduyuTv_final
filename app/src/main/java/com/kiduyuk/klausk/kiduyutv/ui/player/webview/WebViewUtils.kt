@@ -26,7 +26,7 @@ object WebViewUtils {
     // rendering, regardless of whether it's available, due to compatibility issues
     // with Amazon's Chromium WebView.
     if (isFireTV) {
-        //webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+        webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
         Log.i(TAG, "[WebView] Fire TV device — forcing software rendering (hardware acceleration skipped)")
     } else {
         val isHardwareAccelerated = isHardwareAccelerationAvailable(context)

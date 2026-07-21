@@ -238,10 +238,14 @@ class PlayerActivity : AppCompatActivity() {
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
 
-            // Fix: Solid Background Color Overlapping Video
-            // On many Fire OS versions, the video is rendered on a SurfaceView that sits behind
-            // the WebView's main drawing layer. Setting a solid black background hides the video.
-            setBackgroundColor(0x00000000) // Set to transparent
+            // Fix: GPU Compositing Bug — Transparent Background + Hardware Acceleration
+            // On Fire TV devices (and many Android devices), a fully transparent WebView background
+            // (0x00000000) combined with hardware acceleration causes the Chromium GPU compositor
+            // to incorrectly blend the video surface with the WebView's zero-alpha channel,
+            // rendering the video pixels invisible (black screen with audio). Reverting to an
+            // opaque black background resolves this. Modern Fire OS composites inline video
+            // surfaces ABOVE the WebView background, so a black background no longer hides the video.
+            setBackgroundColor(0xFF000000.toInt()) // Opaque black
 
             // Fix: Amazon Chromium WebView vs. System WebView
             // Enable debugging for Amazon Chromium WebView optimizations
