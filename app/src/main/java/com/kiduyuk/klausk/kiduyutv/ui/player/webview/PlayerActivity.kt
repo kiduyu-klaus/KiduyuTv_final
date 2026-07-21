@@ -79,6 +79,39 @@ class PlayerActivity : AppCompatActivity() {
     private var customView: View? = null
     private var customViewCallback: WebChromeClient.CustomViewCallback? = null
 
+    /**
+     * Hides the status bar and navigation bar so the WebView occupies the entire screen.
+     * Called on create and again whenever the window regains focus, since system bars can
+     * reappear after returning from a dialog, another app, or a system overlay.
+     */
+    private fun enterImmersiveFullscreen() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.setDecorFitsSystemWindows(false)
+            window.insetsController?.let { controller ->
+                controller.hide(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
+                controller.systemBarsBehavior =
+                    android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                    or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    or View.SYSTEM_UI_FLAG_FULLSCREEN
+                    or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                )
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            enterImmersiveFullscreen()
+        }
+    }
+
     // Watch history tracking variables
     private var currentTmdbId: Int = -1
     private var currentIsTv: Boolean = false
@@ -171,6 +204,11 @@ class PlayerActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Start fully immersive: hide status bar and navigation bar so the WebView occupies
+        // the entire screen. Uses WindowInsetsControllerCompat (API 30+) with a legacy
+        // systemUiVisibility fallback for older Fire OS/Android TV builds.
+        enterImmersiveFullscreen()
+
         // Required for inline video: the provider's video renders inline via a SurfaceView
         // that composites through a transparent WebView + translucent window (hole-punch).
         // Fullscreen video (WebChromeClient.onShowCustomView) doesn't need this — that view is
@@ -239,7 +277,12 @@ class PlayerActivity : AppCompatActivity() {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
-            setBackgroundColor(android.graphics.Color.BLACK)
+            // Must stay transparent (no background call). The provider's video renders via a
+            // native SurfaceView created inside the WebView (confirmed via cr_SurfaceViewOverlayCore
+            // in logcat — it decodes and renders frames correctly). That SurfaceView is composited
+            // as a separate layer beneath the app's main window surface, and needs every view in
+            // this hierarchy — including rootLayout — to be free of opaque pixels over its region,
+            // or its hole-punch is defeated even though decoding/audio keep working fine.
         }
 
         webView = WebViewUtils.createWebView(this, isFireTV).apply {
