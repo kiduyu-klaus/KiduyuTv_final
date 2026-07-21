@@ -272,13 +272,13 @@ class PlayerActivity : AppCompatActivity() {
                 // FIX: Multi-window support must be TRUE for standard HTML5 video elements
                 // to scale up and trigger full-screen player states natively.
                 setSupportMultipleWindows(false)
-                javaScriptCanOpenWindowsAutomatically = true // Allows player scripts to execute properly
+                //javaScriptCanOpenWindowsAutomatically = true // Allows player scripts to execute properly
 
                 // Security layer bypass for http:// streaming streams running on https:// pages
                 if (Build.VERSION.SDK_INT >= 21) {
                     mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                 }
-                clearCache(true)
+                //clearCache(true)
 
                 cacheMode = WebSettings.LOAD_DEFAULT // Utilizes the browser cache for buffering
 
