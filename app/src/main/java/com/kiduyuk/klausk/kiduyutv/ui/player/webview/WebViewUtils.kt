@@ -15,15 +15,21 @@ object WebViewUtils {
      * Creates and configures a WebView instance optimized for the current device.
      */
     fun createWebView(context: Context, isFireTV: Boolean): WebView {
-        val webView = WebView(context)
+    val webView = WebView(context)
 
-        // Check if hardware acceleration is available
+    // Set the layer type immediately at creation, before the first render happens.
+    // Switching layer types later (e.g. in onPageFinished) forces Android to recreate
+    // the rendering layer after the page has already drawn once, which just causes an
+    // unnecessary redraw/flicker without fixing anything that went wrong on that first frame.
+    //
+    // Fire TV devices skip hardware acceleration entirely and always use software
+    // rendering, regardless of whether it's available, due to compatibility issues
+    // with Amazon's Chromium WebView.
+    if (isFireTV) {
+        //webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+        Log.i(TAG, "[WebView] Fire TV device — forcing software rendering (hardware acceleration skipped)")
+    } else {
         val isHardwareAccelerated = isHardwareAccelerationAvailable(context)
-
-        // Set the layer type immediately at creation, before the first render happens.
-        // Switching layer types later (e.g. in onPageFinished) forces Android to recreate
-        // the rendering layer after the page has already drawn once, which just causes an
-        // unnecessary redraw/flicker without fixing anything that went wrong on that first frame.
         if (isHardwareAccelerated) {
             webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
             Log.i(TAG, "[WebView] Hardware acceleration enabled")
@@ -31,28 +37,28 @@ object WebViewUtils {
             webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
             Log.w(TAG, "[WebView] Hardware acceleration unavailable, using software rendering")
         }
-
-        if (isFireTV) {
-            val isAmazonChromium = isAmazonChromiumAvailable(context)
-
-            Log.i(TAG, "[WebView] Fire TV detected")
-            Log.i(TAG, "[WebView] Amazon Chromium WebView: $isAmazonChromium")
-
-            if (isAmazonChromium) {
-                Log.w(TAG, "[WebView] ⚠️ Running on Amazon Chromium WebView (com.amazon.webview.chromium). For best compatibility, install/activate com.google.android.webview.")
-            } else {
-                Log.i(TAG, "[WebView] ✅ Not using Amazon Chromium WebView")
-            }
-        } else {
-            Log.i(TAG, "[WebView] Non-Fire TV device")
-        }
-
-        // Log detailed WebView implementation info for debugging
-        logWebViewInfo(webView)
-
-        return webView
     }
 
+    if (isFireTV) {
+        val isAmazonChromium = isAmazonChromiumAvailable(context)
+
+        Log.i(TAG, "[WebView] Fire TV detected")
+        Log.i(TAG, "[WebView] Amazon Chromium WebView: $isAmazonChromium")
+
+        if (isAmazonChromium) {
+            Log.w(TAG, "[WebView] ⚠️ Running on Amazon Chromium WebView (com.amazon.webview.chromium). For best compatibility, install/activate com.google.android.webview.")
+        } else {
+            Log.i(TAG, "[WebView] ✅ Not using Amazon Chromium WebView")
+        }
+    } else {
+        Log.i(TAG, "[WebView] Non-Fire TV device")
+    }
+
+    // Log detailed WebView implementation info for debugging
+    logWebViewInfo(webView)
+
+    return webView
+}
     /**
      * Returns true if hardware-accelerated rendering is available for this application.
      */
