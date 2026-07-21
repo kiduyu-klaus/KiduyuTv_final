@@ -551,6 +551,22 @@ class SplashActivity : ComponentActivity() {
                 return@launch
             }
 
+            // Suppress the update dialog when the installed APK already matches
+            // the remote version reported by Firebase. This protects users on a
+            // brand-new build from being prompted to "update" to the version
+            // they are already running (which can happen right after a release
+            // if Firebase is updated before the rollout is paused). The check
+            // is intentionally an exact match — the upstream CI bumps
+            // `versionName` on every release, so the strings line up cleanly.
+            if (isLocalVersionMatchingRemote(update.version)) {
+                Log.i(
+                    TAG,
+                    "Installed version already matches Firebase update.version " +
+                        "(${update.version}); skipping update dialog."
+                )
+                return@launch
+            }
+
             if (update.downloadUrl.isBlank()) {
                 Log.e(TAG, "Firebase app_update is enabled but the device download link is empty")
                 return@launch
@@ -560,6 +576,28 @@ class SplashActivity : ComponentActivity() {
             updateAvailable = true
             showUpdateDialog(update)
         }
+    }
+
+    /**
+     * Returns true when the base part of the installed APK's `versionName`
+     * (e.g. "1.1.71" — the flavor suffix "-phone" / "-tv" added at build time
+     * is stripped) exactly matches the remote version string from Firebase.
+     *
+     * Empty / blank inputs on either side never match, so a misconfigured
+     * Firebase field will not silently suppress the dialog.
+     */
+    private fun isLocalVersionMatchingRemote(remoteVersion: String): Boolean {
+        val remote = remoteVersion.trim()
+        if (remote.isBlank()) return false
+        val local = try {
+            packageManager.getPackageInfo(packageName, 0).versionName.orEmpty()
+        } catch (e: Exception) {
+            ""
+        }
+        if (local.isBlank()) return false
+        // Strip flavor suffix added by productFlavors in app/build.gradle.
+        val localBase = local.substringBefore("-").trim()
+        return localBase.equals(remote, ignoreCase = true)
     }
 
     private suspend fun fetchFirebaseAppUpdate(): FirebaseAppUpdate? {
