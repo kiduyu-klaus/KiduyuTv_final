@@ -255,11 +255,13 @@ class PlayerActivity : AppCompatActivity() {
             // above — one without the other reintroduces a black screen.
             setBackgroundColor(0x00000000)
 
-            // Fix: Amazon Chromium WebView vs. System WebView
-            // Enable debugging for Amazon Chromium WebView optimizations
-            // if (isFireTV) {
-            //     WebView.setWebContentsDebuggingEnabled(true)
-            // }
+            // Enables chrome://inspect on a connected machine (chrome://inspect#devices),
+            // so the live provider page's DOM, computed styles, and console can be inspected
+            // directly. Enabled unconditionally, including release builds, per request — note
+            // this lets any app with debugging tools attached to the device inspect this
+            // WebView's content/session while it's running, so it's worth reverting to a
+            // BuildConfig.DEBUG guard once the black-screen investigation is done.
+            WebView.setWebContentsDebuggingEnabled(true)
 
             settings.apply {
                 javaScriptEnabled = true
@@ -388,6 +390,24 @@ class PlayerActivity : AppCompatActivity() {
                 override fun onProgressChanged(view: WebView?, newProgress: Int) {
                     super.onProgressChanged(view, newProgress)
                     Log.d(TAG, "[WebChrome] Load progress: $newProgress%")
+                }
+
+                /**
+                 * Forwards JS console output from every frame — including the cross-origin
+                 * provider iframe — to Logcat. WebView surfaces console messages from all
+                 * frames to the top-level client regardless of origin, so this is real
+                 * visibility into player-side errors (CORS, DRM, playback failures) instead
+                 * of guessing blind from the Kotlin side.
+                 */
+                override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage?): Boolean {
+                    consoleMessage?.let {
+                        Log.d(
+                            TAG,
+                            "[Console][${it.messageLevel()}] ${it.message()} " +
+                                "(${it.sourceId()}:${it.lineNumber()})"
+                        )
+                    }
+                    return true
                 }
             }
         }
