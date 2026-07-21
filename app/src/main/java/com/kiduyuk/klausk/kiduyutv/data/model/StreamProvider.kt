@@ -751,12 +751,23 @@ object StreamProviderManager {
 
         val attributes = provider.iframeAttributes.toMutableMap()
 
+        // Ensure every provider's iframe gets frameborder="0" and allowfullscreen, even if the
+        // provider config doesn't set them. Check case-insensitively since some fallback
+        // providers use "frameBorder" — avoid adding a duplicate under a different casing.
+        val existingKeysLower = attributes.keys.map { it.lowercase() }
+        if ("frameborder" !in existingKeysLower) {
+            attributes["frameborder"] = "0"
+        }
+        if ("allowfullscreen" !in existingKeysLower) {
+            attributes["allowfullscreen"] = ""
+        }
+
         // Ensure the iframe always advertises the required permissions for the embedded player.
         // We parse the existing "allow" value (if any) into individual features and make sure
         // "autoplay" and "encrypted-media" are present. Already-present features are left as-is
         // to preserve any extras the provider has configured (e.g. "picture-in-picture",
         // "fullscreen"). Works the same whether iframe_attributes is empty or already populated.
-        val requiredAllowFeatures = listOf("autoplay", "encrypted-media")
+        val requiredAllowFeatures = listOf("autoplay", "encrypted-media", "fullscreen")
         val existingAllowFeatures = attributes["allow"]
             ?.split(';', ' ', ',')
             ?.map { it.trim() }
@@ -770,7 +781,11 @@ object StreamProviderManager {
         }
         attributes["allow"] = existingAllowFeatures.joinToString("; ")
 
-        val attrString = attributes.map { "${it.key}=\"${it.value}\"" }.joinToString(" ")
+        val attrString = attributes.entries.joinToString(" ") { (key, value) ->
+            // allowfullscreen is a boolean HTML attribute — its presence means true, so it's
+            // written bare rather than as allowfullscreen="...".
+            if (key.equals("allowfullscreen", ignoreCase = true)) key else "$key=\"$value\""
+        }
 
         // =============== UPDATED TRACKING SCRIPT ============================
         // Only supports: Videasy, Vidrock, Vidfast, Vidking, Vidnest
