@@ -551,17 +551,17 @@ class SplashActivity : ComponentActivity() {
                 return@launch
             }
 
-            // Suppress the update dialog when the installed APK already matches
-            // the remote version reported by Firebase. This protects users on a
-            // brand-new build from being prompted to "update" to the version
-            // they are already running (which can happen right after a release
-            // if Firebase is updated before the rollout is paused). The check
-            // is intentionally an exact match — the upstream CI bumps
-            // `versionName` on every release, so the strings line up cleanly.
-            if (isLocalVersionMatchingRemote(update.version)) {
+            // Suppress the update dialog when the installed APK is at the same
+            // version OR newer than the remote version reported by Firebase.
+            // This protects users on a brand-new build from being prompted to
+            // "update" to the version they are already running (or have surpassed),
+            // which can happen right after a release if Firebase is updated before
+            // the rollout is paused. The comparison is semantic-version based so
+            // that any local version >= remote is treated as up-to-date.
+            if (!isRemoteVersionHigherThanLocal(update.version)) {
                 Log.i(
                     TAG,
-                    "Installed version already matches Firebase update.version " +
+                    "Installed version is ${if (isLocalVersionMatchingRemote(update.version)) "equal to" else "higher than"} Firebase update.version " +
                         "(${update.version}); skipping update dialog."
                 )
                 return@launch
@@ -598,6 +598,43 @@ class SplashActivity : ComponentActivity() {
         // Strip flavor suffix added by productFlavors in app/build.gradle.
         val localBase = local.substringBefore("-").trim()
         return localBase.equals(remote, ignoreCase = true)
+    }
+
+    /**
+     * Returns true when the remote (Firebase) version is strictly higher than
+     * the locally installed version. Both versions are compared as semantic
+     * version numbers (MAJOR.MINOR.PATCH).
+     *
+     * If either version cannot be parsed, the function returns true so that
+     * the update dialog is shown as a safe fallback.
+     */
+    private fun isRemoteVersionHigherThanLocal(remoteVersion: String): Boolean {
+        val remote = remoteVersion.trim()
+        if (remote.isBlank()) return true // can't verify — show dialog
+        val localFull = try {
+            packageManager.getPackageInfo(packageName, 0).versionName.orEmpty()
+        } catch (e: Exception) {
+            ""
+        }
+        if (localFull.isBlank()) return true // can't verify — show dialog
+        val localBase = localFull.substringBefore("-").trim()
+        if (localBase.isBlank()) return true
+
+        val remoteParts = remote.split(".").mapNotNull { it.toIntOrNull() }
+        val localParts = localBase.split(".").mapNotNull { it.toIntOrNull() }
+
+        // If either version is unparseable, fall back to showing the dialog
+        if (remoteParts.isEmpty() || localParts.isEmpty()) return true
+
+        val maxLen = maxOf(remoteParts.size, localParts.size)
+        for (i in 0 until maxLen) {
+            val r = if (i < remoteParts.size) remoteParts[i] else 0
+            val l = if (i < localParts.size) localParts[i] else 0
+            if (r > l) return true
+            if (r < l) return false
+        }
+        // They are equal
+        return false
     }
 
     private suspend fun fetchFirebaseAppUpdate(): FirebaseAppUpdate? {
