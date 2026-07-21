@@ -5,6 +5,7 @@ import android.app.ProgressDialog
 import android.app.UiModeManager
 import android.content.Context
 import android.content.res.Configuration
+import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -170,6 +171,12 @@ class PlayerActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Required for inline video: the provider's video renders inline via a SurfaceView
+        // that composites through a transparent WebView + translucent window (hole-punch).
+        // Fullscreen video (WebChromeClient.onShowCustomView) doesn't need this — that view is
+        // added directly to rootLayout as a normal opaque view — but inline playback does.
+        window.setFormat(PixelFormat.TRANSLUCENT)
+
         val tmdbId = intent.getIntExtra("TMDB_ID", -1)
         val isTv = intent.getBooleanExtra("IS_TV", false)
         currentSeason = intent.getIntExtra("SEASON_NUMBER", 1)
@@ -241,13 +248,12 @@ class PlayerActivity : AppCompatActivity() {
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
 
-            // Opaque black background. A transparent WebView + translucent window was
-            // previously used to "hole-punch" through to a SurfaceView-based video layer,
-            // but on many devices (especially Fire TV) that combination causes the video
-            // surface to composite incorrectly and paint as a black hole with no picture.
-            // Modern WebView video compositing generally does not need this — an opaque
-            // background is the safer default.
-            setBackgroundColor(android.graphics.Color.BLACK)
+            // Transparent so the provider's inline SurfaceView-based video can composite
+            // through (hole-punch) rather than being painted over by the WebView's own layer.
+            // rootLayout behind it stays solid black, so there's no visible gap while the
+            // page/video is loading. This must stay paired with window.setFormat(TRANSLUCENT)
+            // above — one without the other reintroduces a black screen.
+            setBackgroundColor(0x00000000)
 
             // Fix: Amazon Chromium WebView vs. System WebView
             // Enable debugging for Amazon Chromium WebView optimizations
