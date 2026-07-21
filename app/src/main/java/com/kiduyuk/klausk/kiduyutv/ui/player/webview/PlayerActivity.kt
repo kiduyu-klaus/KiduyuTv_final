@@ -5,7 +5,6 @@ import android.app.ProgressDialog
 import android.app.UiModeManager
 import android.content.Context
 import android.content.res.Configuration
-import android.graphics.PixelFormat
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -70,6 +69,14 @@ class PlayerActivity : AppCompatActivity() {
 
     // Loading dialog shown while the provider page is being fetched and rendered.
     private lateinit var loadingDialog: ProgressDialog
+
+    // Native fullscreen video support (WebChromeClient.onShowCustomView/onHideCustomView).
+    // Some providers play video via a native fullscreen surface instead of rendering inline
+    // inside the WebView's composited layer. When that happens, Chromium hides the WebView's
+    // normal content and hands us a view to display ourselves — if we never attach it, the
+    // screen goes black (while the underlying <video> element, and its audio, keep playing).
+    private var customView: View? = null
+    private var customViewCallback: WebChromeClient.CustomViewCallback? = null
 
     // Watch history tracking variables
     private var currentTmdbId: Int = -1
@@ -163,11 +170,6 @@ class PlayerActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Fix: Missing Translucent Window Format
-        // Fire TV's window manager often requires the Activity's window to be explicitly set
-        // to a translucent format to correctly composite the video surface with the WebView UI.
-        window.setFormat(PixelFormat.TRANSLUCENT)
-
         val tmdbId = intent.getIntExtra("TMDB_ID", -1)
         val isTv = intent.getBooleanExtra("IS_TV", false)
         currentSeason = intent.getIntExtra("SEASON_NUMBER", 1)
@@ -230,6 +232,7 @@ class PlayerActivity : AppCompatActivity() {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
+            setBackgroundColor(android.graphics.Color.BLACK)
         }
 
         webView = WebViewUtils.createWebView(this, isFireTV).apply {
@@ -238,10 +241,13 @@ class PlayerActivity : AppCompatActivity() {
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
 
-            // Fix: Solid Background Color Overlapping Video
-            // On many Fire OS versions, the video is rendered on a SurfaceView that sits behind
-            // the WebView's main drawing layer. Setting a solid black background hides the video.
-            setBackgroundColor(0x00000000) // Set to transparent
+            // Opaque black background. A transparent WebView + translucent window was
+            // previously used to "hole-punch" through to a SurfaceView-based video layer,
+            // but on many devices (especially Fire TV) that combination causes the video
+            // surface to composite incorrectly and paint as a black hole with no picture.
+            // Modern WebView video compositing generally does not need this — an opaque
+            // background is the safer default.
+            setBackgroundColor(android.graphics.Color.BLACK)
 
             // Fix: Amazon Chromium WebView vs. System WebView
             // Enable debugging for Amazon Chromium WebView optimizations
@@ -309,11 +315,53 @@ class PlayerActivity : AppCompatActivity() {
             )
 
             webChromeClient = object : WebChromeClient() {
-                /** Receives provider fullscreen requests while the transparent WebView remains active. */
+                /**
+                 * Receives provider native-fullscreen video requests. The passed-in [view]
+                 * contains the actual video surface Chromium wants displayed — it must be
+                 * attached to our layout or the screen goes black while audio keeps playing.
+                 */
                 override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
                     super.onShowCustomView(view, callback)
-                    Log.i(TAG, "[WebChrome] onShowCustomView called")
+
+                    if (view == null) {
+                        Log.w(TAG, "[WebChrome] onShowCustomView called with null view")
+                        return
+                    }
+
+                    // A custom view is already showing; reject the new one per WebView contract.
+                    if (customView != null) {
+                        callback?.onCustomViewHidden()
+                        return
+                    }
+
+                    customView = view
+                    customViewCallback = callback
+
+                    view.layoutParams = FrameLayout.LayoutParams(
+                        FrameLayout.LayoutParams.MATCH_PARENT,
+                        FrameLayout.LayoutParams.MATCH_PARENT
+                    )
+                    rootLayout.addView(view)
+                    view.bringToFront()
+                    if (!isCursorDisabled) {
+                        cursorView.bringToFront()
+                    }
+
+                    Log.i(TAG, "[WebChrome] onShowCustomView: attached native fullscreen view")
                 }
+
+                /** Detaches the native fullscreen view and hands control back to the WebView. */
+                override fun onHideCustomView() {
+                    super.onHideCustomView()
+
+                    customView?.let { rootLayout.removeView(it) }
+                    customView = null
+                    customViewCallback?.onCustomViewHidden()
+                    customViewCallback = null
+
+                    Log.i(TAG, "[WebChrome] onHideCustomView: removed native fullscreen view")
+                }
+
                 /** Rejects provider-created popup windows while leaving same-window playback intact. */
                 override fun onCreateWindow(
                     view: WebView?,
@@ -321,7 +369,12 @@ class PlayerActivity : AppCompatActivity() {
                     isUserGesture: Boolean,
                     resultMsg: Message?
                 ): Boolean {
-                    Log.i(TAG, "[WebChrome] onCreateWindow called, blocking popups")
+                    Log.i(
+                        TAG,
+                        "[WebChrome] onCreateWindow called - provider=$currentProviderName " +
+                            "url=${view?.url} isDialog=$isDialog isUserGesture=$isUserGesture " +
+                            "- blocking popup"
+                    )
                     return false
                 }
 
@@ -443,6 +496,10 @@ class PlayerActivity : AppCompatActivity() {
         stopProgressUpdateTimer()
         cursorHideHandler.removeCallbacks(cursorHideRunnable)
         dismissLoadingDialog()
+
+        customView?.let { rootLayout.removeView(it) }
+        customView = null
+        customViewCallback = null
 
         if (::webView.isInitialized) {
             try {

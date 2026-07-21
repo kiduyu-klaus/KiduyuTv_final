@@ -18,23 +18,25 @@ object WebViewUtils {
         val webView = WebView(context)
 
         // Check if hardware acceleration is available
-        val isHardwareAccelerated =
-            context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_HARDWARE_ACCELERATED != 0
+        val isHardwareAccelerated = isHardwareAccelerationAvailable(context)
+
+        // Set the layer type immediately at creation, before the first render happens.
+        // Switching layer types later (e.g. in onPageFinished) forces Android to recreate
+        // the rendering layer after the page has already drawn once, which just causes an
+        // unnecessary redraw/flicker without fixing anything that went wrong on that first frame.
+        if (isHardwareAccelerated) {
+            webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
+            Log.i(TAG, "[WebView] Hardware acceleration enabled")
+        } else {
+            webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+            Log.w(TAG, "[WebView] Hardware acceleration unavailable, using software rendering")
+        }
 
         if (isFireTV) {
             val isAmazonChromium = isAmazonChromiumAvailable(context)
 
             Log.i(TAG, "[WebView] Fire TV detected")
             Log.i(TAG, "[WebView] Amazon Chromium WebView: $isAmazonChromium")
-            Log.i(TAG, "[WebView] Hardware acceleration available: $isHardwareAccelerated")
-
-            if (isHardwareAccelerated) {
-                //webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
-                Log.i(TAG, "[WebView] Fire TV: hardware acceleration enabled")
-            } else {
-                //webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
-                Log.w(TAG, "[WebView] Fire TV: hardware acceleration unavailable, using software rendering")
-            }
 
             if (isAmazonChromium) {
                 Log.w(TAG, "[WebView] ⚠️ Running on Amazon Chromium WebView (com.amazon.webview.chromium). For best compatibility, install/activate com.google.android.webview.")
@@ -43,21 +45,19 @@ object WebViewUtils {
             }
         } else {
             Log.i(TAG, "[WebView] Non-Fire TV device")
-            Log.i(TAG, "[WebView] Hardware acceleration available: $isHardwareAccelerated")
-
-            if (isHardwareAccelerated) {
-                webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
-                Log.i(TAG, "[WebView] Hardware acceleration enabled")
-            } else {
-                webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null)
-                Log.w(TAG, "[WebView] Hardware acceleration unavailable, using software rendering")
-            }
         }
 
         // Log detailed WebView implementation info for debugging
         logWebViewInfo(webView)
 
         return webView
+    }
+
+    /**
+     * Returns true if hardware-accelerated rendering is available for this application.
+     */
+    fun isHardwareAccelerationAvailable(context: Context): Boolean {
+        return context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_HARDWARE_ACCELERATED != 0
     }
 
     /**
