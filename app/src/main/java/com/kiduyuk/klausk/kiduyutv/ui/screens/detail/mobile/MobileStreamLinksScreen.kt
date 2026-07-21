@@ -334,7 +334,8 @@ private fun launchPlayerWithProvider(
     releaseDate: String?,
     season: Int?,
     episode: Int?,
-    timestamp: Long
+    timestamp: Long,
+    isTvDevice: Boolean = false
 ) {
     try {
         // Use the safe URL resolver from ViewModel (same as TV version)
@@ -345,7 +346,7 @@ private fun launchPlayerWithProvider(
             season = season,
             episode = episode,
             timestamp = timestamp,
-            isTvDevice = false
+            isTvDevice = isTvDevice
         )
 
         // Validate the resolved URL
@@ -368,7 +369,7 @@ private fun launchPlayerWithProvider(
             season = season,
             episode = episode,
             timestamp = timestamp,
-            isTvDevice = false
+            isTvDevice = isTvDevice
         )
 
         // Launch PlayerActivity with the validated URL
