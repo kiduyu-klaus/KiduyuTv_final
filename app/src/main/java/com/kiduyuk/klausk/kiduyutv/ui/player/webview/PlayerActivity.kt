@@ -71,47 +71,6 @@ class PlayerActivity : AppCompatActivity() {
     // Loading dialog shown while the provider page is being fetched and rendered.
     private lateinit var loadingDialog: ProgressDialog
 
-    // Native fullscreen video support (WebChromeClient.onShowCustomView/onHideCustomView).
-    // Some providers play video via a native fullscreen surface instead of rendering inline
-    // inside the WebView's composited layer. When that happens, Chromium hides the WebView's
-    // normal content and hands us a view to display ourselves — if we never attach it, the
-    // screen goes black (while the underlying <video> element, and its audio, keep playing).
-    private var customView: View? = null
-    private var customViewCallback: WebChromeClient.CustomViewCallback? = null
-
-    /**
-     * Hides the status bar and navigation bar so the WebView occupies the entire screen.
-     * Called on create and again whenever the window regains focus, since system bars can
-     * reappear after returning from a dialog, another app, or a system overlay.
-     */
-    private fun enterImmersiveFullscreen() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            window.setDecorFitsSystemWindows(false)
-            window.insetsController?.let { controller ->
-                controller.hide(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.navigationBars())
-                controller.systemBarsBehavior =
-                    android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            }
-        } else {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = (
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                    or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                    or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                    or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                    or View.SYSTEM_UI_FLAG_FULLSCREEN
-                    or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                )
-        }
-    }
-
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) {
-            enterImmersiveFullscreen()
-        }
-    }
-
     // Watch history tracking variables
     private var currentTmdbId: Int = -1
     private var currentIsTv: Boolean = false
@@ -204,15 +163,9 @@ class PlayerActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Start fully immersive: hide status bar and navigation bar so the WebView occupies
-        // the entire screen. Uses WindowInsetsControllerCompat (API 30+) with a legacy
-        // systemUiVisibility fallback for older Fire OS/Android TV builds.
-        enterImmersiveFullscreen()
-
-        // Required for inline video: the provider's video renders inline via a SurfaceView
-        // that composites through a transparent WebView + translucent window (hole-punch).
-        // Fullscreen video (WebChromeClient.onShowCustomView) doesn't need this — that view is
-        // added directly to rootLayout as a normal opaque view — but inline playback does.
+        // Fix: Missing Translucent Window Format
+        // Fire TV's window manager often requires the Activity's window to be explicitly set
+        // to a translucent format to correctly composite the video surface with the WebView UI.
         window.setFormat(PixelFormat.TRANSLUCENT)
 
         val tmdbId = intent.getIntExtra("TMDB_ID", -1)
@@ -277,12 +230,6 @@ class PlayerActivity : AppCompatActivity() {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
             )
-            // Must stay transparent (no background call). The provider's video renders via a
-            // native SurfaceView created inside the WebView (confirmed via cr_SurfaceViewOverlayCore
-            // in logcat — it decodes and renders frames correctly). That SurfaceView is composited
-            // as a separate layer beneath the app's main window surface, and needs every view in
-            // this hierarchy — including rootLayout — to be free of opaque pixels over its region,
-            // or its hole-punch is defeated even though decoding/audio keep working fine.
         }
 
         webView = WebViewUtils.createWebView(this, isFireTV).apply {
@@ -291,20 +238,16 @@ class PlayerActivity : AppCompatActivity() {
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
 
-            // Transparent so the provider's inline SurfaceView-based video can composite
-            // through (hole-punch) rather than being painted over by the WebView's own layer.
-            // rootLayout behind it stays solid black, so there's no visible gap while the
-            // page/video is loading. This must stay paired with window.setFormat(TRANSLUCENT)
-            // above — one without the other reintroduces a black screen.
-            setBackgroundColor(0x00000000)
+            // Fix: Solid Background Color Overlapping Video
+            // On many Fire OS versions, the video is rendered on a SurfaceView that sits behind
+            // the WebView's main drawing layer. Setting a solid black background hides the video.
+            setBackgroundColor(0x00000000) // Set to transparent
 
-            // Enables chrome://inspect on a connected machine (chrome://inspect#devices),
-            // so the live provider page's DOM, computed styles, and console can be inspected
-            // directly. Enabled unconditionally, including release builds, per request — note
-            // this lets any app with debugging tools attached to the device inspect this
-            // WebView's content/session while it's running, so it's worth reverting to a
-            // BuildConfig.DEBUG guard once the black-screen investigation is done.
-            WebView.setWebContentsDebuggingEnabled(true)
+            // Fix: Amazon Chromium WebView vs. System WebView
+            // Enable debugging for Amazon Chromium WebView optimizations
+            // if (isFireTV) {
+            //     WebView.setWebContentsDebuggingEnabled(true)
+            // }
 
             settings.apply {
                 javaScriptEnabled = true
@@ -366,53 +309,11 @@ class PlayerActivity : AppCompatActivity() {
             )
 
             webChromeClient = object : WebChromeClient() {
-                /**
-                 * Receives provider native-fullscreen video requests. The passed-in [view]
-                 * contains the actual video surface Chromium wants displayed — it must be
-                 * attached to our layout or the screen goes black while audio keeps playing.
-                 */
+                /** Receives provider fullscreen requests while the transparent WebView remains active. */
                 override fun onShowCustomView(view: View?, callback: CustomViewCallback?) {
                     super.onShowCustomView(view, callback)
-
-                    if (view == null) {
-                        Log.w(TAG, "[WebChrome] onShowCustomView called with null view")
-                        return
-                    }
-
-                    // A custom view is already showing; reject the new one per WebView contract.
-                    if (customView != null) {
-                        callback?.onCustomViewHidden()
-                        return
-                    }
-
-                    customView = view
-                    customViewCallback = callback
-
-                    view.layoutParams = FrameLayout.LayoutParams(
-                        FrameLayout.LayoutParams.MATCH_PARENT,
-                        FrameLayout.LayoutParams.MATCH_PARENT
-                    )
-                    rootLayout.addView(view)
-                    view.bringToFront()
-                    if (!isCursorDisabled) {
-                        cursorView.bringToFront()
-                    }
-
-                    Log.i(TAG, "[WebChrome] onShowCustomView: attached native fullscreen view")
+                    Log.i(TAG, "[WebChrome] onShowCustomView called")
                 }
-
-                /** Detaches the native fullscreen view and hands control back to the WebView. */
-                override fun onHideCustomView() {
-                    super.onHideCustomView()
-
-                    customView?.let { rootLayout.removeView(it) }
-                    customView = null
-                    customViewCallback?.onCustomViewHidden()
-                    customViewCallback = null
-
-                    Log.i(TAG, "[WebChrome] onHideCustomView: removed native fullscreen view")
-                }
-
                 /** Rejects provider-created popup windows while leaving same-window playback intact. */
                 override fun onCreateWindow(
                     view: WebView?,
@@ -420,12 +321,7 @@ class PlayerActivity : AppCompatActivity() {
                     isUserGesture: Boolean,
                     resultMsg: Message?
                 ): Boolean {
-                    Log.i(
-                        TAG,
-                        "[WebChrome] onCreateWindow called - provider=$currentProviderName " +
-                            "url=${view?.url} isDialog=$isDialog isUserGesture=$isUserGesture " +
-                            "- blocking popup"
-                    )
+                    Log.i(TAG, "[WebChrome] onCreateWindow called, blocking popups")
                     return false
                 }
 
@@ -433,24 +329,6 @@ class PlayerActivity : AppCompatActivity() {
                 override fun onProgressChanged(view: WebView?, newProgress: Int) {
                     super.onProgressChanged(view, newProgress)
                     Log.d(TAG, "[WebChrome] Load progress: $newProgress%")
-                }
-
-                /**
-                 * Forwards JS console output from every frame — including the cross-origin
-                 * provider iframe — to Logcat. WebView surfaces console messages from all
-                 * frames to the top-level client regardless of origin, so this is real
-                 * visibility into player-side errors (CORS, DRM, playback failures) instead
-                 * of guessing blind from the Kotlin side.
-                 */
-                override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage?): Boolean {
-                    consoleMessage?.let {
-                        Log.d(
-                            TAG,
-                            "[Console][${it.messageLevel()}] ${it.message()} " +
-                                "(${it.sourceId()}:${it.lineNumber()})"
-                        )
-                    }
-                    return true
                 }
             }
         }
@@ -565,10 +443,6 @@ class PlayerActivity : AppCompatActivity() {
         stopProgressUpdateTimer()
         cursorHideHandler.removeCallbacks(cursorHideRunnable)
         dismissLoadingDialog()
-
-        customView?.let { rootLayout.removeView(it) }
-        customView = null
-        customViewCallback = null
 
         if (::webView.isInitialized) {
             try {
