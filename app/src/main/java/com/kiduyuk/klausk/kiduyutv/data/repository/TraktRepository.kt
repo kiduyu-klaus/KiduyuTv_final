@@ -21,7 +21,8 @@ import javax.inject.Singleton
 
 data class TraktWatchHistoryPage(
     val items: TraktWatchHistoryResponse,
-    val pageCount: Int?
+    val pageCount: Int?,
+    val totalItemCount: Int?
 )
 
 /**
@@ -107,7 +108,8 @@ class TraktRepository @Inject constructor(
             )
             if (response.isSuccessful && response.body() != null) {
                 val pageCount = response.headers()["X-Pagination-Page-Count"]?.toIntOrNull()
-                emit(Result.success(TraktWatchHistoryPage(response.body()!!, pageCount)))
+                val totalItemCount = response.headers()["X-Pagination-Item-Count"]?.toIntOrNull()
+                emit(Result.success(TraktWatchHistoryPage(response.body()!!, pageCount, totalItemCount)))
             } else {
                 emit(Result.failure(Exception("Failed to fetch watch history: ${response.code()}")))
             }

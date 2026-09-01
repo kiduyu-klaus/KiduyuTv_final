@@ -230,6 +230,8 @@ fun MyListScreen(
     var isLoadingMore by remember { mutableStateOf(false) }
     var hasMoreWatched by remember { mutableStateOf(true) }
     var currentWatchedPage by remember { mutableIntStateOf(0) }
+    var watchedHistoryTotal by remember { mutableStateOf<Int?>(null) }
+    var watchedHistoryLoaded by remember { mutableIntStateOf(0) }
     val processedTmdbIds = remember { mutableSetOf<String>() }
 
     // Tracks how many items we requested this page so we can show a footer spinner
@@ -237,7 +239,8 @@ fun MyListScreen(
 
     // ── Enrichment helper: process a single Trakt history page into MyListItems ──
     suspend fun enrichHistoryPage(
-        history: List<TraktHistoryItem>
+        history: List<TraktHistoryItem>,
+        onItemProcessed: suspend () -> Unit
     ): List<MyListItem> = withContext(Dispatchers.IO) {
         val pageItems = mutableListOf<MyListItem>()
 
@@ -298,6 +301,7 @@ fun MyListScreen(
                     }
                 }
             }
+            onItemProcessed()
         }
         pageItems
     }
@@ -319,11 +323,16 @@ fun MyListScreen(
                         result.fold(
                             onSuccess = { historyPage ->
                                 val history = historyPage.items
+                                historyPage.totalItemCount?.let { watchedHistoryTotal = it }
                                 if (history.isEmpty()) {
                                     //Log.i("MyListScreen", "Page $nextPage empty — no more watched items")
                                     hasMoreWatched = false
                                 } else {
-                                    val newItems = enrichHistoryPage(history)
+                                    val newItems = enrichHistoryPage(history) {
+                                        withContext(Dispatchers.Main) {
+                                            watchedHistoryLoaded += 1
+                                        }
+                                    }
                                     /*Log.i(
                                         "MyListScreen",
                                         "Page $nextPage: fetched=${history.size}, newUnique=${newItems.size}"
@@ -376,6 +385,8 @@ fun MyListScreen(
             watchedItems = emptyList()
             hasMoreWatched = true
             currentWatchedPage = 0
+            watchedHistoryTotal = null
+            watchedHistoryLoaded = 0
             processedTmdbIds.clear()
             clearWatchedCache(context)
             return@LaunchedEffect
@@ -390,6 +401,8 @@ fun MyListScreen(
             )*/
             watchedItems = cached.items
             currentWatchedPage = cached.lastLoadedPage
+            watchedHistoryLoaded = cached.items.size
+            watchedHistoryTotal = null
             hasMoreWatched = cached.hasMore
             cached.items.forEach { item ->
                 processedTmdbIds.add("${item.type}-${item.id}")
@@ -561,10 +574,9 @@ fun MyListScreen(
                             color = MaterialTheme.colorScheme.primary,
                             strokeWidth = 3.dp
                         )
-                        Text(
-                            text = "Loading watched history…",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = TextSecondary
+                        WatchedLoadingStatus(
+                            loadedItems = watchedHistoryLoaded,
+                            totalItems = watchedHistoryTotal
                         )
                     }
                 }
@@ -618,6 +630,8 @@ fun MyListScreen(
                                     processedTmdbIds.clear()
                                     hasMoreWatched = true
                                     currentWatchedPage = 0
+                                    watchedHistoryTotal = null
+                                    watchedHistoryLoaded = 0
                                     isInitialLoading = true
                                     loadNextWatchedPage()
                                 },
@@ -794,6 +808,8 @@ fun MyListScreen(
                                 isLoadingMore = isLoadingMore,
                                 hasMore = hasMoreWatched,
                                 totalItems = watchedItems.size,
+                                loadedHistoryItems = watchedHistoryLoaded,
+                                totalHistoryItems = watchedHistoryTotal,
                                 columns = actualColumns
                             )
                         }
@@ -817,6 +833,8 @@ private fun WatchedFooter(
     isLoadingMore: Boolean,
     hasMore: Boolean,
     totalItems: Int,
+    loadedHistoryItems: Int,
+    totalHistoryItems: Int?,
     columns: Int
 ) {
     Box(
@@ -836,10 +854,9 @@ private fun WatchedFooter(
                         strokeWidth = 3.dp,
                         modifier = Modifier.size(28.dp)
                     )
-                    Text(
-                        text = "Loading more…",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
+                    WatchedLoadingStatus(
+                        loadedItems = loadedHistoryItems,
+                        totalItems = totalHistoryItems
                     )
                 }
             }
@@ -854,6 +871,22 @@ private fun WatchedFooter(
             // when we are actively loading or definitively done.
         }
     }
+}
+
+@Composable
+private fun WatchedLoadingStatus(
+    loadedItems: Int,
+    totalItems: Int?
+) {
+    Text(
+        text = if (totalItems != null && totalItems > 0) {
+            "Loading watched history\nLoaded $loadedItems/$totalItems watched items"
+        } else {
+            "Loading watched history\nLoaded $loadedItems watched items"
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = TextSecondary
+    )
 }
 
 // ── Private item card (used in preview) ──────────────────────────────────────
