@@ -2,7 +2,7 @@ package com.kiduyuk.klausk.kiduyutv.desktop
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
@@ -12,6 +12,7 @@ import com.kiduyuk.klausk.kiduyutv.desktop.data.*
 import com.kiduyuk.klausk.kiduyutv.desktop.navigation.DesktopNavigator
 
 fun main() = application {
+    val scope = rememberCoroutineScope()
     val services = remember {
         val settings = DesktopSettings()
         DesktopServices(
@@ -40,7 +41,11 @@ fun main() = application {
                 onSurface = Color(0xFFF5F5F5)
             )
         ) {
-            KiduyuDesktopApp(services)
+            val appState = rememberDesktopAppState(services)
+            KiduyuDesktopApp(appState)
+            DisposableEffect(Unit) {
+                onDispose { appState.dispose() }
+            }
         }
     }
 }

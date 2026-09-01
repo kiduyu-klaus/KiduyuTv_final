@@ -209,12 +209,286 @@ jobs:
           fi
 
   # ══════════════════════════════════════════════════════════════════════
-  # CREATE RELEASE — waits on both parallel builds, then publishes both APKs
+  # BUILD DESKTOP — Windows EXE/MSI with SQLite and logging
+  # ══════════════════════════════════════════════════════════════════════
+  build_desktop:
+    name: Build Windows Desktop
+    runs-on: windows-latest
+    needs: [prepare_release]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Grant execute permission for gradlew
+        shell: bash
+        run: chmod +x gradlew
+
+      # ═══════════════════════════════════════════════════════════════
+      # CONFIGURE LOGGING — Logback configuration for desktop app
+      # ═══════════════════════════════════════════════════════════════
+      - name: Configure Logback Logging
+        run: |
+          mkdir -p desktopApp\src\main\resources
+          powershell -Command @"
+          @"
+          `<?xml version="1.0" encoding="UTF-8"`?>
+          `<configuration>
+              `<!-- Console Appender --`>
+              `<appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+                  `<encoder>
+                      `<pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+                  `</encoder>
+              `</appender>
+
+              `<!-- File Appender --`>
+              `<appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+                  `<file>`${user.home}/AppData/Local/KiduyuTV/logs/kiduyutv.log</file>
+                  `<encoder>
+                      `<pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+                  `</encoder>
+                  `<rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+                      `<fileNamePattern>`${user.home}/AppData/Local/KiduyuTV/logs/kiduyutv.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+                      `<maxFileSize>10MB</maxFileSize>
+                      `<maxHistory>30</maxHistory>
+                      `<totalSizeCap>500MB</totalSizeCap>
+                  `</rollingPolicy>
+              `</appender>
+
+              `<!-- Logger Configuration --`>
+              `<logger name="com.kiduyuk.klausk.kiduyutv.desktop" level="DEBUG" /`>
+              `<logger name="okhttp3" level="INFO" /`>
+              `<logger name="com.google.gson" level="WARN" /`>
+
+              `<!-- Root Logger --`>
+              `<root level="INFO">
+                  `<appender-ref ref="CONSOLE" /`>
+                  `<appender-ref ref="FILE" /`>
+              `</root>
+          `</configuration>
+          "@
+          '@ | Out-File -Encoding UTF8 desktopApp\src\main\resources\logback.xml
+          Write-Output "✓ Logback configuration created"
+
+      # ═══════════════════════════════════════════════════════════════
+      # CONFIGURE DATABASE — SQLite initialization script
+      # ═══════════════════════════════════════════════════════════════
+      - name: Create SQLite Initialization Script
+        run: |
+          mkdir -p desktopApp\resources
+          powershell -Command @"
+          @"
+          -- KiduyuTV Watch History Database
+          -- Automatically initialized on first run via DatabaseWatchHistoryStore.kt
+
+          CREATE TABLE IF NOT EXISTS watch_progress (
+              tmdb_id INTEGER NOT NULL,
+              media_type TEXT NOT NULL,
+              title TEXT NOT NULL,
+              poster_path TEXT,
+              backdrop_path TEXT,
+              season INTEGER DEFAULT -1,
+              episode INTEGER DEFAULT -1,
+              position_ms INTEGER NOT NULL DEFAULT 0,
+              duration_ms INTEGER NOT NULL DEFAULT 0,
+              updated_at INTEGER NOT NULL,
+              PRIMARY KEY (tmdb_id, media_type, season, episode)
+          );
+
+          CREATE INDEX IF NOT EXISTS idx_updated_at ON watch_progress(updated_at DESC);
+          CREATE INDEX IF NOT EXISTS idx_media_type ON watch_progress(media_type);
+          CREATE INDEX IF NOT EXISTS idx_season_episode ON watch_progress(season, episode);
+          "@
+          '@ | Out-File -Encoding UTF8 desktopApp\resources\init-schema.sql
+          Write-Output "✓ SQLite initialization script created"
+
+      # ═══════════════════════════════════════════════════════════════
+      # OPTIMIZE GRADLE FOR WINDOWS CI (16GB Runner)
+      # ═══════════════════════════════════════════════════════════════
+      - name: Optimize Gradle for Windows CI (16GB)
+        run: |
+          $content = @"
+          # --------------------------------------------------
+          # CI-OPTIMIZED — GitHub Actions 16GB Runner (Windows)
+          # Auto-generated, DO NOT COMMIT
+          # --------------------------------------------------
+
+          # JVM MEMORY (Tuned for 16GB RAM runner — 14GB to JVMs, 2GB headroom for OS)
+          org.gradle.jvmargs=-Xmx10g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -Dfile.encoding=UTF-8
+
+          # GRADLE PERFORMANCE
+          org.gradle.daemon=false
+          org.gradle.parallel=true
+          org.gradle.workers.max=4
+          org.gradle.caching=true
+          org.gradle.configuration-cache=true
+
+          # KOTLIN OPTIMIZATION
+          kotlin.daemon.jvm.options=-Xmx4g
+          kotlin.incremental=true
+          kotlin.compiler.execution.strategy=daemon
+
+          # DESKTOP APP SPECIFIC
+          compose.desktop.skipPackageTargetFormat=false
+          "@
+          if (Test-Path gradle.properties) {
+              Copy-Item gradle.properties gradle.properties.local-backup
+          }
+          $content | Out-File -Encoding UTF8 gradle.properties
+          Write-Output "=== Gradle Configuration ===" 
+          Get-Content gradle.properties
+          Write-Output "============================"
+
+      - name: Bump versionName
+        run: |
+          $VERSION = "${{ needs.prepare_release.outputs.tag }}" -replace 'v',''
+          $version | Out-File -Encoding UTF8 VERSION
+          Write-Output "Version set to $VERSION"
+
+      # ═══════════════════════════════════════════════════════════════
+      # BUILD WINDOWS DESKTOP APP
+      # ═══════════════════════════════════════════════════════════════
+      - name: Build Desktop Release EXE
+        env:
+          KIDUYUTV_STREAM_API_TOKEN: ${{ secrets.STREAM_API_TOKEN }}
+          KIDUYUTV_TMDB_TOKEN: ${{ secrets.TMDB_BEARER_TOKEN }}
+        run: |
+          .\gradlew :desktopApp:packageReleaseExe `
+            --build-cache `
+            --configuration-cache `
+            --parallel `
+            -x test `
+            -x lint
+
+      - name: Build Desktop Release MSI
+        env:
+          KIDUYUTV_STREAM_API_TOKEN: ${{ secrets.STREAM_API_TOKEN }}
+          KIDUYUTV_TMDB_TOKEN: ${{ secrets.TMDB_BEARER_TOKEN }}
+        run: |
+          .\gradlew :desktopApp:packageReleaseMsi `
+            --build-cache `
+            --configuration-cache `
+            --parallel `
+            -x test `
+            -x lint
+
+      # ═══════════════════════════════════════════════════════════════
+      # PACKAGE AND RENAME WINDOWS ARTIFACTS
+      # ═══════════════════════════════════════════════════════════════
+      - name: Rename and Package Windows Artifacts
+        id: package_desktop
+        shell: powershell
+        run: |
+          $VERSION = Get-Content VERSION
+          $BUILD = "${{ needs.prepare_release.outputs.build_count }}"
+          
+          # Locate EXE
+          $exes = Get-ChildItem -Path "desktopApp\build\compose\binaries\main-release" -Filter "*.exe" -Recurse
+          if ($exes) {
+              $exe = $exes[0]
+              $newExeName = "KiduyuTV-setup-${VERSION}-build${BUILD}.exe"
+              $newExePath = Join-Path $exe.DirectoryName $newExeName
+              Move-Item -Path $exe.FullName -Destination $newExePath -Force
+              Write-Output "exe_path=$newExePath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+              Write-Output "✓ Renamed EXE: $newExeName"
+          } else {
+              Write-Output "⚠ No EXE found"
+          }
+          
+          # Locate MSI
+          $msis = Get-ChildItem -Path "desktopApp\build\compose\binaries\main-release" -Filter "*.msi" -Recurse
+          if ($msis) {
+              $msi = $msis[0]
+              $newMsiName = "KiduyuTV-setup-${VERSION}-build${BUILD}.msi"
+              $newMsiPath = Join-Path $msi.DirectoryName $newMsiName
+              Move-Item -Path $msi.FullName -Destination $newMsiPath -Force
+              Write-Output "msi_path=$newMsiPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+              Write-Output "✓ Renamed MSI: $newMsiName"
+          } else {
+              Write-Output "⚠ No MSI found"
+          }
+
+      - name: Generate Windows Release Notes
+        id: release_notes
+        run: |
+          $releaseNotes = @"
+          ## System Requirements
+          - **OS**: Windows 10 x64 or Windows 11 x64
+          - **RAM**: Minimum 4GB
+          - **Storage**: 300MB available space
+          
+          ## Installation
+          1. Download the installer below
+          2. Run the installer and follow the prompts
+          3. Configure your TMDB API token in Settings
+          4. Configure your Stream Provider token in Settings
+          5. Restart the application
+          
+          ## Features
+          - Browse movies and TV shows
+          - Search across thousands of titles
+          - Stream from multiple providers
+          - Track watch history and resume progress
+          - Live TV support (with M3U playlist)
+          - Multiple quality options and playback tracks
+          
+          ## Database & Storage
+          - Watch history saved to: ``%LOCALAPPDATA%\KiduyuTV\history.db``
+          - Image cache at: ``%LOCALAPPDATA%\KiduyuTV\cache\images``
+          - Settings stored in Windows Registry
+          - Logs saved to: ``%LOCALAPPDATA%\KiduyuTV\logs``
+          
+          ## Troubleshooting
+          - **Playback issues**: Verify mpv is installed or bundled
+          - **API errors**: Check your tokens in Settings
+          - **Database errors**: Delete history.db to reset
+          
+          "@ | Out-File -FilePath desktop_release_notes.txt -Encoding UTF8
+          Write-Output "✓ Release notes generated"
+
+      - name: Upload Windows EXE Artifact
+        if: steps.package_desktop.outputs.exe_path != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: ${{ steps.package_desktop.outputs.exe_path }}
+
+      - name: Upload Windows MSI Artifact
+        if: steps.package_desktop.outputs.msi_path != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: ${{ steps.package_desktop.outputs.msi_path }}
+
+      # ═══════════════════════════════════════════════════════════════
+      # RESTORE LOCAL GRADLE PROPERTIES (after build completes)
+      # ═══════════════════════════════════════════════════════════════
+      - name: Restore local gradle.properties
+        if: always()
+        run: |
+          if (Test-Path gradle.properties.local-backup) {
+              Move-Item -Path gradle.properties.local-backup -Destination gradle.properties -Force
+              Write-Output "✓ Restored local gradle.properties"
+          } else {
+              Write-Output "ℹ No local gradle.properties to restore"
+          }
+
+  # ══════════════════════════════════════════════════════════════════════
+  # CREATE RELEASE — waits on all parallel builds (phone, tv, desktop)
   # ══════════════════════════════════════════════════════════════════════
   create_release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [prepare_release, build_apk]
+    needs: [prepare_release, build_apk, build_desktop]
 
     steps:
       - name: Download Phone APK artifact
@@ -229,7 +503,13 @@ jobs:
           name: tv-release
           path: ./apks/tv-release
 
-      # ── Single GitHub Release with all 2 APKs ────────────────
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-release
+          path: ./windows-release
+
+      # ── Single GitHub Release with all artifacts (APKs + Windows) ────────────────
       - name: Create GitHub Release
         id: create_release
         uses: softprops/action-gh-release@v2
@@ -247,8 +527,10 @@ jobs:
             ---
 
             ### Downloads
-            | APK | Platform |
-            |-----|----------|
+
+            #### Android Devices
+            | Package | Platform |
+            |---------|----------|
             | `KiduyuTV-phone-release-*.apk` | Android Phone / Tablet |
             | `KiduyuTV-tv-release-*.apk`    | Android TV / Fire TV   |
 
@@ -262,9 +544,31 @@ jobs:
             adb connect <device-ip>:5555
             adb install KiduyuTV-tv-release-*.apk
             ```
+
+            #### Windows 10/11 x64
+            | Package | Type |
+            |---------|------|
+            | `KiduyuTV-setup-*.exe` | Standalone Installer |
+            | `KiduyuTV-setup-*.msi` | MSI Package (Windows Installation) |
+
+            **Installation (Windows):**
+            1. Download the EXE or MSI file
+            2. Run the installer and follow the prompts
+            3. Launch from Start Menu or desktop shortcut
+            4. Configure TMDB API token in Settings
+            5. Configure Stream Provider token in Settings
+
+            **System Requirements (Windows):**
+            - Windows 10 x64 or Windows 11 x64
+            - 4GB RAM minimum
+            - 300MB free disk space
+            - Internet connection
+
           files: |
             ./apks/phone-release/*.apk
             ./apks/tv-release/*.apk
+            ./windows-release/*.exe
+            ./windows-release/*.msi
           draft: false
           prerelease: false
           make_latest: true
@@ -470,10 +774,19 @@ jobs:
         with:
           path: ./apks
 
-      - name: List downloaded APKs
+      - name: Download all Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-release
+          path: ./windows-release
+
+      - name: List downloaded artifacts
         run: |
           echo "=== Downloaded APKs ==="
           find ./apks -name "*.apk" -type f
+          echo ""
+          echo "=== Downloaded Windows Files ==="
+          find ./windows-release -type f 2>/dev/null || echo "No Windows files found"
 
       - name: Resolve latest release info
         id: release_info
@@ -491,14 +804,26 @@ jobs:
           # Get TV release APK with the highest build number
           TV_ASSET=$(echo "$RELEASE" | jq -r \
             '[.assets[] | select(.name | test("tv-release.*\\.apk$"))] | sort_by(.name) | last')
-          TV_APK_URL=$(echo "$TV_ASSET" | jq -r '.browser_download_url')
-          TV_APK_NAME=$(echo "$TV_ASSET" | jq -r '.name')
+          TV_APK_URL=$(echo "$TV_ASSET" | jq -r '.browser_download_url // empty')
+          TV_APK_NAME=$(echo "$TV_ASSET" | jq -r '.name // empty')
 
           # Get Phone release APK with the highest build number
           PHONE_ASSET=$(echo "$RELEASE" | jq -r \
             '[.assets[] | select(.name | test("phone-release.*\\.apk$"))] | sort_by(.name) | last')
-          PHONE_APK_URL=$(echo "$PHONE_ASSET" | jq -r '.browser_download_url')
-          PHONE_APK_NAME=$(echo "$PHONE_ASSET" | jq -r '.name')
+          PHONE_APK_URL=$(echo "$PHONE_ASSET" | jq -r '.browser_download_url // empty')
+          PHONE_APK_NAME=$(echo "$PHONE_ASSET" | jq -r '.name // empty')
+
+          # Get Windows EXE with the highest build number
+          WIN_EXE_ASSET=$(echo "$RELEASE" | jq -r \
+            '[.assets[] | select(.name | test(".*setup.*\\.exe$"))] | sort_by(.name) | last')
+          WIN_EXE_URL=$(echo "$WIN_EXE_ASSET" | jq -r '.browser_download_url // empty')
+          WIN_EXE_NAME=$(echo "$WIN_EXE_ASSET" | jq -r '.name // empty')
+
+          # Get Windows MSI with the highest build number
+          WIN_MSI_ASSET=$(echo "$RELEASE" | jq -r \
+            '[.assets[] | select(.name | test(".*setup.*\\.msi$"))] | sort_by(.name) | last')
+          WIN_MSI_URL=$(echo "$WIN_MSI_ASSET" | jq -r '.browser_download_url // empty')
+          WIN_MSI_NAME=$(echo "$WIN_MSI_ASSET" | jq -r '.name // empty')
 
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "title=${TITLE}" >> $GITHUB_OUTPUT
@@ -506,22 +831,36 @@ jobs:
           echo "tv_apk_name=${TV_APK_NAME}" >> $GITHUB_OUTPUT
           echo "phone_apk_url=${PHONE_APK_URL}" >> $GITHUB_OUTPUT
           echo "phone_apk_name=${PHONE_APK_NAME}" >> $GITHUB_OUTPUT
+          echo "win_exe_url=${WIN_EXE_URL}" >> $GITHUB_OUTPUT
+          echo "win_exe_name=${WIN_EXE_NAME}" >> $GITHUB_OUTPUT
+          echo "win_msi_url=${WIN_MSI_URL}" >> $GITHUB_OUTPUT
+          echo "win_msi_name=${WIN_MSI_NAME}" >> $GITHUB_OUTPUT
           echo "Resolved: ${TV_APK_NAME} @ ${TV_APK_URL}"
+          echo "Resolved: ${WIN_EXE_NAME} @ ${WIN_EXE_URL}"
+          echo "Resolved: ${WIN_MSI_NAME} @ ${WIN_MSI_URL}"
 
-      - name: Update APK download links in index.html
+      - name: Update APK and Windows download links in index.html
         env:
           TV_APK_URL: ${{ steps.release_info.outputs.tv_apk_url }}
           TV_APK_NAME: ${{ steps.release_info.outputs.tv_apk_name }}
           PHONE_APK_URL: ${{ steps.release_info.outputs.phone_apk_url }}
           PHONE_APK_NAME: ${{ steps.release_info.outputs.phone_apk_name }}
+          WIN_EXE_URL: ${{ steps.release_info.outputs.win_exe_url }}
+          WIN_EXE_NAME: ${{ steps.release_info.outputs.win_exe_name }}
+          WIN_MSI_URL: ${{ steps.release_info.outputs.win_msi_url }}
+          WIN_MSI_NAME: ${{ steps.release_info.outputs.win_msi_name }}
         run: |
           python3 - <<'PYEOF'
           import os, re, pathlib
 
-          tv_apk_url    = os.environ["TV_APK_URL"]
-          tv_apk_name   = os.environ["TV_APK_NAME"]
-          phone_apk_url = os.environ["PHONE_APK_URL"]
-          phone_apk_name = os.environ["PHONE_APK_NAME"]
+          tv_apk_url    = os.environ.get("TV_APK_URL", "")
+          tv_apk_name   = os.environ.get("TV_APK_NAME", "")
+          phone_apk_url = os.environ.get("PHONE_APK_URL", "")
+          phone_apk_name = os.environ.get("PHONE_APK_NAME", "")
+          win_exe_url   = os.environ.get("WIN_EXE_URL", "")
+          win_exe_name  = os.environ.get("WIN_EXE_NAME", "")
+          win_msi_url   = os.environ.get("WIN_MSI_URL", "")
+          win_msi_name  = os.environ.get("WIN_MSI_NAME", "")
 
           html = pathlib.Path("index.html").read_text(encoding="utf-8")
 
@@ -547,12 +886,21 @@ jobs:
               pattern = rf'<a\b(?=[^>]*\bid="{re.escape(anchor_id)}")[^>]*>'
               return re.sub(pattern, replacer, html, flags=re.DOTALL)
 
-          html = patch_anchor(html, "download-tv",     tv_apk_url,    tv_apk_name)
-          html = patch_anchor(html, "download-mobile", phone_apk_url, phone_apk_name)
+          # Update all download links if URLs are available
+          if tv_apk_url:
+              html = patch_anchor(html, "download-tv", tv_apk_url, tv_apk_name)
+              print(f"✅ Updated TV download link → {tv_apk_name}")
+          if phone_apk_url:
+              html = patch_anchor(html, "download-mobile", phone_apk_url, phone_apk_name)
+              print(f"✅ Updated Mobile download link → {phone_apk_name}")
+          if win_exe_url:
+              html = patch_anchor(html, "download-windows-exe", win_exe_url, win_exe_name)
+              print(f"✅ Updated Windows EXE link → {win_exe_name}")
+          if win_msi_url:
+              html = patch_anchor(html, "download-windows-msi", win_msi_url, win_msi_name)
+              print(f"✅ Updated Windows MSI link → {win_msi_name}")
 
           pathlib.Path("index.html").write_text(html, encoding="utf-8")
-          print(f"✅ Updated TV download link    → {tv_apk_name}")
-          print(f"✅ Updated Mobile download link → {phone_apk_name}")
           PYEOF
 
       - name: Upload Pages artifact
