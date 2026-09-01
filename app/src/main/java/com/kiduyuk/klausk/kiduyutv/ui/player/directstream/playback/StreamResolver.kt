@@ -22,7 +22,8 @@ class StreamResolver {
     /**
      * Returns the combined stream list in provider response order. For series
      * titles, both [season] and [episode] are required and must be > 0.
-     * [onProviderProgress] is invoked before each provider request.
+     * [onProviderProgress] is invoked before each provider request, and
+     * [onProviderRetry] is invoked before retrying a failed or empty request.
      */
     suspend fun load(
         type: String,
@@ -30,7 +31,8 @@ class StreamResolver {
         season: Int? = null,
         episode: Int? = null,
         provider: StreamProviderChoice = StreamCatalog.default,
-        onProviderProgress: suspend (index: Int, total: Int, providerName: String) -> Unit = { _, _, _ -> }
+        onProviderProgress: suspend (index: Int, total: Int, providerName: String) -> Unit = { _, _, _ -> },
+        onProviderRetry: suspend (index: Int, total: Int, providerName: String) -> Unit = { _, _, _ -> }
     ): List<StreamItem> = withContext(Dispatchers.IO) {
         val providerNames = if (provider.key.isBlank()) {
             ProvidersApi.enabledProviderNames()
@@ -55,7 +57,7 @@ class StreamResolver {
             var response: StreamResponse? = null
             var failure: Throwable? = null
             repeat(2) { attempt ->
-                if (response != null) return@repeat
+                if (response?.streams?.isNotEmpty() == true) return@repeat
 
                 runCatching {
                     ProvidersApi.streams(
@@ -65,14 +67,19 @@ class StreamResolver {
                         episode = episode,
                         provider = providerName
                     )
-                }.onSuccess {
-                    response = it
+                }.onSuccess { result ->
+                    response = result
+                    if (result.streams.isEmpty() && attempt == 0) {
+                        Log.w(tag, "Provider $providerName returned no streams; retrying stream fetch")
+                        onProviderRetry(index + 1, providerNames.size, providerName)
+                    }
                 }.onFailure { error ->
                     failure = error
                     val shouldRetry = error is ProvidersApiHttpException &&
                         error.statusCode == 500 && attempt == 0
                     if (shouldRetry) {
                         Log.w(tag, "Provider $providerName returned HTTP 500; retrying stream fetch")
+                        onProviderRetry(index + 1, providerNames.size, providerName)
                     }
                 }
             }

@@ -1203,15 +1203,24 @@ class DirectStreamActivity : AppCompatActivity() {
                     tmdbId = tmdbId,
                     season = season,
                     episode = episode,
-                    provider = provider
-                ) { index, total, providerName ->
-                    withContext(Dispatchers.Main) {
-                        showStatus(
-                            "Provider $index/$total enabled providers: $providerName\nfetching streams",
-                            retry = false
-                        )
+                    provider = provider,
+                    onProviderProgress = { index, total, providerName ->
+                        withContext(Dispatchers.Main) {
+                            showStatus(
+                                "Provider $index/$total enabled providers: $providerName\nfetching streams",
+                                retry = false
+                            )
+                        }
+                    },
+                    onProviderRetry = { index, total, providerName ->
+                        withContext(Dispatchers.Main) {
+                            showStatus(
+                                "Provider $index/$total enabled providers: $providerName\nretrying streams",
+                                retry = false
+                            )
+                        }
                     }
-                }
+                )
             }
             result.onSuccess { items ->
                 Log.i(PROVIDER_TAG, "loadAndPlay received ${items.size} streams for provider=${provider.displayName}")
