@@ -92,10 +92,16 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
     }
     var videoWindowId by remember { mutableStateOf<Long?>(null) }
     LaunchedEffect(videoCanvas) {
-        while (isActive && !videoCanvas.isDisplayable) delay(50L)
+        while (
+            isActive &&
+            (!videoCanvas.isDisplayable || !videoCanvas.isShowing || videoCanvas.width <= 0 || videoCanvas.height <= 0)
+        ) {
+            delay(50L)
+        }
         videoWindowId = runCatching { Native.getComponentID(videoCanvas) }
             .getOrNull()
             ?.takeIf { it != 0L }
+        videoCanvas.requestFocusInWindow()
     }
     var streams by remember(request) { mutableStateOf<List<StreamItem>>(emptyList()) }
     var activeStream by remember(request) { mutableStateOf<StreamItem?>(null) }
@@ -264,10 +270,16 @@ fun LivePlayerScreen(services: DesktopServices, route: DesktopRoute.LivePlayer) 
     }
     var videoWindowId by remember { mutableStateOf<Long?>(null) }
     LaunchedEffect(videoCanvas) {
-        while (isActive && !videoCanvas.isDisplayable) delay(50L)
+        while (
+            isActive &&
+            (!videoCanvas.isDisplayable || !videoCanvas.isShowing || videoCanvas.width <= 0 || videoCanvas.height <= 0)
+        ) {
+            delay(50L)
+        }
         videoWindowId = runCatching { Native.getComponentID(videoCanvas) }
             .getOrNull()
             ?.takeIf { it != 0L }
+        videoCanvas.requestFocusInWindow()
     }
     val stream = remember(route) {
         StreamItem(name = route.name, title = route.name, url = route.url, provider = "Live TV", type = "hls", headers = route.headers)

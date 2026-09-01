@@ -47,6 +47,8 @@ class MpvPlayer(
             resolveExecutable().toString(),
             "--input-ipc-server=$pipe",
             "--force-window=yes",
+            "--vo=gpu",
+            "--gpu-context=angle",
             "--keep-open=no",
             "--no-osc",
             "--no-osd-bar",
@@ -61,7 +63,11 @@ class MpvPlayer(
             "--sub-auto=all"
         )
         if (startPositionMs > 0L) args += "--start=${startPositionMs / 1000.0}"
-        windowId?.let { args += "--wid=$it" }
+        windowId?.let {
+            // On Windows mpv expects the native HWND supplied by the embedded AWT Canvas.
+            args += "--wid=$it"
+            args += "--no-border"
+        }
 
         val customHeaders = stream.headers.entries
             .filterNot { it.key.equals("User-Agent", true) || it.key.equals("Referer", true) }
