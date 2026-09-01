@@ -1,5 +1,7 @@
 package com.kiduyuk.klausk.kiduyutv.desktop
 
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -32,8 +34,7 @@ fun main() = application {
         onCloseRequest = ::exitApplication
     ) {
         val darkTheme by services.darkTheme
-        MaterialTheme(
-            colorScheme = if (darkTheme) darkColorScheme(
+        val colorScheme = if (darkTheme) darkColorScheme(
                 primary = Color(0xFFE50914),
                 onPrimary = Color.White,
                 secondary = Color(0xFFFFB4AB),
@@ -55,11 +56,16 @@ fun main() = application {
                 onSurface = Color(0xFF171717),
                 onSurfaceVariant = Color(0xFF404040)
             )
-        ) {
-            val appState = rememberDesktopAppState(services)
-            KiduyuDesktopApp(services)
-            DisposableEffect(Unit) {
-                onDispose { appState.dispose() }
+        MaterialTheme(colorScheme = colorScheme) {
+            CompositionLocalProvider(
+                LocalContentColor provides colorScheme.onBackground,
+                LocalTextStyle provides LocalTextStyle.current.copy(color = colorScheme.onBackground)
+            ) {
+                val appState = rememberDesktopAppState(services)
+                KiduyuDesktopApp(services)
+                DisposableEffect(Unit) {
+                    onDispose { appState.dispose() }
+                }
             }
         }
     }

@@ -74,7 +74,7 @@ private fun ProviderButton(name: String, subtitle: String, onClick: () -> Unit) 
                 Text(name, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                 Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Text("PLAY", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            Text("PLAY", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -350,7 +350,7 @@ private fun PlayerLayout(
                         Text("Buffering…")
                     }
                 } else if (!status.isNullOrBlank() && !state.playing) {
-                    Text(status, color = MaterialTheme.colorScheme.error)
+                    Text(status, color = MaterialTheme.colorScheme.onSurface)
                 }
             }
             Column(Modifier.fillMaxWidth().background(Color(0xD9000000)).padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -416,7 +416,7 @@ private fun StreamSelectionDialog(
                                 Text(stream.displayName, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text(stream.provider, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            Text(stream.quality, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                            Text(stream.quality, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

@@ -183,7 +183,7 @@ fun SearchScreen(services: DesktopServices) {
             singleLine = true
         )
         if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(24.dp)) }
+        error?.let { Text(it, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(24.dp)) }
         LazyVerticalGrid(
             columns = GridCells.Adaptive(160.dp),
             contentPadding = PaddingValues(24.dp),
@@ -264,7 +264,7 @@ fun LiveTvScreen(services: DesktopServices, schedule: Boolean) {
                         Text(channel.group, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (schedule) Text("Select to view and play this channel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Text("PLAY", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    Text("PLAY", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -437,7 +437,7 @@ fun SettingsScreen(services: DesktopServices) {
                 services.darkTheme.value = darkTheme
                 message = "Settings saved"
             })
-            message?.let { Text(it, color = Color(0xFF66BB6A)) }
+            message?.let { Text(it, color = MaterialTheme.colorScheme.onSurface) }
             HorizontalDivider()
             Text("KiduyuTV Windows ${System.getProperty("kiduyutv.version", "1.1.71")}")
             Text("The Windows application follows the Android TV screen graph.", color = MaterialTheme.colorScheme.onSurfaceVariant)
