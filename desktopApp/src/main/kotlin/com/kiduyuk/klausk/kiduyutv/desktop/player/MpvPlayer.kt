@@ -1,0 +1,229 @@
+package com.kiduyuk.klausk.kiduyutv.desktop.player
+
+import com.google.gson.Gson
+import com.google.gson.JsonObject
+import com.kiduyuk.klausk.kiduyutv.desktop.data.DesktopSettings
+import com.kiduyuk.klausk.kiduyutv.desktop.model.StreamItem
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import java.io.RandomAccessFile
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
+import java.util.concurrent.LinkedBlockingQueue
+import kotlin.io.path.isRegularFile
+
+data class MpvState(
+    val running: Boolean = false,
+    val playing: Boolean = false,
+    val positionMs: Long = 0L,
+    val durationMs: Long = 0L,
+    val bufferedMs: Long = 0L,
+    val title: String = "",
+    val error: String? = null
+)
+
+class MpvPlayer(
+    private val settings: DesktopSettings,
+    private val scope: CoroutineScope
+) : AutoCloseable {
+    private val gson = Gson()
+    private val mutableState = MutableStateFlow(MpvState())
+    val state: StateFlow<MpvState> = mutableState.asStateFlow()
+    private val commands = LinkedBlockingQueue<String>()
+    private var process: Process? = null
+    private var ipcJob: Job? = null
+    private var processJob: Job? = null
+    private var intentionallyStopped = false
+
+    fun play(stream: StreamItem, startPositionMs: Long = 0L) {
+        stop()
+        intentionallyStopped = false
+        mutableState.value = MpvState(running = true, title = stream.displayName)
+        val pipe = "\\\\.\\pipe\\kiduyutv-${System.nanoTime()}"
+        val args = mutableListOf(
+            resolveExecutable().toString(),
+            "--input-ipc-server=$pipe",
+            "--force-window=yes",
+            "--keep-open=no",
+            "--hwdec=auto-safe",
+            "--cache=yes",
+            "--cache-secs=30",
+            "--demuxer-max-bytes=256MiB",
+            "--demuxer-readahead-secs=30",
+            "--title=${stream.displayName}",
+            "--alang=eng,en",
+            "--slang=${settings.preferredSubtitleLanguage},eng,en",
+            "--sub-auto=all"
+        )
+        if (startPositionMs > 0L) args += "--start=${startPositionMs / 1000.0}"
+
+        val customHeaders = stream.headers.entries
+            .filterNot { it.key.equals("User-Agent", true) || it.key.equals("Referer", true) }
+            .filter { safeHeader(it.key) && safeHeader(it.value) }
+            .joinToString(",") { "${it.key}: ${it.value}" }
+        stream.headers.valueIgnoreCase("User-Agent")?.takeIf(::safeHeader)?.let {
+            args += "--user-agent=$it"
+        }
+        stream.headers.valueIgnoreCase("Referer")?.takeIf(::safeHeader)?.let {
+            args += "--referrer=$it"
+        }
+        if (customHeaders.isNotBlank()) args += "--http-header-fields=$customHeaders"
+        args += stream.url
+
+        try {
+            process = ProcessBuilder(args)
+                .redirectErrorStream(true)
+                .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                .start()
+            connectIpc(pipe)
+            processJob = scope.launch(Dispatchers.IO) {
+                val exitCode = process?.waitFor() ?: return@launch
+                val previous = mutableState.value
+                mutableState.value = previous.copy(
+                    running = false,
+                    playing = false,
+                    error = if (!intentionallyStopped && exitCode != 0) {
+                        "mpv exited with code $exitCode"
+                    } else previous.error
+                )
+            }
+        } catch (error: Exception) {
+            mutableState.value = MpvState(error = "Could not start mpv: ${error.message}")
+        }
+    }
+
+    fun togglePause() = enqueue("cycle", "pause")
+    fun seekBy(seconds: Int) = enqueue("seek", seconds, "relative")
+    fun seekTo(positionMs: Long) = enqueue("set_property", "time-pos", positionMs / 1000.0)
+    fun cycleAudio() = enqueue("cycle", "aid")
+    fun cycleSubtitle() = enqueue("cycle", "sid")
+    fun cycleVideo() = enqueue("cycle", "vid")
+    fun toggleFullscreen() = enqueue("cycle", "fullscreen")
+    fun addSubtitle(pathOrUrl: String) = enqueue("sub-add", pathOrUrl, "select")
+
+    fun stop() {
+        intentionallyStopped = true
+        enqueue("quit")
+        ipcJob?.cancel()
+        processJob?.cancel()
+        process?.destroy()
+        process = null
+        ipcJob = null
+        processJob = null
+        commands.clear()
+        mutableState.value = mutableState.value.copy(running = false, playing = false)
+    }
+
+    override fun close() = stop()
+
+    private fun connectIpc(pipe: String) {
+        ipcJob = scope.launch(Dispatchers.IO) {
+            val connection = withTimeoutOrNull(8_000L) {
+                while (isActive) {
+                    val opened = runCatching { RandomAccessFile(pipe, "rw") }.getOrNull()
+                    if (opened != null) return@withTimeoutOrNull opened
+                    delay(100L)
+                }
+                null
+            }
+            if (connection == null) {
+                mutableState.value = mutableState.value.copy(error = "Could not connect to mpv control pipe")
+                return@launch
+            }
+            connection.use { ipc ->
+                listOf(
+                    1 to "time-pos",
+                    2 to "duration",
+                    3 to "pause",
+                    4 to "media-title",
+                    5 to "demuxer-cache-time"
+                ).forEach { (id, property) ->
+                    ipc.writeLine(gson.toJson(mapOf("command" to listOf("observe_property", id, property))))
+                }
+                while (isActive && process?.isAlive == true) {
+                    while (true) {
+                        val command = commands.poll() ?: break
+                        ipc.writeLine(command)
+                    }
+                    val line = runCatching { ipc.readLine() }.getOrNull() ?: break
+                    handleEvent(line)
+                }
+            }
+        }
+    }
+
+    private fun handleEvent(line: String) {
+        val json = runCatching { gson.fromJson(line, JsonObject::class.java) }.getOrNull() ?: return
+        if (json.get("event")?.asString != "property-change") return
+        val name = json.get("name")?.asString ?: return
+        val data = json.get("data")
+        val current = mutableState.value
+        mutableState.value = when (name) {
+            "time-pos" -> current.copy(
+                positionMs = data?.takeUnless { it.isJsonNull }?.asDouble?.times(1000)?.toLong() ?: 0L,
+                playing = current.running,
+                error = null
+            )
+            "duration" -> current.copy(
+                durationMs = data?.takeUnless { it.isJsonNull }?.asDouble?.times(1000)?.toLong() ?: 0L
+            )
+            "pause" -> current.copy(
+                playing = !(data?.takeUnless { it.isJsonNull }?.asBoolean ?: true),
+                error = null
+            )
+            "media-title" -> current.copy(title = data?.takeUnless { it.isJsonNull }?.asString ?: current.title)
+            "demuxer-cache-time" -> current.copy(
+                bufferedMs = data?.takeUnless { it.isJsonNull }?.asDouble?.times(1000)?.toLong() ?: 0L
+            )
+            else -> current
+        }
+    }
+
+    private fun enqueue(vararg values: Any) {
+        commands.offer(gson.toJson(mapOf("command" to values.toList())))
+    }
+
+    private fun resolveExecutable(): Path {
+        val configured = settings.mpvPath.trim()
+        if (configured.isNotBlank()) {
+            val path = Paths.get(configured)
+            if (path.isRegularFile()) return path
+            if (path.parent == null) return path
+        }
+        val resources = System.getProperty("compose.application.resources.dir")
+        if (!resources.isNullOrBlank()) {
+            val bundled = Paths.get(resources).resolve("mpv").resolve("mpv.exe")
+            if (Files.isRegularFile(bundled)) return bundled
+        }
+        return Paths.get("mpv.exe")
+    }
+
+    private fun safeHeader(value: String): Boolean =
+        value.isNotBlank() && '\r' !in value && '\n' !in value
+
+    private fun RandomAccessFile.writeLine(text: String) {
+        write((text + "\n").toByteArray(Charsets.UTF_8))
+    }
+}
+
+private fun Map<String, String>.valueIgnoreCase(name: String): String? =
+    entries.firstOrNull { it.key.equals(name, true) }?.value
+
+object StreamRanker {
+    fun automatic(streams: List<StreamItem>): StreamItem? = streams
+        .filter { resolution(it.quality) in 0..1080 }
+        .sortedWith(
+            compareByDescending<StreamItem> { resolution(it.quality) }
+                .thenByDescending { it.type.equals("hls", true) }
+        )
+        .firstOrNull() ?: streams.firstOrNull()
+
+    fun sorted(streams: List<StreamItem>): List<StreamItem> =
+        streams.sortedByDescending { resolution(it.quality) }
+
+    private fun resolution(quality: String): Int =
+        Regex("(\\d{3,4})").find(quality)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+}

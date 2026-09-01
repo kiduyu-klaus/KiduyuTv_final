@@ -35,3 +35,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "KiduyuTv"
 include ':app'
+include ':desktopApp'

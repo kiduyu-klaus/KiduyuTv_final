@@ -1,0 +1,64 @@
+import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+
+plugins {
+    id 'org.jetbrains.kotlin.jvm'
+    id 'org.jetbrains.kotlin.plugin.compose'
+    id 'org.jetbrains.compose'
+}
+
+group = 'com.kiduyuk.klausk.kiduyutv'
+version = providers.gradleProperty('APP_VERSION').getOrElse('1.1.71')
+
+kotlin {
+    jvmToolchain(17)
+}
+
+dependencies {
+    implementation compose.desktop.currentOs
+    implementation compose.material3
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.8.1'
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'com.google.code.gson:gson:2.10.1'
+    testImplementation 'junit:junit:4.13.2'
+}
+
+sourceSets {
+    main {
+        resources {
+            srcDir 'src/main/resources'
+        }
+    }
+}
+
+tasks.named('processResources') {
+    from(rootProject.file('lists')) {
+        into 'lists'
+    }
+}
+
+compose.desktop {
+    application {
+        mainClass = 'com.kiduyuk.klausk.kiduyutv.desktop.MainKt'
+        jvmArgs.addAll(['-Xmx1G', '-Dfile.encoding=UTF-8'])
+
+        nativeDistributions {
+            targetFormats(TargetFormat.Exe, TargetFormat.Msi)
+            packageName = 'KiduyuTV'
+            packageVersion = project.version.toString()
+            description = 'KiduyuTV for Windows'
+            vendor = 'KiduyuTV'
+            modules('java.sql', 'java.net.http', 'java.naming')
+
+            windows {
+                menuGroup = 'KiduyuTV'
+                dirChooser = true
+                perUserInstall = true
+                upgradeUuid = '93e54350-c801-4ee5-943c-32498c73bbf6'
+            }
+        }
+
+        buildTypes.release.proguard {
+            obfuscate.set(false)
+        }
+    }
+}

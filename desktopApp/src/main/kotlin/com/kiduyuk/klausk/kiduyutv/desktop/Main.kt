@@ -1,0 +1,55 @@
+package com.kiduyuk.klausk.kiduyutv.desktop
+
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowState
+import androidx.compose.ui.window.application
+import com.kiduyuk.klausk.kiduyutv.desktop.data.*
+import com.kiduyuk.klausk.kiduyutv.desktop.navigation.DesktopNavigator
+
+fun main() = application {
+    val services = remember {
+        val settings = DesktopSettings()
+        DesktopServices(
+            settings = settings,
+            tmdb = TmdbClient(settings),
+            providers = ProvidersClient(settings),
+            iptv = IptvClient(),
+            library = LocalLibrary(),
+            navigator = DesktopNavigator()
+        )
+    }
+    Window(
+        title = "KiduyuTV",
+        state = WindowState(width = 1366.dp, height = 768.dp),
+        onCloseRequest = ::exitApplication
+    ) {
+        MaterialTheme(
+            colorScheme = darkColorScheme(
+                primary = Color(0xFFE50914),
+                onPrimary = Color.White,
+                secondary = Color(0xFFFFB4AB),
+                background = Color(0xFF080808),
+                surface = Color(0xFF151515),
+                surfaceVariant = Color(0xFF242424),
+                onBackground = Color(0xFFF5F5F5),
+                onSurface = Color(0xFFF5F5F5)
+            )
+        ) {
+            KiduyuDesktopApp(services)
+        }
+    }
+}
+
+data class DesktopServices(
+    val settings: DesktopSettings,
+    val tmdb: TmdbClient,
+    val providers: ProvidersClient,
+    val iptv: IptvClient,
+    val library: LocalLibrary,
+    val navigator: DesktopNavigator
+)
