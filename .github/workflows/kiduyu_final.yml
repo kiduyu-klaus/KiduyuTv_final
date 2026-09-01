@@ -384,30 +384,38 @@ jobs:
           $VERSION = Get-Content VERSION
           $BUILD = "${{ needs.prepare_release.outputs.build_count }}"
           
-          # Locate EXE
-          $exes = Get-ChildItem -Path "desktopApp\build\compose\binaries\main-release" -Filter "*.exe" -Recurse
-          if ($exes) {
+          $buildRoot = "desktopApp\build"
+          if (-not (Test-Path $buildRoot)) {
+              Write-Error "Desktop build directory not found: $buildRoot"
+              exit 1
+          }
+
+          # Compose plugin output paths can vary between plugin versions. Search
+          # the complete desktop build tree instead of assuming main-release.
+          $exes = @(Get-ChildItem -Path $buildRoot -Filter "*.exe" -Recurse -File -ErrorAction SilentlyContinue)
+          if ($exes.Count -gt 0) {
               $exe = $exes[0]
               $newExeName = "KiduyuTV-setup-${VERSION}-build${BUILD}.exe"
               $newExePath = Join-Path $exe.DirectoryName $newExeName
               Move-Item -Path $exe.FullName -Destination $newExePath -Force
-              Write-Output "exe_path=$newExePath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-              Write-Output "✓ Renamed EXE: $newExeName"
+              "exe_path=$newExePath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+              Write-Output "Renamed EXE: $newExeName"
           } else {
-              Write-Output "⚠ No EXE found"
+              Write-Error "No EXE found under $buildRoot"
+              exit 1
           }
-          
-          # Locate MSI
-          $msis = Get-ChildItem -Path "desktopApp\build\compose\binaries\main-release" -Filter "*.msi" -Recurse
-          if ($msis) {
+
+          $msis = @(Get-ChildItem -Path $buildRoot -Filter "*.msi" -Recurse -File -ErrorAction SilentlyContinue)
+          if ($msis.Count -gt 0) {
               $msi = $msis[0]
               $newMsiName = "KiduyuTV-setup-${VERSION}-build${BUILD}.msi"
               $newMsiPath = Join-Path $msi.DirectoryName $newMsiName
               Move-Item -Path $msi.FullName -Destination $newMsiPath -Force
-              Write-Output "msi_path=$newMsiPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-              Write-Output "✓ Renamed MSI: $newMsiName"
+              "msi_path=$newMsiPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+              Write-Output "Renamed MSI: $newMsiName"
           } else {
-              Write-Output "⚠ No MSI found"
+              Write-Error "No MSI found under $buildRoot"
+              exit 1
           }
 
       - name: Generate Windows Release Notes
