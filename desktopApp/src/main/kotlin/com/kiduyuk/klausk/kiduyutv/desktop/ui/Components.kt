@@ -56,7 +56,7 @@ fun RemoteImage(
                 contentScale = contentScale
             )
         } else {
-            Text(contentDescription?.take(1).orEmpty(), color = Color.Gray, fontSize = 28.sp)
+            Text(contentDescription?.take(1).orEmpty(), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 28.sp)
         }
     }
 }

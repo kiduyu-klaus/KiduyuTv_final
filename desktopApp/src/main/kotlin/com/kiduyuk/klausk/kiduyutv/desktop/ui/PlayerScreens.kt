@@ -72,7 +72,7 @@ private fun ProviderButton(name: String, subtitle: String, onClick: () -> Unit) 
         Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(name, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                Text(subtitle, color = Color.Gray)
+                Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Text("PLAY", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
         }
@@ -221,7 +221,7 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
             title = { Text("Tracks") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Cycle through the tracks exposed by the current stream.", color = Color.LightGray)
+                    Text("Cycle through the tracks exposed by the current stream.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     TvActionButton("Next video track", player::cycleVideo, Modifier.fillMaxWidth())
                     TvActionButton("Next audio track", player::cycleAudio, Modifier.fillMaxWidth())
                     TvActionButton("Next subtitle track", player::cycleSubtitle, Modifier.fillMaxWidth())
@@ -324,7 +324,7 @@ private fun PlayerLayout(
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0x55000000), Color(0xEE000000)))))
         Column(Modifier.fillMaxSize()) {
             ScreenHeader(title, onBack, actions = {
-                stream?.let { Text("${it.displayName} • ${it.quality}", color = Color.LightGray) }
+                stream?.let { Text("${it.displayName} • ${it.quality}", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             })
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 SwingPanel(
@@ -402,7 +402,7 @@ private fun StreamSelectionDialog(
                         Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(stream.displayName, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(stream.provider, color = Color.Gray)
+                                Text(stream.provider, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             Text(stream.quality, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                         }

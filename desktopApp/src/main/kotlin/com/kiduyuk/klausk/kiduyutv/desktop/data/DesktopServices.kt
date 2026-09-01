@@ -42,6 +42,10 @@ class DesktopSettings {
         get() = prefs.getBoolean("direct_stream_enabled", true)
         set(value) = prefs.putBoolean("direct_stream_enabled", value)
 
+    var darkTheme: Boolean
+        get() = prefs.getBoolean("dark_theme", true)
+        set(value) = prefs.putBoolean("dark_theme", value)
+
     var defaultProvider: String
         get() = prefs.get("default_provider", "")
         set(value) = prefs.put("default_provider", value)

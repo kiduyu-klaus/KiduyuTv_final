@@ -77,7 +77,7 @@ fun MediaDetailScreen(services: DesktopServices, id: Int, type: MediaType) {
                     Text(media.displayTitle, fontSize = 36.sp, fontWeight = FontWeight.Black)
                     Text(
                         "${media.displayDate.take(4)}  •  ★ ${"%.1f".format(media.voteAverage)}  •  ${media.genres.joinToString { it.name }}",
-                        color = Color.LightGray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(media.overview, maxLines = 5, overflow = TextOverflow.Ellipsis)
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -120,7 +120,7 @@ fun MediaDetailScreen(services: DesktopServices, id: Int, type: MediaType) {
                             Modifier.size(112.dp).clip(CircleShape)
                         )
                         Text(cast.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold)
-                        Text(cast.character, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Color.Gray)
+                        Text(cast.character, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -211,8 +211,8 @@ fun SeasonEpisodesScreen(services: DesktopServices, route: DesktopRoute.SeasonEp
                     RemoteImage(tmdbImage(episode.stillPath, "w300"), episode.name, Modifier.width(150.dp).height(90.dp))
                     Column(Modifier.weight(1f)) {
                         Text("E${episode.episodeNumber} • ${episode.name}", fontWeight = FontWeight.Bold)
-                        Text(episode.overview, maxLines = 3, overflow = TextOverflow.Ellipsis, color = Color.LightGray)
-                        episode.runtime?.let { Text("$it min", color = Color.Gray) }
+                        Text(episode.overview, maxLines = 3, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        episode.runtime?.let { Text("$it min", color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
                 }
             }
@@ -274,7 +274,7 @@ fun CastDetailScreen(services: DesktopServices, castId: Int) {
             RemoteImage(tmdbImage(data.profilePath, "h632"), data.name, Modifier.width(220.dp).height(330.dp))
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(data.name, fontSize = 34.sp, fontWeight = FontWeight.Black)
-                Text(data.knownForDepartment, color = Color.LightGray)
+                Text(data.knownForDepartment, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(data.biography.ifBlank { "No biography available." })
             }
         }
@@ -389,7 +389,7 @@ fun VideosScreen(services: DesktopServices, route: DesktopRoute.Videos) {
                 ) {
                     Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("▶ ${video.name}", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Text("${video.type} • ${video.site}", color = Color.Gray)
+                        Text("${video.type} • ${video.site}", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -419,7 +419,7 @@ fun TraktProfileScreen(services: DesktopServices) {
         })
         Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Desktop profile", fontSize = 28.sp, fontWeight = FontWeight.Bold)
-            Text("Local collection and watch activity are available now. Connect Trakt device authentication here when desktop OAuth credentials are configured.", color = Color.LightGray)
+            Text("Local collection and watch activity are available now. Connect Trakt device authentication here when desktop OAuth credentials are configured.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         MediaRail("Collection", favorites, services::openMedia)
         Spacer(Modifier.height(28.dp))

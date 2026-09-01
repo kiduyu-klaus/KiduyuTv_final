@@ -240,7 +240,7 @@ fun LiveTvScreen(services: DesktopServices, schedule: Boolean) {
                 if (services.settings.epgUrl.isBlank()) "EPG URL is not configured; showing channel schedule entries."
                 else "EPG source: ${services.settings.epgUrl}",
                 modifier = Modifier.padding(horizontal = 20.dp),
-                color = Color.LightGray
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         val filtered = channels.filter { selectedGroup == null || it.group == selectedGroup }
@@ -257,8 +257,8 @@ fun LiveTvScreen(services: DesktopServices, schedule: Boolean) {
                     RemoteImage(channel.logo, channel.name, Modifier.size(72.dp), ContentScale.Fit)
                     Column(Modifier.weight(1f)) {
                         Text(channel.name, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Text(channel.group, color = Color.Gray)
-                        if (schedule) Text("Select to view and play this channel", color = Color.LightGray)
+                        Text(channel.group, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (schedule) Text("Select to view and play this channel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Text("PLAY", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
@@ -277,6 +277,7 @@ fun SettingsScreen(services: DesktopServices) {
     var mpvPath by remember { mutableStateOf(services.settings.mpvPath) }
     var subtitleLanguage by remember { mutableStateOf(services.settings.preferredSubtitleLanguage) }
     var directStream by remember { mutableStateOf(services.settings.directStreamEnabled) }
+    var darkTheme by remember { mutableStateOf(services.settings.darkTheme) }
     var providers by remember { mutableStateOf<List<String>>(emptyList()) }
     var message by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
@@ -290,6 +291,24 @@ fun SettingsScreen(services: DesktopServices) {
             Modifier.widthIn(max = 900.dp).padding(28.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp)
         ) {
+            Text("Appearance", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Theme")
+                    Text(
+                        if (darkTheme) "Dark theme (white text)" else "Light theme",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = darkTheme,
+                    onCheckedChange = {
+                        darkTheme = it
+                        services.settings.darkTheme = it
+                        services.darkTheme.value = it
+                    }
+                )
+            }
             Text("Playback", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Use direct streams", Modifier.weight(1f))
@@ -303,7 +322,7 @@ fun SettingsScreen(services: DesktopServices) {
             Text(
                 if (providers.isEmpty()) "Enabled providers could not be loaded yet."
                 else "Enabled: ${providers.joinToString()}",
-                color = Color.LightGray
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text("Catalog", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             SettingsField("TMDB API read-access bearer token", tmdbToken, { tmdbToken = it }, secret = true)
@@ -319,12 +338,14 @@ fun SettingsScreen(services: DesktopServices) {
                 services.settings.mpvPath = mpvPath
                 services.settings.preferredSubtitleLanguage = subtitleLanguage
                 services.settings.directStreamEnabled = directStream
+                services.settings.darkTheme = darkTheme
+                services.darkTheme.value = darkTheme
                 message = "Settings saved"
             })
             message?.let { Text(it, color = Color(0xFF66BB6A)) }
             HorizontalDivider()
             Text("KiduyuTV Windows ${System.getProperty("kiduyutv.version", "1.1.71")}")
-            Text("The Windows application follows the Android TV screen graph.", color = Color.Gray)
+            Text("The Windows application follows the Android TV screen graph.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
