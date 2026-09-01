@@ -39,6 +39,9 @@ sourceSets {
 }
 
 tasks.named('processResources') {
+    // The CI workflow may create logback.xml while the source set also exposes
+    // the same resource through Compose processing.
+    duplicatesStrategy = org.gradle.api.file.DuplicatesStrategy.EXCLUDE
     from(rootProject.file('lists')) {
         into 'lists'
     }

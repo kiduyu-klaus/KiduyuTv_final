@@ -109,17 +109,20 @@ class DesktopWatchHistoryRepository(
     override suspend fun find(request: PlayRequest): WatchProgress? =
         database.find(request)
 
-    override suspend fun save(progress: WatchProgress) =
+    override suspend fun save(progress: WatchProgress) {
         database.save(progress)
+    }
 
     override suspend fun getAll(): List<WatchProgress> =
         database.getAll()
 
-    override suspend fun delete(request: PlayRequest) =
+    override suspend fun delete(request: PlayRequest) {
         database.delete(request)
+    }
 
-    override suspend fun clear() =
+    override suspend fun clear() {
         database.clear()
+    }
 }
 
 class DesktopFavoritesRepository(

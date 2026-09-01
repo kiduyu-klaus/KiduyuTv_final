@@ -42,7 +42,7 @@ fun main() = application {
             )
         ) {
             val appState = rememberDesktopAppState(services)
-            KiduyuDesktopApp(appState)
+            KiduyuDesktopApp(services)
             DisposableEffect(Unit) {
                 onDispose { appState.dispose() }
             }
