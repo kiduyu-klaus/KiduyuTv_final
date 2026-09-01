@@ -1195,10 +1195,23 @@ class DirectStreamActivity : AppCompatActivity() {
         handlingPlaybackError = false
         binding.btnPlayerStreams.visibility = View.GONE
         updateBottomFocusChain()
-        showStatus(getString(R.string.streams_loading), retry = false)
+        showStatus("Fetching enabled providers", retry = false)
         streamJob = lifecycleScope.launch {
             val result = runCatching {
-                resolver.load(type, tmdbId, season, episode, provider)
+                resolver.load(
+                    type = type,
+                    tmdbId = tmdbId,
+                    season = season,
+                    episode = episode,
+                    provider = provider
+                ) { index, total, providerName ->
+                    withContext(Dispatchers.Main) {
+                        showStatus(
+                            "Provider $index/$total enabled providers: $providerName\nfetching streams",
+                            retry = false
+                        )
+                    }
+                }
             }
             result.onSuccess { items ->
                 Log.i(PROVIDER_TAG, "loadAndPlay received ${items.size} streams for provider=${provider.displayName}")

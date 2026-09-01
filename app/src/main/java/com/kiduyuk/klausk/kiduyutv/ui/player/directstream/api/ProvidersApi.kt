@@ -10,6 +10,8 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
+class ProvidersApiHttpException(val statusCode: Int) : IOException("Providers API HTTP $statusCode")
+
 /**
  * Minimal synchronous client for the local kiduyuTv_providers
  * (TMDB-Embed-API) server. Call every public method from Dispatchers.IO.
@@ -63,7 +65,7 @@ object ProvidersApi {
             HttpCookieStore.captureFrom(connection, urlString)
             val body = (if (status in 200..299) connection.inputStream else connection.errorStream)
                 ?.bufferedReader()?.use { it.readText() }.orEmpty()
-            if (status !in 200..299) throw IOException("Providers API HTTP $status")
+            if (status !in 200..299) throw ProvidersApiHttpException(status)
 
             val json = JSONObject(body)
             if (!json.optBoolean("success", false)) {
@@ -134,7 +136,7 @@ object ProvidersApi {
             if (status !in 200..299) {
                 Log.w(TAG, "HTTP $status from providers API (provider=$providerLabel)")
                 Log.w(TAG, "Body[0..200]=${body.take(200)}")
-                throw IOException("Providers API HTTP $status")
+                throw ProvidersApiHttpException(status)
             }
             val response = parse(JSONObject(body))
             Log.i(
