@@ -351,27 +351,28 @@ jobs:
       # BUILD WINDOWS DESKTOP APP
       # ═══════════════════════════════════════════════════════════════
       - name: Build Desktop Release EXE
+        shell: bash
         env:
           KIDUYUTV_STREAM_API_TOKEN: ${{ secrets.STREAM_API_TOKEN }}
           KIDUYUTV_TMDB_TOKEN: ${{ secrets.TMDB_BEARER_TOKEN }}
         run: |
-          .\gradlew :desktopApp:packageReleaseExe `
-            --build-cache `
-            --configuration-cache `
-            --parallel `
-            -x test `
+          ./gradlew :desktopApp:packageReleaseExe \
+            --build-cache \
+            --configuration-cache \
+            --parallel \
+            -x test \
             -x lint
-
       - name: Build Desktop Release MSI
+        shell: bash
         env:
           KIDUYUTV_STREAM_API_TOKEN: ${{ secrets.STREAM_API_TOKEN }}
           KIDUYUTV_TMDB_TOKEN: ${{ secrets.TMDB_BEARER_TOKEN }}
         run: |
-          .\gradlew :desktopApp:packageReleaseMsi `
-            --build-cache `
-            --configuration-cache `
-            --parallel `
-            -x test `
+          ./gradlew :desktopApp:packageReleaseMsi \
+            --build-cache \
+            --configuration-cache \
+            --parallel \
+            -x test \
             -x lint
 
       # ═══════════════════════════════════════════════════════════════
