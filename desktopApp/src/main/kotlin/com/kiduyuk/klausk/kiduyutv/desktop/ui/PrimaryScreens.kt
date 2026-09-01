@@ -21,12 +21,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kiduyuk.klausk.kiduyutv.desktop.DesktopServices
+import com.kiduyuk.klausk.kiduyutv.desktop.data.*
 import com.kiduyuk.klausk.kiduyutv.desktop.model.*
 import com.kiduyuk.klausk.kiduyutv.desktop.navigation.DesktopRoute
 import com.kiduyuk.klausk.kiduyutv.desktop.openMedia
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun HomeScreen(services: DesktopServices) {
@@ -280,6 +284,12 @@ fun SettingsScreen(services: DesktopServices) {
     var darkTheme by remember { mutableStateOf(services.settings.darkTheme) }
     var providers by remember { mutableStateOf<List<String>>(emptyList()) }
     var message by remember { mutableStateOf<String?>(null) }
+    var updateInfo by remember { mutableStateOf<DesktopUpdateInfo?>(null) }
+    var updateStatus by remember { mutableStateOf<String?>(null) }
+    var checkingForUpdate by remember { mutableStateOf(false) }
+    var installingUpdate by remember { mutableStateOf(false) }
+    val updateScope = rememberCoroutineScope()
+    val updater = remember { DesktopUpdater() }
     LaunchedEffect(Unit) {
         runCatching { services.providers.enabledProviders() }.onSuccess { providers = it }
     }
@@ -329,6 +339,91 @@ fun SettingsScreen(services: DesktopServices) {
             Text("Live TV", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             SettingsField("M3U playlist URL", playlistUrl, { playlistUrl = it })
             SettingsField("XMLTV EPG URL", epgUrl, { epgUrl = it })
+            Text("Updates", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TvActionButton(
+                    "Check for updates",
+                    onClick = {
+                        updateScope.launch {
+                            checkingForUpdate = true
+                            updateStatus = "Checking for updates…"
+                            updateInfo = null
+                            runCatching { updater.checkForUpdate() }
+                                .onSuccess { result ->
+                                    updateInfo = result
+                                    updateStatus = if (result == null) {
+                                        "You are using the latest desktop version."
+                                    } else {
+                                        "Version ${result.version} is available."
+                                    }
+                                }
+                                .onFailure { error ->
+                                    updateStatus = "Update check failed: ${error.message ?: "unknown error"}"
+                                }
+                            checkingForUpdate = false
+                        }
+                    },
+                    enabled = !checkingForUpdate && !installingUpdate
+                )
+                if (checkingForUpdate) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+            }
+            updateInfo?.let { available ->
+                Text(
+                    "Windows update ${available.version} is ready to download.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (available.exeUrl != null) {
+                        TvActionButton(
+                            "Download and install EXE",
+                            onClick = {
+                                updateScope.launch {
+                                    installingUpdate = true
+                                    updateStatus = "Downloading Windows EXE update…"
+                                    runCatching {
+                                        updater.downloadAndInstall(available, preferMsi = false) { progress ->
+                                            withContext(Dispatchers.Main.immediate) {
+                                                updateStatus = "Downloading update… $progress%"
+                                            }
+                                        }
+                                    }.onSuccess {
+                                        updateStatus = "Installer started. Follow the Windows installer prompts."
+                                    }.onFailure { error ->
+                                        updateStatus = "Update installation failed: ${error.message ?: "unknown error"}"
+                                    }
+                                    installingUpdate = false
+                                }
+                            },
+                            enabled = !installingUpdate
+                        )
+                    }
+                    if (available.msiUrl != null) {
+                        TvActionButton(
+                            "Download and install MSI",
+                            onClick = {
+                                updateScope.launch {
+                                    installingUpdate = true
+                                    updateStatus = "Downloading Windows MSI update…"
+                                    runCatching {
+                                        updater.downloadAndInstall(available, preferMsi = true) { progress ->
+                                            withContext(Dispatchers.Main.immediate) {
+                                                updateStatus = "Downloading update… $progress%"
+                                            }
+                                        }
+                                    }.onSuccess {
+                                        updateStatus = "Installer started. Follow the Windows installer prompts."
+                                    }.onFailure { error ->
+                                        updateStatus = "Update installation failed: ${error.message ?: "unknown error"}"
+                                    }
+                                    installingUpdate = false
+                                }
+                            },
+                            enabled = !installingUpdate
+                        )
+                    }
+                }
+            }
+            updateStatus?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             TvActionButton("Save settings", {
                 services.settings.tmdbBearerToken = tmdbToken
                 services.settings.streamApiToken = streamToken
