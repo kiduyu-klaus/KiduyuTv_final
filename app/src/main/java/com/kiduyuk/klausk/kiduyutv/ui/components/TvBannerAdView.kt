@@ -13,6 +13,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.LocalResources
@@ -31,6 +36,7 @@ import com.kiduyuk.klausk.kiduyutv.util.StartAppAdManager
 @Composable
 fun TvBannerAdView(modifier: Modifier = Modifier) {
     val isPreviewMode = LocalInspectionMode.current
+    val focusManager = LocalFocusManager.current
     val context: Context = LocalContext.current
     val activity = context as? Activity
     val screenWidthPx = LocalWindowInfo.current.containerSize.width
@@ -83,7 +89,23 @@ fun TvBannerAdView(modifier: Modifier = Modifier) {
     }
 
     AndroidView(
-        modifier = modifier.wrapContentSize(),
+        modifier = modifier
+            .wrapContentSize()
+            .onPreviewKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown || event.key != Key.DirectionUp) {
+                    false
+                } else {
+                    // The banner is rendered as a bottom overlay, so Compose's normal
+                    // spatial search can stop on a nearby lower row. Continue moving
+                    // upward until the topmost reachable control is focused.
+                    var moved = false
+                    for (step in 0 until 64) {
+                        if (!focusManager.moveFocus(FocusDirection.Up)) break
+                        moved = true
+                    }
+                    moved
+                }
+            },
         factory = { ctx ->
             FrameLayout(ctx).apply {
                 containerRef.value = this
