@@ -461,14 +461,13 @@ jobs:
         if: steps.package_desktop.outputs.exe_path != ''
         uses: actions/upload-artifact@v4
         with:
-          name: windows-release
+          name: windows-release-exe
           path: ${{ steps.package_desktop.outputs.exe_path }}
-
       - name: Upload Windows MSI Artifact
         if: steps.package_desktop.outputs.msi_path != ''
         uses: actions/upload-artifact@v4
         with:
-          name: windows-release
+          name: windows-release-msi
           path: ${{ steps.package_desktop.outputs.msi_path }}
 
       # ═══════════════════════════════════════════════════════════════
@@ -505,10 +504,15 @@ jobs:
           name: tv-release
           path: ./apks/tv-release
 
-      - name: Download Windows artifact
+      - name: Download Windows EXE artifact
         uses: actions/download-artifact@v4
         with:
-          name: windows-release
+          name: windows-release-exe
+          path: ./windows-release
+      - name: Download Windows MSI artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-release-msi
           path: ./windows-release
 
       # ── Single GitHub Release with all artifacts (APKs + Windows) ────────────────
