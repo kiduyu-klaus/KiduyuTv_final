@@ -65,6 +65,7 @@ compose.desktop {
             windows {
                 iconFile.set(project.file('src/main/resources/kiduyutv.ico'))
                 menuGroup = 'KiduyuTV'
+                shortcut = true
                 dirChooser = true
                 perUserInstall = true
                 upgradeUuid = '93e54350-c801-4ee5-943c-32498c73bbf6'
