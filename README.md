@@ -275,6 +275,26 @@ app/build/outputs/apk/tv/debug/
 
 Release variants are available as `assemblePhoneRelease` and `assembleTvRelease`. Production builds require the project's signing configuration.
 
+### Windows desktop application
+
+KiduyuTV also includes a native Windows desktop application in the `desktopApp` module. It is built with Kotlin/JVM and Compose Multiplatform for Desktop, and is distributed as standard Windows **EXE** and **MSI** installers. The Windows package creates a Start Menu entry and desktop shortcut, supports per-user installation, and includes a directory chooser during setup.
+
+The desktop application provides a mouse-and-keyboard-friendly experience for browsing movies and TV shows, searching the catalog, managing My List, using Live TV and schedule views, configuring settings, and opening native playback. It also includes TMDB-backed discovery, IPTV playlist and EPG configuration, Trakt-related screens, local desktop settings, and GitHub release update checks. When a newer release is available, the desktop updater can download the available EXE or MSI installer and launch the appropriate Windows installer.
+
+| Windows package | Use case |
+| --- | --- |
+| `.exe` | Standard interactive Windows installer. |
+| `.msi` | Windows Installer package for managed or enterprise-style deployment. |
+
+To build the desktop distributions locally, use the Compose Desktop packaging tasks from the repository root:
+
+```bash
+bash ./gradlew :desktopApp:packageReleaseExe
+bash ./gradlew :desktopApp:packageReleaseMsi
+```
+
+The desktop module requires Java 17. Its Windows packaging configuration is defined in [`desktopApp/build.gradle`](desktopApp/build.gradle), and the application entry point is `com.kiduyuk.klausk.kiduyutv.desktop.MainKt`.
+
 ## Configuration
 
 Before building, configure the services used by your selected features:
