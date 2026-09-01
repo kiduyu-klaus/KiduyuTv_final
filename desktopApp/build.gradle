@@ -63,8 +63,7 @@ compose.desktop {
             modules('java.sql', 'java.net.http', 'java.naming')
 
             windows {
-                // Icon file - create desktopApp/src/main/resources/kiduyutv.ico
-                // iconFile.set(project.file('src/main/resources/kiduyutv.ico'))
+                iconFile.set(project.file('src/main/resources/kiduyutv.ico'))
                 menuGroup = 'KiduyuTV'
                 dirChooser = true
                 perUserInstall = true
