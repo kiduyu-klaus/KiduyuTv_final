@@ -237,59 +237,54 @@ jobs:
       # CONFIGURE LOGGING — Logback configuration for desktop app
       # ═══════════════════════════════════════════════════════════════
       - name: Configure Logback Logging
+        shell: pwsh
         run: |
-          mkdir -p desktopApp\src\main\resources
-          powershell -Command @"
-          @"
-          `<?xml version="1.0" encoding="UTF-8"`?>
-          `<configuration>
-              `<!-- Console Appender --`>
-              `<appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
-                  `<encoder>
-                      `<pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
-                  `</encoder>
-              `</appender>
-
-              `<!-- File Appender --`>
-              `<appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-                  `<file>`${user.home}/AppData/Local/KiduyuTV/logs/kiduyutv.log</file>
-                  `<encoder>
-                      `<pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
-                  `</encoder>
-                  `<rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-                      `<fileNamePattern>`${user.home}/AppData/Local/KiduyuTV/logs/kiduyutv.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
-                      `<maxFileSize>10MB</maxFileSize>
-                      `<maxHistory>30</maxHistory>
-                      `<totalSizeCap>500MB</totalSizeCap>
-                  `</rollingPolicy>
-              `</appender>
-
-              `<!-- Logger Configuration --`>
-              `<logger name="com.kiduyuk.klausk.kiduyutv.desktop" level="DEBUG" /`>
-              `<logger name="okhttp3" level="INFO" /`>
-              `<logger name="com.google.gson" level="WARN" /`>
-
-              `<!-- Root Logger --`>
-              `<root level="INFO">
-                  `<appender-ref ref="CONSOLE" /`>
-                  `<appender-ref ref="FILE" /`>
-              `</root>
-          `</configuration>
-          "@
-          '@ | Out-File -Encoding UTF8 desktopApp\src\main\resources\logback.xml
-          Write-Output "✓ Logback configuration created"
+          New-Item -ItemType Directory -Force -Path "desktopApp\src\main\resources" | Out-Null
+          @'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <configuration>
+              <!-- Console Appender -->
+              <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+                  <encoder>
+                      <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+                  </encoder>
+              </appender>
+              <!-- File Appender -->
+              <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+                  <file>${user.home}/AppData/Local/KiduyuTV/logs/kiduyutv.log</file>
+                  <encoder>
+                      <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+                  </encoder>
+                  <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+                      <fileNamePattern>${user.home}/AppData/Local/KiduyuTV/logs/kiduyutv.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+                      <maxFileSize>10MB</maxFileSize>
+                      <maxHistory>30</maxHistory>
+                      <totalSizeCap>500MB</totalSizeCap>
+                  </rollingPolicy>
+              </appender>
+              <!-- Logger Configuration -->
+              <logger name="com.kiduyuk.klausk.kiduyutv.desktop" level="DEBUG" />
+              <logger name="okhttp3" level="INFO" />
+              <logger name="com.google.gson" level="WARN" />
+              <!-- Root Logger -->
+              <root level="INFO">
+                  <appender-ref ref="CONSOLE" />
+                  <appender-ref ref="FILE" />
+              </root>
+          </configuration>
+          '@ | Set-Content -Encoding utf8 desktopApp\src\main\resources\logback.xml
+          Write-Output "Logback configuration created"
 
       # ═══════════════════════════════════════════════════════════════
       # CONFIGURE DATABASE — SQLite initialization script
       # ═══════════════════════════════════════════════════════════════
       - name: Create SQLite Initialization Script
+        shell: pwsh
         run: |
-          mkdir -p desktopApp\resources
-          powershell -Command @"
-          @"
+          New-Item -ItemType Directory -Force -Path "desktopApp\resources" | Out-Null
+          @'
           -- KiduyuTV Watch History Database
           -- Automatically initialized on first run via DatabaseWatchHistoryStore.kt
-
           CREATE TABLE IF NOT EXISTS watch_progress (
               tmdb_id INTEGER NOT NULL,
               media_type TEXT NOT NULL,
@@ -303,13 +298,11 @@ jobs:
               updated_at INTEGER NOT NULL,
               PRIMARY KEY (tmdb_id, media_type, season, episode)
           );
-
           CREATE INDEX IF NOT EXISTS idx_updated_at ON watch_progress(updated_at DESC);
           CREATE INDEX IF NOT EXISTS idx_media_type ON watch_progress(media_type);
           CREATE INDEX IF NOT EXISTS idx_season_episode ON watch_progress(season, episode);
-          "@
-          '@ | Out-File -Encoding UTF8 desktopApp\resources\init-schema.sql
-          Write-Output "✓ SQLite initialization script created"
+          '@ | Set-Content -Encoding utf8 desktopApp\resources\init-schema.sql
+          Write-Output "SQLite initialization script created"
 
       # ═══════════════════════════════════════════════════════════════
       # OPTIMIZE GRADLE FOR WINDOWS CI (16GB Runner)
