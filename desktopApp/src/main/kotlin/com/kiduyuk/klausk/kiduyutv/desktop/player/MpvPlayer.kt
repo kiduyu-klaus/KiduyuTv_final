@@ -38,7 +38,7 @@ class MpvPlayer(
     private var processJob: Job? = null
     private var intentionallyStopped = false
 
-    fun play(stream: StreamItem, startPositionMs: Long = 0L) {
+    fun play(stream: StreamItem, startPositionMs: Long = 0L, windowId: Long? = null) {
         stop()
         intentionallyStopped = false
         mutableState.value = MpvState(running = true, title = stream.displayName)
@@ -48,6 +48,8 @@ class MpvPlayer(
             "--input-ipc-server=$pipe",
             "--force-window=yes",
             "--keep-open=no",
+            "--no-osc",
+            "--no-osd-bar",
             "--hwdec=auto-safe",
             "--cache=yes",
             "--cache-secs=30",
@@ -59,6 +61,7 @@ class MpvPlayer(
             "--sub-auto=all"
         )
         if (startPositionMs > 0L) args += "--start=${startPositionMs / 1000.0}"
+        windowId?.let { args += "--wid=$it" }
 
         val customHeaders = stream.headers.entries
             .filterNot { it.key.equals("User-Agent", true) || it.key.equals("Referer", true) }

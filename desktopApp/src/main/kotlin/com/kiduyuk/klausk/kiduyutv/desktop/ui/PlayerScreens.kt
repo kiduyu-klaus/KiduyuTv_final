@@ -16,12 +16,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.awt.SwingPanel
 import com.kiduyuk.klausk.kiduyutv.desktop.DesktopServices
 import com.kiduyuk.klausk.kiduyutv.desktop.model.*
 import com.kiduyuk.klausk.kiduyutv.desktop.navigation.DesktopRoute
 import com.kiduyuk.klausk.kiduyutv.desktop.player.MpvPlayer
 import com.kiduyuk.klausk.kiduyutv.desktop.player.StreamRanker
+import com.sun.jna.Native
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import java.awt.Canvas
+import java.awt.Dimension
 import java.util.concurrent.TimeUnit
 
 @Composable
@@ -79,6 +84,19 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
     val scope = rememberCoroutineScope()
     val player = remember { MpvPlayer(services.settings, scope) }
     val playerState by player.state.collectAsState()
+    val videoCanvas = remember {
+        Canvas().apply {
+            background = java.awt.Color.BLACK
+            preferredSize = Dimension(1280, 720)
+        }
+    }
+    var videoWindowId by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(videoCanvas) {
+        while (isActive && !videoCanvas.isDisplayable) delay(50L)
+        videoWindowId = runCatching { Native.getComponentID(videoCanvas) }
+            .getOrNull()
+            ?.takeIf { it != 0L }
+    }
     var streams by remember(request) { mutableStateOf<List<StreamItem>>(emptyList()) }
     var activeStream by remember(request) { mutableStateOf<StreamItem?>(null) }
     var loading by remember(request) { mutableStateOf(true) }
@@ -93,10 +111,11 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
 
     fun start(stream: StreamItem, positionMs: Long) {
         activeStream = stream
-        player.play(stream, positionMs)
+        player.play(stream, positionMs, videoWindowId)
     }
 
-    LaunchedEffect(request, attempt) {
+    LaunchedEffect(request, attempt, videoWindowId) {
+        if (videoWindowId == null) return@LaunchedEffect
         loading = true
         fetchError = null
         showNoStreams = false
@@ -152,6 +171,7 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
             "  S${request.season ?: 1} E${request.episode ?: 1}"
         } else "",
         backdrop = request.backdropPath,
+        videoCanvas = videoCanvas,
         state = playerState,
         stream = activeStream,
         loading = loading,
@@ -236,14 +256,30 @@ fun LivePlayerScreen(services: DesktopServices, route: DesktopRoute.LivePlayer) 
     val scope = rememberCoroutineScope()
     val player = remember { MpvPlayer(services.settings, scope) }
     val state by player.state.collectAsState()
+    val videoCanvas = remember {
+        Canvas().apply {
+            background = java.awt.Color.BLACK
+            preferredSize = Dimension(1280, 720)
+        }
+    }
+    var videoWindowId by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(videoCanvas) {
+        while (isActive && !videoCanvas.isDisplayable) delay(50L)
+        videoWindowId = runCatching { Native.getComponentID(videoCanvas) }
+            .getOrNull()
+            ?.takeIf { it != 0L }
+    }
     val stream = remember(route) {
         StreamItem(name = route.name, title = route.name, url = route.url, provider = "Live TV", type = "hls", headers = route.headers)
     }
-    LaunchedEffect(route) { player.play(stream) }
+    LaunchedEffect(route, videoWindowId) {
+        videoWindowId?.let { player.play(stream, windowId = it) }
+    }
     DisposableEffect(route) { onDispose { player.close() } }
     PlayerLayout(
         title = route.name,
         backdrop = null,
+        videoCanvas = videoCanvas,
         state = state,
         stream = stream,
         loading = state.running && !state.playing,
@@ -266,6 +302,7 @@ fun LivePlayerScreen(services: DesktopServices, route: DesktopRoute.LivePlayer) 
 private fun PlayerLayout(
     title: String,
     backdrop: String?,
+    videoCanvas: Canvas,
     state: com.kiduyuk.klausk.kiduyutv.desktop.player.MpvState,
     stream: StreamItem?,
     loading: Boolean,
@@ -290,6 +327,11 @@ private fun PlayerLayout(
                 stream?.let { Text("${it.displayName} • ${it.quality}", color = Color.LightGray) }
             })
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                SwingPanel(
+                    factory = { videoCanvas },
+                    modifier = Modifier.fillMaxSize(),
+                    update = {}
+                )
                 if (loading && !state.playing) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         CircularProgressIndicator()
@@ -297,8 +339,6 @@ private fun PlayerLayout(
                     }
                 } else if (!status.isNullOrBlank() && !state.playing) {
                     Text(status, color = MaterialTheme.colorScheme.error)
-                } else {
-                    Text("Playback is running in the KiduyuTV mpv window", color = Color.LightGray)
                 }
             }
             Column(Modifier.fillMaxWidth().background(Color(0xD9000000)).padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
