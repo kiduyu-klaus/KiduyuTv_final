@@ -90,6 +90,7 @@ import kotlinx.serialization.json.Json
 
 // ── SharedPreferences cache helpers ──────────────────────────────────────────
 
+private const val TAG = "MyListScreen"
 private const val PREFS_NAME = "trakt_watched_cache"
 private const val KEY_WATCHED_ITEMS = "watched_items_json"
 private const val KEY_CACHE_TIMESTAMP = "cache_timestamp_ms"
@@ -136,8 +137,8 @@ private fun saveWatchedCache(
             .putBoolean(KEY_CACHED_HAS_MORE, hasMore)
             .apply()
         //Log.i("MyListScreen", "Saved ${items.size} watched items to cache (page=$lastLoadedPage, hasMore=$hasMore)")
-    } catch (e: Exception) {
-        Log.e("MyListScreen", "Failed to save watched cache: ${e.message}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to save watched cache: ${e.message}", e)
     }
 }
 
@@ -171,7 +172,7 @@ private fun loadWatchedCache(context: Context): WatchedCache? {
             WatchedCache(items, lastPage, hasMore)
         }
     } catch (e: Exception) {
-        Log.e("MyListScreen", "Failed to load watched cache: ${e.message}")
+        Log.e(TAG, "Failed to load watched cache: ${e.message}", e)
         null
     }
 }
@@ -308,12 +309,26 @@ fun MyListScreen(
 
     // ── Core "load next page" function shared by initial fetch + infinite scroll ──
     fun loadNextWatchedPage() {
-        if (!isTraktConnected) return
-        if (isLoadingMore || isInitialLoading) return
-        if (!hasMoreWatched) return
+        if (!isTraktConnected) {
+            Log.d(TAG, "Skipping watched page load: Trakt is not connected")
+            return
+        }
+        if (isLoadingMore || isInitialLoading) {
+            Log.d(TAG, "Skipping watched page load: another watched load is active")
+            return
+        }
+        if (!hasMoreWatched) {
+            Log.d(TAG, "Skipping watched page load: no more watched pages")
+            return
+        }
 
         val nextPage = currentWatchedPage + 1
         isLoadingMore = true
+        Log.i(
+            TAG,
+            "Loading watched history page=$nextPage, loaded=$watchedHistoryLoaded, " +
+                "total=${watchedHistoryTotal ?: "unknown"}"
+        )
 
         coroutineScope.launch {
             try {
@@ -323,14 +338,27 @@ fun MyListScreen(
                         result.fold(
                             onSuccess = { historyPage ->
                                 val history = historyPage.items
-                                historyPage.totalItemCount?.let { watchedHistoryTotal = it }
+                                historyPage.totalItemCount?.let {
+                                    watchedHistoryTotal = it
+                                    Log.i(TAG, "Trakt watched total item count=$it")
+                                }
+                                Log.i(
+                                    TAG,
+                                    "Received watched page=$nextPage: records=${history.size}, " +
+                                        "pageCount=${historyPage.pageCount ?: "unknown"}"
+                                )
                                 if (history.isEmpty()) {
-                                    //Log.i("MyListScreen", "Page $nextPage empty — no more watched items")
+                                    Log.i(TAG, "Watched page=$nextPage is empty; reached end of Trakt history")
                                     hasMoreWatched = false
                                 } else {
                                     val newItems = enrichHistoryPage(history) {
                                         withContext(Dispatchers.Main) {
                                             watchedHistoryLoaded += 1
+                                            Log.d(
+                                                TAG,
+                                                "Watched history progress: $watchedHistoryLoaded/" +
+                                                    "${watchedHistoryTotal ?: "?"} records processed"
+                                            )
                                         }
                                     }
                                     /*Log.i(
@@ -341,6 +369,12 @@ fun MyListScreen(
                                     withContext(Dispatchers.Main) {
                                         watchedItems = watchedItems + newItems
                                         currentWatchedPage = nextPage
+                                        Log.i(
+                                            TAG,
+                                            "Appended watched page=$nextPage: added=${newItems.size}, " +
+                                                "displayed=${watchedItems.size}, " +
+                                                "processed=$watchedHistoryLoaded/${watchedHistoryTotal ?: "?"}"
+                                        )
                                         // Trakt's page-count response header is authoritative.
                                         // Falling back to page size preserves compatibility if a
                                         // proxy removes the pagination header.
@@ -358,19 +392,21 @@ fun MyListScreen(
                                 }
                             },
                             onFailure = { error ->
-                                Log.e(
-                                    "MyListScreen",
-                                    "Page $nextPage fetch failed: ${error.message}"
-                                )
+                                Log.e(TAG, "Watched page=$nextPage fetch failed: ${error.message}", error)
                                 hasMoreWatched = false
                             }
                         )
                     }
             } catch (e: Exception) {
-                Log.e("MyListScreen", "Error during watched pagination: ${e.message}")
+                Log.e(TAG, "Error during watched pagination: ${e.message}", e)
                 hasMoreWatched = false
             } finally {
                 isLoadingMore = false
+                Log.d(
+                    TAG,
+                    "Watched page load finished: page=$nextPage, loaded=$watchedHistoryLoaded, " +
+                        "total=${watchedHistoryTotal ?: "unknown"}, hasMore=$hasMoreWatched"
+                )
                 isInitialLoading = false
             }
         }
@@ -378,7 +414,7 @@ fun MyListScreen(
 
     // ── Reset / initial-load orchestration ──────────────────────────────────
     LaunchedEffect(isTraktConnected) {
-        //Log.i("MyListScreen", "isTraktConnected: $isTraktConnected")
+        Log.i(TAG, "Watched tab connection state changed: connected=$isTraktConnected")
 
         if (!isTraktConnected) {
             //Log.i("MyListScreen", "Trakt not connected, clearing history")
@@ -389,16 +425,18 @@ fun MyListScreen(
             watchedHistoryLoaded = 0
             processedTmdbIds.clear()
             clearWatchedCache(context)
+            Log.i(TAG, "Cleared watched tab state and cache because Trakt is disconnected")
             return@LaunchedEffect
         }
 
         // 1) Try cache first for instant display
         val cached = loadWatchedCache(context)
         if (cached != null && cached.items.isNotEmpty()) {
-            /*Log.i(
-                "MyListScreen",
-                "Cache hit — displaying ${cached.items.size} items (page=${cached.lastLoadedPage}, hasMore=${cached.hasMore})"
-            )*/
+            Log.i(
+                TAG,
+                "Watched cache hit: items=${cached.items.size}, page=${cached.lastLoadedPage}, " +
+                    "hasMore=${cached.hasMore}"
+            )
             watchedItems = cached.items
             currentWatchedPage = cached.lastLoadedPage
             watchedHistoryLoaded = cached.items.size
@@ -412,7 +450,7 @@ fun MyListScreen(
             coroutineScope.launch {
                 val itemsToEnrich = watchedItems.filter { it.posterPath == null || it.voteAverage == 0.0 }
                 if (itemsToEnrich.isNotEmpty()) {
-                    //Log.i("MyListScreen", "Enriching ${itemsToEnrich.size} cached items with missing info")
+                    Log.i(TAG, "Enriching ${itemsToEnrich.size} cached watched items with missing TMDB metadata")
                     val enrichedItems = watchedItems.map { item ->
                         if (item.posterPath == null || item.voteAverage == 0.0) {
                             try {
@@ -440,6 +478,7 @@ fun MyListScreen(
                     withContext(Dispatchers.Main) {
                         watchedItems = enrichedItems
                         saveWatchedCache(context, watchedItems, currentWatchedPage, hasMoreWatched)
+                        Log.i(TAG, "Finished cached watched-item enrichment: attempted=${itemsToEnrich.size}")
                     }
                 }
             }
@@ -453,7 +492,7 @@ fun MyListScreen(
         }
 
         // 2) No cache — fetch the first page and show a spinner
-        //Log.i("MyListScreen", "No cache — fetching first page of Trakt watch history")
+        Log.i(TAG, "No watched cache found; starting Trakt watched-history fetch")
         isInitialLoading = true
         loadNextWatchedPage()
     }
@@ -880,9 +919,9 @@ private fun WatchedLoadingStatus(
 ) {
     Text(
         text = if (totalItems != null && totalItems > 0) {
-            "Loading watched history\nLoaded $loadedItems/$totalItems watched items"
+            "Loading watched history\nLoaded $loadedItems/$totalItems total watched items"
         } else {
-            "Loading watched history\nLoaded $loadedItems watched items"
+            "Loading watched history\nLoaded $loadedItems watched items (total unavailable)"
         },
         style = MaterialTheme.typography.bodySmall,
         color = TextSecondary
