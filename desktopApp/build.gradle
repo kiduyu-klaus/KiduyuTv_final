@@ -7,7 +7,7 @@ plugins {
 }
 
 group = 'com.kiduyuk.klausk.kiduyutv'
-version = providers.gradleProperty('APP_VERSION').getOrElse('1.1.71')
+version = providers.gradleProperty('APP_VERSION').getOrElse(rootProject.file('VERSION').text.trim())
 
 kotlin {
     jvmToolchain(17)
@@ -52,7 +52,11 @@ tasks.named('processResources') {
 compose.desktop {
     application {
         mainClass = 'com.kiduyuk.klausk.kiduyutv.desktop.MainKt'
-        jvmArgs.addAll(['-Xmx1G', '-Dfile.encoding=UTF-8'])
+        jvmArgs.addAll([
+            '-Xmx1G',
+            '-Dfile.encoding=UTF-8',
+            "-Dkiduyutv.version=${project.version}"
+        ])
 
         nativeDistributions {
             targetFormats(TargetFormat.Exe, TargetFormat.Msi)
