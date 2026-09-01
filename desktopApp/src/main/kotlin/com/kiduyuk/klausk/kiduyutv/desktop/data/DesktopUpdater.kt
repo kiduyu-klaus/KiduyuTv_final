@@ -77,9 +77,9 @@ class DesktopUpdater(
         onProgress: suspend (Int) -> Unit = {}
     ) = withContext(Dispatchers.IO) {
         if (!isWindows()) throw IOException("Windows installer updates are only supported on Windows")
-        val url = if (preferMsi) update.msiUrl ?: update.exeUrl else update.exeUrl ?: update.msiUrl
+        val url = (if (preferMsi) update.msiUrl ?: update.exeUrl else update.exeUrl ?: update.msiUrl)
             ?: throw IOException("No Windows installer was found in the latest release")
-        val fileName = if (preferMsi) update.msiName ?: update.exeName else update.exeName ?: update.msiName
+        val fileName = (if (preferMsi) update.msiName ?: update.exeName else update.exeName ?: update.msiName)
             ?: "KiduyuTV-update.${if (url.endsWith(".msi", true)) "msi" else "exe"}"
         val destination = File(System.getProperty("java.io.tmpdir"), fileName)
 
