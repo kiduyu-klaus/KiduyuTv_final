@@ -79,7 +79,10 @@ fun TvActionButton(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.onFocusChanged { focused = it.isFocused },
-        colors = ButtonDefaults.buttonColors(containerColor = color),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = color,
+            contentColor = MaterialTheme.colorScheme.onSurface
+        ),
         shape = RoundedCornerShape(10.dp)
     ) { Text(text, maxLines = 1) }
 }
@@ -152,7 +155,7 @@ fun ErrorView(message: String, onRetry: (() -> Unit)? = null) {
 @Composable
 fun ScreenHeader(title: String, onBack: (() -> Unit)? = null, actions: @Composable RowScope.() -> Unit = {}) {
     Row(
-        Modifier.fillMaxWidth().height(72.dp).background(Color(0xD9111111)).padding(horizontal = 20.dp),
+        Modifier.fillMaxWidth().height(72.dp).background(MaterialTheme.colorScheme.surface).padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {

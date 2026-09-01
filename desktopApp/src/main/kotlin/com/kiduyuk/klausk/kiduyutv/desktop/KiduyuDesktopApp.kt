@@ -56,11 +56,11 @@ fun KiduyuDesktopApp(services: DesktopServices) {
 private fun PrimaryShell(services: DesktopServices, destination: PrimaryDestination) {
     Row(Modifier.fillMaxSize()) {
         Column(
-            Modifier.width(132.dp).fillMaxHeight().background(Color(0xF2121212)).padding(10.dp),
+            Modifier.width(132.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface).padding(10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("K", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.displaySmall)
+            Text("K", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.displaySmall)
             Spacer(Modifier.height(8.dp))
             PrimaryDestination.entries.forEach { item ->
                 NavigationRailItem(
@@ -69,6 +69,13 @@ private fun PrimaryShell(services: DesktopServices, destination: PrimaryDestinat
                     icon = { Text(item.shortLabel) },
                     label = { Text(item.label) },
                     alwaysShowLabel = true,
+                    colors = NavigationRailItemDefaults.colors(
+                        selectedIconColor = MaterialTheme.colorScheme.onSurface,
+                        selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurface,
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurface,
+                        indicatorColor = MaterialTheme.colorScheme.surfaceVariant
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
