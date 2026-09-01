@@ -55,7 +55,7 @@ compose.desktop {
         jvmArgs.addAll([
             '-Xmx1G',
             '-Dfile.encoding=UTF-8',
-            "-Dkiduyutv.version=${project.version}"
+            "-Dkiduyutv.version=${project.version}".toString()
         ])
 
         nativeDistributions {
