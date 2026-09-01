@@ -356,7 +356,7 @@ jobs:
           KIDUYUTV_STREAM_API_TOKEN: ${{ secrets.STREAM_API_TOKEN }}
           KIDUYUTV_TMDB_TOKEN: ${{ secrets.TMDB_BEARER_TOKEN }}
         run: |
-          ./gradlew :desktopApp:packageReleaseExe \
+          ./gradlew :desktopApp:packageExe \
             --build-cache \
             --configuration-cache \
             --parallel \
@@ -368,7 +368,7 @@ jobs:
           KIDUYUTV_STREAM_API_TOKEN: ${{ secrets.STREAM_API_TOKEN }}
           KIDUYUTV_TMDB_TOKEN: ${{ secrets.TMDB_BEARER_TOKEN }}
         run: |
-          ./gradlew :desktopApp:packageReleaseMsi \
+          ./gradlew :desktopApp:packageMsi \
             --build-cache \
             --configuration-cache \
             --parallel \
