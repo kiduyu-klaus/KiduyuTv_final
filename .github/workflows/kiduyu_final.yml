@@ -780,10 +780,15 @@ jobs:
         with:
           path: ./apks
 
-      - name: Download all Windows artifacts
+      - name: Download Windows EXE artifact
         uses: actions/download-artifact@v4
         with:
-          name: windows-release
+          name: windows-release-exe
+          path: ./windows-release
+      - name: Download Windows MSI artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-release-msi
           path: ./windows-release
 
       - name: List downloaded artifacts
