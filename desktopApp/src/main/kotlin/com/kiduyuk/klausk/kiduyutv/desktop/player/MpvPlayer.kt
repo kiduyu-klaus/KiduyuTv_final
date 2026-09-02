@@ -81,12 +81,13 @@ class MpvPlayer(
         val args = mutableListOf(
             resolveExecutable().toString(),
             "--input-ipc-server=$pipe",
-            // Avoid incompatible user-level mpv settings. gpu-next supports
-            // the bundled ANGLE, D3D11, and WinVk contexts; the selected
+            // Avoid incompatible user-level mpv settings. Use the legacy gpu
+            // VO because gpu-next fell back to its OpenGL path on machines
+            // whose driver does not expose OpenGL 2.1+. The selected Windows
             // context may change between attempts on incompatible machines.
             "--no-config",
             "--force-window=yes",
-            "--vo=gpu-next",
+            "--vo=gpu",
             "--gpu-context=$gpuContext",
             "--keep-open=no",
             "--no-osc",
