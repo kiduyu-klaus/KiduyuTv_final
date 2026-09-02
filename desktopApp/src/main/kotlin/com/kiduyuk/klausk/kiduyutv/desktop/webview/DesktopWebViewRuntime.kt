@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.concurrent.atomic.AtomicBoolean
 
 sealed interface WebViewRuntimeState {
@@ -53,12 +55,21 @@ object DesktopWebViewRuntime {
                     ?.takeIf(String::isNotBlank)
                     ?.let(::File)
                     ?: File(System.getProperty("user.home"), "AppData/Local")
-                val persistentRoot = File(appData, "KiduyuTV/WebView")
+                // The Compose per-user installer owns %LOCALAPPDATA%\KiduyuTV and
+                // removes that directory during an upgrade. Keep the downloaded
+                // Chromium runtime in a sibling application-data directory so an
+                // EXE/MSI update cannot delete it.
+                val persistentRoot = File(appData, "KiduyuTVData/WebView")
+                migrateInstallerOwnedRuntime(
+                    oldRoot = File(appData, "KiduyuTV/WebView"),
+                    newRoot = persistentRoot
+                )
+                persistentRoot.mkdirs()
                 val bundledInstallDir = bundledRoot?.let { File(it, "kcef-bundle") }
                 val bundledEngineAvailable = bundledInstallDir
                     ?.takeIf { it.isDirectory && (it.listFiles()?.isNotEmpty() == true) }
                 val installDir = bundledEngineAvailable ?: File(persistentRoot, "kcef-bundle")
-                val cacheDir = File(persistentRoot, "cache")
+                val cacheDir = File(persistentRoot, "cache").apply { mkdirs() }
                 DesktopLog.logger.info(
                     "Initializing KCEF installDir={} cacheDir={} bundledEngineAvailable={}",
                     installDir,
@@ -152,5 +163,27 @@ object DesktopWebViewRuntime {
             runCatching { KCEF.disposeBlocking() }
         }
         runtimeScope.cancel()
+    }
+
+    /**
+     * Moves a runtime downloaded by an older build out of the installer-owned
+     * application directory. A copy fallback handles cross-volume or locked-file
+     * move failures without deleting the source installation.
+     */
+    private fun migrateInstallerOwnedRuntime(oldRoot: File, newRoot: File) {
+        if (!oldRoot.isDirectory || newRoot.exists()) return
+        runCatching {
+            newRoot.parentFile?.mkdirs()
+            Files.move(oldRoot.toPath(), newRoot.toPath(), StandardCopyOption.ATOMIC_MOVE)
+            DesktopLog.logger.info("Migrated KCEF runtime to installer-safe storage path={}", newRoot)
+        }.recoverCatching {
+            oldRoot.copyRecursively(newRoot, overwrite = false)
+            DesktopLog.logger.info("Copied KCEF runtime to installer-safe storage path={}", newRoot)
+        }.onFailure { error ->
+            DesktopLog.logger.warn(
+                "Could not migrate the existing KCEF runtime; KCEF will repair the new location: {}",
+                error.message
+            )
+        }
     }
 }
