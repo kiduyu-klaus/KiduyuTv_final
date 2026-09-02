@@ -358,6 +358,7 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
         } else "",
         backdrop = request.backdropPath,
         videoCanvas = videoCanvas,
+        videoReady = videoWindowId != null && playerState.playing,
         state = playerState,
         stream = activeStream,
         loading = playerLoading,
@@ -568,6 +569,7 @@ fun LivePlayerScreen(services: DesktopServices, route: DesktopRoute.LivePlayer) 
         title = route.name,
         backdrop = null,
         videoCanvas = videoCanvas,
+        videoReady = videoWindowId != null && state.playing,
         state = state,
         stream = stream,
         loading = videoSurfaceError == null && (videoWindowId == null || state.running && !state.playing),
@@ -592,6 +594,7 @@ private fun PlayerLayout(
     title: String,
     backdrop: String?,
     videoCanvas: Canvas,
+    videoReady: Boolean,
     state: com.kiduyuk.klausk.kiduyutv.desktop.player.MpvState,
     stream: StreamItem?,
     loading: Boolean,
@@ -620,15 +623,33 @@ private fun PlayerLayout(
                 Modifier.weight(1f).fillMaxWidth().background(Color.Black),
                 contentAlignment = Alignment.Center
             ) {
-                SwingPanel(
-                    factory = { videoCanvas },
-                    background = Color.Black,
-                    modifier = Modifier.fillMaxSize(),
-                    update = { canvas ->
-                        canvas.background = java.awt.Color.BLACK
-                        canvas.isVisible = true
-                    }
-                )
+                if (videoReady) {
+                    SwingPanel(
+                        factory = { videoCanvas },
+                        background = Color.Black,
+                        modifier = Modifier.fillMaxSize(),
+                        update = { canvas ->
+                            canvas.background = java.awt.Color.BLACK
+                            canvas.isVisible = true
+                        }
+                    )
+                } else {
+                    // Keep the media artwork visible while the AWT surface and
+                    // embedded mpv window are being created or connecting.
+                    RemoteImage(
+                        tmdbImage(backdrop, "original"),
+                        title,
+                        Modifier.fillMaxSize(),
+                        ContentScale.Crop
+                    )
+                    Box(
+                        Modifier.fillMaxSize().background(
+                            Brush.verticalGradient(
+                                listOf(Color(0x33000000), Color(0xCC000000))
+                            )
+                        )
+                    )
+                }
             }
             if ((loading && !state.playing) || (!status.isNullOrBlank() && !state.playing)) {
                 Row(
