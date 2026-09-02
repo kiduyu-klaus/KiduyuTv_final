@@ -7,13 +7,15 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.application
 import com.kiduyuk.klausk.kiduyutv.desktop.data.*
 import com.kiduyuk.klausk.kiduyutv.desktop.navigation.DesktopNavigator
+import com.kiduyuk.klausk.kiduyutv.desktop.resources.Res
+import com.kiduyuk.klausk.kiduyutv.desktop.resources.kiduyutv
+import org.jetbrains.compose.resources.painterResource
 
 fun main() {
     // Keep heavyweight AWT video surfaces opaque on Windows. Enabling Compose
@@ -22,7 +24,7 @@ fun main() {
     System.setProperty("compose.interop.blending", "false")
 
     application {
-        val appIcon = painterResource("kiduyutv.png")
+        val appIcon = painterResource(Res.drawable.kiduyutv)
         val services = remember {
             val settings = DesktopSettings()
             val tmdb = TmdbClient(settings)

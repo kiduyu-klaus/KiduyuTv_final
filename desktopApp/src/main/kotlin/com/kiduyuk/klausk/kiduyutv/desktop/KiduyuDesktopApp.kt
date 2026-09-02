@@ -24,13 +24,15 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.kiduyuk.klausk.kiduyutv.desktop.model.MediaItem
 import com.kiduyuk.klausk.kiduyutv.desktop.model.MediaType
 import com.kiduyuk.klausk.kiduyutv.desktop.navigation.DesktopRoute
 import com.kiduyuk.klausk.kiduyutv.desktop.navigation.PrimaryDestination
+import com.kiduyuk.klausk.kiduyutv.desktop.resources.Res
+import com.kiduyuk.klausk.kiduyutv.desktop.resources.kiduyutv
 import com.kiduyuk.klausk.kiduyutv.desktop.ui.*
+import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun KiduyuDesktopApp(services: DesktopServices) {
@@ -73,7 +75,7 @@ private fun PrimaryShell(services: DesktopServices, destination: PrimaryDestinat
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Image(
-                painter = painterResource("kiduyutv.png"),
+                painter = painterResource(Res.drawable.kiduyutv),
                 contentDescription = "KiduyuTV",
                 modifier = Modifier.size(64.dp)
             )

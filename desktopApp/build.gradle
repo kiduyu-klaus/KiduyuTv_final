@@ -134,6 +134,7 @@ dependencies {
     implementation compose.desktop.currentOs
     implementation compose.material3
     implementation compose.materialIconsExtended
+    implementation compose.components.resources
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.8.1'
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     implementation 'com.google.code.gson:gson:2.10.1'
@@ -149,6 +150,10 @@ dependencies {
     implementation 'ch.qos.logback:logback-classic:1.4.14'
     
     testImplementation 'junit:junit:4.13.2'
+}
+
+compose.resources {
+    packageOfResClass = 'com.kiduyuk.klausk.kiduyutv.desktop.resources'
 }
 
 sourceSets {
