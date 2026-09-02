@@ -36,7 +36,7 @@ import com.kiduyuk.klausk.kiduyutv.desktop.webview.WebViewRuntimeState
 import com.multiplatform.webview.web.LoadingState
 import com.multiplatform.webview.web.WebView
 import com.multiplatform.webview.web.rememberWebViewNavigator
-import com.multiplatform.webview.web.rememberWebViewStateWithHTMLData
+import com.multiplatform.webview.web.rememberWebViewState
 
 private const val DESKTOP_BROWSER_USER_AGENT =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
@@ -96,8 +96,8 @@ private fun EmbeddedProviderPlayer(services: DesktopServices, route: DesktopRout
     val resumeSeconds = remember(request) {
         (services.library.progress(request)?.positionMs ?: 0L) / 1_000L
     }
-    val iframeHtml = remember(route, resumeSeconds) {
-        StreamProviderManager.generateIframeHtml(
+    val providerUrl = remember(route, resumeSeconds) {
+        StreamProviderManager.generateUrl(
             providerName = route.providerName,
             tmdbId = request.tmdbId,
             isTv = request.mediaType == com.kiduyuk.klausk.kiduyutv.desktop.model.MediaType.SERIES,
@@ -106,25 +106,20 @@ private fun EmbeddedProviderPlayer(services: DesktopServices, route: DesktopRout
             timestamp = resumeSeconds
         )
     }
-    val baseUrl = remember(route.providerName) { StreamProviderManager.getBaseUrl(route.providerName) }
 
-    LaunchedEffect(iframeHtml, baseUrl) {
+    LaunchedEffect(providerUrl) {
         DesktopLog.logger.info(
-            "WebView navigation prepared provider={} baseUrl={} iframeHtmlLength={} htmlUrl={}",
+            "WebView direct navigation prepared provider={} url={}",
             route.providerName,
-            baseUrl.logSafe(250),
-            iframeHtml.length,
-            iframeHtml.substringAfter("src=\"", "").substringBefore("\" ").logSafe(500)
+            providerUrl.logSafe(500)
         )
     }
 
     key(route.providerName, request.tmdbId, request.season, request.episode) {
-        val webViewState = rememberWebViewStateWithHTMLData(
-            data = iframeHtml,
-            baseUrl = baseUrl,
-            encoding = "utf-8",
-            mimeType = "text/html"
-        )
+        // KCEF implements HTML-data loading by writing a temporary file:///kcefbrowser page.
+        // Provider players need a real top-level HTTPS origin for scripts, cookies, storage,
+        // autoplay and redirects, so navigate directly to the generated provider URL.
+        val webViewState = rememberWebViewState(providerUrl)
         val webViewNavigator = rememberWebViewNavigator()
 
         // Configure browser creation synchronously. The rendering mode is consumed by the
@@ -178,6 +173,9 @@ private fun EmbeddedProviderPlayer(services: DesktopServices, route: DesktopRout
                 state = webViewState,
                 navigator = webViewNavigator,
                 captureBackPresses = false,
+                onCreated = {
+                    DesktopLog.logger.info("WebView created provider={} url={}", route.providerName, providerUrl.logSafe(500))
+                },
                 modifier = Modifier.weight(1f).fillMaxWidth()
             )
         }
