@@ -35,6 +35,7 @@ import com.kiduyuk.klausk.kiduyutv.desktop.webview.StreamProviderManager
 import com.kiduyuk.klausk.kiduyutv.desktop.webview.WebViewRuntimeState
 import com.multiplatform.webview.web.LoadingState
 import com.multiplatform.webview.web.WebView
+import dev.datlag.kcef.KCEFBrowser
 import com.multiplatform.webview.web.rememberWebViewNavigator
 import com.multiplatform.webview.web.rememberWebViewState
 
@@ -173,7 +174,7 @@ private fun EmbeddedProviderPlayer(services: DesktopServices, route: DesktopRout
                 state = webViewState,
                 navigator = webViewNavigator,
                 captureBackPresses = false,
-                onCreated = {
+                onCreated = { _: KCEFBrowser ->
                     DesktopLog.logger.info("WebView created provider={} url={}", route.providerName, providerUrl.logSafe(500))
                 },
                 modifier = Modifier.weight(1f).fillMaxWidth()
