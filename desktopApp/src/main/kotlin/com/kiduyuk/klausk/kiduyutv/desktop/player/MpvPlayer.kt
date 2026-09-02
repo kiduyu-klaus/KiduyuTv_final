@@ -46,9 +46,12 @@ class MpvPlayer(
         val args = mutableListOf(
             resolveExecutable().toString(),
             "--input-ipc-server=$pipe",
+            // Avoid incompatible user-level mpv settings and select the Windows
+            // Direct3D11 backend explicitly for stable embedded rendering.
+            "--no-config",
             "--force-window=yes",
             "--vo=gpu",
-            "--gpu-context=auto",
+            "--gpu-context=d3d11",
             "--keep-open=no",
             "--no-osc",
             "--no-osd-bar",
