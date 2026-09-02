@@ -198,7 +198,22 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
         )
     }
     val scope = rememberCoroutineScope()
-    val player = remember { MpvPlayer(services.settings, scope) }
+    val playbackIdentity = remember(
+        request.tmdbId,
+        request.mediaType,
+        request.season,
+        request.episode,
+        request.provider
+    ) {
+        listOf(
+            request.tmdbId.toString(),
+            request.mediaType.name,
+            request.season?.toString().orEmpty(),
+            request.episode?.toString().orEmpty(),
+            request.provider.orEmpty()
+        ).joinToString("|")
+    }
+    val player = remember(playbackIdentity) { MpvPlayer(services.settings, scope) }
     val playerState by player.state.collectAsState()
     val videoCanvas = remember {
         Canvas().apply {
@@ -241,7 +256,7 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
             DesktopLog.logger.error("Embedded mpv surface initialization failed")
         }
     }
-    val streamLoader = remember(request, services.providers) {
+    val streamLoader = remember(playbackIdentity) {
         DesktopStreamLoader(services.providers, request)
     }
     val streamLoadState by streamLoader.state.collectAsState()
@@ -268,7 +283,8 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
         player.play(stream, positionMs, videoWindowId)
     }
 
-    LaunchedEffect(streamLoader) {
+    LaunchedEffect(playbackIdentity, streamLoader) {
+        DesktopLog.logger.info("Starting stable direct-player load identity={}", playbackIdentity)
         streamLoader.load()
     }
     LaunchedEffect(streams, videoWindowId) {
@@ -314,7 +330,7 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
             services.navigator.push(DesktopRoute.Player(next))
         }
     }
-    DisposableEffect(request) {
+    DisposableEffect(player, streamLoader) {
         onDispose {
             DesktopLog.logger.info(
                 "DirectPlayerScreen disposed title={} tmdbId={} positionMs={} durationMs={}",
