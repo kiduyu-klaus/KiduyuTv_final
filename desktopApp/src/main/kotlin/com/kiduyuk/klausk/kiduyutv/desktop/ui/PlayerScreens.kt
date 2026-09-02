@@ -130,7 +130,8 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
         fetchStatus = "Fetching enabled providers…"
         showNoStreams = false
         var lastFailure: Throwable? = null
-        var found = emptyList<StreamItem>()
+        // ProvidersClient completes only after provider discovery, every enabled-provider
+        // request, and each provider retry has finished.
         val result = runCatching {
             services.providers.streams(
                 request = request,
@@ -147,7 +148,10 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
                 }
             )
         }
-        result.onSuccess { found = it }.onFailure { lastFailure = it }
+        val found = result.getOrElse {
+            lastFailure = it
+            emptyList()
+        }
         streams = StreamRanker.sorted(found)
         if (streams.isEmpty()) {
             fetchError = lastFailure?.message ?: "No streams were found"

@@ -80,27 +80,11 @@ class DesktopStreamRepository(
         request: PlayRequest,
         provider: String?,
         onProgress: suspend (current: Int, total: Int, provider: String) -> Unit
-    ): List<StreamItem> {
-        return if (provider != null) {
-            // Single provider
-            providers.streams(request, provider)
-        } else {
-            // Multi-provider with progress
-            val enabledProviders = enabledProviders()
-            val allStreams = mutableListOf<StreamItem>()
-
-            enabledProviders.forEachIndexed { index, providerName ->
-                onProgress(index + 1, enabledProviders.size, providerName)
-                try {
-                    val streams = providers.streams(request, providerName)
-                    allStreams.addAll(streams)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-            allStreams
-        }
-    }
+    ): List<StreamItem> = providers.streams(
+        request = request,
+        provider = provider,
+        onProviderProgress = onProgress
+    )
 }
 
 class DesktopWatchHistoryRepository(
