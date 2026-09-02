@@ -1,6 +1,7 @@
 package com.kiduyuk.klausk.kiduyutv.desktop.webview
 
 import dev.datlag.kcef.KCEF
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -8,10 +9,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import com.kiduyuk.klausk.kiduyutv.desktop.data.DesktopLog
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 
 sealed interface WebViewRuntimeState {
     data object NotStarted : WebViewRuntimeState
@@ -23,6 +26,8 @@ sealed interface WebViewRuntimeState {
 
 /** Owns the single Chromium/JCEF runtime used by all desktop WebView player screens. */
 object DesktopWebViewRuntime {
+    private const val INITIALIZATION_TIMEOUT_MS = 30_000L
+
     private val runtimeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val mutableState = MutableStateFlow<WebViewRuntimeState>(WebViewRuntimeState.NotStarted)
     val state: StateFlow<WebViewRuntimeState> = mutableState.asStateFlow()
@@ -41,7 +46,9 @@ object DesktopWebViewRuntime {
 
         mutableState.value = WebViewRuntimeState.Preparing("Preparing browser engine…")
         initializationJob = runtimeScope.launch {
+            val initializationSettled = AtomicBoolean(false)
             runCatching {
+                val initializationCompleted = CompletableDeferred<Unit>()
                 val appData = System.getenv("LOCALAPPDATA")
                     ?.takeIf(String::isNotBlank)
                     ?.let(::File)
@@ -77,8 +84,13 @@ object DesktopWebViewRuntime {
                                 mutableState.value = WebViewRuntimeState.Preparing("Starting browser engine…")
                             }
                             onInitialized {
-                                DesktopLog.logger.info("KCEF initialized successfully")
-                                mutableState.value = WebViewRuntimeState.Ready
+                                if (initializationSettled.compareAndSet(false, true)) {
+                                    DesktopLog.logger.info("KCEF initialized successfully")
+                                    mutableState.value = WebViewRuntimeState.Ready
+                                    initializationCompleted.complete(Unit)
+                                } else {
+                                    DesktopLog.logger.warn("Ignoring late KCEF initialized callback")
+                                }
                             }
                         }
                         settings {
@@ -91,28 +103,37 @@ object DesktopWebViewRuntime {
                         )
                     },
                     onError = { error ->
-                        DesktopLog.logger.error("KCEF initialization error", error)
-                        mutableState.value = WebViewRuntimeState.Failed(
-                            error?.message ?: "The browser engine could not be initialized."
-                        )
+                        if (initializationSettled.compareAndSet(false, true)) {
+                            DesktopLog.logger.error("KCEF initialization error", error)
+                            mutableState.value = WebViewRuntimeState.Failed(
+                                error?.message ?: "The browser engine could not be initialized."
+                            )
+                            initializationCompleted.complete(Unit)
+                        }
                     },
                     onRestartRequired = {
-                        DesktopLog.logger.warn("KCEF requested an application restart")
-                        mutableState.value = WebViewRuntimeState.RestartRequired(
-                            "The browser engine was updated. Restart KiduyuTV to use WebView playback."
-                        )
+                        if (initializationSettled.compareAndSet(false, true)) {
+                            DesktopLog.logger.warn("KCEF requested an application restart")
+                            mutableState.value = WebViewRuntimeState.RestartRequired(
+                                "The browser engine was updated. Restart KiduyuTV to use WebView playback."
+                            )
+                            initializationCompleted.complete(Unit)
+                        }
                     }
                 )
-                if (mutableState.value !is WebViewRuntimeState.RestartRequired &&
-                    mutableState.value !is WebViewRuntimeState.Failed
-                ) {
-                    mutableState.value = WebViewRuntimeState.Ready
+                // KCEF.init can return after creating CefApp but before Chromium's context is
+                // initialized. Creating a browser during that gap leaves the wrapper stuck in
+                // LoadingState.Initializing and can launch an extra application process.
+                withTimeout(INITIALIZATION_TIMEOUT_MS) {
+                    initializationCompleted.await()
                 }
             }.onFailure { error ->
-                DesktopLog.logger.error("WebView runtime initialization failed", error)
-                mutableState.value = WebViewRuntimeState.Failed(
-                    error.message ?: "The browser engine could not be initialized."
-                )
+                if (initializationSettled.compareAndSet(false, true)) {
+                    DesktopLog.logger.error("WebView runtime initialization failed", error)
+                    mutableState.value = WebViewRuntimeState.Failed(
+                        error.message ?: "The browser engine could not be initialized."
+                    )
+                }
             }
         }
     }

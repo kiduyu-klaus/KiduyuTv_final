@@ -126,6 +126,19 @@ private fun EmbeddedProviderPlayer(services: DesktopServices, route: DesktopRout
             mimeType = "text/html"
         )
         val webViewNavigator = rememberWebViewNavigator()
+
+        // Configure browser creation synchronously. The rendering mode is consumed by the
+        // factory while it creates the native browser, so changing it from an effect is too late.
+        webViewState.webSettings.apply {
+            isJavaScriptEnabled = true
+            customUserAgentString = DESKTOP_BROWSER_USER_AGENT
+            supportZoom = false
+            desktopWebSettings.apply {
+                offScreenRendering = false
+                transparent = false
+                disablePopupWindows = true
+            }
+        }
         LaunchedEffect(
             webViewState.loadingState,
             webViewState.lastLoadedUrl,
@@ -143,17 +156,6 @@ private fun EmbeddedProviderPlayer(services: DesktopServices, route: DesktopRout
             )
         }
         DisposableEffect(webViewState) {
-            DesktopLog.logger.info("Configuring WebView provider={}", route.providerName)
-            webViewState.webSettings.apply {
-                isJavaScriptEnabled = true
-                customUserAgentString = DESKTOP_BROWSER_USER_AGENT
-                supportZoom = false
-                desktopWebSettings.apply {
-                    offScreenRendering = true
-                    transparent = false
-                    disablePopupWindows = true
-                }
-            }
             onDispose {
                 DesktopLog.logger.info("WebView disposed provider={}", route.providerName)
             }
@@ -176,6 +178,9 @@ private fun EmbeddedProviderPlayer(services: DesktopServices, route: DesktopRout
                 state = webViewState,
                 navigator = webViewNavigator,
                 captureBackPresses = false,
+                onCreated = {
+                    DesktopLog.logger.info("WebView created provider={}", route.providerName)
+                },
                 modifier = Modifier.weight(1f).fillMaxWidth()
             )
         }
