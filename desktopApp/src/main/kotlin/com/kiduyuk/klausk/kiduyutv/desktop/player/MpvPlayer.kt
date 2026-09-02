@@ -48,7 +48,7 @@ class MpvPlayer(
             "--input-ipc-server=$pipe",
             "--force-window=yes",
             "--vo=gpu",
-            "--gpu-context=angle",
+            "--gpu-context=auto",
             "--keep-open=no",
             "--no-osc",
             "--no-osd-bar",
@@ -148,7 +148,8 @@ class MpvPlayer(
                     2 to "duration",
                     3 to "pause",
                     4 to "media-title",
-                    5 to "demuxer-cache-time"
+                    5 to "demuxer-cache-time",
+                    6 to "paused-for-cache"
                 ).forEach { (id, property) ->
                     ipc.writeLine(gson.toJson(mapOf("command" to listOf("observe_property", id, property))))
                 }
@@ -166,10 +167,30 @@ class MpvPlayer(
 
     private fun handleEvent(line: String) {
         val json = runCatching { gson.fromJson(line, JsonObject::class.java) }.getOrNull() ?: return
-        if (json.get("event")?.asString != "property-change") return
+        val event = json.get("event")?.asString ?: return
+        val current = mutableState.value
+        when (event) {
+            "start-file" -> {
+                mutableState.value = current.copy(playing = false, error = null)
+                return
+            }
+            "file-loaded" -> {
+                mutableState.value = current.copy(error = null)
+                return
+            }
+            "playback-restart" -> {
+                mutableState.value = current.copy(playing = current.running, error = null)
+                return
+            }
+            "end-file" -> {
+                mutableState.value = current.copy(playing = false)
+                return
+            }
+            "property-change" -> Unit
+            else -> return
+        }
         val name = json.get("name")?.asString ?: return
         val data = json.get("data")
-        val current = mutableState.value
         mutableState.value = when (name) {
             "time-pos" -> current.copy(
                 positionMs = data?.takeUnless { it.isJsonNull }?.asDouble?.times(1000)?.toLong() ?: 0L,
@@ -180,12 +201,26 @@ class MpvPlayer(
                 durationMs = data?.takeUnless { it.isJsonNull }?.asDouble?.times(1000)?.toLong() ?: 0L
             )
             "pause" -> current.copy(
-                playing = !(data?.takeUnless { it.isJsonNull }?.asBoolean ?: true),
+                // An initial pause=false property arrives before the first video frame.
+                // Only a pause=true transition should change readiness here;
+                // playback-restart/time-pos marks the surface ready to reveal.
+                playing = if (data?.takeUnless { it.isJsonNull }?.asBoolean == true) {
+                    false
+                } else {
+                    current.playing
+                },
                 error = null
             )
             "media-title" -> current.copy(title = data?.takeUnless { it.isJsonNull }?.asString ?: current.title)
             "demuxer-cache-time" -> current.copy(
                 bufferedMs = data?.takeUnless { it.isJsonNull }?.asDouble?.times(1000)?.toLong() ?: 0L
+            )
+            "paused-for-cache" -> current.copy(
+                playing = if (data?.takeUnless { it.isJsonNull }?.asBoolean == true) {
+                    false
+                } else {
+                    current.playing
+                }
             )
             else -> current
         }

@@ -26,6 +26,7 @@ import com.kiduyuk.klausk.kiduyutv.desktop.webview.StreamProviderManager
 import com.sun.jna.Native
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withTimeoutOrNull
 import java.awt.Canvas
 import java.awt.Dimension
 import java.util.concurrent.TimeUnit
@@ -81,16 +82,26 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
         }
     }
     var videoWindowId by remember { mutableStateOf<Long?>(null) }
+    var videoSurfaceError by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(videoCanvas) {
-        while (
-            isActive &&
-            (!videoCanvas.isDisplayable || !videoCanvas.isShowing || videoCanvas.width <= 0 || videoCanvas.height <= 0)
-        ) {
-            delay(50L)
+        val surfaceReady = withTimeoutOrNull(5_000L) {
+            while (
+                isActive &&
+                (!videoCanvas.isDisplayable || !videoCanvas.isShowing ||
+                    videoCanvas.width <= 0 || videoCanvas.height <= 0)
+            ) {
+                delay(50L)
+            }
+            true
         }
-        videoWindowId = runCatching { Native.getComponentID(videoCanvas) }
-            .getOrNull()
-            ?.takeIf { it != 0L }
+        videoWindowId = if (surfaceReady == true) {
+            runCatching { windowsMpvWindowId(videoCanvas) }.getOrNull()?.takeIf { it != 0L }
+        } else {
+            null
+        }
+        if (videoWindowId == null) {
+            videoSurfaceError = "The embedded video surface could not be initialized."
+        }
     }
     var streams by remember(request) { mutableStateOf<List<StreamItem>>(emptyList()) }
     var activeStream by remember(request) { mutableStateOf<StreamItem?>(null) }
@@ -116,10 +127,10 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
         showNoStreams = false
         var lastFailure: Throwable? = null
         var found = emptyList<StreamItem>()
-        repeat(3) { retry ->
+        for (retry in 0 until 3) {
             val result = runCatching { services.providers.streams(request, request.provider) }
             result.onSuccess { found = it }.onFailure { lastFailure = it }
-            if (found.isNotEmpty()) return@repeat
+            if (found.isNotEmpty()) break
             if (retry < 2) delay((retry + 1) * 1_000L)
         }
         streams = StreamRanker.sorted(found)
@@ -161,10 +172,9 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
         }
     }
 
-    val playerLoading = loading || (
-        playerState.running && !playerState.playing && playerState.error == null
-    )
-    val playerStatus = playerState.error ?: fetchError
+    val playerLoading = videoSurfaceError == null &&
+        (loading || (playerState.running && !playerState.playing && playerState.error == null))
+    val playerStatus = videoSurfaceError ?: playerState.error ?: fetchError
     val dialogVisible = showNoStreams || showStreams || showTracks || showSubtitle
     PlayerLayout(
         title = request.title + if (request.mediaType == MediaType.SERIES) {
@@ -177,10 +187,10 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
         loading = playerLoading,
         loadingMessage = if (activeStream == null) "Loading streams…" else "Buffering…",
         status = playerStatus,
-        videoObscured = videoWindowId != null && (
+        videoObscured =
             dialogVisible ||
-                (!playerStatus.isNullOrBlank() && !playerState.playing)
-            ),
+                (playerLoading && !playerState.playing) ||
+                (!playerStatus.isNullOrBlank() && !playerState.playing),
         onBack = {
             if (playerState.positionMs > 0L) {
                 services.library.saveProgress(request.toProgress(playerState.positionMs, playerState.durationMs))
@@ -268,16 +278,26 @@ fun LivePlayerScreen(services: DesktopServices, route: DesktopRoute.LivePlayer) 
         }
     }
     var videoWindowId by remember { mutableStateOf<Long?>(null) }
+    var videoSurfaceError by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(videoCanvas) {
-        while (
-            isActive &&
-            (!videoCanvas.isDisplayable || !videoCanvas.isShowing || videoCanvas.width <= 0 || videoCanvas.height <= 0)
-        ) {
-            delay(50L)
+        val surfaceReady = withTimeoutOrNull(5_000L) {
+            while (
+                isActive &&
+                (!videoCanvas.isDisplayable || !videoCanvas.isShowing ||
+                    videoCanvas.width <= 0 || videoCanvas.height <= 0)
+            ) {
+                delay(50L)
+            }
+            true
         }
-        videoWindowId = runCatching { Native.getComponentID(videoCanvas) }
-            .getOrNull()
-            ?.takeIf { it != 0L }
+        videoWindowId = if (surfaceReady == true) {
+            runCatching { windowsMpvWindowId(videoCanvas) }.getOrNull()?.takeIf { it != 0L }
+        } else {
+            null
+        }
+        if (videoWindowId == null) {
+            videoSurfaceError = "The embedded video surface could not be initialized."
+        }
     }
     val stream = remember(route) {
         StreamItem(name = route.name, title = route.name, url = route.url, provider = "Live TV", type = "hls", headers = route.headers)
@@ -292,10 +312,12 @@ fun LivePlayerScreen(services: DesktopServices, route: DesktopRoute.LivePlayer) 
         videoCanvas = videoCanvas,
         state = state,
         stream = stream,
-        loading = state.running && !state.playing,
+        loading = videoSurfaceError == null && (videoWindowId == null || state.running && !state.playing),
         loadingMessage = "Buffering…",
-        status = state.error,
-        videoObscured = videoWindowId != null && state.error != null,
+        status = videoSurfaceError ?: state.error,
+        videoObscured =
+            videoWindowId == null || (state.running && !state.playing) ||
+                videoSurfaceError != null || state.error != null,
         onBack = { player.close(); services.navigator.pop() },
         onPause = player::togglePause,
         onRewind = { player.seekBy(-30) },
@@ -340,14 +362,28 @@ private fun PlayerLayout(
             ScreenHeader(title, onBack, actions = {
                 stream?.let { Text("${it.displayName} • ${it.quality}", color = MaterialTheme.colorScheme.onSurfaceVariant) }
             })
-            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier.weight(1f).fillMaxWidth().background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
                 SwingPanel(
                     factory = { videoCanvas },
-                    modifier = Modifier.fillMaxSize(),
+                    background = Color.Black,
+                    modifier = if (videoObscured) {
+                        // Keep the native HWND alive for mpv, but move its heavyweight
+                        // surface out of the way so Compose status content and dialogs
+                        // are painted above it.
+                        Modifier.align(Alignment.BottomEnd).size(1.dp)
+                    } else {
+                        Modifier.fillMaxSize()
+                    },
                     // AWT Canvas is heavyweight on Windows and can otherwise paint over
-                    // Compose dialogs/status content. Hiding it keeps the native HWND alive
-                    // while allowing those overlays to remain visible.
-                    update = { it.isVisible = !videoObscured }
+                    // Compose dialogs/status content. Resizing instead of hiding preserves
+                    // the HWND that the running mpv process is attached to.
+                    update = { canvas ->
+                        canvas.background = java.awt.Color.BLACK
+                        canvas.isVisible = true
+                    }
                 )
                 if (loading && !state.playing) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -456,3 +492,7 @@ private fun formatTime(ms: Long): String {
     return if (hours > 0) "%d:%02d:%02d".format(hours, minutes, seconds)
     else "%02d:%02d".format(minutes, seconds)
 }
+
+/** mpv expects a Windows HWND represented as an unsigned 32-bit value. */
+private fun windowsMpvWindowId(canvas: Canvas): Long =
+    Native.getComponentID(canvas) and 0xFFFF_FFFFL

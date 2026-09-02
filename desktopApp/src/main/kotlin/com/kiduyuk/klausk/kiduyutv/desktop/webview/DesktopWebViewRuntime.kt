@@ -79,7 +79,7 @@ object DesktopWebViewRuntime {
                     },
                     onError = { error ->
                         mutableState.value = WebViewRuntimeState.Failed(
-                            error.message ?: "The browser engine could not be initialized."
+                            error?.message ?: "The browser engine could not be initialized."
                         )
                     },
                     onRestartRequired = {
