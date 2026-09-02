@@ -72,17 +72,28 @@ class MpvPlayer(
             args += "--no-border"
         }
 
+        val userAgent = stream.headers.valueIgnoreCase("User-Agent")
+            ?.takeIf(::safeHeader)
+        val referrer = stream.headers.valueIgnoreCase("Referer")
+            ?: stream.headers.valueIgnoreCase("Referrer")
+        val origin = stream.headers.valueIgnoreCase("Origin")
+            ?.takeIf(::safeHeader)
         val customHeaders = stream.headers.entries
-            .filterNot { it.key.equals("User-Agent", true) || it.key.equals("Referer", true) }
+            .filterNot {
+                it.key.equals("User-Agent", true) ||
+                    it.key.equals("Referer", true) ||
+                    it.key.equals("Referrer", true) ||
+                    it.key.equals("Origin", true)
+            }
             .filter { safeHeader(it.key) && safeHeader(it.value) }
-            .joinToString(",") { "${it.key}: ${it.value}" }
-        stream.headers.valueIgnoreCase("User-Agent")?.takeIf(::safeHeader)?.let {
-            args += "--user-agent=$it"
+            .map { "${it.key}: ${it.value}" }
+            .toMutableList()
+        userAgent?.let { args += "--user-agent=$it" }
+        referrer?.takeIf(::safeHeader)?.let { args += "--referrer=$it" }
+        origin?.let { customHeaders += "Origin: $it" }
+        if (customHeaders.isNotEmpty()) {
+            args += "--http-header-fields=${customHeaders.joinToString(",")}"
         }
-        stream.headers.valueIgnoreCase("Referer")?.takeIf(::safeHeader)?.let {
-            args += "--referrer=$it"
-        }
-        if (customHeaders.isNotBlank()) args += "--http-header-fields=$customHeaders"
         args += stream.url
 
         try {

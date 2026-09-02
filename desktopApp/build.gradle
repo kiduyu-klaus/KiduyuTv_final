@@ -101,6 +101,20 @@ tasks.matching {
     dependsOn(tasks.named('prepareBundledMpv'))
 }
 
+// jpackage reads main.wxs from build/compose/tmp/resources immediately before
+// invoking WiX. Copy the full JDK 17-compatible template after its preparation
+// tasks have completed so the Finish dialog offers a checked Open KiduyuTV action.
+tasks.matching { it.name == 'packageMsi' || it.name == 'packageExe' }.configureEach {
+    doFirst {
+        File jpackageResources = layout.buildDirectory.dir('compose/tmp/resources').get().asFile
+        jpackageResources.mkdirs()
+        copy {
+            from project.file('packaging/main.wxs')
+            into jpackageResources
+        }
+    }
+}
+
 kotlin {
     jvmToolchain(17)
 }
