@@ -39,11 +39,11 @@ class MpvPlayer(
     private var processOutputJob: Job? = null
     private var intentionallyStopped = false
 
-    // Ordered by preference: try the modern backend first, fall back toward
-    // legacy ones that are more compatible with old/weak WDDM 1.x drivers.
-    // A device that crashes shortly after start on a candidate is assumed
-    // incompatible with that gpu-context and we retry with the next one.
-    private val gpuContextCandidates = listOf("d3d11", "dxinterop", "angle")
+    // These contexts are supported by the bundled Windows mpv runtime.
+    // ANGLE is first because it can fall back to the software WARP renderer
+    // on machines without a usable hardware GPU. Native D3D11 and WinVk are
+    // retained as fallbacks for systems where ANGLE is unavailable or crashes.
+    private val gpuContextCandidates = listOf("angle", "d3d11", "winvk")
 
     // Access violation / other native-crash-style exit codes we treat as
     // "this gpu-context doesn't work here" rather than a stream problem.
@@ -85,12 +85,12 @@ class MpvPlayer(
         val args = mutableListOf(
             resolveExecutable().toString(),
             "--input-ipc-server=$pipe",
-            // Avoid incompatible user-level mpv settings and select the GPU
-            // context explicitly; which one is chosen may change between
-            // attempts if the current machine can't handle the preferred one.
+            // Avoid incompatible user-level mpv settings. gpu-next supports
+            // the bundled ANGLE, D3D11, and WinVk contexts; the selected
+            // context may change between attempts on incompatible machines.
             "--no-config",
             "--force-window=yes",
-            "--vo=gpu",
+            "--vo=gpu-next",
             "--gpu-context=$gpuContext",
             "--keep-open=no",
             "--no-osc",
