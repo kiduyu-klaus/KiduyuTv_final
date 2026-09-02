@@ -200,14 +200,15 @@ class MpvPlayer(
         if (configured.isNotBlank()) {
             val path = Paths.get(configured)
             if (path.isRegularFile()) return path
-            if (path.parent == null) return path
         }
         val resources = System.getProperty("compose.application.resources.dir")
         if (!resources.isNullOrBlank()) {
             val bundled = Paths.get(resources).resolve("mpv").resolve("mpv.exe")
             if (Files.isRegularFile(bundled)) return bundled
         }
-        return Paths.get("mpv.exe")
+        // Keep an explicitly configured command/path as the final fallback. The default
+        // "mpv.exe" setting must not bypass the packaged executable above.
+        return configured.takeIf { it.isNotBlank() }?.let(Paths::get) ?: Paths.get("mpv.exe")
     }
 
     private fun safeHeader(value: String): Boolean =

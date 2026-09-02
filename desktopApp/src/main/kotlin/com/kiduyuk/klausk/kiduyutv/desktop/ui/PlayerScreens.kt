@@ -101,7 +101,6 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
         videoWindowId = runCatching { Native.getComponentID(videoCanvas) }
             .getOrNull()
             ?.takeIf { it != 0L }
-        videoCanvas.requestFocusInWindow()
     }
     var streams by remember(request) { mutableStateOf<List<StreamItem>>(emptyList()) }
     var activeStream by remember(request) { mutableStateOf<StreamItem?>(null) }
@@ -172,6 +171,11 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
         }
     }
 
+    val playerLoading = loading || (
+        playerState.running && !playerState.playing && playerState.error == null
+    )
+    val playerStatus = playerState.error ?: fetchError
+    val dialogVisible = showNoStreams || showStreams || showTracks || showSubtitle
     PlayerLayout(
         title = request.title + if (request.mediaType == MediaType.SERIES) {
             "  S${request.season ?: 1} E${request.episode ?: 1}"
@@ -180,8 +184,13 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
         videoCanvas = videoCanvas,
         state = playerState,
         stream = activeStream,
-        loading = loading,
-        status = fetchError,
+        loading = playerLoading,
+        loadingMessage = if (activeStream == null) "Loading streams…" else "Buffering…",
+        status = playerStatus,
+        videoObscured = videoWindowId != null && (
+            dialogVisible ||
+                (!playerStatus.isNullOrBlank() && !playerState.playing)
+            ),
         onBack = {
             if (playerState.positionMs > 0L) {
                 services.library.saveProgress(request.toProgress(playerState.positionMs, playerState.durationMs))
@@ -279,7 +288,6 @@ fun LivePlayerScreen(services: DesktopServices, route: DesktopRoute.LivePlayer) 
         videoWindowId = runCatching { Native.getComponentID(videoCanvas) }
             .getOrNull()
             ?.takeIf { it != 0L }
-        videoCanvas.requestFocusInWindow()
     }
     val stream = remember(route) {
         StreamItem(name = route.name, title = route.name, url = route.url, provider = "Live TV", type = "hls", headers = route.headers)
@@ -295,7 +303,9 @@ fun LivePlayerScreen(services: DesktopServices, route: DesktopRoute.LivePlayer) 
         state = state,
         stream = stream,
         loading = state.running && !state.playing,
+        loadingMessage = "Buffering…",
         status = state.error,
+        videoObscured = videoWindowId != null && state.error != null,
         onBack = { player.close(); services.navigator.pop() },
         onPause = player::togglePause,
         onRewind = { player.seekBy(-30) },
@@ -318,7 +328,9 @@ private fun PlayerLayout(
     state: com.kiduyuk.klausk.kiduyutv.desktop.player.MpvState,
     stream: StreamItem?,
     loading: Boolean,
+    loadingMessage: String,
     status: String?,
+    videoObscured: Boolean,
     onBack: () -> Unit,
     onPause: () -> Unit,
     onRewind: () -> Unit,
@@ -342,15 +354,22 @@ private fun PlayerLayout(
                 SwingPanel(
                     factory = { videoCanvas },
                     modifier = Modifier.fillMaxSize(),
-                    update = {}
+                    // AWT Canvas is heavyweight on Windows and can otherwise paint over
+                    // Compose dialogs/status content. Hiding it keeps the native HWND alive
+                    // while allowing those overlays to remain visible.
+                    update = { it.isVisible = !videoObscured }
                 )
                 if (loading && !state.playing) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         CircularProgressIndicator()
-                        Text("Buffering…")
+                        Text(loadingMessage, color = Color.White)
                     }
                 } else if (!status.isNullOrBlank() && !state.playing) {
-                    Text(status, color = MaterialTheme.colorScheme.onSurface)
+                    Text(
+                        status,
+                        color = Color.White,
+                        modifier = Modifier.background(Color(0xB3000000), RoundedCornerShape(10.dp)).padding(16.dp)
+                    )
                 }
             }
             Column(Modifier.fillMaxWidth().background(Color(0xD9000000)).padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -361,9 +380,9 @@ private fun PlayerLayout(
                     valueRange = 0f..state.durationMs.coerceAtLeast(1L).toFloat()
                 )
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(formatTime(state.positionMs))
-                    Text("Buffered ${formatTime(state.bufferedMs)}")
-                    Text(formatTime(state.durationMs))
+                    Text(formatTime(state.positionMs), color = Color.White)
+                    Text("Buffered ${formatTime(state.bufferedMs)}", color = Color.White)
+                    Text(formatTime(state.durationMs), color = Color.White)
                 }
                 Row(
                     Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center,

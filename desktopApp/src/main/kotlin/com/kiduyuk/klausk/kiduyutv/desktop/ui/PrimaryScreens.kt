@@ -69,14 +69,26 @@ private fun Hero(item: MediaItem?, onOpen: () -> Unit) {
         )
         Box(
             Modifier.fillMaxSize().background(
-                Brush.horizontalGradient(listOf(Color(0xF2080808), Color(0x33080808), Color.Transparent))
+                Brush.horizontalGradient(
+                    listOf(
+                        MaterialTheme.colorScheme.background.copy(alpha = 0.96f),
+                        MaterialTheme.colorScheme.background.copy(alpha = 0.72f),
+                        Color.Transparent
+                    )
+                )
             )
         )
         Column(
             Modifier.align(Alignment.CenterStart).widthIn(max = 620.dp).padding(42.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text(item?.displayTitle ?: "KiduyuTV", fontSize = 38.sp, fontWeight = FontWeight.Black)
+            Text(
+                item?.displayTitle ?: "KiduyuTV",
+                fontSize = 38.sp,
+                fontWeight = FontWeight.Black,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
             if (!item?.overview.isNullOrBlank()) {
                 Text(item?.overview.orEmpty(), maxLines = 4, overflow = TextOverflow.Ellipsis)
             }
