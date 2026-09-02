@@ -112,7 +112,7 @@ fun MediaCard(item: MediaItem, onClick: () -> Unit, modifier: Modifier = Modifie
         Text(
             text = item.displayTitle,
             modifier = Modifier.padding(10.dp),
-            maxLines = 2,
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             fontWeight = FontWeight.SemiBold
         )
