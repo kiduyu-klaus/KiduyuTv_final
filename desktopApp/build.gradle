@@ -1,4 +1,5 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import groovy.json.JsonSlurper
 import java.security.MessageDigest
 import java.util.zip.ZipFile
 
@@ -11,10 +12,9 @@ plugins {
 group = 'com.kiduyuk.klausk.kiduyutv'
 version = providers.gradleProperty('APP_VERSION').getOrElse(rootProject.file('VERSION').text.trim())
 
-def mpvArchiveName = 'mpv-v0.41.0-dev-g174b638f2-33547610191-x86_64-pc-windows-msvc.zip'
-def mpvDownloadUrl = "https://github.com/mpv-player/mpv/releases/download/git-release/${mpvArchiveName}"
-def mpvSha256 = 'bb9e9687100f2a014811a64a891afefa412e0bce28baf409d9a087d8c35485e0'
-def mpvArchive = layout.buildDirectory.file("downloads/mpv/${mpvArchiveName}")
+def mpvReleaseApi = 'https://api.github.com/repos/mpv-player/mpv/releases/tags/git-release'
+def mpvArchivePattern = ~/mpv-.*-x86_64-pc-windows-msvc\.zip/
+def mpvDownloadDir = layout.buildDirectory.dir('downloads/mpv')
 def appResourcesRoot = layout.buildDirectory.dir('generated/appResources')
 def desktopDefaultsDir = layout.buildDirectory.dir('generated/desktopDefaults')
 
@@ -53,34 +53,67 @@ tasks.register('generateDesktopDefaults') {
 
 tasks.register('prepareBundledMpv') {
     group = 'distribution'
-    description = 'Downloads, verifies, and stages the pinned mpv Windows runtime.'
-    inputs.property('mpvDownloadUrl', mpvDownloadUrl)
-    inputs.property('mpvSha256', mpvSha256)
+    description = 'Downloads, verifies, and stages the current official mpv Windows runtime.'
+    inputs.property('mpvReleaseApi', mpvReleaseApi)
     outputs.files(
         appResourcesRoot.map { it.file('windows-x64/mpv/mpv.exe') },
         appResourcesRoot.map { it.file('windows-x64/mpv/vulkan-1.dll') }
     )
 
     doLast {
-        File archive = mpvArchive.get().asFile
+        URLConnection metadataConnection = new URL(mpvReleaseApi).openConnection()
+        metadataConnection.setRequestProperty('Accept', 'application/vnd.github+json')
+        metadataConnection.setRequestProperty('User-Agent', 'KiduyuTV-build')
+        String githubToken = System.getenv('GITHUB_TOKEN') ?: ''
+        if (!githubToken.isBlank()) {
+            metadataConnection.setRequestProperty('Authorization', "Bearer ${githubToken}")
+        }
+        def release = metadataConnection.inputStream.withCloseable { input ->
+            new JsonSlurper().parse(input)
+        }
+        def asset = release.assets.find { candidate ->
+            candidate.name ==~ mpvArchivePattern && !candidate.name.contains('-pdb')
+        }
+        if (asset == null) {
+            throw new GradleException('The official mpv release has no x86_64 Windows MSVC runtime')
+        }
+        String assetDigest = asset.digest ?: ''
+        if (!assetDigest.startsWith('sha256:')) {
+            throw new GradleException("GitHub did not provide a SHA-256 digest for ${asset.name}")
+        }
+        String expectedSha256 = assetDigest.substring('sha256:'.length())
+        File archive = mpvDownloadDir.get().file(asset.name as String).asFile
         archive.parentFile.mkdirs()
         if (!archive.isFile()) {
-            logger.lifecycle("Downloading bundled mpv runtime from ${mpvDownloadUrl}")
-            new URL(mpvDownloadUrl).withInputStream { input ->
-                archive.withOutputStream { output -> output << input }
+            logger.lifecycle("Downloading bundled mpv runtime ${asset.name}")
+            File partialArchive = new File(archive.parentFile, "${archive.name}.part")
+            partialArchive.delete()
+            try {
+                URLConnection downloadConnection = new URL(asset.browser_download_url as String).openConnection()
+                downloadConnection.setRequestProperty('User-Agent', 'KiduyuTV-build')
+                downloadConnection.inputStream.withCloseable { input ->
+                    partialArchive.withOutputStream { output -> output << input }
+                }
+                java.nio.file.Files.move(
+                    partialArchive.toPath(),
+                    archive.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING
+                )
+            } finally {
+                partialArchive.delete()
             }
         }
 
-        MessageDigest digest = MessageDigest.getInstance('SHA-256')
+        MessageDigest messageDigest = MessageDigest.getInstance('SHA-256')
         archive.withInputStream { input ->
             byte[] buffer = new byte[64 * 1024]
             int count
-            while ((count = input.read(buffer)) != -1) digest.update(buffer, 0, count)
+            while ((count = input.read(buffer)) != -1) messageDigest.update(buffer, 0, count)
         }
-        String actualSha256 = digest.digest().encodeHex().toString()
-        if (!actualSha256.equalsIgnoreCase(mpvSha256)) {
+        String actualSha256 = messageDigest.digest().encodeHex().toString()
+        if (!actualSha256.equalsIgnoreCase(expectedSha256)) {
             archive.delete()
-            throw new GradleException("Bundled mpv checksum mismatch: expected ${mpvSha256}, got ${actualSha256}")
+            throw new GradleException("Bundled mpv checksum mismatch: expected ${expectedSha256}, got ${actualSha256}")
         }
 
         File destination = appResourcesRoot.get().dir('windows-x64/mpv').asFile
