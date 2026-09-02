@@ -623,17 +623,20 @@ private fun PlayerLayout(
                 Modifier.weight(1f).fillMaxWidth().background(Color.Black),
                 contentAlignment = Alignment.Center
             ) {
-                if (videoReady) {
-                    SwingPanel(
-                        factory = { videoCanvas },
-                        background = Color.Black,
-                        modifier = Modifier.fillMaxSize(),
-                        update = { canvas ->
-                            canvas.background = java.awt.Color.BLACK
-                            canvas.isVisible = true
-                        }
-                    )
-                } else {
+                // The SwingPanel must remain mounted while the Canvas is
+                // becoming displayable; otherwise videoReady can never become
+                // true because no native HWND is created for an unattached
+                // Canvas. The artwork is layered above it until mpv is ready.
+                SwingPanel(
+                    factory = { videoCanvas },
+                    background = Color.Black,
+                    modifier = Modifier.fillMaxSize(),
+                    update = { canvas ->
+                        canvas.background = java.awt.Color.BLACK
+                        canvas.isVisible = true
+                    }
+                )
+                if (!videoReady) {
                     // Keep the media artwork visible while the AWT surface and
                     // embedded mpv window are being created or connecting.
                     RemoteImage(
