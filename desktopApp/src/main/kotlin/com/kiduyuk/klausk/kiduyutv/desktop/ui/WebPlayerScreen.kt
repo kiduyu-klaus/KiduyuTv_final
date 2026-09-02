@@ -178,9 +178,6 @@ private fun EmbeddedProviderPlayer(services: DesktopServices, route: DesktopRout
                 state = webViewState,
                 navigator = webViewNavigator,
                 captureBackPresses = false,
-                onCreated = {
-                    DesktopLog.logger.info("WebView created provider={}", route.providerName)
-                },
                 modifier = Modifier.weight(1f).fillMaxWidth()
             )
         }

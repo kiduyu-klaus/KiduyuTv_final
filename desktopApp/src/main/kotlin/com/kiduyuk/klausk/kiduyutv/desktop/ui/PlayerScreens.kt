@@ -21,6 +21,7 @@ import androidx.compose.ui.window.DialogWindow
 import androidx.compose.ui.window.rememberDialogState
 import com.kiduyuk.klausk.kiduyutv.desktop.DesktopServices
 import com.kiduyuk.klausk.kiduyutv.desktop.data.DesktopLog
+import com.kiduyuk.klausk.kiduyutv.desktop.data.ProvidersClient
 import com.kiduyuk.klausk.kiduyutv.desktop.data.logSafe
 import com.kiduyuk.klausk.kiduyutv.desktop.model.*
 import com.kiduyuk.klausk.kiduyutv.desktop.navigation.DesktopRoute
