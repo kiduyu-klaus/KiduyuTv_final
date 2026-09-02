@@ -4,8 +4,10 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.*
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -117,11 +119,68 @@ fun MediaCard(item: MediaItem, onClick: () -> Unit, modifier: Modifier = Modifie
 }
 
 @Composable
+fun TvHorizontalLazyRow(
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
+    horizontalArrangement: Arrangement.Horizontal = Arrangement.Start,
+    content: LazyListScope.() -> Unit
+) {
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val canScrollBackward by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
+        }
+    }
+    val canScrollForward by remember {
+        derivedStateOf {
+            val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            lastVisibleIndex < listState.layoutInfo.totalItemsCount - 1
+        }
+    }
+
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        IconButton(
+            onClick = {
+                scope.launch {
+                    listState.animateScrollToItem(
+                        (listState.firstVisibleItemIndex - 5).coerceAtLeast(0)
+                    )
+                }
+            },
+            enabled = canScrollBackward
+        ) {
+            Text("‹", fontSize = 32.sp, color = MaterialTheme.colorScheme.onSurface)
+        }
+        LazyRow(
+            state = listState,
+            modifier = Modifier.weight(1f),
+            contentPadding = contentPadding,
+            horizontalArrangement = horizontalArrangement,
+            content = content
+        )
+        IconButton(
+            onClick = {
+                scope.launch {
+                    val lastIndex = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                    listState.animateScrollToItem(
+                        (listState.firstVisibleItemIndex + 5).coerceAtMost(lastIndex)
+                    )
+                }
+            },
+            enabled = canScrollForward
+        ) {
+            Text("›", fontSize = 32.sp, color = MaterialTheme.colorScheme.onSurface)
+        }
+    }
+}
+
+@Composable
 fun MediaRail(title: String, items: List<MediaItem>, onClick: (MediaItem) -> Unit) {
     if (items.isEmpty()) return
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(title, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 24.dp))
-        LazyRow(
+        TvHorizontalLazyRow(
             contentPadding = PaddingValues(horizontal = 24.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {

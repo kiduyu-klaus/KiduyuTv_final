@@ -3,7 +3,6 @@ package com.kiduyuk.klausk.kiduyutv.desktop.ui
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -242,7 +241,7 @@ fun LiveTvScreen(services: DesktopServices, schedule: Boolean) {
             return@Column
         }
         val groups = remember(channels) { channels.map { it.group }.distinct().sorted() }
-        LazyRow(
+        TvHorizontalLazyRow(
             contentPadding = PaddingValues(16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {

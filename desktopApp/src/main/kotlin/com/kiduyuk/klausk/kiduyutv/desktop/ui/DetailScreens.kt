@@ -2,7 +2,6 @@ package com.kiduyuk.klausk.kiduyutv.desktop.ui
 
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -63,7 +62,13 @@ fun MediaDetailScreen(services: DesktopServices, id: Int, type: MediaType) {
             RemoteImage(tmdbImage(media.backdropPath, "original"), media.displayTitle, Modifier.fillMaxSize())
             Box(
                 Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(listOf(Color(0x22080808), Color(0xF4080808)))
+                    Brush.horizontalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.96f),
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.72f),
+                            Color.Transparent
+                        )
+                    )
                 )
             )
             ScreenHeader(media.displayTitle, { services.navigator.pop() })
@@ -107,7 +112,10 @@ fun MediaDetailScreen(services: DesktopServices, id: Int, type: MediaType) {
         }
         if (media.credits.cast.isNotEmpty()) {
             Text("Cast", fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(24.dp))
-            LazyRow(contentPadding = PaddingValues(horizontal = 24.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            TvHorizontalLazyRow(
+                contentPadding = PaddingValues(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
                 items(media.credits.cast.take(20), key = { it.id }) { cast ->
                     Column(
                         Modifier.width(130.dp).clickable {
@@ -171,7 +179,10 @@ fun SeasonEpisodesScreen(services: DesktopServices, route: DesktopRoute.SeasonEp
     }
     Column(Modifier.fillMaxSize()) {
         ScreenHeader("${route.title} — Episodes", { services.navigator.pop() })
-        LazyRow(contentPadding = PaddingValues(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        TvHorizontalLazyRow(
+            contentPadding = PaddingValues(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             items((1..route.totalSeasons).toList()) { number ->
                 FilterChip(selectedSeason == number, { selectedSeason = number }, { Text("Season $number") })
             }
