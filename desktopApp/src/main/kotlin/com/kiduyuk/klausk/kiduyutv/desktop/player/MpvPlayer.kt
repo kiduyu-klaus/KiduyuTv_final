@@ -53,6 +53,10 @@ class MpvPlayer(
             "--force-window=yes",
             "--vo=gpu",
             "--gpu-context=d3d11",
+            // Use the Windows Advanced Rasterization Platform when no hardware
+            // GPU is available; this keeps the embedded HWND video path usable
+            // with software rendering.
+            "--d3d11-warp=yes",
             "--keep-open=no",
             "--no-osc",
             "--no-osd-bar",
