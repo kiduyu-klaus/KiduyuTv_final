@@ -23,6 +23,7 @@ data class MpvState(
     val durationMs: Long = 0L,
     val bufferedMs: Long = 0L,
     val title: String = "",
+    val videoFill: Boolean = false,
     val error: String? = null
 )
 
@@ -64,6 +65,7 @@ class MpvPlayer(
     private var currentWindowId: Long? = null
     private var videoOutputAttemptIndex: Int = 0
     private var playStartedAtMs: Long = 0L
+    private var videoFill = false
 
     fun play(stream: StreamItem, startPositionMs: Long = 0L, windowId: Long? = null) {
         currentStream = stream
@@ -77,7 +79,11 @@ class MpvPlayer(
         stop()
         intentionallyStopped = false
         val outputProfile = videoOutputProfiles[videoOutputAttemptIndex]
-        mutableState.value = MpvState(running = true, title = stream.displayName)
+        mutableState.value = MpvState(
+            running = true,
+            title = stream.displayName,
+            videoFill = videoFill
+        )
         val pipe = "\\\\.\\pipe\\kiduyutv-${System.nanoTime()}"
         val args = mutableListOf(
             resolveExecutable().toString(),
@@ -90,6 +96,8 @@ class MpvPlayer(
             "--keep-open=no",
             "--no-osc",
             "--no-osd-bar",
+            "--keepaspect=yes",
+            "--panscan=${if (videoFill) 1.0 else 0.0}",
             // Prevent video frames or letterbox areas from carrying alpha into
             // the embedded Windows child surface.
             "--background=color",
@@ -237,6 +245,12 @@ class MpvPlayer(
     fun cycleSubtitle() = enqueue("cycle", "sid")
     fun cycleVideo() = enqueue("cycle", "vid")
     fun toggleFullscreen() = enqueue("cycle", "fullscreen")
+    fun toggleVideoFit() {
+        videoFill = !videoFill
+        mutableState.value = mutableState.value.copy(videoFill = videoFill)
+        enqueue("set_property", "keepaspect", true)
+        enqueue("set_property", "panscan", if (videoFill) 1.0 else 0.0)
+    }
     fun addSubtitle(pathOrUrl: String) = enqueue("sub-add", pathOrUrl, "select")
 
     fun stop() {

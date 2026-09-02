@@ -421,9 +421,12 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
             DesktopLog.logger.info("Opening direct subtitle dialog")
             showSubtitle = true
         },
-        onFullscreen = {
-            DesktopLog.logger.info("Direct player fullscreen toggle")
-            player.toggleFullscreen()
+        onResizeMode = {
+            DesktopLog.logger.info(
+                "Direct player resize mode={}",
+                if (playerState.videoFill) "fit" else "fill"
+            )
+            player.toggleVideoFit()
         },
         onPrevious = if (request.mediaType == MediaType.SERIES && (request.episode ?: 1) > 1) ({
             DesktopLog.logger.info("Navigating to previous episode episode={}", (request.episode ?: 1) - 1)
@@ -606,7 +609,7 @@ fun LivePlayerScreen(services: DesktopServices, route: DesktopRoute.LivePlayer) 
         onStreams = {},
         onTracks = player::cycleAudio,
         onSubtitle = player::cycleSubtitle,
-        onFullscreen = player::toggleFullscreen,
+        onResizeMode = player::toggleVideoFit,
         onPrevious = null,
         onNext = null
     )
@@ -631,7 +634,7 @@ private fun PlayerLayout(
     onStreams: () -> Unit,
     onTracks: () -> Unit,
     onSubtitle: () -> Unit,
-    onFullscreen: () -> Unit,
+    onResizeMode: () -> Unit,
     onPrevious: (() -> Unit)?,
     onNext: (() -> Unit)?
 ) {
@@ -724,7 +727,7 @@ private fun PlayerLayout(
                     Spacer(Modifier.width(8.dp))
                     TvActionButton("+30", onForward)
                     Spacer(Modifier.width(8.dp))
-                    TvActionButton("Fit / Full", onFullscreen)
+                    TvActionButton(if (state.videoFill) "Fill" else "Fit", onResizeMode)
                     Spacer(Modifier.width(8.dp))
                     TvActionButton("Subtitles", onSubtitle)
                     Spacer(Modifier.width(8.dp))
