@@ -1,6 +1,7 @@
 package com.kiduyuk.klausk.kiduyutv.desktop
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -14,6 +15,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.kiduyuk.klausk.kiduyutv.desktop.model.MediaItem
 import com.kiduyuk.klausk.kiduyutv.desktop.model.MediaType
@@ -60,7 +62,11 @@ private fun PrimaryShell(services: DesktopServices, destination: PrimaryDestinat
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("K", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.displaySmall)
+            Image(
+                painter = painterResource("kiduyutv.png"),
+                contentDescription = "KiduyuTV",
+                modifier = Modifier.size(64.dp)
+            )
             Spacer(Modifier.height(8.dp))
             PrimaryDestination.entries.forEach { item ->
                 NavigationRailItem(

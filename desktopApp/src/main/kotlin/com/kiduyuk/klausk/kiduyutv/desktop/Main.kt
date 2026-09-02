@@ -7,6 +7,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowState
@@ -20,6 +21,7 @@ fun main() {
     System.setProperty("compose.interop.blending", "true")
 
     application {
+        val appIcon = painterResource("kiduyutv.png")
         val services = remember {
             val settings = DesktopSettings()
             DesktopServices(
@@ -34,6 +36,7 @@ fun main() {
         }
         Window(
             title = "KiduyuTV",
+            icon = appIcon,
             state = WindowState(width = 1366.dp, height = 768.dp),
             onCloseRequest = ::exitApplication
         ) {
