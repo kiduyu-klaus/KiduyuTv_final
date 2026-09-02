@@ -81,6 +81,11 @@ class DesktopSettings {
         get() = prefs.get("mpv_path", "mpv.exe")
         set(value) = prefs.put("mpv_path", value.trim())
 
+    /** Cached working mpv GPU context; blank means probe the supported candidates. */
+    var mpvGpuContext: String
+        get() = prefs.get("mpv_gpu_context", "")
+        set(value) = prefs.put("mpv_gpu_context", value.trim())
+
     var preferredSubtitleLanguage: String
         get() = prefs.get("subtitle_language", "en")
         set(value) = prefs.put("subtitle_language", value.trim())
