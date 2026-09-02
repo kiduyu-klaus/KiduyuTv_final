@@ -50,14 +50,11 @@ class MpvPlayer(
             // Avoid incompatible user-level mpv settings.
             "--no-config",
             "--force-window=yes",
-            "--vo=gpu-next",
-            // ANGLE can fall back to a software (WARP) D3D11 device when no real GPU
-            // is present, instead of hard-failing on a direct hardware-device request.
-            "--gpu-context=angle",
+            "--vo=gpu",
+            "--gpu-context=dxinterop",
             "--keep-open=no",
             "--no-osc",
             "--no-osd-bar",
-            // Avoid DXVA native crashes with provider HLS streams on Windows.
             "--hwdec=no",
             "--cache=yes",
             "--cache-secs=30",
@@ -66,10 +63,7 @@ class MpvPlayer(
             "--title=${stream.displayName}",
             "--alang=eng,en",
             "--slang=${settings.preferredSubtitleLanguage},eng,en",
-            "--sub-auto=all",
-            // Keep a native mpv trace alongside the KiduyuTV application log.
-            "--log-file=${System.getenv("TEMP")}\\mpv-kiduyutv.log",
-            "--msg-level=all=debug"
+            "--sub-auto=all"
         )
         if (startPositionMs > 0L) args += "--start=${startPositionMs / 1000.0}"
         windowId?.let {
