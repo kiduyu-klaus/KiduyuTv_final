@@ -100,6 +100,22 @@ data class VideoItem(
 
 data class Videos(val results: List<VideoItem> = emptyList())
 
+data class MovieCollection(
+    val id: Int = 0,
+    val name: String = "",
+    @SerializedName("poster_path") val posterPath: String? = null,
+    @SerializedName("backdrop_path") val backdropPath: String? = null
+)
+
+data class CollectionDetails(
+    val id: Int = 0,
+    val name: String = "",
+    val overview: String = "",
+    @SerializedName("poster_path") val posterPath: String? = null,
+    @SerializedName("backdrop_path") val backdropPath: String? = null,
+    val parts: List<MediaItem> = emptyList()
+)
+
 data class MediaDetails(
     val id: Int = 0,
     val title: String? = null,
@@ -118,7 +134,8 @@ data class MediaDetails(
     val credits: Credits = Credits(),
     val images: Images = Images(),
     val videos: Videos = Videos(),
-    val recommendations: TmdbPage<MediaItem> = TmdbPage()
+    val recommendations: TmdbPage<MediaItem> = TmdbPage(),
+    @SerializedName("belongs_to_collection") val belongsToCollection: MovieCollection? = null
 ) {
     val displayTitle: String get() = title ?: name ?: "Untitled"
     val displayDate: String get() = releaseDate ?: firstAirDate ?: ""

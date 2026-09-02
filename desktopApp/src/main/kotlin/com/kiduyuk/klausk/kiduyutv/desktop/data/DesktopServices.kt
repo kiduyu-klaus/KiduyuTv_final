@@ -224,6 +224,9 @@ class TmdbClient(
         mapOf("append_to_response" to "credits,images,videos,recommendations")
     )
 
+    suspend fun collection(id: Int): CollectionDetails =
+        get("collection/$id")
+
     suspend fun season(tvId: Int, season: Int): SeasonDetails =
         get("tv/$tvId/season/$season")
 

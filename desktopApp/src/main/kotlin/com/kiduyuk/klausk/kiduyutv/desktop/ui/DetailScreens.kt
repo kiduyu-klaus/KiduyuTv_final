@@ -34,14 +34,34 @@ fun MediaDetailScreen(services: DesktopServices, id: Int, type: MediaType) {
     var details by remember(id, type) { mutableStateOf<MediaDetails?>(null) }
     var loading by remember(id, type) { mutableStateOf(true) }
     var error by remember(id, type) { mutableStateOf<String?>(null) }
+    var collection by remember(id, type) { mutableStateOf<CollectionDetails?>(null) }
     var favoriteRevision by remember { mutableIntStateOf(0) }
     var reload by remember { mutableIntStateOf(0) }
     LaunchedEffect(id, type, reload) {
         loading = true
-        runCatching { services.tmdb.details(id, type) }
-            .onSuccess { details = it; error = null }
-            .onFailure { error = it.message }
-        loading = false
+        collection = null
+        try {
+            val loaded = services.tmdb.details(id, type)
+            details = loaded
+            error = null
+            if (type == MediaType.MOVIE) {
+                loaded.belongsToCollection?.id?.let { collectionId ->
+                    collection = runCatching { services.tmdb.collection(collectionId) }
+                        .onFailure { error ->
+                            com.kiduyuk.klausk.kiduyutv.desktop.data.DesktopLog.logger.warn(
+                                "Unable to load movie collection id={}",
+                                collectionId,
+                                error
+                            )
+                        }
+                        .getOrNull()
+                }
+            }
+        } catch (loadError: Exception) {
+            error = loadError.message
+        } finally {
+            loading = false
+        }
     }
     if (loading) return LoadingView("Loading details…")
     error?.let { return ErrorView(it) { reload++ } }
@@ -133,6 +153,13 @@ fun MediaDetailScreen(services: DesktopServices, id: Int, type: MediaType) {
                         Text(cast.character, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
+            }
+        }
+        collection?.let { collectionDetails ->
+            val collectionParts = collectionDetails.parts.map { it.copy(mediaType = "movie") }
+            if (collectionParts.isNotEmpty()) {
+                Spacer(Modifier.height(28.dp))
+                MediaRail(collectionDetails.name.uppercase(), collectionParts, services::openMedia)
             }
         }
         Spacer(Modifier.height(28.dp))
