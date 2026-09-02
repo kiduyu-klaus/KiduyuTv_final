@@ -24,6 +24,7 @@ import com.kiduyuk.klausk.kiduyutv.desktop.DesktopServices
 import com.kiduyuk.klausk.kiduyutv.desktop.model.*
 import com.kiduyuk.klausk.kiduyutv.desktop.navigation.DesktopRoute
 import com.kiduyuk.klausk.kiduyutv.desktop.openMedia
+import kotlinx.coroutines.CancellationException
 import java.awt.Desktop
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
@@ -469,12 +470,16 @@ fun TraktProfileScreen(services: DesktopServices) {
         }
         loading = true
         error = null
-        runCatching {
+        try {
             profile = services.trakt.profile()
-            services.trakt.shelf(selectedShelf)
-        }.onSuccess { media = it }
-            .onFailure { error = it.message ?: "Unable to load Trakt data" }
-        loading = false
+            media = services.trakt.shelf(selectedShelf)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            error = failure.message ?: "Unable to load Trakt data"
+        } finally {
+            loading = false
+        }
     }
 
     LaunchedEffect(authAttempt) {
@@ -482,20 +487,21 @@ fun TraktProfileScreen(services: DesktopServices) {
         loading = true
         error = null
         deviceCode = null
-        runCatching {
+        try {
             val code = services.trakt.requestDeviceCode()
             deviceCode = code
             runCatching { Desktop.getDesktop().browse(URI(code.verificationUrl)) }
-            services.trakt.awaitDeviceAuthorization(code)
-        }.onSuccess {
-            profile = it
+            profile = services.trakt.awaitDeviceAuthorization(code)
             deviceCode = null
             authRevision++
-        }.onFailure {
-            error = it.message ?: "Trakt authentication failed"
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            error = failure.message ?: "Trakt authentication failed"
             deviceCode = null
+        } finally {
+            loading = false
         }
-        loading = false
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -592,6 +598,27 @@ fun TraktProfileScreen(services: DesktopServices) {
                 Spacer(Modifier.height(18.dp))
                 MediaRail(selectedShelf.name.lowercase().replaceFirstChar(Char::uppercase), media, services::openMedia)
             }
+        }
+
+        if (services.trakt.isAuthenticated && loading && deviceCode == null) {
+            AlertDialog(
+                onDismissRequest = {},
+                title = {
+                    Text(
+                        "Loading ${selectedShelf.name.lowercase().replaceFirstChar(Char::uppercase)}"
+                    )
+                },
+                text = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        CircularProgressIndicator(Modifier.size(32.dp), strokeWidth = 3.dp)
+                        Text("Fetching your Trakt data…")
+                    }
+                },
+                confirmButton = {}
+            )
         }
     }
 }
