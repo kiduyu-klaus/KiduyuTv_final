@@ -39,22 +39,63 @@ class MpvPlayer(
     private var processOutputJob: Job? = null
     private var intentionallyStopped = false
 
+    // Ordered by preference: try the modern backend first, fall back toward
+    // legacy ones that are more compatible with old/weak WDDM 1.x drivers.
+    // A device that crashes shortly after start on a candidate is assumed
+    // incompatible with that gpu-context and we retry with the next one.
+    private val gpuContextCandidates = listOf("d3d11", "dxinterop", "angle")
+
+    // Access violation / other native-crash-style exit codes we treat as
+    // "this gpu-context doesn't work here" rather than a stream problem.
+    private val crashExitCodes = setOf(-1073741819, -1073740791) // 0xC0000005, 0xC0000409
+
+    private var currentStream: StreamItem? = null
+    private var currentStartPositionMs: Long = 0L
+    private var currentWindowId: Long? = null
+    private var gpuContextAttemptIndex: Int = 0
+    private var playStartedAtMs: Long = 0L
+
     fun play(stream: StreamItem, startPositionMs: Long = 0L, windowId: Long? = null) {
+        currentStream = stream
+        currentStartPositionMs = startPositionMs
+        currentWindowId = windowId
+        gpuContextAttemptIndex = candidateStartIndex()
+        startProcess(stream, startPositionMs, windowId)
+    }
+
+    /**
+     * Start from the cached working gpu-context for this machine if we have
+     * one, otherwise start probing from the top of the candidate list.
+     */
+    private fun candidateStartIndex(): Int {
+        val cached = settings.mpvGpuContext.trim()
+        if (cached.isNotBlank()) {
+            val idx = gpuContextCandidates.indexOf(cached)
+            if (idx >= 0) return idx
+        }
+        return 0
+    }
+
+    private fun startProcess(stream: StreamItem, startPositionMs: Long, windowId: Long?) {
         stop()
         intentionallyStopped = false
+        val gpuContext = gpuContextCandidates[gpuContextAttemptIndex]
         mutableState.value = MpvState(running = true, title = stream.displayName)
         val pipe = "\\\\.\\pipe\\kiduyutv-${System.nanoTime()}"
         val args = mutableListOf(
             resolveExecutable().toString(),
             "--input-ipc-server=$pipe",
-            // Avoid incompatible user-level mpv settings.
+            // Avoid incompatible user-level mpv settings and select the GPU
+            // context explicitly; which one is chosen may change between
+            // attempts if the current machine can't handle the preferred one.
             "--no-config",
             "--force-window=yes",
             "--vo=gpu",
-            "--gpu-context=dxinterop",
+            "--gpu-context=$gpuContext",
             "--keep-open=no",
             "--no-osc",
             "--no-osd-bar",
+            // Avoid hardware-decoder/DXVA native crashes with provider HLS streams on Windows.
             "--hwdec=no",
             "--cache=yes",
             "--cache-secs=30",
@@ -67,7 +108,6 @@ class MpvPlayer(
         )
         if (startPositionMs > 0L) args += "--start=${startPositionMs / 1000.0}"
         windowId?.let {
-            // On Windows mpv expects the native HWND supplied by the embedded AWT Canvas.
             args += "--wid=$it"
             args += "--no-border"
         }
@@ -101,6 +141,7 @@ class MpvPlayer(
                 .redirectErrorStream(true)
                 .start()
             process = startedProcess
+            playStartedAtMs = 0L
             processOutputJob = scope.launch(Dispatchers.IO) {
                 startedProcess.inputStream.bufferedReader().useLines { lines ->
                     lines.forEach { line ->
@@ -116,8 +157,46 @@ class MpvPlayer(
             connectIpc(pipe, startedProcess)
             processJob = scope.launch(Dispatchers.IO) {
                 val exitCode = startedProcess.waitFor()
-                val previous = mutableState.value
-                if (process === startedProcess) {
+                com.kiduyuk.klausk.kiduyutv.desktop.data.DesktopLog.logger.info(
+                    "mpv process exited code={} intentionallyStopped={} gpuContext={}",
+                    exitCode,
+                    intentionallyStopped,
+                    gpuContext
+                )
+                if (process !== startedProcess) return@launch
+
+                val elapsedSincePlaying = playStartedAtMs.takeIf { it > 0L }
+                    ?.let { System.currentTimeMillis() - it }
+                val looksLikeGpuContextCrash = !intentionallyStopped &&
+                    exitCode in crashExitCodes &&
+                    (elapsedSincePlaying == null || elapsedSincePlaying < 5_000L) &&
+                    gpuContextAttemptIndex < gpuContextCandidates.lastIndex
+
+                if (looksLikeGpuContextCrash) {
+                    com.kiduyuk.klausk.kiduyutv.desktop.data.DesktopLog.logger.warn(
+                        "gpu-context={} crashed early (code={}), retrying with next candidate",
+                        gpuContext,
+                        exitCode
+                    )
+                    gpuContextAttemptIndex += 1
+                    val stream = currentStream
+                    if (stream != null) {
+                        startProcess(stream, currentStartPositionMs, currentWindowId)
+                    }
+                } else {
+                    if (!intentionallyStopped && exitCode == 0) {
+                        // Survived to a clean/normal exit on this gpu-context:
+                        // remember it so future launches skip straight to it.
+                        settings.mpvGpuContext = gpuContext
+                    } else if (!intentionallyStopped && exitCode !in crashExitCodes) {
+                        // Non-crash nonzero exit (e.g. stream error) on a
+                        // gpu-context we've already seen play frames under
+                        // is still evidence it's usable; remember it too.
+                        if (elapsedSincePlaying != null) {
+                            settings.mpvGpuContext = gpuContext
+                        }
+                    }
+                    val previous = mutableState.value
                     mutableState.value = previous.copy(
                         running = false,
                         playing = false,
@@ -126,11 +205,6 @@ class MpvPlayer(
                         } else previous.error
                     )
                 }
-                com.kiduyuk.klausk.kiduyutv.desktop.data.DesktopLog.logger.info(
-                    "mpv process exited code={} intentionallyStopped={}",
-                    exitCode,
-                    intentionallyStopped
-                )
             }
         } catch (error: Exception) {
             mutableState.value = MpvState(error = "Could not start mpv: ${error.message}")
@@ -192,13 +266,27 @@ class MpvPlayer(
                 ).forEach { (id, property) ->
                     ipc.writeLine(gson.toJson(mapOf("command" to listOf("observe_property", id, property))))
                 }
-                while (isActive && startedProcess.isAlive) {
-                    while (true) {
-                        val command = commands.poll() ?: break
-                        ipc.writeLine(command)
+
+                val writer = launch(Dispatchers.IO) {
+                    while (isActive && startedProcess.isAlive) {
+                        val command = try {
+                            commands.poll(200, java.util.concurrent.TimeUnit.MILLISECONDS)
+                        } catch (e: InterruptedException) {
+                            null
+                        }
+                        if (command != null) {
+                            val sent = runCatching { ipc.writeLine(command) }
+                            if (sent.isFailure) return@launch
+                        }
                     }
-                    val line = runCatching { ipc.readLine() }.getOrNull() ?: break
-                    handleEvent(line)
+                }
+                try {
+                    while (isActive && startedProcess.isAlive) {
+                        val line = runCatching { ipc.readLine() }.getOrNull() ?: break
+                        handleEvent(line)
+                    }
+                } finally {
+                    writer.cancel()
                 }
             }
         }
@@ -219,6 +307,7 @@ class MpvPlayer(
             }
             "playback-restart" -> {
                 mutableState.value = current.copy(playing = current.running, error = null)
+                if (current.running) playStartedAtMs = System.currentTimeMillis()
                 return
             }
             "end-file" -> {
@@ -240,9 +329,6 @@ class MpvPlayer(
                 durationMs = data?.takeUnless { it.isJsonNull }?.asDouble?.times(1000)?.toLong() ?: 0L
             )
             "pause" -> current.copy(
-                // An initial pause=false property arrives before the first video frame.
-                // Only a pause=true transition should change readiness here;
-                // playback-restart/time-pos marks the surface ready to reveal.
                 playing = if (data?.takeUnless { it.isJsonNull }?.asBoolean == true) {
                     false
                 } else {
@@ -280,8 +366,6 @@ class MpvPlayer(
             val bundled = Paths.get(resources).resolve("mpv").resolve("mpv.exe")
             if (Files.isRegularFile(bundled)) return bundled
         }
-        // Keep an explicitly configured command/path as the final fallback. The default
-        // "mpv.exe" setting must not bypass the packaged executable above.
         return configured.takeIf { it.isNotBlank() }?.let(Paths::get) ?: Paths.get("mpv.exe")
     }
 
