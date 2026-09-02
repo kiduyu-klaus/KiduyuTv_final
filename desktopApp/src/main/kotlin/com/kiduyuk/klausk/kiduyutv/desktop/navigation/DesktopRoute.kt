@@ -5,15 +5,15 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import com.kiduyuk.klausk.kiduyutv.desktop.model.MediaType
 import com.kiduyuk.klausk.kiduyutv.desktop.model.PlayRequest
 
-enum class PrimaryDestination(val label: String, val shortLabel: String) {
-    HOME("Home", "H"),
-    MOVIES("Movies", "M"),
-    TV_SHOWS("TV Shows", "TV"),
-    MY_LIST("My List", "+"),
-    LIVE_TV("Live TV", "LIVE"),
-    SCHEDULE("Schedule", "EPG"),
-    SEARCH("Search", "?"),
-    SETTINGS("Settings", "⚙")
+enum class PrimaryDestination(val label: String) {
+    HOME("Home"),
+    MOVIES("Movies"),
+    TV_SHOWS("TV Shows"),
+    MY_LIST("My List"),
+    LIVE_TV("Live TV"),
+    SCHEDULE("Schedule"),
+    SEARCH("Search"),
+    SETTINGS("Settings")
 }
 
 sealed interface DesktopRoute {

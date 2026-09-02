@@ -5,6 +5,15 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmarks
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LiveTv
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -73,7 +82,21 @@ private fun PrimaryShell(services: DesktopServices, destination: PrimaryDestinat
                 NavigationRailItem(
                     selected = destination == item,
                     onClick = { services.navigator.primary(item) },
-                    icon = { Text(item.shortLabel) },
+                    icon = {
+                        Icon(
+                            imageVector = when (item) {
+                                PrimaryDestination.HOME -> Icons.Filled.Home
+                                PrimaryDestination.MOVIES -> Icons.Filled.Movie
+                                PrimaryDestination.TV_SHOWS -> Icons.Filled.Tv
+                                PrimaryDestination.MY_LIST -> Icons.Filled.Bookmarks
+                                PrimaryDestination.LIVE_TV -> Icons.Filled.LiveTv
+                                PrimaryDestination.SCHEDULE -> Icons.Filled.CalendarMonth
+                                PrimaryDestination.SEARCH -> Icons.Filled.Search
+                                PrimaryDestination.SETTINGS -> Icons.Filled.Settings
+                            },
+                            contentDescription = item.label
+                        )
+                    },
                     label = { Text(item.label) },
                     alwaysShowLabel = true,
                     colors = NavigationRailItemDefaults.colors(

@@ -15,8 +15,25 @@ import okhttp3.Request
 import java.io.File
 import java.io.IOException
 import java.net.URI
+import java.util.Properties
 import java.util.concurrent.TimeUnit
 import java.util.prefs.Preferences
+
+private object DesktopBuildDefaults {
+    private val properties: Properties by lazy {
+        Properties().apply {
+            DesktopBuildDefaults::class.java.classLoader
+                .getResourceAsStream("kiduyutv-defaults.properties")
+                ?.use { input -> load(input) }
+        }
+    }
+
+    val tmdbBearerToken: String
+        get() = properties.getProperty("tmdbBearerToken", "").trim()
+
+    val streamApiToken: String
+        get() = properties.getProperty("streamApiToken", "").trim()
+}
 
 class DesktopSettings {
     private val prefs = Preferences.userRoot().node("com/kiduyutv/desktop")
@@ -24,11 +41,13 @@ class DesktopSettings {
     var tmdbBearerToken: String
         get() = prefs.get("tmdb_bearer_token", "")
             .ifBlank { System.getenv("KIDUYUTV_TMDB_TOKEN").orEmpty() }
+            .ifBlank { DesktopBuildDefaults.tmdbBearerToken }
         set(value) = prefs.put("tmdb_bearer_token", value.trim())
 
     var streamApiToken: String
         get() = prefs.get("stream_api_token", "")
             .ifBlank { System.getenv("KIDUYUTV_STREAM_API_TOKEN").orEmpty() }
+            .ifBlank { DesktopBuildDefaults.streamApiToken }
         set(value) = prefs.put("stream_api_token", value.trim())
 
     var providersBaseUrl: String

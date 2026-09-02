@@ -16,6 +16,32 @@ def mpvDownloadUrl = "https://github.com/mpv-player/mpv/releases/download/git-re
 def mpvSha256 = 'bb9e9687100f2a014811a64a891afefa412e0bce28baf409d9a087d8c35485e0'
 def mpvArchive = layout.buildDirectory.file("downloads/mpv/${mpvArchiveName}")
 def appResourcesRoot = layout.buildDirectory.dir('generated/appResources')
+def desktopDefaultsDir = layout.buildDirectory.dir('generated/desktopDefaults')
+
+tasks.register('generateDesktopDefaults') {
+    group = 'build setup'
+    description = 'Generates packaged desktop defaults from CI environment variables.'
+    outputs.dir(desktopDefaultsDir)
+    outputs.upToDateWhen { false }
+    outputs.cacheIf { false }
+
+    doLast {
+        File outputFile = desktopDefaultsDir.get().file('kiduyutv-defaults.properties').asFile
+        outputFile.parentFile.mkdirs()
+        Properties defaults = new Properties()
+        defaults.setProperty(
+            'streamApiToken',
+            System.getenv('KIDUYUTV_STREAM_API_TOKEN') ?: ''
+        )
+        defaults.setProperty(
+            'tmdbBearerToken',
+            System.getenv('KIDUYUTV_TMDB_TOKEN') ?: ''
+        )
+        outputFile.withOutputStream { output ->
+            defaults.store(output, 'Generated desktop defaults')
+        }
+    }
+}
 
 tasks.register('prepareBundledMpv') {
     group = 'distribution'
@@ -82,6 +108,7 @@ kotlin {
 dependencies {
     implementation compose.desktop.currentOs
     implementation compose.material3
+    implementation compose.materialIconsExtended
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.8.1'
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     implementation 'com.google.code.gson:gson:2.10.1'
@@ -103,11 +130,13 @@ sourceSets {
     main {
         resources {
             srcDir 'src/main/resources'
+            srcDir desktopDefaultsDir
         }
     }
 }
 
 tasks.named('processResources') {
+    dependsOn(tasks.named('generateDesktopDefaults'))
     // The CI workflow may create logback.xml while the source set also exposes
     // the same resource through Compose processing.
     duplicatesStrategy = org.gradle.api.file.DuplicatesStrategy.EXCLUDE
