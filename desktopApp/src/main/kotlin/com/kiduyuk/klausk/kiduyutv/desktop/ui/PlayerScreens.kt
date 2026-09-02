@@ -24,8 +24,10 @@ import com.kiduyuk.klausk.kiduyutv.desktop.player.MpvPlayer
 import com.kiduyuk.klausk.kiduyutv.desktop.player.StreamRanker
 import com.kiduyuk.klausk.kiduyutv.desktop.webview.StreamProviderManager
 import com.sun.jna.Native
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.awt.Canvas
 import java.awt.Dimension
@@ -107,6 +109,7 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
     var activeStream by remember(request) { mutableStateOf<StreamItem?>(null) }
     var loading by remember(request) { mutableStateOf(true) }
     var fetchError by remember(request) { mutableStateOf<String?>(null) }
+    var fetchStatus by remember(request) { mutableStateOf("Fetching enabled providers…") }
     var attempt by remember(request) { mutableIntStateOf(0) }
     var showNoStreams by remember(request) { mutableStateOf(false) }
     var showStreams by remember { mutableStateOf(false) }
@@ -124,15 +127,27 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
         if (videoWindowId == null) return@LaunchedEffect
         loading = true
         fetchError = null
+        fetchStatus = "Fetching enabled providers…"
         showNoStreams = false
         var lastFailure: Throwable? = null
         var found = emptyList<StreamItem>()
-        for (retry in 0 until 3) {
-            val result = runCatching { services.providers.streams(request, request.provider) }
-            result.onSuccess { found = it }.onFailure { lastFailure = it }
-            if (found.isNotEmpty()) break
-            if (retry < 2) delay((retry + 1) * 1_000L)
+        val result = runCatching {
+            services.providers.streams(
+                request = request,
+                provider = request.provider,
+                onProviderProgress = { index, total, providerName ->
+                    withContext(Dispatchers.Main.immediate) {
+                        fetchStatus = "Provider $index/$total enabled providers: $providerName\nfetching streams"
+                    }
+                },
+                onProviderRetry = { index, total, providerName ->
+                    withContext(Dispatchers.Main.immediate) {
+                        fetchStatus = "Provider $index/$total enabled providers: $providerName\nretrying streams"
+                    }
+                }
+            )
         }
+        result.onSuccess { found = it }.onFailure { lastFailure = it }
         streams = StreamRanker.sorted(found)
         if (streams.isEmpty()) {
             fetchError = lastFailure?.message ?: "No streams were found"
@@ -185,7 +200,7 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
         state = playerState,
         stream = activeStream,
         loading = playerLoading,
-        loadingMessage = if (activeStream == null) "Loading streams…" else "Buffering…",
+        loadingMessage = if (activeStream == null) fetchStatus else "Buffering…",
         status = playerStatus,
         videoObscured =
             dialogVisible ||

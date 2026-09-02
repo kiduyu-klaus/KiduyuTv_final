@@ -233,6 +233,8 @@ class TmdbClient(
         if (type == MediaType.MOVIE) "movie" else "tv"
 }
 
+class ProvidersHttpException(val statusCode: Int) : IOException("Providers API HTTP $statusCode")
+
 class ProvidersClient(
     private val settings: DesktopSettings,
     private val client: OkHttpClient = DesktopHttp.client,
@@ -240,25 +242,72 @@ class ProvidersClient(
 ) {
     suspend fun enabledProviders(): List<String> = withContext(Dispatchers.IO) {
         val request = Request.Builder()
-            .url("${settings.providersBaseUrl}/api/providers")
+            .url("${settings.providersBaseUrl.trimEnd('/')}/api/providers")
             .header("Accept", "application/json")
             .header("User-Agent", "KiduyuTV/1.0 (Windows)")
             .build()
         client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) throw IOException("Providers HTTP ${response.code}")
-            gson.fromJson(response.body?.string().orEmpty(), ProvidersResponse::class.java)
-                .providers.filter { it.enabled }.map { it.name }
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) throw ProvidersHttpException(response.code)
+            val parsed = gson.fromJson(body, ProvidersResponse::class.java)
+            if (!parsed.success) throw IOException("Providers API returned success=false")
+            parsed.providers
+                .filter { it.enabled }
+                .map { it.name.trim().lowercase() }
+                .filter { it.isNotBlank() }
+                .distinct()
         }
     }
 
-    suspend fun streams(request: PlayRequest, provider: String? = null): List<StreamItem> =
+    suspend fun streams(
+        request: PlayRequest,
+        provider: String? = null,
+        onProviderProgress: suspend (index: Int, total: Int, providerName: String) -> Unit = { _, _, _ -> },
+        onProviderRetry: suspend (index: Int, total: Int, providerName: String) -> Unit = { _, _, _ -> }
+    ): List<StreamItem> = withContext(Dispatchers.IO) {
+        val providerNames = if (provider.isNullOrBlank()) {
+            enabledProviders()
+        } else {
+            listOf(provider.trim().lowercase())
+        }
+        if (providerNames.isEmpty()) return@withContext emptyList()
+
+        val allStreams = mutableListOf<StreamItem>()
+        providerNames.forEachIndexed { index, providerName ->
+            onProviderProgress(index + 1, providerNames.size, providerName)
+            var streams = emptyList<StreamItem>()
+            var lastError: Throwable? = null
+            var attempt = 0
+            while (attempt < 2 && streams.isEmpty()) {
+                try {
+                    streams = fetchProviderStreams(request, providerName)
+                    lastError = null
+                } catch (error: Exception) {
+                    if (error is kotlinx.coroutines.CancellationException) throw error
+                    lastError = error
+                }
+                if (streams.isEmpty() && attempt == 0) {
+                    onProviderRetry(index + 1, providerNames.size, providerName)
+                }
+                attempt++
+            }
+            if (lastError != null) {
+                // Continue so one unavailable provider cannot hide other results.
+                return@forEachIndexed
+            }
+            allStreams += streams
+        }
+        allStreams.distinctBy { "${it.provider.lowercase()}|${it.url}" }
+    }
+
+    private suspend fun fetchProviderStreams(request: PlayRequest, provider: String): List<StreamItem> =
         withContext(Dispatchers.IO) {
             val token = settings.streamApiToken
             if (token.isBlank()) throw IllegalStateException("Add the stream API token in Settings")
             val base = settings.providersBaseUrl.toHttpUrl().newBuilder()
                 .addPathSegment("api")
                 .addPathSegment("streams")
-                .apply { provider?.takeIf { it.isNotBlank() }?.let(::addPathSegment) }
+                .addPathSegment(provider)
                 .addPathSegment(request.mediaType.apiValue)
                 .addPathSegment(request.tmdbId.toString())
                 .addQueryParameter("token", token)
@@ -274,8 +323,9 @@ class ProvidersClient(
                 .header("User-Agent", "KiduyuTV/1.0 (Windows)")
                 .build()
             client.newCall(call).execute().use { response ->
-                if (!response.isSuccessful) throw IOException("Streams HTTP ${response.code}")
-                gson.fromJson(response.body?.string().orEmpty(), StreamResponse::class.java)
+                val body = response.body?.string().orEmpty()
+                if (!response.isSuccessful) throw ProvidersHttpException(response.code)
+                gson.fromJson(body, StreamResponse::class.java)
                     .streams.filter { it.url.isHttpUrl() }
             }
         }
