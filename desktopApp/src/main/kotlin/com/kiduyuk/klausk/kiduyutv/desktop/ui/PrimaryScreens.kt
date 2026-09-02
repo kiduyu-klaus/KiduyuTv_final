@@ -286,6 +286,8 @@ fun LiveTvScreen(services: DesktopServices, schedule: Boolean) {
 fun SettingsScreen(services: DesktopServices) {
     var tmdbToken by remember { mutableStateOf(services.settings.tmdbBearerToken) }
     var streamToken by remember { mutableStateOf(services.settings.streamApiToken) }
+    var traktClientId by remember { mutableStateOf(services.settings.traktClientId) }
+    var traktClientSecret by remember { mutableStateOf(services.settings.traktClientSecret) }
     var providersUrl by remember { mutableStateOf(services.settings.providersBaseUrl) }
     var playlistUrl by remember { mutableStateOf(services.settings.playlistUrl) }
     var epgUrl by remember { mutableStateOf(services.settings.epgUrl) }
@@ -293,6 +295,8 @@ fun SettingsScreen(services: DesktopServices) {
     var subtitleLanguage by remember { mutableStateOf(services.settings.preferredSubtitleLanguage) }
     var directStream by remember { mutableStateOf(services.settings.directStreamEnabled) }
     var darkTheme by remember { mutableStateOf(services.settings.darkTheme) }
+    var traktRevision by remember { mutableIntStateOf(0) }
+    val traktConnected = remember(traktRevision) { services.trakt.isAuthenticated }
     var providers by remember { mutableStateOf<List<String>>(emptyList()) }
     var message by remember { mutableStateOf<String?>(null) }
     var updateInfo by remember { mutableStateOf<DesktopUpdateInfo?>(null) }
@@ -350,6 +354,36 @@ fun SettingsScreen(services: DesktopServices) {
             Text("Live TV", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             SettingsField("M3U playlist URL", playlistUrl, { playlistUrl = it })
             SettingsField("XMLTV EPG URL", epgUrl, { epgUrl = it })
+            Text("Trakt.tv", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            SettingsField("Trakt client ID", traktClientId, { traktClientId = it }, secret = true)
+            SettingsField("Trakt client secret", traktClientSecret, { traktClientSecret = it }, secret = true)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text(if (traktConnected) "Connected" else "Not connected")
+                    Text(
+                        if (traktConnected) {
+                            services.settings.traktUsername.ifBlank { "Open your profile to refresh account details" }
+                        } else {
+                            "Sync collection, watchlist, recommendations, and playback activity"
+                        },
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (traktConnected) {
+                    TvActionButton("Disconnect", {
+                        services.trakt.signOut()
+                        traktRevision++
+                    })
+                }
+                TvActionButton(
+                    if (traktConnected) "View profile" else "Connect",
+                    {
+                        services.settings.traktClientId = traktClientId
+                        services.settings.traktClientSecret = traktClientSecret
+                        services.navigator.push(DesktopRoute.TraktProfile)
+                    }
+                )
+            }
             Text("Updates", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TvActionButton(
@@ -438,6 +472,8 @@ fun SettingsScreen(services: DesktopServices) {
             TvActionButton("Save settings", {
                 services.settings.tmdbBearerToken = tmdbToken
                 services.settings.streamApiToken = streamToken
+                services.settings.traktClientId = traktClientId
+                services.settings.traktClientSecret = traktClientSecret
                 services.settings.providersBaseUrl = providersUrl
                 services.settings.playlistUrl = playlistUrl
                 services.settings.epgUrl = epgUrl

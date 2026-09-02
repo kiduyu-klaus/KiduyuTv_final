@@ -355,6 +355,8 @@ jobs:
         env:
           KIDUYUTV_STREAM_API_TOKEN: ${{ secrets.STREAM_API_TOKEN }}
           KIDUYUTV_TMDB_TOKEN: ${{ secrets.TMDB_BEARER_TOKEN }}
+          KIDUYUTV_TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+          KIDUYUTV_TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
         run: |
           ./gradlew :desktopApp:packageExe \
             --build-cache \
@@ -367,6 +369,8 @@ jobs:
         env:
           KIDUYUTV_STREAM_API_TOKEN: ${{ secrets.STREAM_API_TOKEN }}
           KIDUYUTV_TMDB_TOKEN: ${{ secrets.TMDB_BEARER_TOKEN }}
+          KIDUYUTV_TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+          KIDUYUTV_TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
         run: |
           ./gradlew :desktopApp:packageMsi \
             --build-cache \

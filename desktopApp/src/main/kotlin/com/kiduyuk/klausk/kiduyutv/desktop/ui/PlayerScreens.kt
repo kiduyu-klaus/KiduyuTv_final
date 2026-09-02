@@ -267,6 +267,7 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
     var showTracks by remember { mutableStateOf(false) }
     var showSubtitle by remember { mutableStateOf(false) }
     var subtitleUrl by remember { mutableStateOf("") }
+    var completionReported by remember(request) { mutableStateOf(false) }
     val resume = remember(request) { services.library.progress(request) }
 
     fun start(stream: StreamItem, positionMs: Long) {
@@ -308,7 +309,23 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
             delay(15_000L)
             if (playerState.positionMs > 0L) {
                 services.library.saveProgress(request.toProgress(playerState.positionMs, playerState.durationMs))
+                services.trakt.scrobble(
+                    request = request,
+                    positionMs = playerState.positionMs,
+                    durationMs = playerState.durationMs,
+                    action = "start"
+                )
             }
+        }
+    }
+    LaunchedEffect(playerState.playing, playerState.durationMs, activeStream) {
+        if (activeStream != null && playerState.durationMs > 0L) {
+            services.trakt.scrobble(
+                request = request,
+                positionMs = playerState.positionMs,
+                durationMs = playerState.durationMs,
+                action = if (playerState.playing) "start" else "pause"
+            )
         }
     }
     LaunchedEffect(playerState.running, playerState.playing, playerState.videoOutputReady, playerState.error) {
@@ -323,13 +340,16 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
         )
     }
     LaunchedEffect(playerState.running, playerState.durationMs, playerState.positionMs) {
-        if (!playerState.running && playerState.durationMs > 0L &&
-            playerState.positionMs >= playerState.durationMs * 0.92 &&
-            request.mediaType == MediaType.SERIES
+        if (!completionReported && !playerState.running && playerState.durationMs > 0L &&
+            playerState.positionMs >= playerState.durationMs * 0.92
         ) {
-            val next = request.copy(episode = (request.episode ?: 1) + 1, provider = request.provider)
-            DesktopLog.logger.info("Auto-advancing to next episode season={} episode={}", next.season, next.episode)
-            services.navigator.push(DesktopRoute.Player(next))
+            completionReported = true
+            services.trakt.scrobble(request, playerState.positionMs, playerState.durationMs, "stop")
+            if (request.mediaType == MediaType.SERIES) {
+                val next = request.copy(episode = (request.episode ?: 1) + 1, provider = request.provider)
+                DesktopLog.logger.info("Auto-advancing to next episode season={} episode={}", next.season, next.episode)
+                services.navigator.push(DesktopRoute.Player(next))
+            }
         }
     }
     DisposableEffect(player, streamLoader) {

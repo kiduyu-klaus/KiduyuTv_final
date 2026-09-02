@@ -25,6 +25,8 @@ import com.kiduyuk.klausk.kiduyutv.desktop.model.*
 import com.kiduyuk.klausk.kiduyutv.desktop.navigation.DesktopRoute
 import com.kiduyuk.klausk.kiduyutv.desktop.openMedia
 import java.awt.Desktop
+import java.awt.Toolkit
+import java.awt.datatransfer.StringSelection
 import java.net.URI
 
 @Composable
@@ -422,26 +424,147 @@ fun ImageSliderScreen(services: DesktopServices, route: DesktopRoute.ImageSlider
 
 @Composable
 fun TraktProfileScreen(services: DesktopServices) {
-    val history = remember { services.library.history() }
-    val favorites = remember { services.library.favorites() }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        ScreenHeader("Trakt Profile", { services.navigator.pop() }, actions = {
-            TvActionButton("Open Trakt", { runCatching { Desktop.getDesktop().browse(URI("https://trakt.tv")) } })
-        })
-        Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("Desktop profile", fontSize = 28.sp, fontWeight = FontWeight.Bold)
-            Text("Local collection and watch activity are available now. Connect Trakt device authentication here when desktop OAuth credentials are configured.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+    var selectedShelf by remember { mutableStateOf(TraktShelfType.COLLECTION) }
+    var profile by remember { mutableStateOf<TraktProfile?>(null) }
+    var media by remember { mutableStateOf<List<MediaItem>>(emptyList()) }
+    var loading by remember { mutableStateOf(services.trakt.isAuthenticated) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var deviceCode by remember { mutableStateOf<TraktDeviceCode?>(null) }
+    var authAttempt by remember { mutableIntStateOf(0) }
+    var authRevision by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(selectedShelf, authRevision) {
+        if (!services.trakt.isAuthenticated) {
+            profile = null
+            media = emptyList()
+            loading = false
+            return@LaunchedEffect
         }
-        MediaRail("Collection", favorites, services::openMedia)
-        Spacer(Modifier.height(28.dp))
-        MediaRail("Recently Watched", history.map {
-            MediaItem(
-                id = it.tmdbId,
-                title = it.title.takeIf { _ -> it.mediaType == MediaType.MOVIE },
-                name = it.title.takeIf { _ -> it.mediaType == MediaType.SERIES },
-                posterPath = it.posterPath,
-                mediaType = if (it.mediaType == MediaType.MOVIE) "movie" else "tv"
-            )
-        }, services::openMedia)
+        loading = true
+        error = null
+        runCatching {
+            profile = services.trakt.profile()
+            services.trakt.shelf(selectedShelf)
+        }.onSuccess { media = it }
+            .onFailure { error = it.message ?: "Unable to load Trakt data" }
+        loading = false
+    }
+
+    LaunchedEffect(authAttempt) {
+        if (authAttempt == 0) return@LaunchedEffect
+        loading = true
+        error = null
+        deviceCode = null
+        runCatching {
+            val code = services.trakt.requestDeviceCode()
+            deviceCode = code
+            runCatching { Desktop.getDesktop().browse(URI(code.verificationUrl)) }
+            services.trakt.awaitDeviceAuthorization(code)
+        }.onSuccess {
+            profile = it
+            deviceCode = null
+            authRevision++
+        }.onFailure {
+            error = it.message ?: "Trakt authentication failed"
+            deviceCode = null
+        }
+        loading = false
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        ScreenHeader("Trakt Profile", { services.navigator.pop() }, actions = {
+            if (services.trakt.isAuthenticated) {
+                TvActionButton("Refresh", { authRevision++ })
+                TvActionButton("Disconnect", {
+                    services.trakt.signOut()
+                    profile = null
+                    media = emptyList()
+                    error = null
+                    authRevision++
+                })
+            }
+        })
+
+        if (!services.trakt.isAuthenticated && deviceCode == null && !loading) {
+            Column(
+                Modifier.fillMaxSize().padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text("Connect Trakt.tv", fontSize = 32.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "Sync your collection, watchlist, recommendations, and playback activity.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                error?.let {
+                    Spacer(Modifier.height(12.dp))
+                    Text(it, color = MaterialTheme.colorScheme.error)
+                }
+                Spacer(Modifier.height(24.dp))
+                TvActionButton("Connect with Trakt.tv", { authAttempt++ })
+            }
+            return@Column
+        }
+
+        deviceCode?.let { code ->
+            Column(
+                Modifier.fillMaxWidth().padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Text("Authorize KiduyuTV", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                Text("Open ${code.verificationUrl} and enter:")
+                Text(code.userCode.uppercase(), fontSize = 44.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    TvActionButton("Open Trakt", { runCatching { Desktop.getDesktop().browse(URI(code.verificationUrl)) } })
+                    TvActionButton("Copy code", {
+                        Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(code.userCode), null)
+                    })
+                }
+                CircularProgressIndicator(Modifier.size(32.dp))
+                Text("Waiting for authorization…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+
+        if (services.trakt.isAuthenticated) {
+            profile?.let { user ->
+                Row(
+                    Modifier.fillMaxWidth().padding(24.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(18.dp)
+                ) {
+                    RemoteImage(user.avatarUrl, user.username, Modifier.size(76.dp).clip(CircleShape))
+                    Column(Modifier.weight(1f)) {
+                        Text(user.username, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                        user.name?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        user.about?.let { Text(it, maxLines = 2, overflow = TextOverflow.Ellipsis) }
+                    }
+                }
+            }
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                TraktShelfType.entries.forEach { shelf ->
+                    FilterChip(
+                        selected = selectedShelf == shelf,
+                        onClick = { selectedShelf = shelf },
+                        label = { Text(shelf.name.lowercase().replaceFirstChar(Char::uppercase)) }
+                    )
+                }
+            }
+            error?.let { Text(it, Modifier.padding(24.dp), color = MaterialTheme.colorScheme.error) }
+            if (loading && media.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            } else if (media.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No items found in ${selectedShelf.name.lowercase()}.")
+                }
+            } else {
+                Spacer(Modifier.height(18.dp))
+                MediaRail(selectedShelf.name.lowercase().replaceFirstChar(Char::uppercase), media, services::openMedia)
+            }
+        }
     }
 }

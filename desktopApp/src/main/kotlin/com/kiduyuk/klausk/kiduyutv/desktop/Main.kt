@@ -24,12 +24,14 @@ fun main() {
         val appIcon = painterResource("kiduyutv.png")
         val services = remember {
             val settings = DesktopSettings()
+            val tmdb = TmdbClient(settings)
             DesktopServices(
                 settings = settings,
-                tmdb = TmdbClient(settings),
+                tmdb = tmdb,
                 providers = ProvidersClient(settings),
                 iptv = IptvClient(),
                 library = LocalLibrary(),
+                trakt = TraktClient(settings, tmdb),
                 navigator = DesktopNavigator(),
                 darkTheme = mutableStateOf(settings.darkTheme)
             )
@@ -85,6 +87,7 @@ data class DesktopServices(
     val providers: ProvidersClient,
     val iptv: IptvClient,
     val library: LocalLibrary,
+    val trakt: TraktClient,
     val navigator: DesktopNavigator,
     val darkTheme: MutableState<Boolean>
 )

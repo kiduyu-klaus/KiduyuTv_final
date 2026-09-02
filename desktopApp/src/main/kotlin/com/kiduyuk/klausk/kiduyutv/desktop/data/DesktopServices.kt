@@ -33,6 +33,12 @@ private object DesktopBuildDefaults {
 
     val streamApiToken: String
         get() = properties.getProperty("streamApiToken", "").trim()
+
+    val traktClientId: String
+        get() = properties.getProperty("traktClientId", "").trim()
+
+    val traktClientSecret: String
+        get() = properties.getProperty("traktClientSecret", "").trim()
 }
 
 class DesktopSettings {
@@ -49,6 +55,18 @@ class DesktopSettings {
             .ifBlank { System.getenv("KIDUYUTV_STREAM_API_TOKEN").orEmpty() }
             .ifBlank { DesktopBuildDefaults.streamApiToken }
         set(value) = prefs.put("stream_api_token", value.trim())
+
+    var traktClientId: String
+        get() = prefs.get("trakt_client_id", "")
+            .ifBlank { System.getenv("KIDUYUTV_TRAKT_CLIENT_ID").orEmpty() }
+            .ifBlank { DesktopBuildDefaults.traktClientId }
+        set(value) = prefs.put("trakt_client_id", value.trim())
+
+    var traktClientSecret: String
+        get() = prefs.get("trakt_client_secret", "")
+            .ifBlank { System.getenv("KIDUYUTV_TRAKT_CLIENT_SECRET").orEmpty() }
+            .ifBlank { DesktopBuildDefaults.traktClientSecret }
+        set(value) = prefs.put("trakt_client_secret", value.trim())
 
     var providersBaseUrl: String
         get() = prefs.get(
@@ -89,6 +107,36 @@ class DesktopSettings {
     var preferredSubtitleLanguage: String
         get() = prefs.get("subtitle_language", "en")
         set(value) = prefs.put("subtitle_language", value.trim())
+
+    var traktAccessToken: String
+        get() = prefs.get("trakt_access_token", "")
+        set(value) = prefs.put("trakt_access_token", value)
+
+    var traktRefreshToken: String
+        get() = prefs.get("trakt_refresh_token", "")
+        set(value) = prefs.put("trakt_refresh_token", value)
+
+    var traktExpiresAtMs: Long
+        get() = prefs.getLong("trakt_expires_at", 0L)
+        set(value) = prefs.putLong("trakt_expires_at", value)
+
+    var traktUsername: String
+        get() = prefs.get("trakt_username", "")
+        set(value) = prefs.put("trakt_username", value)
+
+    var traktAvatarUrl: String
+        get() = prefs.get("trakt_avatar_url", "")
+        set(value) = prefs.put("trakt_avatar_url", value)
+
+    fun clearTraktAuth() {
+        listOf(
+            "trakt_access_token",
+            "trakt_refresh_token",
+            "trakt_expires_at",
+            "trakt_username",
+            "trakt_avatar_url"
+        ).forEach(prefs::remove)
+    }
 }
 
 object DesktopHttp {

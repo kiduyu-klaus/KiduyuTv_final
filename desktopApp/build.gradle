@@ -37,6 +37,14 @@ tasks.register('generateDesktopDefaults') {
             'tmdbBearerToken',
             System.getenv('KIDUYUTV_TMDB_TOKEN') ?: ''
         )
+        defaults.setProperty(
+            'traktClientId',
+            System.getenv('KIDUYUTV_TRAKT_CLIENT_ID') ?: ''
+        )
+        defaults.setProperty(
+            'traktClientSecret',
+            System.getenv('KIDUYUTV_TRAKT_CLIENT_SECRET') ?: ''
+        )
         outputFile.withOutputStream { output ->
             defaults.store(output, 'Generated desktop defaults')
         }

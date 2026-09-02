@@ -200,3 +200,25 @@ data class PlayRequest(
     val episode: Int? = null,
     val provider: String? = null
 )
+
+data class TraktProfile(
+    val username: String = "",
+    val name: String? = null,
+    val about: String? = null,
+    val location: String? = null,
+    val avatarUrl: String? = null
+)
+
+data class TraktDeviceCode(
+    val deviceCode: String,
+    val userCode: String,
+    val verificationUrl: String,
+    val intervalSeconds: Int,
+    val expiresAtMs: Long
+)
+
+enum class TraktShelfType {
+    COLLECTION,
+    WATCHLIST,
+    RECOMMENDATIONS
+}
