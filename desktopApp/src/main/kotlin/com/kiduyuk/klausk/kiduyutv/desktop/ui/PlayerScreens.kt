@@ -29,9 +29,17 @@ import com.kiduyuk.klausk.kiduyutv.desktop.player.StreamRanker
 import com.kiduyuk.klausk.kiduyutv.desktop.webview.StreamProviderManager
 import com.sun.jna.Native
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.awt.Canvas
@@ -96,6 +104,86 @@ private fun ProviderButton(name: String, subtitle: String, onClick: () -> Unit) 
     }
 }
 
+private data class DesktopStreamLoadState(
+    val loading: Boolean = true,
+    val status: String = "Fetching enabled providers…",
+    val streams: List<StreamItem> = emptyList(),
+    val error: String? = null,
+    val completed: Boolean = false
+)
+
+/**
+ * Activity-like owner for a direct-stream request.
+ *
+ * Android's DirectStreamActivity keeps its resolver Job in lifecycleScope. This desktop
+ * equivalent deliberately does not make the network Job a child of a Compose effect, so a
+ * recomposition cannot turn LeftCompositionCancellationException into an early empty result.
+ */
+private class DesktopStreamLoader(
+    private val providers: ProvidersClient,
+    private val request: PlayRequest
+) : AutoCloseable {
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val mutableState = MutableStateFlow(DesktopStreamLoadState())
+    val state: StateFlow<DesktopStreamLoadState> = mutableState.asStateFlow()
+    private var streamJob: Job? = null
+
+    fun load() {
+        streamJob?.cancel()
+        mutableState.value = DesktopStreamLoadState()
+        streamJob = scope.launch {
+            DesktopLog.logger.info(
+                "Starting provider stream fetch title={} tmdbId={} type={} providerMode={}",
+                request.title,
+                request.tmdbId,
+                request.mediaType,
+                request.provider ?: "aggregate-enabled-providers"
+            )
+            try {
+                val found = providers.streams(
+                    request = request,
+                    provider = request.provider,
+                    onProviderProgress = { index, total, providerName ->
+                        mutableState.value = mutableState.value.copy(
+                            status = "Provider $index/$total enabled providers: $providerName\nfetching streams"
+                        )
+                    },
+                    onProviderRetry = { index, total, providerName ->
+                        mutableState.value = mutableState.value.copy(
+                            status = "Provider $index/$total enabled providers: $providerName\nretrying streams"
+                        )
+                    }
+                )
+                val sorted = StreamRanker.sorted(found)
+                DesktopLog.logger.info("Provider stream fetch completed totalStreams={}", sorted.size)
+                mutableState.value = DesktopStreamLoadState(
+                    loading = false,
+                    status = "Streams loaded",
+                    streams = sorted,
+                    error = if (sorted.isEmpty()) "No streams were found" else null,
+                    completed = true
+                )
+            } catch (cancelled: CancellationException) {
+                DesktopLog.logger.debug("Provider stream fetch cancelled because its loader was replaced or closed")
+                throw cancelled
+            } catch (error: Exception) {
+                DesktopLog.logger.error("Provider stream fetch failed", error)
+                mutableState.value = DesktopStreamLoadState(
+                    loading = false,
+                    status = "Stream fetch failed",
+                    error = error.message ?: "Unable to fetch streams",
+                    completed = true
+                )
+            }
+        }
+    }
+
+    override fun close() {
+        streamJob?.cancel()
+        scope.cancel()
+    }
+}
+
 @Composable
 fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
     LaunchedEffect(request) {
@@ -153,13 +241,12 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
             DesktopLog.logger.error("Embedded mpv surface initialization failed")
         }
     }
-    var streams by remember(request) { mutableStateOf<List<StreamItem>>(emptyList()) }
+    val streamLoader = remember(request, services.providers) {
+        DesktopStreamLoader(services.providers, request)
+    }
+    val streamLoadState by streamLoader.state.collectAsState()
+    val streams = streamLoadState.streams
     var activeStream by remember(request) { mutableStateOf<StreamItem?>(null) }
-    var loading by remember(request) { mutableStateOf(true) }
-    var fetchError by remember(request) { mutableStateOf<String?>(null) }
-    var fetchStatus by remember(request) { mutableStateOf("Fetching enabled providers…") }
-    var attempt by remember(request) { mutableIntStateOf(0) }
-    var showNoStreams by remember(request) { mutableStateOf(false) }
     var showStreams by remember { mutableStateOf(false) }
     var showTracks by remember { mutableStateOf(false) }
     var showSubtitle by remember { mutableStateOf(false) }
@@ -181,57 +268,11 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
         player.play(stream, positionMs, videoWindowId)
     }
 
-    LaunchedEffect(request, attempt) {
-        // Wait inside one stable effect instead of using videoWindowId as an effect key.
-        // A native-surface handle transition must not cancel an in-flight aggregate fetch.
-        while (isActive && videoWindowId == null && videoSurfaceError == null) {
-            delay(50L)
-        }
-        if (videoWindowId == null) return@LaunchedEffect
-        loading = true
-        fetchError = null
-        fetchStatus = "Fetching enabled providers…"
-        showNoStreams = false
-        var lastFailure: Throwable? = null
-        // ProvidersClient completes only after provider discovery, every enabled-provider
-        // request, and each provider retry has finished.
-        DesktopLog.logger.info(
-            "Starting provider stream fetch title={} tmdbId={} type={} providerMode={}",
-            request.title,
-            request.tmdbId,
-            request.mediaType,
-            request.provider ?: "aggregate-enabled-providers"
-        )
-        val found = try {
-            services.providers.streams(
-                request = request,
-                provider = request.provider,
-                onProviderProgress = { index, total, providerName ->
-                    withContext(Dispatchers.Main.immediate) {
-                        fetchStatus = "Provider $index/$total enabled providers: $providerName\nfetching streams"
-                    }
-                },
-                onProviderRetry = { index, total, providerName ->
-                    withContext(Dispatchers.Main.immediate) {
-                        fetchStatus = "Provider $index/$total enabled providers: $providerName\nretrying streams"
-                    }
-                }
-            )
-        } catch (cancelled: CancellationException) {
-            // Leaving or restarting this effect is not a provider failure.
-            throw cancelled
-        } catch (error: Exception) {
-            lastFailure = error
-            DesktopLog.logger.error("Provider stream fetch failed", error)
-            emptyList()
-        }
-        DesktopLog.logger.info("Provider stream fetch completed totalStreams={}", found.size)
-        streams = StreamRanker.sorted(found)
-        if (streams.isEmpty()) {
-            fetchError = lastFailure?.message ?: "No streams were found"
-            DesktopLog.logger.warn("No playable streams found error={}", fetchError)
-            showNoStreams = true
-        } else {
+    LaunchedEffect(streamLoader) {
+        streamLoader.load()
+    }
+    LaunchedEffect(streams, videoWindowId) {
+        if (streams.isNotEmpty() && videoWindowId != null && activeStream == null) {
             val automatic = StreamRanker.automatic(streams)
             DesktopLog.logger.info(
                 "Playable streams sorted count={} automaticSelection={}",
@@ -240,7 +281,6 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
             )
             automatic?.let { start(it, resume?.positionMs ?: 0L) }
         }
-        loading = false
     }
 
     LaunchedEffect(playerState.positionMs, playerState.durationMs, activeStream) {
@@ -286,13 +326,14 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
             if (playerState.positionMs > 0L) {
                 services.library.saveProgress(request.toProgress(playerState.positionMs, playerState.durationMs))
             }
+            streamLoader.close()
             player.close()
         }
     }
 
     val playerLoading = videoSurfaceError == null &&
-        (loading || (playerState.running && !playerState.playing && playerState.error == null))
-    val playerStatus = videoSurfaceError ?: playerState.error ?: fetchError
+        (streamLoadState.loading || (playerState.running && !playerState.playing && playerState.error == null))
+    val playerStatus = videoSurfaceError ?: playerState.error ?: streamLoadState.error
     PlayerLayout(
         title = request.title + if (request.mediaType == MediaType.SERIES) {
             "  S${request.season ?: 1} E${request.episode ?: 1}"
@@ -302,7 +343,7 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
         state = playerState,
         stream = activeStream,
         loading = playerLoading,
-        loadingMessage = if (activeStream == null) fetchStatus else "Buffering…",
+        loadingMessage = if (activeStream == null) streamLoadState.status else "Buffering…",
         status = playerStatus,
         onBack = {
             DesktopLog.logger.info("Direct player back pressed title={} tmdbId={}", request.title, request.tmdbId)
@@ -354,9 +395,10 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
         }) else null
     )
 
-    LaunchedEffect(showNoStreams, fetchError) {
+    val showNoStreams = streamLoadState.completed && streams.isEmpty()
+    LaunchedEffect(showNoStreams, streamLoadState.error) {
         if (showNoStreams) {
-            DesktopLog.logger.info("Showing no-streams dialog error={}", fetchError ?: "<none>")
+            DesktopLog.logger.info("Showing no-streams dialog error={}", streamLoadState.error ?: "<none>")
         }
     }
     if (showNoStreams && !playerState.playing) {
@@ -366,7 +408,9 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
             actions = {
                 TextButton({
                     DesktopLog.logger.info("Retrying direct provider stream fetch")
-                    attempt++
+                    activeStream = null
+                    player.close()
+                    streamLoader.load()
                 }) { Text("Retry") }
                 TextButton({
                     DesktopLog.logger.info("Exiting after no direct streams")
@@ -374,7 +418,7 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
                 }) { Text("Exit") }
             }
         ) {
-            Text(fetchError ?: "No provider returned a stream.")
+            Text(streamLoadState.error ?: "No provider returned a stream.")
         }
     }
     if (showStreams) {
