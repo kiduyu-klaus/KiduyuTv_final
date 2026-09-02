@@ -104,14 +104,17 @@ tasks.matching {
 // jpackage reads main.wxs from build/compose/tmp/resources immediately before
 // invoking WiX. Copy the full JDK 17-compatible template after its preparation
 // tasks have completed so the Finish dialog offers a checked Open KiduyuTV action.
+def jpackageResourcesDir = layout.buildDirectory.dir('compose/tmp/resources')
+def customWixTemplate = file('packaging/main.wxs')
 tasks.matching { it.name == 'packageMsi' || it.name == 'packageExe' }.configureEach {
     doFirst {
-        File jpackageResources = layout.buildDirectory.dir('compose/tmp/resources').get().asFile
+        File jpackageResources = jpackageResourcesDir.get().asFile
         jpackageResources.mkdirs()
-        copy {
-            from project.file('packaging/main.wxs')
-            into jpackageResources
-        }
+        java.nio.file.Files.copy(
+            customWixTemplate.toPath(),
+            new File(jpackageResources, 'main.wxs').toPath(),
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING
+        )
     }
 }
 
