@@ -39,11 +39,7 @@ class MpvPlayer(
     private var processOutputJob: Job? = null
     private var intentionallyStopped = false
 
-    // These contexts are supported by the bundled Windows mpv runtime.
-    // ANGLE is first because it can fall back to the software WARP renderer
-    // on machines without a usable hardware GPU. Native D3D11 and WinVk are
-    // retained as fallbacks for systems where ANGLE is unavailable or crashes.
-    private val gpuContextCandidates = listOf("angle", "d3d11", "winvk")
+    private val gpuContextCandidates = listOf("d3d11", "win", "winvk")
 
     // Access violation / other native-crash-style exit codes we treat as
     // "this gpu-context doesn't work here" rather than a stream problem.
