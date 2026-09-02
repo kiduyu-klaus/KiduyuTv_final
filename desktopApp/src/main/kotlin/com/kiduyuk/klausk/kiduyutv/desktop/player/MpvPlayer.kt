@@ -47,20 +47,17 @@ class MpvPlayer(
         val args = mutableListOf(
             resolveExecutable().toString(),
             "--input-ipc-server=$pipe",
-            // Avoid incompatible user-level mpv settings and select the Windows
-            // Direct3D11 backend explicitly for stable embedded rendering.
+            // Avoid incompatible user-level mpv settings.
             "--no-config",
             "--force-window=yes",
-            "--vo=gpu",
-            "--gpu-context=d3d11",
-            // Use the Windows Advanced Rasterization Platform when no hardware
-            // GPU is available; this keeps the embedded HWND video path usable
-            // with software rendering.
-            "--d3d11-warp=yes",
+            "--vo=gpu-next",
+            // ANGLE can fall back to a software (WARP) D3D11 device when no real GPU
+            // is present, instead of hard-failing on a direct hardware-device request.
+            "--gpu-context=angle",
             "--keep-open=no",
             "--no-osc",
             "--no-osd-bar",
-            // Avoid hardware-decoder/DXVA native crashes with provider HLS streams on Windows.
+            // Avoid DXVA native crashes with provider HLS streams on Windows.
             "--hwdec=no",
             "--cache=yes",
             "--cache-secs=30",
@@ -69,7 +66,10 @@ class MpvPlayer(
             "--title=${stream.displayName}",
             "--alang=eng,en",
             "--slang=${settings.preferredSubtitleLanguage},eng,en",
-            "--sub-auto=all"
+            "--sub-auto=all",
+            // Keep a native mpv trace alongside the KiduyuTV application log.
+            "--log-file=${System.getenv("TEMP")}\\mpv-kiduyutv.log",
+            "--msg-level=all=debug"
         )
         if (startPositionMs > 0L) args += "--start=${startPositionMs / 1000.0}"
         windowId?.let {
