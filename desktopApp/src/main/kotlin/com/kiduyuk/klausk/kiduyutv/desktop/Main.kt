@@ -16,9 +16,10 @@ import com.kiduyuk.klausk.kiduyutv.desktop.data.*
 import com.kiduyuk.klausk.kiduyutv.desktop.navigation.DesktopNavigator
 
 fun main() {
-    // Allow Compose content and dialogs to render above the embedded AWT mpv surface.
-    // This property must be set before Compose creates its first rendering window.
-    System.setProperty("compose.interop.blending", "true")
+    // Keep heavyweight AWT video surfaces opaque on Windows. Enabling Compose
+    // interop blending turns the mpv child HWND into a translucent compositor
+    // layer on some Direct3D drivers, allowing the desktop to show through.
+    System.setProperty("compose.interop.blending", "false")
 
     application {
         val appIcon = painterResource("kiduyutv.png")

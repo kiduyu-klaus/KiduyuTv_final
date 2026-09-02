@@ -90,6 +90,10 @@ class MpvPlayer(
             "--keep-open=no",
             "--no-osc",
             "--no-osd-bar",
+            // Prevent video frames or letterbox areas from carrying alpha into
+            // the embedded Windows child surface.
+            "--background=color",
+            "--background-color=#FF000000",
             // Avoid hardware-decoder/DXVA native crashes with provider HLS streams on Windows.
             "--hwdec=no",
             "--cache=yes",

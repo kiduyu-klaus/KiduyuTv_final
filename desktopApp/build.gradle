@@ -176,7 +176,7 @@ compose.desktop {
         jvmArgs.addAll([
             '-Xmx1G',
             '-Dfile.encoding=UTF-8',
-            '-Dcompose.interop.blending=true',
+            '-Dcompose.interop.blending=false',
             '--add-opens=java.desktop/sun.awt=ALL-UNNAMED',
             '--add-opens=java.desktop/java.awt.peer=ALL-UNNAMED',
             "-Dkiduyutv.version=${project.version}".toString()
