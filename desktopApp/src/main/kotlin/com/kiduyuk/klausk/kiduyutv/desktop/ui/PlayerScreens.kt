@@ -263,6 +263,7 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
     val streamLoadState by streamLoader.state.collectAsState()
     val streams = streamLoadState.streams
     var activeStream by remember(request) { mutableStateOf<StreamItem?>(null) }
+    var manuallySelectedStream by remember(request) { mutableStateOf(false) }
     var showStreams by remember { mutableStateOf(false) }
     var showTracks by remember { mutableStateOf(false) }
     var showSubtitle by remember { mutableStateOf(false) }
@@ -288,8 +289,8 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
         DesktopLog.logger.info("Starting stable direct-player load identity={}", playbackIdentity)
         streamLoader.load()
     }
-    LaunchedEffect(streams, videoWindowId) {
-        if (streams.isNotEmpty() && videoWindowId != null && activeStream == null) {
+    LaunchedEffect(streams, videoWindowId, manuallySelectedStream) {
+        if (streams.isNotEmpty() && videoWindowId != null && activeStream == null && !manuallySelectedStream) {
             val automatic = StreamRanker.automatic(streams)
             DesktopLog.logger.info(
                 "Playable streams sorted count={} automaticSelection={}",
@@ -426,6 +427,7 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
                 TextButton({
                     DesktopLog.logger.info("Retrying direct provider stream fetch")
                     activeStream = null
+                    manuallySelectedStream = false
                     player.close()
                     streamLoader.load()
                 }) { Text("Retry") }
@@ -441,6 +443,7 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
     if (showStreams) {
         StreamSelectionDialog(streams, activeStream, {
             val resumeAt = playerState.positionMs
+            manuallySelectedStream = true
             DesktopLog.logger.info("Manual stream selected name={} provider={}", it.displayName, it.provider)
             start(it, resumeAt)
             showStreams = false
