@@ -59,7 +59,11 @@ import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.ApiClient
 import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktCollectionItem
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktMovie
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktShow
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktUser
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktWatchlistItem
 import com.kiduyuk.klausk.kiduyutv.data.remote.TraktApiClient
 import com.kiduyuk.klausk.kiduyutv.data.repository.TraktRepository
 import com.kiduyuk.klausk.kiduyutv.ui.components.MovieCard
@@ -355,6 +359,50 @@ private fun ErrorMessage(message: String, onBackClick: () -> Unit) {
     }
 }
 
+/**
+ * Appends a movie/show pair to [results] as a [MyListItem], deduping on a
+ * "type-tmdbId" key so collection+watchlist+recommendations never double-add
+ * the same title. No-op if there's no TMDB id to key/poster-fetch off of.
+ */
+private fun addMediaItem(
+    results: MutableList<MyListItem>,
+    processedIds: MutableSet<String>,
+    movie: TraktMovie? = null,
+    show: TraktShow? = null
+) {
+    if (movie != null) {
+        movie.ids.tmdb?.let { tmdbId ->
+            val key = "movie-$tmdbId"
+            if (processedIds.add(key)) {
+                results.add(
+                    MyListItem(
+                        id = tmdbId,
+                        title = movie.title,
+                        posterPath = null,
+                        type = "movie",
+                        voteAverage = movie.rating ?: 0.0
+                    )
+                )
+            }
+        }
+    } else if (show != null) {
+        show.ids.tmdb?.let { tmdbId ->
+            val key = "tv-$tmdbId"
+            if (processedIds.add(key)) {
+                results.add(
+                    MyListItem(
+                        id = tmdbId,
+                        title = show.title,
+                        posterPath = null,
+                        type = "tv",
+                        voteAverage = show.rating ?: 0.0
+                    )
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun TraktMediaTabContent(
     traktRepository: TraktRepository,
@@ -375,63 +423,60 @@ private fun TraktMediaTabContent(
             val results = mutableListOf<MyListItem>()
             val processedIds = mutableSetOf<String>()
 
-            // Fetch both movies and shows
-            val types = listOf("movies", "shows")
-            
-            for (type in types) {
-                val flow = when (tabType) {
-                    "collection" -> traktRepository.getCollection(type)
-                    "watchlist" -> traktRepository.getWatchlist(type)
-                    else -> traktRepository.getRecommendations(type)
-                }
-
-                flow.collect { result ->
-                    result.onSuccess { items ->
-                        items.forEach { item ->
-                            val movie = (item as? com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktCollectionItem)?.movie
-                                ?: (item as? com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktWatchlistItem)?.movie
-                                ?: (item as? com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktRecommendation)?.movie
-                            
-                            val show = (item as? com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktCollectionItem)?.show
-                                ?: (item as? com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktWatchlistItem)?.show
-                                ?: (item as? com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktRecommendation)?.show
-
-                            if (movie != null) {
-                                movie.ids.tmdb?.let { tmdbId ->
-                                    val key = "movie-$tmdbId"
-                                    if (processedIds.add(key)) {
-                                        results.add(MyListItem(
-                                            id = tmdbId,
-                                            title = movie.title,
-                                            posterPath = null,
-                                            type = "movie",
-                                            voteAverage = movie.rating ?: 0.0
-                                        ))
-                                    }
+            when (tabType) {
+                "collection" -> {
+                    for (type in listOf("movies", "shows")) {
+                        traktRepository.getCollection(type).collect { result ->
+                            result.onSuccess { items: List<TraktCollectionItem> ->
+                                items.forEach { item ->
+                                    addMediaItem(results, processedIds, movie = item.movie, show = item.show)
                                 }
-                            } else if (show != null) {
-                                show.ids.tmdb?.let { tmdbId ->
-                                    val key = "tv-$tmdbId"
-                                    if (processedIds.add(key)) {
-                                        results.add(MyListItem(
-                                            id = tmdbId,
-                                            title = show.title,
-                                            posterPath = null,
-                                            type = "tv",
-                                            voteAverage = show.rating ?: 0.0
-                                        ))
-                                    }
-                                }
+                            }.onFailure { e ->
+                                Log.e("TraktProfileScreen", "Failed to fetch collection $type: ${e.message}")
                             }
                         }
-                    }.onFailure { e ->
-                        Log.e("TraktProfileScreen", "Failed to fetch $tabType $type: ${e.message}")
+                    }
+                }
+                "watchlist" -> {
+                    for (type in listOf("movies", "shows")) {
+                        traktRepository.getWatchlist(type).collect { result ->
+                            result.onSuccess { items: List<TraktWatchlistItem> ->
+                                items.forEach { item ->
+                                    addMediaItem(results, processedIds, movie = item.movie, show = item.show)
+                                }
+                            }.onFailure { e ->
+                                Log.e("TraktProfileScreen", "Failed to fetch watchlist $type: ${e.message}")
+                            }
+                        }
+                    }
+                }
+                else -> {
+                    // "recommendations" — /recommendations/movies and
+                    // /recommendations/shows each return a flat list of
+                    // TraktMovie / TraktShow directly, no wrapper object.
+                    traktRepository.getMovieRecommendations().collect { result ->
+                        result.onSuccess { movies: List<TraktMovie> ->
+                            movies.forEach { movie ->
+                                addMediaItem(results, processedIds, movie = movie)
+                            }
+                        }.onFailure { e ->
+                            Log.e("TraktProfileScreen", "Failed to fetch movie recommendations: ${e.message}")
+                        }
+                    }
+                    traktRepository.getShowRecommendations().collect { result ->
+                        result.onSuccess { shows: List<TraktShow> ->
+                            shows.forEach { show ->
+                                addMediaItem(results, processedIds, show = show)
+                            }
+                        }.onFailure { e ->
+                            Log.e("TraktProfileScreen", "Failed to fetch show recommendations: ${e.message}")
+                        }
                     }
                 }
             }
 
             mediaItems = results.toList()
-            
+
             // Background loading for posters and ratings
             withContext(Dispatchers.IO) {
                 mediaItems.forEachIndexed { index, item ->

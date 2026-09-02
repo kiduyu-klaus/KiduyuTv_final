@@ -2,12 +2,14 @@ package com.kiduyuk.klausk.kiduyutv.data.repository
 
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktCollectionItem
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktIds
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktMovie
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktRecommendation
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktScrobbleEpisode
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktScrobbleMovie
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktScrobbleRequest
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktScrobbleResponse
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktSettings
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktShow
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktSyncItems
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktSyncMovie
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktWatchHistoryResponse
@@ -166,7 +168,57 @@ class TraktRepository @Inject constructor(
     }
 
     /**
-     * Get user's personalized recommendations.
+     * Get user's personalized movie recommendations.
+     * NOTE: /recommendations/movies returns a flat array of TraktMovie
+     * objects directly — there is no wrapper like collection/watchlist use.
+     */
+    fun getMovieRecommendations(): Flow<Result<List<TraktMovie>>> = flow {
+        try {
+            val token = traktAuthManager.getValidAccessToken()
+            if (token == null) {
+                emit(Result.failure(Exception("Not authenticated with Trakt.tv")))
+                return@flow
+            }
+
+            val response = traktApiService.getMovieRecommendations("Bearer $token")
+            if (response.isSuccessful && response.body() != null) {
+                emit(Result.success(response.body()!!))
+            } else {
+                emit(Result.failure(Exception("Failed to fetch movie recommendations: ${response.code()}")))
+            }
+        } catch (e: Exception) {
+            emit(Result.failure(e))
+        }
+    }
+
+    /**
+     * Get user's personalized show recommendations.
+     * NOTE: /recommendations/shows returns a flat array of TraktShow
+     * objects directly — there is no wrapper like collection/watchlist use.
+     */
+    fun getShowRecommendations(): Flow<Result<List<TraktShow>>> = flow {
+        try {
+            val token = traktAuthManager.getValidAccessToken()
+            if (token == null) {
+                emit(Result.failure(Exception("Not authenticated with Trakt.tv")))
+                return@flow
+            }
+
+            val response = traktApiService.getShowRecommendations("Bearer $token")
+            if (response.isSuccessful && response.body() != null) {
+                emit(Result.success(response.body()!!))
+            } else {
+                emit(Result.failure(Exception("Failed to fetch show recommendations: ${response.code()}")))
+            }
+        } catch (e: Exception) {
+            emit(Result.failure(e))
+        }
+    }
+
+    /**
+     * Compatibility adapter for the mobile profile screen. The supplied
+     * implementation uses typed flat recommendation endpoints; this method
+     * wraps those results in the legacy movie/show container shape.
      */
     fun getRecommendations(type: String = "movies"): Flow<Result<List<TraktRecommendation>>> = flow {
         try {
@@ -176,11 +228,24 @@ class TraktRepository @Inject constructor(
                 return@flow
             }
 
-            val response = traktApiService.getRecommendations("Bearer $token", type)
-            if (response.isSuccessful && response.body() != null) {
-                emit(Result.success(response.body()!!))
+            if (type == "shows") {
+                val response = traktApiService.getShowRecommendations("Bearer $token")
+                if (response.isSuccessful && response.body() != null) {
+                    emit(Result.success(response.body()!!.mapIndexed { index, show ->
+                        TraktRecommendation(index + 1, "", "show", null, show)
+                    }))
+                } else {
+                    emit(Result.failure(Exception("Failed to fetch show recommendations: ${response.code()}")))
+                }
             } else {
-                emit(Result.failure(Exception("Failed to fetch recommendations: ${response.code()}")))
+                val response = traktApiService.getMovieRecommendations("Bearer $token")
+                if (response.isSuccessful && response.body() != null) {
+                    emit(Result.success(response.body()!!.mapIndexed { index, movie ->
+                        TraktRecommendation(index + 1, "", "movie", movie, null)
+                    }))
+                } else {
+                    emit(Result.failure(Exception("Failed to fetch movie recommendations: ${response.code()}")))
+                }
             }
         } catch (e: Exception) {
             emit(Result.failure(e))

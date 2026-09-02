@@ -271,7 +271,9 @@ data class TraktCollectionItem(
 )
 
 /**
- * Trakt recommendation item
+ * Compatibility wrapper for consumers that still expect recommendation items
+ * to expose movie/show fields. The API service uses typed flat recommendation
+ * responses, and the repository adapts them into this shape when needed.
  */
 data class TraktRecommendation(
     @SerializedName("rank") val rank: Int,
@@ -280,5 +282,3 @@ data class TraktRecommendation(
     @SerializedName("movie") val movie: TraktMovie?,
     @SerializedName("show") val show: TraktShow?
 )
-
-

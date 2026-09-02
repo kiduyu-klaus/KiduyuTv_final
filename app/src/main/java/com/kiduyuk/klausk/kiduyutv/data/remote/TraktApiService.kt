@@ -2,11 +2,12 @@ package com.kiduyuk.klausk.kiduyutv.data.remote
 
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktCollectionItem
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktHistoryItem
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktMovie
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktPlaybackProgress
-import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktRecommendation
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktScrobbleRequest
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktScrobbleResponse
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktSettings
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktShow
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktSyncItems
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktSyncResponse
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktUser
@@ -27,7 +28,7 @@ import retrofit2.http.Query
 interface TraktApiService {
 
     // ── User ────────────────────────────────────────────────────────────────
-    
+
     /**
      * Get user profile
      */
@@ -36,7 +37,7 @@ interface TraktApiService {
         @Header("Authorization") token: String,
         @Query("extended") extended: String = "full" // Defaults to "full" to always pull the bio
     ): Response<TraktUser>
-    
+
     /**
      * Get user settings
      */
@@ -44,7 +45,7 @@ interface TraktApiService {
     suspend fun getSettings(
         @Header("Authorization") token: String
     ): Response<TraktSettings>
-    
+
     /**
      * Get watched movies
      */
@@ -52,7 +53,7 @@ interface TraktApiService {
     suspend fun getWatchedMovies(
         @Header("Authorization") token: String
     ): Response<List<TraktWatchedMovie>>
-    
+
     /**
      * Get watched shows (includes all seasons/episodes)
      */
@@ -60,9 +61,9 @@ interface TraktApiService {
     suspend fun getWatchedShows(
         @Header("Authorization") token: String
     ): Response<List<TraktWatchedShow>>
-    
+
     // ── Sync ────────────────────────────────────────────────────────────────
-    
+
     /**
      * Get playback progress for movies and shows
      */
@@ -71,7 +72,7 @@ interface TraktApiService {
         @Header("Authorization") token: String,
         @Query("type") type: String
     ): Response<List<TraktPlaybackProgress>>
-    
+
     /**
      * Get watchlist
      */
@@ -82,7 +83,7 @@ interface TraktApiService {
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 100
     ): Response<List<TraktWatchlistItem>>
-    
+
     /**
      * Add item to watchlist
      */
@@ -91,7 +92,7 @@ interface TraktApiService {
         @Header("Authorization") token: String,
         @Body items: TraktSyncItems
     ): Response<TraktSyncResponse>
-    
+
     /**
      * Remove item from watchlist
      */
@@ -100,9 +101,9 @@ interface TraktApiService {
         @Header("Authorization") token: String,
         @Body items: TraktSyncItems
     ): Response<TraktSyncResponse>
-    
+
     // ── Scrobble ────────────────────────────────────────────────────────────
-    
+
     /**
      * Start scrobbling (start watching) for movie
      */
@@ -111,7 +112,7 @@ interface TraktApiService {
         @Header("Authorization") token: String,
         @Body scrobble: TraktScrobbleRequest
     ): Response<TraktScrobbleResponse>
-    
+
     /**
      * Start scrobbling (start watching) for episode
      */
@@ -120,7 +121,7 @@ interface TraktApiService {
         @Header("Authorization") token: String,
         @Body scrobble: TraktScrobbleRequest
     ): Response<TraktScrobbleResponse>
-    
+
     /**
      * Pause scrobbling (update progress)
      */
@@ -129,7 +130,7 @@ interface TraktApiService {
         @Header("Authorization") token: String,
         @Body scrobble: TraktScrobbleRequest
     ): Response<TraktScrobbleResponse>
-    
+
     /**
      * Stop scrobbling (mark as watched)
      */
@@ -138,9 +139,9 @@ interface TraktApiService {
         @Header("Authorization") token: String,
         @Body scrobble: TraktScrobbleRequest
     ): Response<TraktScrobbleResponse>
-    
+
     // ── History ──────────────────────────────────────────────────────────────
-    
+
     /**
      * Add to watch history
      */
@@ -149,7 +150,7 @@ interface TraktApiService {
         @Header("Authorization") token: String,
         @Body items: TraktSyncItems
     ): Response<TraktSyncResponse>
-    
+
     /**
      * Get watch history
      */
@@ -159,9 +160,9 @@ interface TraktApiService {
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 100
     ): Response<List<TraktHistoryItem>>
-    
+
     // ── Collection ──────────────────────────────────────────────────────────
-    
+
     /**
      * Get user's collection
      */
@@ -170,15 +171,31 @@ interface TraktApiService {
         @Header("Authorization") token: String,
         @Path("type") type: String = "movies"
     ): Response<List<TraktCollectionItem>>
-    
+
     // ── Recommendations ──────────────────────────────────────────────────────
-    
+    // NOTE: /recommendations/{type} returns a FLAT array of movie or show
+    // objects directly — there is no {rank, listed_at, movie/show} wrapper
+    // like /sync/watchlist or /users/me/collection use. Two typed endpoints
+    // are used here instead of one generic one, since Retrofit can't branch
+    // the return type on a runtime "movies"/"shows" string.
+
     /**
-     * Get user's personalized recommendations
+     * Get user's personalized movie recommendations
      */
-    @GET("recommendations/{type}")
-    suspend fun getRecommendations(
+    @GET("recommendations/movies")
+    suspend fun getMovieRecommendations(
         @Header("Authorization") token: String,
-        @Path("type") type: String = "movies"
-    ): Response<List<TraktRecommendation>>
+        @Query("ignore_collected") ignoreCollected: Boolean? = null,
+        @Query("ignore_watchlisted") ignoreWatchlisted: Boolean? = null
+    ): Response<List<TraktMovie>>
+
+    /**
+     * Get user's personalized show recommendations
+     */
+    @GET("recommendations/shows")
+    suspend fun getShowRecommendations(
+        @Header("Authorization") token: String,
+        @Query("ignore_collected") ignoreCollected: Boolean? = null,
+        @Query("ignore_watchlisted") ignoreWatchlisted: Boolean? = null
+    ): Response<List<TraktShow>>
 }
