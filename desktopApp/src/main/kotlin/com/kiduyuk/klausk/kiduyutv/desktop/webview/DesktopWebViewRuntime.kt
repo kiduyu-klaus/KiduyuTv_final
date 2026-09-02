@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import com.kiduyuk.klausk.kiduyutv.desktop.data.DesktopLog
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +31,11 @@ object DesktopWebViewRuntime {
 
     @Synchronized
     fun ensureInitialized(forceRetry: Boolean = false) {
+        DesktopLog.logger.info(
+            "WebView runtime initialization requested forceRetry={} currentState={}",
+            forceRetry,
+            mutableState.value
+        )
         if (!forceRetry && mutableState.value == WebViewRuntimeState.Ready) return
         if (initializationJob?.isActive == true) return
 
@@ -41,6 +47,11 @@ object DesktopWebViewRuntime {
                     ?.let(::File)
                     ?: File(System.getProperty("user.home"), "AppData/Local")
                 val webViewRoot = File(appData, "KiduyuTV/WebView")
+                DesktopLog.logger.info(
+                    "Initializing KCEF installDir={} cacheDir={}",
+                    File(webViewRoot, "kcef-bundle"),
+                    File(webViewRoot, "cache")
+                )
 
                 KCEF.init(
                     builder = {
@@ -50,6 +61,7 @@ object DesktopWebViewRuntime {
                                 mutableState.value = WebViewRuntimeState.Preparing("Locating browser engine…")
                             }
                             onDownloading { percent ->
+                                DesktopLog.logger.info("KCEF downloading percent={}", percent)
                                 mutableState.value = WebViewRuntimeState.Preparing(
                                     message = "Downloading browser engine…",
                                     downloadPercent = percent.coerceIn(0f, 100f)
@@ -65,6 +77,7 @@ object DesktopWebViewRuntime {
                                 mutableState.value = WebViewRuntimeState.Preparing("Starting browser engine…")
                             }
                             onInitialized {
+                                DesktopLog.logger.info("KCEF initialized successfully")
                                 mutableState.value = WebViewRuntimeState.Ready
                             }
                         }
@@ -78,11 +91,13 @@ object DesktopWebViewRuntime {
                         )
                     },
                     onError = { error ->
+                        DesktopLog.logger.error("KCEF initialization error", error)
                         mutableState.value = WebViewRuntimeState.Failed(
                             error?.message ?: "The browser engine could not be initialized."
                         )
                     },
                     onRestartRequired = {
+                        DesktopLog.logger.warn("KCEF requested an application restart")
                         mutableState.value = WebViewRuntimeState.RestartRequired(
                             "The browser engine was updated. Restart KiduyuTV to use WebView playback."
                         )
@@ -94,6 +109,7 @@ object DesktopWebViewRuntime {
                     mutableState.value = WebViewRuntimeState.Ready
                 }
             }.onFailure { error ->
+                DesktopLog.logger.error("WebView runtime initialization failed", error)
                 mutableState.value = WebViewRuntimeState.Failed(
                     error.message ?: "The browser engine could not be initialized."
                 )
@@ -102,6 +118,7 @@ object DesktopWebViewRuntime {
     }
 
     fun dispose() {
+        DesktopLog.logger.info("Disposing WebView runtime state={}", mutableState.value)
         initializationJob?.cancel()
         if (mutableState.value == WebViewRuntimeState.Ready) {
             runCatching { KCEF.disposeBlocking() }

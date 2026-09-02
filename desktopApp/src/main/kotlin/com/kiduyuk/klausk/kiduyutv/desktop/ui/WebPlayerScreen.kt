@@ -27,6 +27,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.kiduyuk.klausk.kiduyutv.desktop.DesktopServices
+import com.kiduyuk.klausk.kiduyutv.desktop.data.DesktopLog
+import com.kiduyuk.klausk.kiduyutv.desktop.data.logSafe
 import com.kiduyuk.klausk.kiduyutv.desktop.navigation.DesktopRoute
 import com.kiduyuk.klausk.kiduyutv.desktop.webview.DesktopWebViewRuntime
 import com.kiduyuk.klausk.kiduyutv.desktop.webview.StreamProviderManager
@@ -43,7 +45,20 @@ private const val DESKTOP_BROWSER_USER_AGENT =
 @Composable
 fun WebPlayerScreen(services: DesktopServices, route: DesktopRoute.WebPlayer) {
     val runtimeState by DesktopWebViewRuntime.state.collectAsState()
-    LaunchedEffect(Unit) { DesktopWebViewRuntime.ensureInitialized() }
+    LaunchedEffect(Unit) {
+        DesktopLog.logger.info(
+            "WebPlayerScreen opened provider={} type={} tmdbId={} season={} episode={}",
+            route.providerName,
+            route.request.mediaType,
+            route.request.tmdbId,
+            route.request.season,
+            route.request.episode
+        )
+        DesktopWebViewRuntime.ensureInitialized()
+    }
+    LaunchedEffect(runtimeState) {
+        DesktopLog.logger.info("WebView runtime state provider={} state={}", route.providerName, runtimeState)
+    }
 
     when (val state = runtimeState) {
         WebViewRuntimeState.Ready -> EmbeddedProviderPlayer(services, route)
@@ -93,6 +108,16 @@ private fun EmbeddedProviderPlayer(services: DesktopServices, route: DesktopRout
     }
     val baseUrl = remember(route.providerName) { StreamProviderManager.getBaseUrl(route.providerName) }
 
+    LaunchedEffect(iframeHtml, baseUrl) {
+        DesktopLog.logger.info(
+            "WebView navigation prepared provider={} baseUrl={} iframeHtmlLength={} htmlUrl={}",
+            route.providerName,
+            baseUrl.logSafe(250),
+            iframeHtml.length,
+            iframeHtml.substringAfter("src=\"", "").substringBefore("\" ").logSafe(500)
+        )
+    }
+
     key(route.providerName, request.tmdbId, request.season, request.episode) {
         val webViewState = rememberWebViewStateWithHTMLData(
             data = iframeHtml,
@@ -101,7 +126,24 @@ private fun EmbeddedProviderPlayer(services: DesktopServices, route: DesktopRout
             mimeType = "text/html"
         )
         val webViewNavigator = rememberWebViewNavigator()
+        LaunchedEffect(
+            webViewState.loadingState,
+            webViewState.lastLoadedUrl,
+            webViewState.pageTitle,
+            webViewState.errorsForCurrentRequest.size
+        ) {
+            val errors = webViewState.errorsForCurrentRequest.joinToString(" | ") { it.toString() }
+            DesktopLog.logger.info(
+                "WebView state provider={} loadingState={} lastLoadedUrl={} pageTitle={} errors={}",
+                route.providerName,
+                webViewState.loadingState,
+                webViewState.lastLoadedUrl?.logSafe(500) ?: "<none>",
+                webViewState.pageTitle?.logSafe(200) ?: "<none>",
+                errors.logSafe(2_000).ifBlank { "<none>" }
+            )
+        }
         DisposableEffect(webViewState) {
+            DesktopLog.logger.info("Configuring WebView provider={}", route.providerName)
             webViewState.webSettings.apply {
                 isJavaScriptEnabled = true
                 customUserAgentString = DESKTOP_BROWSER_USER_AGENT
@@ -112,7 +154,9 @@ private fun EmbeddedProviderPlayer(services: DesktopServices, route: DesktopRout
                     disablePopupWindows = true
                 }
             }
-            onDispose { }
+            onDispose {
+                DesktopLog.logger.info("WebView disposed provider={}", route.providerName)
+            }
         }
 
         Column(Modifier.fillMaxSize().background(Color.Black)) {

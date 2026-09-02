@@ -1,5 +1,8 @@
 package com.kiduyuk.klausk.kiduyutv.desktop.webview
 
+import com.kiduyuk.klausk.kiduyutv.desktop.data.DesktopLog
+import com.kiduyuk.klausk.kiduyutv.desktop.data.logSafe
+
 import java.net.URI
 
 data class StreamProvider(
@@ -226,16 +229,35 @@ object StreamProviderManager {
         episode: Int?,
         timestamp: Long = 0L
     ): String {
-        val provider = getProvider(providerName) ?: providers.first()
+        val provider = getProvider(providerName) ?: providers.first().also {
+            DesktopLog.logger.warn("Unknown WebView provider={} fallback={}", providerName, it.name)
+        }
         val baseUrl = if (isTv) {
             provider.tvUrlTemplate.format(tmdbId, season ?: 1, episode ?: 1)
         } else {
             provider.movieUrlTemplate.format(tmdbId)
         }
         val params = if (isTv) provider.tvParameters(timestamp) else provider.movieParameters(timestamp)
-        if (params.isEmpty()) return baseUrl
+        if (params.isEmpty()) {
+            DesktopLog.logger.info(
+                "Generated WebView URL provider={} type={} tmdbId={} url={}",
+                provider.name,
+                if (isTv) "series" else "movie",
+                tmdbId,
+                baseUrl.logSafe()
+            )
+            return baseUrl
+        }
         val query = params.entries.joinToString("&") { (key, value) -> "$key=$value" }
-        return if ('?' in baseUrl) "$baseUrl&$query" else "$baseUrl?$query"
+        return (if ('?' in baseUrl) "$baseUrl&$query" else "$baseUrl?$query").also {
+            DesktopLog.logger.info(
+                "Generated WebView URL provider={} type={} tmdbId={} url={}",
+                provider.name,
+                if (isTv) "series" else "movie",
+                tmdbId,
+                it.logSafe()
+            )
+        }
     }
 
     fun generateIframeHtml(
