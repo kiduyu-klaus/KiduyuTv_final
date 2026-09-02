@@ -36,6 +36,7 @@ class MpvPlayer(
     private var process: Process? = null
     private var ipcJob: Job? = null
     private var processJob: Job? = null
+    private var processOutputJob: Job? = null
     private var intentionallyStopped = false
 
     fun play(stream: StreamItem, startPositionMs: Long = 0L, windowId: Long? = null) {
@@ -55,7 +56,8 @@ class MpvPlayer(
             "--keep-open=no",
             "--no-osc",
             "--no-osd-bar",
-            "--hwdec=auto-safe",
+            // Avoid hardware-decoder/DXVA native crashes with provider HLS streams on Windows.
+            "--hwdec=no",
             "--cache=yes",
             "--cache-secs=30",
             "--demuxer-max-bytes=256MiB",
@@ -97,20 +99,39 @@ class MpvPlayer(
         args += stream.url
 
         try {
-            process = ProcessBuilder(args)
+            val startedProcess = ProcessBuilder(args)
                 .redirectErrorStream(true)
-                .redirectOutput(ProcessBuilder.Redirect.DISCARD)
                 .start()
-            connectIpc(pipe)
+            process = startedProcess
+            processOutputJob = scope.launch(Dispatchers.IO) {
+                startedProcess.inputStream.bufferedReader().useLines { lines ->
+                    lines.forEach { line ->
+                        if (line.isNotBlank()) {
+                            com.kiduyuk.klausk.kiduyutv.desktop.data.DesktopLog.logger.info(
+                                "mpv output: {}",
+                                line.take(2_000)
+                            )
+                        }
+                    }
+                }
+            }
+            connectIpc(pipe, startedProcess)
             processJob = scope.launch(Dispatchers.IO) {
-                val exitCode = process?.waitFor() ?: return@launch
+                val exitCode = startedProcess.waitFor()
                 val previous = mutableState.value
-                mutableState.value = previous.copy(
-                    running = false,
-                    playing = false,
-                    error = if (!intentionallyStopped && exitCode != 0) {
-                        "mpv exited with code $exitCode"
-                    } else previous.error
+                if (process === startedProcess) {
+                    mutableState.value = previous.copy(
+                        running = false,
+                        playing = false,
+                        error = if (!intentionallyStopped && exitCode != 0) {
+                            "mpv exited with code $exitCode"
+                        } else previous.error
+                    )
+                }
+                com.kiduyuk.klausk.kiduyutv.desktop.data.DesktopLog.logger.info(
+                    "mpv process exited code={} intentionallyStopped={}",
+                    exitCode,
+                    intentionallyStopped
                 )
             }
         } catch (error: Exception) {
@@ -132,17 +153,19 @@ class MpvPlayer(
         enqueue("quit")
         ipcJob?.cancel()
         processJob?.cancel()
+        processOutputJob?.cancel()
         process?.destroy()
         process = null
         ipcJob = null
         processJob = null
+        processOutputJob = null
         commands.clear()
         mutableState.value = mutableState.value.copy(running = false, playing = false)
     }
 
     override fun close() = stop()
 
-    private fun connectIpc(pipe: String) {
+    private fun connectIpc(pipe: String, startedProcess: Process) {
         ipcJob = scope.launch(Dispatchers.IO) {
             val connection = withTimeoutOrNull(8_000L) {
                 while (isActive) {
@@ -154,6 +177,10 @@ class MpvPlayer(
             }
             if (connection == null) {
                 mutableState.value = mutableState.value.copy(error = "Could not connect to mpv control pipe")
+                com.kiduyuk.klausk.kiduyutv.desktop.data.DesktopLog.logger.error(
+                    "Timed out connecting to mpv IPC pipe; terminating process"
+                )
+                if (startedProcess.isAlive) startedProcess.destroy()
                 return@launch
             }
             connection.use { ipc ->
@@ -167,7 +194,7 @@ class MpvPlayer(
                 ).forEach { (id, property) ->
                     ipc.writeLine(gson.toJson(mapOf("command" to listOf("observe_property", id, property))))
                 }
-                while (isActive && process?.isAlive == true) {
+                while (isActive && startedProcess.isAlive) {
                     while (true) {
                         val command = commands.poll() ?: break
                         ipc.writeLine(command)
