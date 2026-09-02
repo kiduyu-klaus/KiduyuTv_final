@@ -18,6 +18,7 @@ import kotlin.io.path.isRegularFile
 data class MpvState(
     val running: Boolean = false,
     val playing: Boolean = false,
+    val videoOutputReady: Boolean = false,
     val positionMs: Long = 0L,
     val durationMs: Long = 0L,
     val bufferedMs: Long = 0L,
@@ -39,7 +40,20 @@ class MpvPlayer(
     private var processOutputJob: Job? = null
     private var intentionallyStopped = false
 
-    private val gpuContextCandidates = listOf("d3d11", "win", "winvk")
+    private data class VideoOutputProfile(
+        val id: String,
+        val videoOutput: String,
+        val gpuContext: String? = null
+    )
+
+    // Direct3D 9 is intentionally first: it is available in the bundled mpv build and does
+    // not require the OpenGL 2.1/3.x context that fails on older Windows display drivers.
+    private val videoOutputProfiles = listOf(
+        VideoOutputProfile(id = "direct3d", videoOutput = "direct3d"),
+        VideoOutputProfile(id = "d3d11", videoOutput = "gpu", gpuContext = "d3d11"),
+        VideoOutputProfile(id = "winvk", videoOutput = "gpu", gpuContext = "winvk"),
+        VideoOutputProfile(id = "win", videoOutput = "gpu", gpuContext = "win")
+    )
 
     // Access violation / other native-crash-style exit codes we treat as
     // "this gpu-context doesn't work here" rather than a stream problem.
@@ -48,47 +62,31 @@ class MpvPlayer(
     private var currentStream: StreamItem? = null
     private var currentStartPositionMs: Long = 0L
     private var currentWindowId: Long? = null
-    private var gpuContextAttemptIndex: Int = 0
+    private var videoOutputAttemptIndex: Int = 0
     private var playStartedAtMs: Long = 0L
 
     fun play(stream: StreamItem, startPositionMs: Long = 0L, windowId: Long? = null) {
         currentStream = stream
         currentStartPositionMs = startPositionMs
         currentWindowId = windowId
-        gpuContextAttemptIndex = candidateStartIndex()
+        videoOutputAttemptIndex = 0
         startProcess(stream, startPositionMs, windowId)
-    }
-
-    /**
-     * Start from the cached working gpu-context for this machine if we have
-     * one, otherwise start probing from the top of the candidate list.
-     */
-    private fun candidateStartIndex(): Int {
-        val cached = settings.mpvGpuContext.trim()
-        if (cached.isNotBlank()) {
-            val idx = gpuContextCandidates.indexOf(cached)
-            if (idx >= 0) return idx
-        }
-        return 0
     }
 
     private fun startProcess(stream: StreamItem, startPositionMs: Long, windowId: Long?) {
         stop()
         intentionallyStopped = false
-        val gpuContext = gpuContextCandidates[gpuContextAttemptIndex]
+        val outputProfile = videoOutputProfiles[videoOutputAttemptIndex]
         mutableState.value = MpvState(running = true, title = stream.displayName)
         val pipe = "\\\\.\\pipe\\kiduyutv-${System.nanoTime()}"
         val args = mutableListOf(
             resolveExecutable().toString(),
             "--input-ipc-server=$pipe",
-            // Avoid incompatible user-level mpv settings. Use the legacy gpu
-            // VO because gpu-next fell back to its OpenGL path on machines
-            // whose driver does not expose OpenGL 2.1+. The selected Windows
-            // context may change between attempts on incompatible machines.
+            // Avoid incompatible user-level mpv settings. The first profile uses the bundled
+            // Direct3D renderer and therefore does not depend on an OpenGL context.
             "--no-config",
             "--force-window=yes",
-            "--vo=gpu",
-            "--gpu-context=$gpuContext",
+            "--vo=${outputProfile.videoOutput}",
             "--keep-open=no",
             "--no-osc",
             "--no-osd-bar",
@@ -103,6 +101,7 @@ class MpvPlayer(
             "--slang=${settings.preferredSubtitleLanguage},eng,en",
             "--sub-auto=all"
         )
+        outputProfile.gpuContext?.let { args += "--gpu-context=$it" }
         if (startPositionMs > 0L) args += "--start=${startPositionMs / 1000.0}"
         windowId?.let {
             args += "--wid=$it"
@@ -140,6 +139,7 @@ class MpvPlayer(
             process = startedProcess
             playStartedAtMs = 0L
             processOutputJob = scope.launch(Dispatchers.IO) {
+                var videoOutputFallbackScheduled = false
                 startedProcess.inputStream.bufferedReader().useLines { lines ->
                     lines.forEach { line ->
                         if (line.isNotBlank()) {
@@ -148,6 +148,32 @@ class MpvPlayer(
                                 line.take(2_000)
                             )
                         }
+                        if (!videoOutputFallbackScheduled && line.contains("Video: no video", ignoreCase = true)) {
+                            videoOutputFallbackScheduled = true
+                            if (videoOutputAttemptIndex < videoOutputProfiles.lastIndex) {
+                                val failedProfile = outputProfile.id
+                                scope.launch(Dispatchers.IO) {
+                                    if (process === startedProcess) {
+                                        videoOutputAttemptIndex += 1
+                                        val nextProfile = videoOutputProfiles[videoOutputAttemptIndex]
+                                        com.kiduyuk.klausk.kiduyutv.desktop.data.DesktopLog.logger.warn(
+                                            "No video output with profile={}; retrying with profile={}",
+                                            failedProfile,
+                                            nextProfile.id
+                                        )
+                                        currentStream?.let {
+                                            startProcess(it, currentStartPositionMs, currentWindowId)
+                                        }
+                                    }
+                                }
+                            } else {
+                                mutableState.value = mutableState.value.copy(
+                                    playing = false,
+                                    videoOutputReady = false,
+                                    error = "Windows could not initialize a compatible video renderer."
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -155,10 +181,10 @@ class MpvPlayer(
             processJob = scope.launch(Dispatchers.IO) {
                 val exitCode = startedProcess.waitFor()
                 com.kiduyuk.klausk.kiduyutv.desktop.data.DesktopLog.logger.info(
-                    "mpv process exited code={} intentionallyStopped={} gpuContext={}",
+                    "mpv process exited code={} intentionallyStopped={} videoOutputProfile={}",
                     exitCode,
                     intentionallyStopped,
-                    gpuContext
+                    outputProfile.id
                 )
                 if (process !== startedProcess) return@launch
 
@@ -167,31 +193,23 @@ class MpvPlayer(
                 val looksLikeGpuContextCrash = !intentionallyStopped &&
                     exitCode in crashExitCodes &&
                     (elapsedSincePlaying == null || elapsedSincePlaying < 5_000L) &&
-                    gpuContextAttemptIndex < gpuContextCandidates.lastIndex
+                    videoOutputAttemptIndex < videoOutputProfiles.lastIndex
 
                 if (looksLikeGpuContextCrash) {
                     com.kiduyuk.klausk.kiduyutv.desktop.data.DesktopLog.logger.warn(
-                        "gpu-context={} crashed early (code={}), retrying with next candidate",
-                        gpuContext,
+                        "video-output profile={} crashed early (code={}), retrying with next candidate",
+                        outputProfile.id,
                         exitCode
                     )
-                    gpuContextAttemptIndex += 1
+                    videoOutputAttemptIndex += 1
                     val stream = currentStream
                     if (stream != null) {
                         startProcess(stream, currentStartPositionMs, currentWindowId)
                     }
                 } else {
-                    if (!intentionallyStopped && exitCode == 0) {
-                        // Survived to a clean/normal exit on this gpu-context:
-                        // remember it so future launches skip straight to it.
-                        settings.mpvGpuContext = gpuContext
-                    } else if (!intentionallyStopped && exitCode !in crashExitCodes) {
-                        // Non-crash nonzero exit (e.g. stream error) on a
-                        // gpu-context we've already seen play frames under
-                        // is still evidence it's usable; remember it too.
-                        if (elapsedSincePlaying != null) {
-                            settings.mpvGpuContext = gpuContext
-                        }
+                    if (!intentionallyStopped && mutableState.value.videoOutputReady) {
+                        // Persist a renderer only after mpv has exposed real video output.
+                        settings.mpvGpuContext = outputProfile.id
                     }
                     val previous = mutableState.value
                     mutableState.value = previous.copy(
@@ -259,7 +277,8 @@ class MpvPlayer(
                     3 to "pause",
                     4 to "media-title",
                     5 to "demuxer-cache-time",
-                    6 to "paused-for-cache"
+                    6 to "paused-for-cache",
+                    7 to "video-out-params"
                 ).forEach { (id, property) ->
                     ipc.writeLine(gson.toJson(mapOf("command" to listOf("observe_property", id, property))))
                 }
@@ -295,7 +314,11 @@ class MpvPlayer(
         val current = mutableState.value
         when (event) {
             "start-file" -> {
-                mutableState.value = current.copy(playing = false, error = null)
+                mutableState.value = current.copy(
+                    playing = false,
+                    videoOutputReady = false,
+                    error = null
+                )
                 return
             }
             "file-loaded" -> {
@@ -308,7 +331,7 @@ class MpvPlayer(
                 return
             }
             "end-file" -> {
-                mutableState.value = current.copy(playing = false)
+                mutableState.value = current.copy(playing = false, videoOutputReady = false)
                 return
             }
             "property-change" -> Unit
@@ -319,8 +342,7 @@ class MpvPlayer(
         mutableState.value = when (name) {
             "time-pos" -> current.copy(
                 positionMs = data?.takeUnless { it.isJsonNull }?.asDouble?.times(1000)?.toLong() ?: 0L,
-                playing = current.running,
-                error = null
+                playing = current.running
             )
             "duration" -> current.copy(
                 durationMs = data?.takeUnless { it.isJsonNull }?.asDouble?.times(1000)?.toLong() ?: 0L
@@ -330,8 +352,7 @@ class MpvPlayer(
                     false
                 } else {
                     current.playing
-                },
-                error = null
+                }
             )
             "media-title" -> current.copy(title = data?.takeUnless { it.isJsonNull }?.asString ?: current.title)
             "demuxer-cache-time" -> current.copy(
@@ -343,6 +364,9 @@ class MpvPlayer(
                 } else {
                     current.playing
                 }
+            )
+            "video-out-params" -> current.copy(
+                videoOutputReady = data != null && !data.isJsonNull
             )
             else -> current
         }

@@ -41,7 +41,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.awt.Canvas
 import java.awt.Dimension
@@ -312,11 +311,12 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
             }
         }
     }
-    LaunchedEffect(playerState.running, playerState.playing, playerState.error) {
+    LaunchedEffect(playerState.running, playerState.playing, playerState.videoOutputReady, playerState.error) {
         DesktopLog.logger.info(
-            "Direct player state running={} playing={} positionMs={} durationMs={} error={}",
+            "Direct player state running={} playing={} videoOutputReady={} positionMs={} durationMs={} error={}",
             playerState.running,
             playerState.playing,
+            playerState.videoOutputReady,
             playerState.positionMs,
             playerState.durationMs,
             playerState.error ?: "<none>"
@@ -350,7 +350,8 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
     }
 
     val playerLoading = videoSurfaceError == null &&
-        (streamLoadState.loading || (playerState.running && !playerState.playing && playerState.error == null))
+        (streamLoadState.loading ||
+            (playerState.running && !playerState.videoOutputReady && playerState.error == null))
     val playerStatus = videoSurfaceError ?: playerState.error ?: streamLoadState.error
     PlayerLayout(
         title = request.title + if (request.mediaType == MediaType.SERIES) {
@@ -358,7 +359,7 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
         } else "",
         backdrop = request.backdropPath,
         videoCanvas = videoCanvas,
-        videoReady = videoWindowId != null && playerState.playing,
+        videoReady = videoWindowId != null && playerState.videoOutputReady,
         state = playerState,
         stream = activeStream,
         loading = playerLoading,
@@ -549,11 +550,12 @@ fun LivePlayerScreen(services: DesktopServices, route: DesktopRoute.LivePlayer) 
             player.play(stream, windowId = it)
         }
     }
-    LaunchedEffect(state.running, state.playing, state.error) {
+    LaunchedEffect(state.running, state.playing, state.videoOutputReady, state.error) {
         DesktopLog.logger.info(
-            "Live player state running={} playing={} positionMs={} durationMs={} error={}",
+            "Live player state running={} playing={} videoOutputReady={} positionMs={} durationMs={} error={}",
             state.running,
             state.playing,
+            state.videoOutputReady,
             state.positionMs,
             state.durationMs,
             state.error ?: "<none>"
@@ -569,10 +571,11 @@ fun LivePlayerScreen(services: DesktopServices, route: DesktopRoute.LivePlayer) 
         title = route.name,
         backdrop = null,
         videoCanvas = videoCanvas,
-        videoReady = videoWindowId != null && state.playing,
+        videoReady = videoWindowId != null && state.videoOutputReady,
         state = state,
         stream = stream,
-        loading = videoSurfaceError == null && (videoWindowId == null || state.running && !state.playing),
+        loading = videoSurfaceError == null &&
+            (videoWindowId == null || state.running && !state.videoOutputReady),
         loadingMessage = "Buffering…",
         status = videoSurfaceError ?: state.error,
         onBack = { player.close(); services.navigator.pop() },
@@ -630,7 +633,13 @@ private fun PlayerLayout(
                 SwingPanel(
                     factory = { videoCanvas },
                     background = Color.Black,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = if (videoReady) {
+                        Modifier.fillMaxSize()
+                    } else {
+                        // Keep a mounted HWND for mpv without allowing the empty heavyweight
+                        // surface to cover the Compose artwork before video output is ready.
+                        Modifier.size(1.dp).align(Alignment.BottomEnd)
+                    },
                     update = { canvas ->
                         canvas.background = java.awt.Color.BLACK
                         canvas.isVisible = true
@@ -654,7 +663,7 @@ private fun PlayerLayout(
                     )
                 }
             }
-            if ((loading && !state.playing) || (!status.isNullOrBlank() && !state.playing)) {
+            if ((loading && !videoReady) || (!status.isNullOrBlank() && !videoReady)) {
                 Row(
                     Modifier.fillMaxWidth().background(Color(0xFF181818))
                         .padding(horizontal = 22.dp, vertical = 12.dp),
