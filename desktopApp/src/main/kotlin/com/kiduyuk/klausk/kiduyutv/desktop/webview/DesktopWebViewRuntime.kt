@@ -1,0 +1,111 @@
+package com.kiduyuk.klausk.kiduyutv.desktop.webview
+
+import dev.datlag.kcef.KCEF
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import java.io.File
+
+sealed interface WebViewRuntimeState {
+    data object NotStarted : WebViewRuntimeState
+    data class Preparing(val message: String, val downloadPercent: Float? = null) : WebViewRuntimeState
+    data object Ready : WebViewRuntimeState
+    data class RestartRequired(val message: String) : WebViewRuntimeState
+    data class Failed(val message: String) : WebViewRuntimeState
+}
+
+/** Owns the single Chromium/JCEF runtime used by all desktop WebView player screens. */
+object DesktopWebViewRuntime {
+    private val runtimeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val mutableState = MutableStateFlow<WebViewRuntimeState>(WebViewRuntimeState.NotStarted)
+    val state: StateFlow<WebViewRuntimeState> = mutableState.asStateFlow()
+
+    private var initializationJob: Job? = null
+
+    @Synchronized
+    fun ensureInitialized(forceRetry: Boolean = false) {
+        if (!forceRetry && mutableState.value == WebViewRuntimeState.Ready) return
+        if (initializationJob?.isActive == true) return
+
+        mutableState.value = WebViewRuntimeState.Preparing("Preparing browser engine…")
+        initializationJob = runtimeScope.launch {
+            runCatching {
+                val appData = System.getenv("LOCALAPPDATA")
+                    ?.takeIf(String::isNotBlank)
+                    ?.let(::File)
+                    ?: File(System.getProperty("user.home"), "AppData/Local")
+                val webViewRoot = File(appData, "KiduyuTV/WebView")
+
+                KCEF.init(
+                    builder = {
+                        installDir(File(webViewRoot, "kcef-bundle"))
+                        progress {
+                            onLocating {
+                                mutableState.value = WebViewRuntimeState.Preparing("Locating browser engine…")
+                            }
+                            onDownloading { percent ->
+                                mutableState.value = WebViewRuntimeState.Preparing(
+                                    message = "Downloading browser engine…",
+                                    downloadPercent = percent.coerceIn(0f, 100f)
+                                )
+                            }
+                            onExtracting {
+                                mutableState.value = WebViewRuntimeState.Preparing("Extracting browser engine…")
+                            }
+                            onInstall {
+                                mutableState.value = WebViewRuntimeState.Preparing("Installing browser engine…")
+                            }
+                            onInitializing {
+                                mutableState.value = WebViewRuntimeState.Preparing("Starting browser engine…")
+                            }
+                            onInitialized {
+                                mutableState.value = WebViewRuntimeState.Ready
+                            }
+                        }
+                        settings {
+                            cachePath = File(webViewRoot, "cache").absolutePath
+                            windowlessRenderingEnabled = true
+                        }
+                        addArgs(
+                            "--autoplay-policy=no-user-gesture-required",
+                            "--disable-features=TranslateUI"
+                        )
+                    },
+                    onError = { error ->
+                        mutableState.value = WebViewRuntimeState.Failed(
+                            error.message ?: "The browser engine could not be initialized."
+                        )
+                    },
+                    onRestartRequired = {
+                        mutableState.value = WebViewRuntimeState.RestartRequired(
+                            "The browser engine was updated. Restart KiduyuTV to use WebView playback."
+                        )
+                    }
+                )
+                if (mutableState.value !is WebViewRuntimeState.RestartRequired &&
+                    mutableState.value !is WebViewRuntimeState.Failed
+                ) {
+                    mutableState.value = WebViewRuntimeState.Ready
+                }
+            }.onFailure { error ->
+                mutableState.value = WebViewRuntimeState.Failed(
+                    error.message ?: "The browser engine could not be initialized."
+                )
+            }
+        }
+    }
+
+    fun dispose() {
+        initializationJob?.cancel()
+        if (mutableState.value == WebViewRuntimeState.Ready) {
+            runCatching { KCEF.disposeBlocking() }
+        }
+        runtimeScope.cancel()
+    }
+}

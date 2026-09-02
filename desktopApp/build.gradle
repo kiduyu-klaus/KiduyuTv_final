@@ -87,6 +87,7 @@ dependencies {
     implementation 'com.google.code.gson:gson:2.10.1'
     implementation 'net.java.dev.jna:jna:5.15.0'
     implementation 'net.java.dev.jna:jna-platform:5.15.0'
+    implementation 'io.github.kevinnzou:compose-webview-multiplatform-desktop:2.0.3'
     
     // Database
     implementation 'org.xerial:sqlite-jdbc:3.45.0.0'
@@ -122,6 +123,8 @@ compose.desktop {
             '-Xmx1G',
             '-Dfile.encoding=UTF-8',
             '-Dcompose.interop.blending=true',
+            '--add-opens=java.desktop/sun.awt=ALL-UNNAMED',
+            '--add-opens=java.desktop/java.awt.peer=ALL-UNNAMED',
             "-Dkiduyutv.version=${project.version}".toString()
         ])
 
@@ -146,6 +149,7 @@ compose.desktop {
 
         buildTypes.release.proguard {
             obfuscate.set(false)
+            configurationFiles.from(project.file('compose-desktop.pro'))
         }
     }
 }

@@ -1,0 +1,3 @@
+-keep class org.cef.** { *; }
+-keep class dev.datlag.kcef.** { *; }
+-keep class kotlinx.coroutines.swing.SwingDispatcherFactory

@@ -8,6 +8,7 @@ import com.kiduyuk.klausk.kiduyutv.desktop.data.*
 import com.kiduyuk.klausk.kiduyutv.desktop.model.*
 import com.kiduyuk.klausk.kiduyutv.desktop.navigation.DesktopNavigator
 import com.kiduyuk.klausk.kiduyutv.desktop.navigation.PrimaryDestination
+import com.kiduyuk.klausk.kiduyutv.desktop.webview.DesktopWebViewRuntime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 
@@ -45,6 +46,7 @@ class DesktopAppState(
     }
 
     fun dispose() {
+        DesktopWebViewRuntime.dispose()
         scope.cancel()
     }
 }

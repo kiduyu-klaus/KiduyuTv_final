@@ -34,6 +34,7 @@ sealed interface DesktopRoute {
     data class ImageSlider(val urls: List<String>, val initialIndex: Int) : DesktopRoute
     data object TraktProfile : DesktopRoute
     data class StreamLinks(val request: PlayRequest) : DesktopRoute
+    data class WebPlayer(val request: PlayRequest, val providerName: String) : DesktopRoute
     data class Player(val request: PlayRequest) : DesktopRoute
     data class LivePlayer(val name: String, val url: String, val headers: Map<String, String> = emptyMap()) : DesktopRoute
 }

@@ -48,6 +48,7 @@ fun KiduyuDesktopApp(services: DesktopServices) {
             is DesktopRoute.ImageSlider -> ImageSliderScreen(services, route)
             is DesktopRoute.TraktProfile -> TraktProfileScreen(services)
             is DesktopRoute.StreamLinks -> StreamLinksScreen(services, route.request)
+            is DesktopRoute.WebPlayer -> WebPlayerScreen(services, route)
             is DesktopRoute.Player -> DirectPlayerScreen(services, route.request)
             is DesktopRoute.LivePlayer -> LivePlayerScreen(services, route)
         }

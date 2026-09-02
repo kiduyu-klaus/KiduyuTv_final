@@ -22,6 +22,7 @@ import com.kiduyuk.klausk.kiduyutv.desktop.model.*
 import com.kiduyuk.klausk.kiduyutv.desktop.navigation.DesktopRoute
 import com.kiduyuk.klausk.kiduyutv.desktop.player.MpvPlayer
 import com.kiduyuk.klausk.kiduyutv.desktop.player.StreamRanker
+import com.kiduyuk.klausk.kiduyutv.desktop.webview.StreamProviderManager
 import com.sun.jna.Native
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -31,35 +32,24 @@ import java.util.concurrent.TimeUnit
 
 @Composable
 fun StreamLinksScreen(services: DesktopServices, request: PlayRequest) {
-    var providers by remember { mutableStateOf<List<String>>(emptyList()) }
-    var loading by remember { mutableStateOf(true) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var reload by remember { mutableIntStateOf(0) }
-    LaunchedEffect(reload) {
-        loading = true
-        runCatching { services.providers.enabledProviders() }
-            .onSuccess { providers = it; error = null }
-            .onFailure { error = it.message }
-        loading = false
+    if (services.settings.directStreamEnabled) {
+        LaunchedEffect(request) {
+            services.navigator.pop()
+            services.navigator.push(DesktopRoute.Player(request))
+        }
+        LoadingView("Opening direct stream player…")
+        return
     }
+    val providers = StreamProviderManager.providers
     Column(Modifier.fillMaxSize()) {
         ScreenHeader("Choose a server — ${request.title}", { services.navigator.pop() })
-        when {
-            loading -> LoadingView("Loading enabled providers…")
-            error != null -> ErrorView(error.orEmpty()) { reload++ }
-            else -> LazyColumn(
-                contentPadding = PaddingValues(28.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                item {
-                    ProviderButton("All Providers", "Automatic aggregate stream discovery") {
-                        services.navigator.push(DesktopRoute.Player(request.copy(provider = null)))
-                    }
-                }
-                items(providers, key = { it }) { provider ->
-                    ProviderButton(provider.replaceFirstChar(Char::uppercase), "Play using $provider") {
-                        services.navigator.push(DesktopRoute.Player(request.copy(provider = provider)))
-                    }
+        LazyColumn(
+            contentPadding = PaddingValues(28.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(providers, key = { it.name }) { provider ->
+                ProviderButton(provider.name, "Open ${provider.name} in WebView") {
+                    services.navigator.push(DesktopRoute.WebPlayer(request, provider.name))
                 }
             }
         }
