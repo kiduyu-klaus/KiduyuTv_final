@@ -18,6 +18,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.awt.SwingPanel
 import com.kiduyuk.klausk.kiduyutv.desktop.DesktopServices
+import com.kiduyuk.klausk.kiduyutv.desktop.data.DesktopLog
+import com.kiduyuk.klausk.kiduyutv.desktop.data.logSafe
 import com.kiduyuk.klausk.kiduyutv.desktop.model.*
 import com.kiduyuk.klausk.kiduyutv.desktop.navigation.DesktopRoute
 import com.kiduyuk.klausk.kiduyutv.desktop.player.MpvPlayer
@@ -35,8 +37,19 @@ import java.util.concurrent.TimeUnit
 
 @Composable
 fun StreamLinksScreen(services: DesktopServices, request: PlayRequest) {
+    LaunchedEffect(request) {
+        DesktopLog.logger.info(
+            "StreamLinksScreen opened title={} type={} tmdbId={} provider={} directStreamEnabled={}",
+            request.title,
+            request.mediaType,
+            request.tmdbId,
+            request.provider ?: "<aggregate>",
+            services.settings.directStreamEnabled
+        )
+    }
     if (services.settings.directStreamEnabled) {
         LaunchedEffect(request) {
+            DesktopLog.logger.info("Opening direct player title={} tmdbId={}", request.title, request.tmdbId)
             services.navigator.pop()
             services.navigator.push(DesktopRoute.Player(request))
         }
@@ -44,6 +57,7 @@ fun StreamLinksScreen(services: DesktopServices, request: PlayRequest) {
         return
     }
     val providers = StreamProviderManager.providers
+    DesktopLog.logger.debug("Rendering WebView provider chooser count={}", providers.size)
     Column(Modifier.fillMaxSize()) {
         ScreenHeader("Choose a server — ${request.title}", { services.navigator.pop() })
         LazyColumn(
@@ -52,6 +66,13 @@ fun StreamLinksScreen(services: DesktopServices, request: PlayRequest) {
         ) {
             items(providers, key = { it.name }) { provider ->
                 ProviderButton(provider.name, "Open ${provider.name} in WebView") {
+                    DesktopLog.logger.info(
+                        "Opening WebView provider={} title={} tmdbId={} type={}",
+                        provider.name,
+                        request.title,
+                        request.tmdbId,
+                        request.mediaType
+                    )
                     services.navigator.push(DesktopRoute.WebPlayer(request, provider.name))
                 }
             }
@@ -74,6 +95,17 @@ private fun ProviderButton(name: String, subtitle: String, onClick: () -> Unit) 
 
 @Composable
 fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
+    LaunchedEffect(request) {
+        DesktopLog.logger.info(
+            "DirectPlayerScreen opened title={} type={} tmdbId={} season={} episode={} provider={}",
+            request.title,
+            request.mediaType,
+            request.tmdbId,
+            request.season,
+            request.episode,
+            request.provider ?: "<aggregate>"
+        )
+    }
     val scope = rememberCoroutineScope()
     val player = remember { MpvPlayer(services.settings, scope) }
     val playerState by player.state.collectAsState()
@@ -97,12 +129,25 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
             true
         }
         videoWindowId = if (surfaceReady == true) {
-            runCatching { windowsMpvWindowId(videoCanvas) }.getOrNull()?.takeIf { it != 0L }
+            runCatching { windowsMpvWindowId(videoCanvas) }
+                .onFailure { DesktopLog.logger.error("Failed to obtain embedded mpv window ID", it) }
+                .getOrNull()
+                ?.takeIf { it != 0L }
         } else {
             null
         }
+        DesktopLog.logger.info(
+            "Embedded mpv surface ready={} displayable={} showing={} size={}x{} windowId={}",
+            surfaceReady == true,
+            videoCanvas.isDisplayable,
+            videoCanvas.isShowing,
+            videoCanvas.width,
+            videoCanvas.height,
+            videoWindowId
+        )
         if (videoWindowId == null) {
             videoSurfaceError = "The embedded video surface could not be initialized."
+            DesktopLog.logger.error("Embedded mpv surface initialization failed")
         }
     }
     var streams by remember(request) { mutableStateOf<List<StreamItem>>(emptyList()) }
@@ -119,6 +164,16 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
     val resume = remember(request) { services.library.progress(request) }
 
     fun start(stream: StreamItem, positionMs: Long) {
+        DesktopLog.logger.info(
+            "Starting direct stream name={} provider={} type={} quality={} url={} resumeMs={} windowId={}",
+            stream.displayName,
+            stream.provider,
+            stream.type,
+            stream.quality,
+            stream.url.logSafe(500),
+            positionMs,
+            videoWindowId
+        )
         activeStream = stream
         player.play(stream, positionMs, videoWindowId)
     }
@@ -132,6 +187,13 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
         var lastFailure: Throwable? = null
         // ProvidersClient completes only after provider discovery, every enabled-provider
         // request, and each provider retry has finished.
+        DesktopLog.logger.info(
+            "Starting provider stream fetch title={} tmdbId={} type={} providerMode={}",
+            request.title,
+            request.tmdbId,
+            request.mediaType,
+            request.provider ?: "aggregate-enabled-providers"
+        )
         val result = runCatching {
             services.providers.streams(
                 request = request,
@@ -150,14 +212,23 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
         }
         val found = result.getOrElse {
             lastFailure = it
+            DesktopLog.logger.error("Provider stream fetch failed", it)
             emptyList()
         }
+        DesktopLog.logger.info("Provider stream fetch completed totalStreams={}", found.size)
         streams = StreamRanker.sorted(found)
         if (streams.isEmpty()) {
             fetchError = lastFailure?.message ?: "No streams were found"
+            DesktopLog.logger.warn("No playable streams found error={}", fetchError)
             showNoStreams = true
         } else {
-            StreamRanker.automatic(streams)?.let { start(it, resume?.positionMs ?: 0L) }
+            val automatic = StreamRanker.automatic(streams)
+            DesktopLog.logger.info(
+                "Playable streams sorted count={} automaticSelection={}",
+                streams.size,
+                automatic?.displayName ?: "<none>"
+            )
+            automatic?.let { start(it, resume?.positionMs ?: 0L) }
         }
         loading = false
     }
@@ -173,17 +244,35 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
             }
         }
     }
+    LaunchedEffect(playerState.running, playerState.playing, playerState.error) {
+        DesktopLog.logger.info(
+            "Direct player state running={} playing={} positionMs={} durationMs={} error={}",
+            playerState.running,
+            playerState.playing,
+            playerState.positionMs,
+            playerState.durationMs,
+            playerState.error ?: "<none>"
+        )
+    }
     LaunchedEffect(playerState.running, playerState.durationMs, playerState.positionMs) {
         if (!playerState.running && playerState.durationMs > 0L &&
             playerState.positionMs >= playerState.durationMs * 0.92 &&
             request.mediaType == MediaType.SERIES
         ) {
             val next = request.copy(episode = (request.episode ?: 1) + 1, provider = request.provider)
+            DesktopLog.logger.info("Auto-advancing to next episode season={} episode={}", next.season, next.episode)
             services.navigator.push(DesktopRoute.Player(next))
         }
     }
     DisposableEffect(request) {
         onDispose {
+            DesktopLog.logger.info(
+                "DirectPlayerScreen disposed title={} tmdbId={} positionMs={} durationMs={}",
+                request.title,
+                request.tmdbId,
+                playerState.positionMs,
+                playerState.durationMs
+            )
             if (playerState.positionMs > 0L) {
                 services.library.saveProgress(request.toProgress(playerState.positionMs, playerState.durationMs))
             }
@@ -211,40 +300,79 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
                 (playerLoading && !playerState.playing) ||
                 (!playerStatus.isNullOrBlank() && !playerState.playing),
         onBack = {
+            DesktopLog.logger.info("Direct player back pressed title={} tmdbId={}", request.title, request.tmdbId)
             if (playerState.positionMs > 0L) {
                 services.library.saveProgress(request.toProgress(playerState.positionMs, playerState.durationMs))
             }
             player.close()
             services.navigator.pop()
         },
-        onPause = player::togglePause,
-        onRewind = { player.seekBy(-30) },
-        onForward = { player.seekBy(30) },
-        onSeek = player::seekTo,
-        onStreams = { showStreams = true },
-        onTracks = { showTracks = true },
-        onSubtitle = { showSubtitle = true },
-        onFullscreen = player::toggleFullscreen,
+        onPause = {
+            DesktopLog.logger.info("Direct player pause toggle")
+            player.togglePause()
+        },
+        onRewind = {
+            DesktopLog.logger.info("Direct player rewind seconds=30")
+            player.seekBy(-30)
+        },
+        onForward = {
+            DesktopLog.logger.info("Direct player forward seconds=30")
+            player.seekBy(30)
+        },
+        onSeek = {
+            DesktopLog.logger.info("Direct player seek positionMs={}", it)
+            player.seekTo(it)
+        },
+        onStreams = {
+            DesktopLog.logger.info("Opening direct stream selection count={}", streams.size)
+            showStreams = true
+        },
+        onTracks = {
+            DesktopLog.logger.info("Opening direct track dialog")
+            showTracks = true
+        },
+        onSubtitle = {
+            DesktopLog.logger.info("Opening direct subtitle dialog")
+            showSubtitle = true
+        },
+        onFullscreen = {
+            DesktopLog.logger.info("Direct player fullscreen toggle")
+            player.toggleFullscreen()
+        },
         onPrevious = if (request.mediaType == MediaType.SERIES && (request.episode ?: 1) > 1) ({
+            DesktopLog.logger.info("Navigating to previous episode episode={}", (request.episode ?: 1) - 1)
             services.navigator.push(DesktopRoute.Player(request.copy(episode = (request.episode ?: 1) - 1)))
         }) else null,
         onNext = if (request.mediaType == MediaType.SERIES) ({
+            DesktopLog.logger.info("Navigating to next episode episode={}", (request.episode ?: 1) + 1)
             services.navigator.push(DesktopRoute.Player(request.copy(episode = (request.episode ?: 1) + 1)))
         }) else null
     )
 
     if (showNoStreams && !playerState.playing) {
+        DesktopLog.logger.info("Showing no-streams dialog error={}", fetchError ?: "<none>")
         AlertDialog(
             onDismissRequest = {},
             title = { Text("No streams found") },
             text = { Text(fetchError ?: "No provider returned a stream.") },
-            confirmButton = { TextButton({ attempt++ }) { Text("Retry") } },
-            dismissButton = { TextButton({ services.navigator.pop() }) { Text("Exit") } }
+            confirmButton = {
+                TextButton({
+                    DesktopLog.logger.info("Retrying direct provider stream fetch")
+                    attempt++
+                }) { Text("Retry") }
+            },
+            dismissButton = {
+                TextButton({
+                    DesktopLog.logger.info("Exiting after no direct streams")
+                    services.navigator.pop()
+                }) { Text("Exit") }
+            }
         )
     }
     if (showStreams) {
         StreamSelectionDialog(streams, activeStream, {
             val resumeAt = playerState.positionMs
+            DesktopLog.logger.info("Manual stream selected name={} provider={}", it.displayName, it.provider)
             start(it, resumeAt)
             showStreams = false
         }, { showStreams = false })
@@ -287,6 +415,13 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
 
 @Composable
 fun LivePlayerScreen(services: DesktopServices, route: DesktopRoute.LivePlayer) {
+    LaunchedEffect(route) {
+        DesktopLog.logger.info(
+            "LivePlayerScreen opened name={} url={}",
+            route.name,
+            route.url.logSafe(500)
+        )
+    }
     val scope = rememberCoroutineScope()
     val player = remember { MpvPlayer(services.settings, scope) }
     val state by player.state.collectAsState()
@@ -310,21 +445,52 @@ fun LivePlayerScreen(services: DesktopServices, route: DesktopRoute.LivePlayer) 
             true
         }
         videoWindowId = if (surfaceReady == true) {
-            runCatching { windowsMpvWindowId(videoCanvas) }.getOrNull()?.takeIf { it != 0L }
+            runCatching { windowsMpvWindowId(videoCanvas) }
+                .onFailure { DesktopLog.logger.error("Failed to obtain live embedded mpv window ID", it) }
+                .getOrNull()
+                ?.takeIf { it != 0L }
         } else {
             null
         }
+        DesktopLog.logger.info(
+            "Live embedded mpv surface ready={} displayable={} showing={} size={}x{} windowId={}",
+            surfaceReady == true,
+            videoCanvas.isDisplayable,
+            videoCanvas.isShowing,
+            videoCanvas.width,
+            videoCanvas.height,
+            videoWindowId
+        )
         if (videoWindowId == null) {
             videoSurfaceError = "The embedded video surface could not be initialized."
+            DesktopLog.logger.error("Live embedded mpv surface initialization failed")
         }
     }
     val stream = remember(route) {
         StreamItem(name = route.name, title = route.name, url = route.url, provider = "Live TV", type = "hls", headers = route.headers)
     }
     LaunchedEffect(route, videoWindowId) {
-        videoWindowId?.let { player.play(stream, windowId = it) }
+        videoWindowId?.let {
+            DesktopLog.logger.info("Starting live stream name={} url={} windowId={}", route.name, route.url.logSafe(500), it)
+            player.play(stream, windowId = it)
+        }
     }
-    DisposableEffect(route) { onDispose { player.close() } }
+    LaunchedEffect(state.running, state.playing, state.error) {
+        DesktopLog.logger.info(
+            "Live player state running={} playing={} positionMs={} durationMs={} error={}",
+            state.running,
+            state.playing,
+            state.positionMs,
+            state.durationMs,
+            state.error ?: "<none>"
+        )
+    }
+    DisposableEffect(route) {
+        onDispose {
+            DesktopLog.logger.info("LivePlayerScreen disposed name={} positionMs={}", route.name, state.positionMs)
+            player.close()
+        }
+    }
     PlayerLayout(
         title = route.name,
         backdrop = null,
