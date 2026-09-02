@@ -136,7 +136,7 @@ private fun saveWatchedCache(
             .putInt(KEY_CACHED_PAGE, lastLoadedPage)
             .putBoolean(KEY_CACHED_HAS_MORE, hasMore)
             .apply()
-        //Log.i("MyListScreen", "Saved ${items.size} watched items to cache (page=$lastLoadedPage, hasMore=$hasMore)")
+        Log.d(TAG, "Saved watched cache: items=${items.size}, page=$lastLoadedPage, hasMore=$hasMore")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to save watched cache: ${e.message}", e)
     }
@@ -165,10 +165,10 @@ private fun loadWatchedCache(context: Context): WatchedCache? {
                     voteAverage = it.voteAverage
                 )
             }
-            //Log.i("MyListScreen", "Loaded ${items.get(0).posterPath} ")
+            Log.d(TAG, "Loaded watched cache payload: items=${items.size}")
             val lastPage = prefs.getInt(KEY_CACHED_PAGE, 0)
             val hasMore = prefs.getBoolean(KEY_CACHED_HAS_MORE, true)
-            //Log.i("MyListScreen", "Loaded ${items.size} watched items from cache (page=$lastPage, hasMore=$hasMore)")
+            Log.d(TAG, "Loaded watched cache metadata: page=$lastPage, hasMore=$hasMore")
             WatchedCache(items, lastPage, hasMore)
         }
     } catch (e: Exception) {
@@ -180,7 +180,7 @@ private fun loadWatchedCache(context: Context): WatchedCache? {
 /** Clear the watched cache (e.g. on logout). */
 private fun clearWatchedCache(context: Context) {
     context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().clear().apply()
-    //Log.i("MyListScreen", "Watched cache cleared")
+    Log.i(TAG, "Watched cache cleared")
 }
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -243,9 +243,11 @@ fun MyListScreen(
         history: List<TraktHistoryItem>,
         onItemProcessed: suspend () -> Unit
     ): List<MyListItem> = withContext(Dispatchers.IO) {
+        Log.d(TAG, "Starting Trakt history enrichment: records=${history.size}")
         val pageItems = mutableListOf<MyListItem>()
 
         history.forEach { item ->
+            Log.d(TAG, "Processing Trakt history record: type=${item.type}")
             when (item.type) {
                 "movie" -> {
                     val movie = item.movie
@@ -253,6 +255,7 @@ fun MyListScreen(
                     if (tmdbId != null) {
                         val cacheKey = "movie-$tmdbId"
                         if (processedTmdbIds.add(cacheKey)) {
+                            Log.d(TAG, "Enriching watched movie from TMDB: tmdbId=$tmdbId")
                             var posterPath: String? = null
                             var rating = movie.rating ?: 0.0
                             try {
@@ -260,7 +263,7 @@ fun MyListScreen(
                                 posterPath = detail.posterPath
                                 if (rating == 0.0) rating = detail.voteAverage
                             } catch (e: Exception) {
-                                Log.e("MyListScreen", "TMDB movie detail failed for $tmdbId: ${e.message}")
+                                Log.e(TAG, "TMDB movie detail failed for watched movie $tmdbId: ${e.message}", e)
                             }
                             pageItems.add(
                                 MyListItem(
@@ -280,6 +283,7 @@ fun MyListScreen(
                     if (tmdbId != null) {
                         val cacheKey = "tv-$tmdbId"
                         if (processedTmdbIds.add(cacheKey)) {
+                            Log.d(TAG, "Enriching watched TV show from TMDB: tmdbId=$tmdbId")
                             var posterPath: String? = null
                             var rating = show.rating ?: 0.0
                             try {
@@ -287,7 +291,7 @@ fun MyListScreen(
                                 posterPath = detail.posterPath
                                 if (rating == 0.0) rating = detail.voteAverage
                             } catch (e: Exception) {
-                                Log.e("MyListScreen", "TMDB tv detail failed for $tmdbId: ${e.message}")
+                                Log.e(TAG, "TMDB TV detail failed for watched show $tmdbId: ${e.message}", e)
                             }
                             pageItems.add(
                                 MyListItem(
@@ -301,9 +305,11 @@ fun MyListScreen(
                         }
                     }
                 }
+                else -> Log.w(TAG, "Skipping unsupported Trakt history type=${item.type}")
             }
             onItemProcessed()
         }
+        Log.d(TAG, "Completed Trakt history enrichment: uniqueItems=${pageItems.size}")
         pageItems
     }
 
@@ -417,7 +423,7 @@ fun MyListScreen(
         Log.i(TAG, "Watched tab connection state changed: connected=$isTraktConnected")
 
         if (!isTraktConnected) {
-            //Log.i("MyListScreen", "Trakt not connected, clearing history")
+            Log.d(TAG, "Trakt disconnected; clearing watched history state")
             watchedItems = emptyList()
             hasMoreWatched = true
             currentWatchedPage = 0
@@ -468,7 +474,7 @@ fun MyListScreen(
                                     )
                                 }
                             } catch (e: Exception) {
-                                Log.e("MyListScreen", "Failed to enrich cached item ${item.id}: ${e.message}")
+                                Log.e(TAG, "Failed to enrich cached watched item ${item.id}: ${e.message}", e)
                                 item
                             }
                         } else {
@@ -513,10 +519,7 @@ fun MyListScreen(
                 total > 0 &&
                 lastVisible >= total - WATCHED_END_THRESHOLD
             ) {
-                /*Log.i(
-                    "MyListScreen",
-                    "End-of-grid reached (last=$lastVisible, total=$total) — loading more"
-                )*/
+                Log.d(TAG, "Watched grid reached load threshold: lastVisible=$lastVisible, total=$total")
                 loadNextWatchedPage()
             }
         }
@@ -672,6 +675,7 @@ fun MyListScreen(
                                     watchedHistoryTotal = null
                                     watchedHistoryLoaded = 0
                                     isInitialLoading = true
+                                    Log.i(TAG, "Manual watched-history refresh requested by user")
                                     loadNextWatchedPage()
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
