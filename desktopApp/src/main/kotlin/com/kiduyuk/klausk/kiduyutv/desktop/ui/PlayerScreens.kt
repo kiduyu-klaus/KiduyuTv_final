@@ -17,6 +17,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.awt.SwingPanel
+import androidx.compose.ui.window.DialogWindow
+import androidx.compose.ui.window.rememberDialogState
 import com.kiduyuk.klausk.kiduyutv.desktop.DesktopServices
 import com.kiduyuk.klausk.kiduyutv.desktop.data.DesktopLog
 import com.kiduyuk.klausk.kiduyutv.desktop.data.logSafe
@@ -26,6 +28,7 @@ import com.kiduyuk.klausk.kiduyutv.desktop.player.MpvPlayer
 import com.kiduyuk.klausk.kiduyutv.desktop.player.StreamRanker
 import com.kiduyuk.klausk.kiduyutv.desktop.webview.StreamProviderManager
 import com.sun.jna.Native
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -178,7 +181,12 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
         player.play(stream, positionMs, videoWindowId)
     }
 
-    LaunchedEffect(request, attempt, videoWindowId) {
+    LaunchedEffect(request, attempt) {
+        // Wait inside one stable effect instead of using videoWindowId as an effect key.
+        // A native-surface handle transition must not cancel an in-flight aggregate fetch.
+        while (isActive && videoWindowId == null && videoSurfaceError == null) {
+            delay(50L)
+        }
         if (videoWindowId == null) return@LaunchedEffect
         loading = true
         fetchError = null
@@ -194,7 +202,7 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
             request.mediaType,
             request.provider ?: "aggregate-enabled-providers"
         )
-        val result = runCatching {
+        val found = try {
             services.providers.streams(
                 request = request,
                 provider = request.provider,
@@ -209,10 +217,12 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
                     }
                 }
             )
-        }
-        val found = result.getOrElse {
-            lastFailure = it
-            DesktopLog.logger.error("Provider stream fetch failed", it)
+        } catch (cancelled: CancellationException) {
+            // Leaving or restarting this effect is not a provider failure.
+            throw cancelled
+        } catch (error: Exception) {
+            lastFailure = error
+            DesktopLog.logger.error("Provider stream fetch failed", error)
             emptyList()
         }
         DesktopLog.logger.info("Provider stream fetch completed totalStreams={}", found.size)
@@ -283,7 +293,6 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
     val playerLoading = videoSurfaceError == null &&
         (loading || (playerState.running && !playerState.playing && playerState.error == null))
     val playerStatus = videoSurfaceError ?: playerState.error ?: fetchError
-    val dialogVisible = showNoStreams || showStreams || showTracks || showSubtitle
     PlayerLayout(
         title = request.title + if (request.mediaType == MediaType.SERIES) {
             "  S${request.season ?: 1} E${request.episode ?: 1}"
@@ -295,10 +304,6 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
         loading = playerLoading,
         loadingMessage = if (activeStream == null) fetchStatus else "Buffering…",
         status = playerStatus,
-        videoObscured =
-            dialogVisible ||
-                (playerLoading && !playerState.playing) ||
-                (!playerStatus.isNullOrBlank() && !playerState.playing),
         onBack = {
             DesktopLog.logger.info("Direct player back pressed title={} tmdbId={}", request.title, request.tmdbId)
             if (playerState.positionMs > 0L) {
@@ -349,25 +354,28 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
         }) else null
     )
 
+    LaunchedEffect(showNoStreams, fetchError) {
+        if (showNoStreams) {
+            DesktopLog.logger.info("Showing no-streams dialog error={}", fetchError ?: "<none>")
+        }
+    }
     if (showNoStreams && !playerState.playing) {
-        DesktopLog.logger.info("Showing no-streams dialog error={}", fetchError ?: "<none>")
-        AlertDialog(
+        PlayerDialogWindow(
+            title = "No streams found",
             onDismissRequest = {},
-            title = { Text("No streams found") },
-            text = { Text(fetchError ?: "No provider returned a stream.") },
-            confirmButton = {
+            actions = {
                 TextButton({
                     DesktopLog.logger.info("Retrying direct provider stream fetch")
                     attempt++
                 }) { Text("Retry") }
-            },
-            dismissButton = {
                 TextButton({
                     DesktopLog.logger.info("Exiting after no direct streams")
                     services.navigator.pop()
                 }) { Text("Exit") }
             }
-        )
+        ) {
+            Text(fetchError ?: "No provider returned a stream.")
+        }
     }
     if (showStreams) {
         StreamSelectionDialog(streams, activeStream, {
@@ -378,38 +386,39 @@ fun DirectPlayerScreen(services: DesktopServices, request: PlayRequest) {
         }, { showStreams = false })
     }
     if (showTracks) {
-        AlertDialog(
+        PlayerDialogWindow(
+            title = "Tracks",
             onDismissRequest = { showTracks = false },
-            title = { Text("Tracks") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Cycle through the tracks exposed by the current stream.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    TvActionButton("Next video track", player::cycleVideo, Modifier.fillMaxWidth())
-                    TvActionButton("Next audio track", player::cycleAudio, Modifier.fillMaxWidth())
-                    TvActionButton("Next subtitle track", player::cycleSubtitle, Modifier.fillMaxWidth())
-                }
-            },
-            confirmButton = { TextButton({ showTracks = false }) { Text("Done") } }
-        )
+            actions = { TextButton({ showTracks = false }) { Text("Done") } }
+        ) {
+            Text(
+                "Cycle through the tracks exposed by the current stream.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            TvActionButton("Next video track", player::cycleVideo, Modifier.fillMaxWidth())
+            TvActionButton("Next audio track", player::cycleAudio, Modifier.fillMaxWidth())
+            TvActionButton("Next subtitle track", player::cycleSubtitle, Modifier.fillMaxWidth())
+        }
     }
     if (showSubtitle) {
-        AlertDialog(
+        PlayerDialogWindow(
+            title = "Load subtitle",
             onDismissRequest = { showSubtitle = false },
-            title = { Text("Load subtitle") },
-            text = {
-                OutlinedTextField(
-                    subtitleUrl, { subtitleUrl = it },
-                    label = { Text("SRT or VTT URL/file") }, modifier = Modifier.fillMaxWidth()
-                )
-            },
-            confirmButton = {
+            actions = {
                 TextButton({
                     subtitleUrl.takeIf(String::isNotBlank)?.let(player::addSubtitle)
                     showSubtitle = false
                 }) { Text("Load") }
-            },
-            dismissButton = { TextButton({ showSubtitle = false }) { Text("Cancel") } }
-        )
+                TextButton({ showSubtitle = false }) { Text("Cancel") }
+            }
+        ) {
+            OutlinedTextField(
+                subtitleUrl,
+                { subtitleUrl = it },
+                label = { Text("SRT or VTT URL/file") },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }
 
@@ -500,9 +509,6 @@ fun LivePlayerScreen(services: DesktopServices, route: DesktopRoute.LivePlayer) 
         loading = videoSurfaceError == null && (videoWindowId == null || state.running && !state.playing),
         loadingMessage = "Buffering…",
         status = videoSurfaceError ?: state.error,
-        videoObscured =
-            videoWindowId == null || (state.running && !state.playing) ||
-                videoSurfaceError != null || state.error != null,
         onBack = { player.close(); services.navigator.pop() },
         onPause = player::togglePause,
         onRewind = { player.seekBy(-30) },
@@ -527,7 +533,6 @@ private fun PlayerLayout(
     loading: Boolean,
     loadingMessage: String,
     status: String?,
-    videoObscured: Boolean,
     onBack: () -> Unit,
     onPause: () -> Unit,
     onRewind: () -> Unit,
@@ -554,32 +559,28 @@ private fun PlayerLayout(
                 SwingPanel(
                     factory = { videoCanvas },
                     background = Color.Black,
-                    modifier = if (videoObscured) {
-                        // Keep the native HWND alive for mpv, but move its heavyweight
-                        // surface out of the way so Compose status content and dialogs
-                        // are painted above it.
-                        Modifier.align(Alignment.BottomEnd).size(1.dp)
-                    } else {
-                        Modifier.fillMaxSize()
-                    },
-                    // AWT Canvas is heavyweight on Windows and can otherwise paint over
-                    // Compose dialogs/status content. Resizing instead of hiding preserves
-                    // the HWND that the running mpv process is attached to.
+                    modifier = Modifier.fillMaxSize(),
                     update = { canvas ->
                         canvas.background = java.awt.Color.BLACK
                         canvas.isVisible = true
                     }
                 )
-                if (loading && !state.playing) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CircularProgressIndicator()
-                        Text(loadingMessage, color = Color.White)
+            }
+            if ((loading && !state.playing) || (!status.isNullOrBlank() && !state.playing)) {
+                Row(
+                    Modifier.fillMaxWidth().background(Color(0xFF181818))
+                        .padding(horizontal = 22.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (loading && status.isNullOrBlank()) {
+                        CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 3.dp)
                     }
-                } else if (!status.isNullOrBlank() && !state.playing) {
                     Text(
-                        status,
+                        if (!status.isNullOrBlank()) status else loadingMessage,
                         color = Color.White,
-                        modifier = Modifier.background(Color(0xB3000000), RoundedCornerShape(10.dp)).padding(16.dp)
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -627,33 +628,75 @@ private fun StreamSelectionDialog(
     onSelect: (StreamItem) -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
+    PlayerDialogWindow(
+        title = "Choose stream",
         onDismissRequest = onDismiss,
-        title = { Text("Choose stream") },
-        text = {
-            LazyColumn(Modifier.widthIn(min = 520.dp, max = 760.dp).heightIn(max = 520.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(streams, key = { "${it.provider}-${it.name}-${it.quality}-${it.url.hashCode()}" }) { stream ->
-                    Card(
-                        onClick = { onSelect(stream) },
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (stream == active) MaterialTheme.colorScheme.primaryContainer
-                            else MaterialTheme.colorScheme.surfaceVariant
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(stream.displayName, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(stream.provider, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Text(stream.quality, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
+        width = 800.dp,
+        height = 620.dp,
+        actions = { TextButton(onDismiss) { Text("Close") } }
+    ) {
+        LazyColumn(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(streams, key = { "${it.provider}-${it.name}-${it.quality}-${it.url.hashCode()}" }) { stream ->
+                Card(
+                    onClick = { onSelect(stream) },
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (stream == active) MaterialTheme.colorScheme.primaryContainer
+                        else MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(stream.displayName, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(stream.provider, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
+                        Text(stream.quality, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                     }
                 }
             }
-        },
-        confirmButton = { TextButton(onDismiss) { Text("Close") } }
-    )
+        }
+    }
+}
+
+@Composable
+private fun PlayerDialogWindow(
+    title: String,
+    onDismissRequest: () -> Unit,
+    width: androidx.compose.ui.unit.Dp = 620.dp,
+    height: androidx.compose.ui.unit.Dp = 360.dp,
+    actions: @Composable RowScope.() -> Unit,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    val typography = MaterialTheme.typography
+    DialogWindow(
+        onCloseRequest = onDismissRequest,
+        state = rememberDialogState(width = width, height = height),
+        title = title,
+        resizable = false,
+        alwaysOnTop = true
+    ) {
+        MaterialTheme(colorScheme = colorScheme, typography = typography) {
+            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
+                Column(
+                    Modifier.fillMaxSize().padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Column(
+                        Modifier.weight(1f).fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        content = content
+                    )
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                        content = actions
+                    )
+                }
+            }
+        }
+    }
 }
 
 private fun PlayRequest.toProgress(positionMs: Long, durationMs: Long) = WatchProgress(

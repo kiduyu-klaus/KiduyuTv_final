@@ -8,5 +8,8 @@ object DesktopLog {
 }
 
 fun String.logSafe(maxLength: Int = 500): String =
-    replace(Regex("(?i)(token|authorization|cookie)=[^&\\s]+"), "$1=<redacted>")
+    replace(
+        Regex("(?i)(token|authorization|cookie|signature|x-amz-signature|x-amz-credential|policy|key-pair-id)=[^&\\s]+"),
+        "$1=<redacted>"
+    )
         .take(maxLength)
