@@ -47,3 +47,8 @@ rtdb-app_config-export.json
 apikey.txt
 KiduyuTVLite/
 WINDOWS_DESKTOP_IMPLEMENTATION_GUIDE.md
+mpv-extracted/mpv-register.bat
+mpv-extracted/mpv-unregister.bat
+mpv-extracted/mpv.com
+mpv-extracted/mpv.exe
+mpv-extracted/vulkan-1.dll
