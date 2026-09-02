@@ -9,7 +9,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import com.kiduyuk.klausk.kiduyutv.desktop.data.DesktopLog
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,8 +25,6 @@ sealed interface WebViewRuntimeState {
 
 /** Owns the single Chromium/JCEF runtime used by all desktop WebView player screens. */
 object DesktopWebViewRuntime {
-    private const val INITIALIZATION_TIMEOUT_MS = 30_000L
-
     private val runtimeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val mutableState = MutableStateFlow<WebViewRuntimeState>(WebViewRuntimeState.NotStarted)
     val state: StateFlow<WebViewRuntimeState> = mutableState.asStateFlow()
@@ -49,20 +46,29 @@ object DesktopWebViewRuntime {
             val initializationSettled = AtomicBoolean(false)
             runCatching {
                 val initializationCompleted = CompletableDeferred<Unit>()
+                val bundledRoot = System.getProperty("compose.application.resources.dir")
+                    ?.takeIf(String::isNotBlank)
+                    ?.let(::File)
                 val appData = System.getenv("LOCALAPPDATA")
                     ?.takeIf(String::isNotBlank)
                     ?.let(::File)
                     ?: File(System.getProperty("user.home"), "AppData/Local")
-                val webViewRoot = File(appData, "KiduyuTV/WebView")
+                val persistentRoot = File(appData, "KiduyuTV/WebView")
+                val bundledInstallDir = bundledRoot?.let { File(it, "kcef-bundle") }
+                val bundledEngineAvailable = bundledInstallDir
+                    ?.takeIf { it.isDirectory && (it.listFiles()?.isNotEmpty() == true) }
+                val installDir = bundledEngineAvailable ?: File(persistentRoot, "kcef-bundle")
+                val cacheDir = File(persistentRoot, "cache")
                 DesktopLog.logger.info(
-                    "Initializing KCEF installDir={} cacheDir={}",
-                    File(webViewRoot, "kcef-bundle"),
-                    File(webViewRoot, "cache")
+                    "Initializing KCEF installDir={} cacheDir={} bundledEngineAvailable={}",
+                    installDir,
+                    cacheDir,
+                    bundledEngineAvailable != null
                 )
 
                 KCEF.init(
                     builder = {
-                        installDir(File(webViewRoot, "kcef-bundle"))
+                        installDir(installDir)
                         progress {
                             onLocating {
                                 mutableState.value = WebViewRuntimeState.Preparing("Locating browser engine…")
@@ -94,8 +100,10 @@ object DesktopWebViewRuntime {
                             }
                         }
                         settings {
-                            cachePath = File(webViewRoot, "cache").absolutePath
-                            windowlessRenderingEnabled = true
+                            cachePath = cacheDir.absolutePath
+                            // Match compose-webview-multiplatform DesktopWebSettings defaults.
+                            // The WebView composable controls off-screen rendering per browser.
+                            windowlessRenderingEnabled = false
                         }
                         addArgs(
                             "--autoplay-policy=no-user-gesture-required",
@@ -121,12 +129,11 @@ object DesktopWebViewRuntime {
                         }
                     }
                 )
-                // KCEF.init can return after creating CefApp but before Chromium's context is
-                // initialized. Creating a browser during that gap leaves the wrapper stuck in
-                // LoadingState.Initializing and can launch an extra application process.
-                withTimeout(INITIALIZATION_TIMEOUT_MS) {
-                    initializationCompleted.await()
-                }
+                // KCEF.init may spend several minutes preparing Chromium on first run.
+                // Do not impose a short timeout: cancelling this coroutine while KCEF is still
+                // downloading or extracting leaves the runtime in an indeterminate state and
+                // causes the UI to report a false initialization failure.
+                initializationCompleted.await()
             }.onFailure { error ->
                 if (initializationSettled.compareAndSet(false, true)) {
                     DesktopLog.logger.error("WebView runtime initialization failed", error)
