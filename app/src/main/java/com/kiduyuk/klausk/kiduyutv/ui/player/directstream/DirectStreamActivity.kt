@@ -167,6 +167,7 @@ class DirectStreamActivity : AppCompatActivity() {
     private lateinit var episodeAdapter: EpisodeAdapter
     private var isEpisodesPanelOpen = false
     private var episodeFetchJob: Job? = null
+    private var autoAdvanceJob: Job? = null
     private var cachedSeasonDetail: SeasonDetail? = null
     private var cachedSeasonFor: Int? = null   // which season is in the cache
 
@@ -574,11 +575,101 @@ class DirectStreamActivity : AppCompatActivity() {
 
     private fun loadAdjacentEpisode(delta: Int) {
         if (currentMediaType != TYPE_SERIES) return
-        val episode = currentEpisode ?: return
-        val nextEpisode = episode + delta
-        if (nextEpisode < 1) return
+        if (delta > 0) {
+            loadNextEpisodeOrSeason()
+            return
+        }
 
-        currentEpisode = nextEpisode
+        val season = currentSeason ?: return
+        val episode = currentEpisode ?: return
+        val previousEpisode = episode + delta
+        if (previousEpisode < 1) return
+        loadEpisodeInPlace(season, previousEpisode, delta)
+    }
+
+    /**
+     * Loads the next episode in the current season. When the current episode
+     * is the final episode, the next available season is queried and started
+     * from its first episode.
+     */
+    private fun loadNextEpisodeOrSeason() {
+        val season = currentSeason ?: return
+        val episode = currentEpisode ?: return
+        autoAdvanceJob?.cancel()
+        autoAdvanceJob = lifecycleScope.launch {
+            val currentSeasonDetail = if (cachedSeasonFor == season) {
+                cachedSeasonDetail
+            } else {
+                withContext(Dispatchers.IO) {
+                    repository.getSeasonDetail(currentTmdbId, season).getOrNull()
+                }
+            }
+
+            val nextEpisode = currentSeasonDetail
+                ?.episodes
+                ?.filter { it.episodeNumber > episode }
+                ?.minByOrNull { it.episodeNumber }
+
+            if (nextEpisode != null) {
+                cachedSeasonDetail = currentSeasonDetail
+                cachedSeasonFor = season
+                loadEpisodeInPlace(season, nextEpisode.episodeNumber, 1)
+                return@launch
+            }
+
+            val tvShowDetail = withContext(Dispatchers.IO) {
+                repository.getTvShowDetail(currentTmdbId).getOrNull()
+            }
+            val configuredSeasonNumbers = tvShowDetail
+                ?.seasons
+                ?.asSequence()
+                ?.map { it.seasonNumber }
+                ?.filter { it > season }
+                ?.sorted()
+                ?.toList()
+                .orEmpty()
+            val seasonNumbers = if (configuredSeasonNumbers.isNotEmpty()) {
+                configuredSeasonNumbers
+            } else {
+                val totalSeasons = tvShowDetail?.numberOfSeasons ?: 0
+                if (totalSeasons > season) {
+                    (season + 1..totalSeasons).toList()
+                } else {
+                    emptyList()
+                }
+            }
+
+            var nextSeasonEpisode: Episode? = null
+            var nextSeasonNumber: Int? = null
+            for (candidateSeason in seasonNumbers) {
+                val detail = withContext(Dispatchers.IO) {
+                    repository.getSeasonDetail(currentTmdbId, candidateSeason).getOrNull()
+                }
+                val firstEpisode = detail
+                    ?.episodes
+                    ?.filter { it.episodeNumber > 0 }
+                    ?.minByOrNull { it.episodeNumber }
+                if (firstEpisode != null) {
+                    nextSeasonEpisode = firstEpisode
+                    nextSeasonNumber = candidateSeason
+                    cachedSeasonDetail = detail
+                    cachedSeasonFor = candidateSeason
+                    break
+                }
+            }
+
+            if (nextSeasonEpisode != null && nextSeasonNumber != null) {
+                loadEpisodeInPlace(nextSeasonNumber, nextSeasonEpisode.episodeNumber, 1)
+            } else {
+                persistWatchProgress()
+                Log.i(PROVIDER_TAG, "No next episode or season found for S${season}E$episode")
+            }
+        }
+    }
+
+    private fun loadEpisodeInPlace(season: Int, episode: Int, delta: Int) {
+        currentSeason = season
+        currentEpisode = episode
         pendingStartPositionMs = 0L
         // Clear the previously cached TMDB runtime so the next fetch
         // populates the duration for the new episode.
@@ -588,7 +679,7 @@ class DirectStreamActivity : AppCompatActivity() {
         updatePlayerTitle()
         updateEpisodeButtons()
         if (::episodeAdapter.isInitialized) {
-            episodeAdapter.setCurrentlyPlaying(nextEpisode)
+            episodeAdapter.setCurrentlyPlaying(episode)
         }
         trackDialog?.takeIf { it.isShowing }?.dismiss()
         streamDialog?.takeIf { it.isShowing }?.dismiss()
@@ -596,7 +687,7 @@ class DirectStreamActivity : AppCompatActivity() {
         showLoadingArtwork()
         Log.i(
             PROVIDER_TAG,
-            "Loading adjacent episode season=$currentSeason episode=$nextEpisode delta=$delta"
+            "Loading adjacent episode season=$season episode=$episode delta=$delta"
         )
         resetWatchProgressForCurrentEpisode()
         // Kick off the TMDB episode-runtime lookup for the new episode.
@@ -1656,13 +1747,26 @@ class DirectStreamActivity : AppCompatActivity() {
         stream: StreamItem,
         verificationUrl: String = stream.url
     ) {
-        // Retain explicit verification targets (for example, the DahmerMovies
-        // clearance page), while reducing the final input to the host only.
+        // DahmerMovies uses p.111477.xyz for its Cloudflare challenge. Force
+        // this target even when the generic 403-dialog path calls this method
+        // without an explicit verification URL and the media URL/referer still
+        // points at the old a.111477.xyz host.
+        val effectiveVerificationUrl = if (
+            stream.provider.equals(DAHMER_PROVIDER, ignoreCase = true)
+        ) {
+            DAHMER_CLEARANCE_URL
+        } else {
+            verificationUrl
+        }
+
+        // Retain explicit verification targets while reducing the final input
+        // to the host only because CloudflareBypassActivity opens the host root.
         val bypassHost = when {
-            verificationUrl.isBlank() -> resolveCloudflareBypassHost(stream, stream.url)
-            verificationUrl.equals(stream.url, ignoreCase = true) ->
-                resolveCloudflareBypassHost(stream, verificationUrl)
-            else -> runCatching { Uri.parse(verificationUrl).host.orEmpty() }
+            effectiveVerificationUrl.isBlank() ->
+                resolveCloudflareBypassHost(stream, stream.url)
+            effectiveVerificationUrl.equals(stream.url, ignoreCase = true) ->
+                resolveCloudflareBypassHost(stream, effectiveVerificationUrl)
+            else -> runCatching { Uri.parse(effectiveVerificationUrl).host.orEmpty() }
                 .getOrDefault("")
                 .takeIf { it.isNotBlank() }
         }
@@ -2434,6 +2538,8 @@ class DirectStreamActivity : AppCompatActivity() {
         cloudflareProbeJob = null
         episodeFetchJob?.cancel()
         episodeFetchJob = null
+        autoAdvanceJob?.cancel()
+        autoAdvanceJob = null
         episodeDurationFetchJob?.cancel()
         episodeDurationFetchJob = null
         skipSegmentsFetchJob?.cancel()
