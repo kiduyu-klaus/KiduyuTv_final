@@ -15,7 +15,9 @@ import android.view.View
 import android.view.WindowManager
 
 import android.view.animation.AccelerateDecelerateInterpolator
+import android.widget.ScrollView
 import android.widget.SeekBar
+import android.widget.TextView
 import android.widget.Toast
 
 import androidx.activity.OnBackPressedCallback
@@ -97,6 +99,7 @@ class DirectStreamActivity : AppCompatActivity() {
     private var noStreamsDialog: AlertDialog? = null
     private var quitDialog: QuitDialog? = null
     private var cloudflareDialog: AlertDialog? = null
+    private var playbackErrorDialog: AlertDialog? = null
     private var cloudflareProbeJob: Job? = null
     private var subtitleJob: Job? = null
     private var availableStreams: List<StreamItem> = emptyList()
@@ -213,12 +216,14 @@ class DirectStreamActivity : AppCompatActivity() {
             R.string.cloudflare_bypass_retried,
             Toast.LENGTH_SHORT
         ).show()
-        // The user should return to the player with the fresh cookie jar.
-        // Recreate the activity so all player components rebind using the
-        // newly saved Cloudflare cookies instead of continuing with stale
-        // state from the prior session.
+        // Keep the current activity alive so availableStreams, the selected
+        // stream, subtitles, and playback state are all retained. The
+        // Cloudflare activity has already persisted the cookie; retry this
+        // exact stream directly instead of recreating and fetching streams
+        // again.
         activeStream = stream
-        recreate()
+        handlingPlaybackError = false
+        startStreamPlayback(stream, resumeMs)
     }
 
     private val watchProgressTick = object : Runnable {
@@ -1202,6 +1207,34 @@ class DirectStreamActivity : AppCompatActivity() {
         startStreamPlayback(stream, positionMs)
     }
 
+    private fun showPlaybackErrorDialog(errorMessage: String) {
+        if (isFinishing || isDestroyed) return
+        playbackErrorDialog?.takeIf { it.isShowing }?.dismiss()
+
+        val messageView = TextView(this).apply {
+            text = errorMessage.ifBlank { "Unknown playback error" }
+            setTextIsSelectable(true)
+            setPadding(48, 8, 48, 8)
+            textSize = 14f
+        }
+        val scrollView = ScrollView(this).apply {
+            addView(messageView)
+        }
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle("Playback Error")
+            .setView(scrollView)
+            .setPositiveButton("Close") { currentDialog, _ ->
+                currentDialog.dismiss()
+            }
+            .create()
+        dialog.setOnDismissListener {
+            if (playbackErrorDialog === dialog) playbackErrorDialog = null
+        }
+        playbackErrorDialog = dialog
+        dialog.show()
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.requestFocus()
+    }
+
     private fun handlePlaybackError(code: String) {
         if (handlingPlaybackError || isFinishing || isDestroyed) return
         handlingPlaybackError = true
@@ -1214,6 +1247,7 @@ class DirectStreamActivity : AppCompatActivity() {
         hideLoadingArtwork()
         binding.playerStatus.visibility = View.GONE
         showControls()
+        showPlaybackErrorDialog(code)
         // The ExoPlayer error name doesn't carry the underlying HTTP
         // status code, but Cloudflare-style 403 challenges are by far the
         // most common reason playback fails after a successful stream
@@ -2556,6 +2590,8 @@ class DirectStreamActivity : AppCompatActivity() {
         quitDialog = null
         cloudflareDialog?.takeIf { it.isShowing }?.dismiss()
         cloudflareDialog = null
+        playbackErrorDialog?.takeIf { it.isShowing }?.dismiss()
+        playbackErrorDialog = null
         pendingCloudflareStream = null
         pendingCloudflareResumeMs = 0L
         uiHandler.removeCallbacksAndMessages(null)

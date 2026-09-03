@@ -411,12 +411,22 @@ class PlayerEngine(context: Context) {
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                Log.w(
-                    TAG,
-                    "ExoPlayer error code=${error.errorCode} name=${error.errorCodeName} url=${sanitize(currentUrl)}",
-                    error
-                )
-                onError?.invoke(error.errorCodeName)
+                val completeErrorMessage = buildString {
+                    append("Error code: ${error.errorCode}\n")
+                    append("Error name: ${error.errorCodeName}\n")
+                    append("URL: ${sanitize(currentUrl)}")
+                    error.message?.takeIf { it.isNotBlank() }?.let {
+                        append("\nMessage: $it")
+                    }
+                    error.cause?.let { cause ->
+                        append("\nCause: ${cause.javaClass.simpleName}")
+                        cause.message?.takeIf { it.isNotBlank() }?.let {
+                            append("\nCause message: $it")
+                        }
+                    }
+                }
+                Log.w(TAG, completeErrorMessage, error)
+                onError?.invoke(completeErrorMessage)
             }
 
             override fun onTracksChanged(tracks: Tracks) {
