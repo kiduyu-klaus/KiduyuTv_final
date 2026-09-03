@@ -270,7 +270,7 @@ class SchedulePlayerActivity : ComponentActivity() {
                 onFailure = { error ->
                     android.util.Log.e(TAG, "Failed to fetch watch page: ${error.message}")
                     currentIframeHtml = generateIframeHtml(
-                        "https://dlhd.st/player/stream-$channelId.php"
+                        "https://dlstreams.st/player/stream-$channelId.php"
                     )
                     loadCurrentStream()
                 }
@@ -282,7 +282,7 @@ class SchedulePlayerActivity : ComponentActivity() {
         currentIframeHtml?.let { html ->
             if (::webView.isInitialized) {
                 webView.loadDataWithBaseURL(
-                    "https://dlhd.st",
+                    "https://dlstreams.st",
                     html,
                     "text/html",
                     "UTF-8",
@@ -805,7 +805,7 @@ class SchedulePlayerActivity : ComponentActivity() {
                                 "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
                         }
                     )
-                    putReplacingCaseInsensitive("Referer", "https://dlhd.st")
+                    putReplacingCaseInsensitive("Referer", "https://dlstreams.st")
                     putReplacingCaseInsensitive("Accept-Language", "en-US,en;q=0.5")
                 }
             } else {
@@ -893,7 +893,7 @@ class SchedulePlayerActivity : ComponentActivity() {
 
     private fun withFallbackPlayerOptions(discovered: List<PlayerOption>): List<PlayerOption> {
         val fallbackUrls = STREAM_PATHS.map { path ->
-            "https://dlhd.st${path.format(channelId)}"
+            "https://dlstreams.st${path.format(channelId)}"
         }
         return (discovered.map { it.url } + fallbackUrls)
             .filter { it.isNotBlank() }

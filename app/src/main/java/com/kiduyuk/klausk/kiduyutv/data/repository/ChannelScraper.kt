@@ -8,11 +8,11 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 
 /**
- * Repository for scraping live TV channels from dlhd.pk
+ * Repository for scraping live TV channels from dlstreams.st
  * Uses Jsoup for HTML parsing
  *
  * Correct flow:
- * 1. Load https://dlhd.pk/24-7-channels.php
+ * 1. Load https://dlstreams.st/24-7-channels.php
  * 2. Inside div.grid, get all a tags with class="card"
  * 3. Save href as watchPageUrl, div.card__title text as name, id from link, category="Channels"
  * 4. When channel is clicked, open watchPageUrl, get iframeUrls from button data-url in div#playerBtns
@@ -21,7 +21,7 @@ import org.jsoup.nodes.Document
 object ChannelScraper {
 
     private const val TAG = "ChannelScraper"
-    private const val BASE_URL = "https://dlhd.st"
+    private const val BASE_URL = "https://dlstreams.st"
     private const val CHANNELS_URL = "$BASE_URL/24-7-channels.php"
     private const val TIMEOUT_MS = 15000
 
@@ -128,9 +128,12 @@ object ChannelScraper {
         }
         android.util.Log.i(TAG, "Found div.grid element")
 
-        // Get all a.card elements
-        val cardLinks = grid.select("a.card")
-        android.util.Log.i(TAG, "Found ${cardLinks.size} a.card elements inside div.grid")
+        // The current page uses a.card, but retain a semantic fallback so
+        // minor class-name changes do not make the scraper return zero items.
+        val cardLinks = grid.select("a.card").ifEmpty {
+            grid.select("a[href*='/watch.php?id=']")
+        }
+        android.util.Log.i(TAG, "Found ${cardLinks.size} channel links inside div.grid")
 
         for ((index, link) in cardLinks.withIndex()) {
             try {
@@ -145,9 +148,15 @@ object ChannelScraper {
 
                 val watchPageUrl = if (href.startsWith("http")) href else "$BASE_URL$href"
 
-                // Get name from div.card__title
+                // Prefer the visible card title, then the page's data-title.
                 val titleElement = link.selectFirst("div.card__title")
-                val name = titleElement?.text()?.trim() ?: "Unknown Channel"
+                val name = titleElement?.text()?.trim()
+                    ?.takeIf { it.isNotBlank() }
+                    ?: link.attr("data-title")
+                        .trim()
+                        .takeIf { it.isNotBlank() }
+                    ?: link.text().trim().takeIf { it.isNotBlank() }
+                    ?: "Channel $channelId"
                 android.util.Log.i(TAG, "[${index + 1}] Channel name: '$name'")
 
                 // Get id from href (e.g., /watch.php?id=51 -> 51)
@@ -194,7 +203,7 @@ object ChannelScraper {
      * <div class="watch__player">
      *   <div class="watch__actions is-scrollable" id="playerActions">
      *     <div class="btn-group" id="playerBtns">
-     *       <button type="button" class="btn player-btn is-active" data-url="https://dlhd.pk/stream/stream-283.php">
+     *       <button type="button" class="btn player-btn is-active" data-url="https://dlstreams.st/stream/stream-283.php">
      *         Player 1
      *       </button>
      *       ...

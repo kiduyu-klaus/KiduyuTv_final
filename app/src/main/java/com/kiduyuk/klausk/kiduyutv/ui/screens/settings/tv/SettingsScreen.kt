@@ -1986,7 +1986,7 @@ private fun LiveTvSettingsCard(
         ) {
             Column {
                 Text(
-                    text = "Scrape Channels from dlhd.pk",
+                    text = "Scrape Channels from dlstreams.st",
                     color = TextPrimary,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold
