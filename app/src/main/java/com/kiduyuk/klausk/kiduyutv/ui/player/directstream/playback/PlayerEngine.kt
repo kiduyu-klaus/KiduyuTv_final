@@ -354,6 +354,35 @@ class PlayerEngine(context: Context) {
         .setSeekForwardIncrementMs(SEEK_STEP_MS)
         .build()
 
+    init {
+        // Establish a sensible default audio track selection: prefer
+        // universally-supported codecs (AAC) over surround codecs the
+        // device's AudioTrack may not be able to initialise (E-AC3 5.1).
+        // Without this, the default TrackSelectionParameters lets the
+        // player pick the *first* audio rendition it finds in the
+        // manifest, which for HLS playlists that list the E-AC3 5.1
+        // rendition first would force-feed E-AC3 to devices whose
+        // AudioTrack cannot initialize 5.1 surround and raise
+        // ERROR_CODE_AUDIO_TRACK_INIT_FAILED (5001).
+        val defaults = player.trackSelectionParameters.buildUpon()
+            .setSelectAudioByDefault(true)
+            .setPreferredAudioMimeTypes(
+                MimeTypes.AUDIO_AAC,
+                MimeTypes.AUDIO_AC3,
+                MimeTypes.AUDIO_E_AC3,
+                MimeTypes.AUDIO_MPEG,
+                MimeTypes.AUDIO_MPEG_L2,
+                MimeTypes.AUDIO_RAW
+            )
+            .build()
+        player.trackSelectionParameters = defaults
+        Log.i(
+            TAG,
+            "Default TrackSelectionParameters initialised with preferred audio " +
+                "MIME types: AAC > AC3 > E-AC3 > MPEG > MPEG-L2 > RAW"
+        )
+    }
+
     /**
      * Builds a [DefaultLoadControl] that keeps 3 minutes of media
      * buffered ahead of the playhead. The 3-minute window means
@@ -398,6 +427,7 @@ class PlayerEngine(context: Context) {
     private var currentUrl: String = ""
     private var currentSourceIsPlaylist = false
     private var highestVideoTrackApplied = false
+    private var autoAudioTrackApplied = false
 
     /** Invoked on fatal playback errors. The argument is a stable error code name. */
     var onError: ((String) -> Unit)? = null
@@ -450,6 +480,7 @@ class PlayerEngine(context: Context) {
                         "text=${countByType(tracks, C.TRACK_TYPE_TEXT)})"
                 )
                 selectHighestResolutionVideoTrack(tracks)
+                applyAutoAudioTrack(tracks)
                 onTracksChanged?.invoke(tracks)
             }
         })
@@ -457,6 +488,73 @@ class PlayerEngine(context: Context) {
 
     private fun countByType(tracks: Tracks, type: Int): Int =
         tracks.groups.count { it.type == type }
+
+    /**
+     * Sets the audio track to "auto" for a newly loaded HLS/DASH playlist.
+     *
+     * Behavior:
+     *  - Runs once per media source. A subsequent user override from the
+     *    Tracks dialog ("Audio > Track N") is preserved for the rest of
+     *    the source's lifetime because the one-shot guard re-arms only in
+     *    [play] when a brand new source is loaded.
+     *  - Clears any audio track override that may have been carried over
+     *    from a previous playback so Media3 is free to pick a compatible
+     *    audio rendition from the current manifest.
+     *  - Re-asserts the preferred audio MIME type order (AAC > AC3 >
+     *    E-AC3) so when the manifest lists the E-AC3 5.1 rendition first
+     *    the player falls back to the AAC stereo rendition rather than
+     *    failing with ERROR_CODE_AUDIO_TRACK_INIT_FAILED (5001).
+     *  - Re-enables audio in case a previous Track Selection dialog left
+     *    it disabled.
+     *
+     * Mirrors [selectHighestResolutionVideoTrack] in scope and lifetime.
+     */
+    private fun applyAutoAudioTrack(tracks: Tracks) {
+        if (!currentSourceIsPlaylist || autoAudioTrackApplied) return
+        // No-op when the manifest exposes zero audio tracks; some streams
+        // (e.g. video-only promo clips) legitimately have no audio group.
+        val hasAudio = tracks.groups.any { it.type == C.TRACK_TYPE_AUDIO && it.length > 0 }
+        if (!hasAudio) {
+            Log.i(TAG, "applyAutoAudioTrack: no audio groups in manifest, skipping")
+            return
+        }
+        autoAudioTrackApplied = true
+        val current = player.trackSelectionParameters
+        val builder = current.buildUpon()
+            .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+            .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
+            .setSelectAudioByDefault(true)
+            .setPreferredAudioMimeTypes(
+                MimeTypes.AUDIO_AAC,
+                MimeTypes.AUDIO_AC3,
+                MimeTypes.AUDIO_E_AC3,
+                MimeTypes.AUDIO_MPEG,
+                MimeTypes.AUDIO_MPEG_L2,
+                MimeTypes.AUDIO_RAW
+            )
+        player.trackSelectionParameters = builder.build()
+        val chosen = describeCurrentAudioTrack(tracks)
+        Log.i(
+            TAG,
+            "Applied Playlist audio track=auto (preferred AAC > AC3 > E-AC3). " +
+                "Active audio track after selection: ${chosen ?: "<none>"}"
+        )
+    }
+
+    /**
+     * Returns a short description of the currently selected audio track
+     * for logging, or null if no track is selected.
+     */
+    private fun describeCurrentAudioTrack(tracks: Tracks): String? {
+        val group = tracks.groups.firstOrNull { it.type == C.TRACK_TYPE_AUDIO } ?: return null
+        val selectedIndex = (0 until group.length).firstOrNull { group.isTrackSelected(it) }
+            ?: return null
+        val format = group.getTrackFormat(selectedIndex)
+        val language = format.language?.takeIf { it.isNotBlank() } ?: "und"
+        val channels = format.channelCount.takeIf { it > 0 }?.let { "${it}ch" } ?: "?ch"
+        val mime = format.sampleMimeType ?: format.codecs ?: "?"
+        return "$language $channels $mime"
+    }
 
     /**
      * Pins a newly loaded HLS/DASH playlist to its highest-resolution
@@ -522,6 +620,7 @@ class PlayerEngine(context: Context) {
         val isHlsStream = isHls(playbackStream)
         currentSourceIsPlaylist = isHlsStream || isDash(playbackStream)
         highestVideoTrackApplied = false
+        autoAudioTrackApplied = false
         val sourceType = when {
             isHlsStream -> "HlsMediaSource"
             isDash(playbackStream) -> "DashMediaSource"
