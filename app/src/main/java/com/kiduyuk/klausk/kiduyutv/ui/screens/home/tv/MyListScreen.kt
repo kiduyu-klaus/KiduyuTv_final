@@ -238,75 +238,83 @@ fun MyListScreen(
     // Tracks how many items we requested this page so we can show a footer spinner
     val gridState = rememberLazyGridState()
 
-    // ── Enrichment helper: process a single Trakt history page into MyListItems ──
+    // ── Enrichment helper: append basic records immediately, then enrich them ──
     suspend fun enrichHistoryPage(
         history: List<TraktHistoryItem>,
         onItemProcessed: suspend () -> Unit,
-        onItemAdded: suspend (MyListItem) -> Unit
+        onItemAdded: suspend (MyListItem) -> Unit,
+        onItemUpdated: suspend (MyListItem) -> Unit
     ): List<MyListItem> = withContext(Dispatchers.IO) {
         Log.d(TAG, "Starting Trakt history enrichment: records=${history.size}")
         val pageItems = mutableListOf<MyListItem>()
 
         history.forEach { item ->
             Log.d(TAG, "Processing Trakt history record: type=${item.type}")
+            val tmdbId: Int?
+            val type: String
+            val title: String
+            val traktRating: Double
+
             when (item.type) {
                 "movie" -> {
                     val movie = item.movie
-                    val tmdbId = movie?.ids?.tmdb
-                    if (tmdbId != null) {
-                        val cacheKey = "movie-$tmdbId"
-                        if (processedTmdbIds.add(cacheKey)) {
-                            Log.d(TAG, "Enriching watched movie from TMDB: tmdbId=$tmdbId")
-                            var posterPath: String? = null
-                            var rating = movie.rating ?: 0.0
-                            try {
-                                val detail = tmdbApiService.getMovieDetail(tmdbId)
-                                posterPath = detail.posterPath
-                                if (rating == 0.0) rating = detail.voteAverage
-                            } catch (e: Exception) {
-                                Log.e(TAG, "TMDB movie detail failed for watched movie $tmdbId: ${e.message}", e)
-                            }
-                            val enrichedItem = MyListItem(
-                                id = tmdbId,
-                                title = movie.title,
-                                posterPath = posterPath,
-                                type = "movie",
-                                voteAverage = rating
-                            )
-                            pageItems.add(enrichedItem)
-                            onItemAdded(enrichedItem)
-                        }
-                    }
+                    tmdbId = movie?.ids?.tmdb
+                    type = "movie"
+                    title = movie?.title.orEmpty()
+                    traktRating = movie?.rating ?: 0.0
                 }
                 "episode", "show" -> {
                     val show = item.show
-                    val tmdbId = show?.ids?.tmdb
-                    if (tmdbId != null) {
-                        val cacheKey = "tv-$tmdbId"
-                        if (processedTmdbIds.add(cacheKey)) {
-                            Log.d(TAG, "Enriching watched TV show from TMDB: tmdbId=$tmdbId")
-                            var posterPath: String? = null
-                            var rating = show.rating ?: 0.0
-                            try {
-                                val detail = tmdbApiService.getTvShowDetail(tmdbId)
-                                posterPath = detail.posterPath
-                                if (rating == 0.0) rating = detail.voteAverage
-                            } catch (e: Exception) {
-                                Log.e(TAG, "TMDB TV detail failed for watched show $tmdbId: ${e.message}", e)
-                            }
-                            val enrichedItem = MyListItem(
-                                id = tmdbId,
-                                title = show.title,
-                                posterPath = posterPath,
-                                type = "tv",
-                                voteAverage = rating
+                    tmdbId = show?.ids?.tmdb
+                    type = "tv"
+                    title = show?.title.orEmpty()
+                    traktRating = show?.rating ?: 0.0
+                }
+                else -> {
+                    Log.w(TAG, "Skipping unsupported Trakt history type=${item.type}")
+                    onItemProcessed()
+                    return@forEach
+                }
+            }
+
+            if (tmdbId != null && title.isNotBlank()) {
+                val cacheKey = "$type-$tmdbId"
+                if (processedTmdbIds.add(cacheKey)) {
+                    // Add a usable card before the slower TMDB detail request.
+                    // The UI can render the title immediately and update the poster/rating later.
+                    val baseItem = MyListItem(
+                        id = tmdbId,
+                        title = title,
+                        posterPath = null,
+                        type = type,
+                        voteAverage = traktRating
+                    )
+                    pageItems.add(baseItem)
+                    onItemAdded(baseItem)
+
+                    var enrichedItem = baseItem
+                    try {
+                        enrichedItem = if (type == "movie") {
+                            val detail = tmdbApiService.getMovieDetail(tmdbId)
+                            baseItem.copy(
+                                posterPath = detail.posterPath,
+                                voteAverage = if (traktRating == 0.0) detail.voteAverage else traktRating
                             )
-                            pageItems.add(enrichedItem)
-                            onItemAdded(enrichedItem)
+                        } else {
+                            val detail = tmdbApiService.getTvShowDetail(tmdbId)
+                            baseItem.copy(
+                                posterPath = detail.posterPath,
+                                voteAverage = if (traktRating == 0.0) detail.voteAverage else traktRating
+                            )
                         }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "TMDB detail failed for watched $type $tmdbId: ${e.message}", e)
+                    }
+
+                    if (enrichedItem != baseItem) {
+                        onItemUpdated(enrichedItem)
                     }
                 }
-                else -> Log.w(TAG, "Skipping unsupported Trakt history type=${item.type}")
             }
             onItemProcessed()
         }
@@ -380,6 +388,14 @@ fun MyListScreen(
                                                             "${item.type}/${item.id}, displayed=${watchedItems.size}"
                                                     )
                                                 }
+                                            }
+                                        },
+                                        onItemUpdated = { item ->
+                                            withContext(Dispatchers.Main) {
+                                                watchedItems = watchedItems.map { existing ->
+                                                    if (existing.id == item.id && existing.type == item.type) item else existing
+                                                }
+                                                Log.d(TAG, "Updated watched item metadata: ${item.type}/${item.id}")
                                             }
                                         }
                                     )
