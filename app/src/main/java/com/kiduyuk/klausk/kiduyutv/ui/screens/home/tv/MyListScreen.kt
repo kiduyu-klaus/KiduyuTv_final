@@ -82,6 +82,8 @@ import com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.HomeViewModel
 import com.kiduyuk.klausk.kiduyutv.viewmodel.MyListItem
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -245,11 +247,11 @@ fun MyListScreen(
         onItemAdded: suspend (MyListItem) -> Unit,
         onItemUpdated: suspend (MyListItem) -> Unit
     ): List<MyListItem> = withContext(Dispatchers.IO) {
-        Log.d(TAG, "Starting Trakt history enrichment: records=${history.size}")
+        Log.d(TAG, "[enrichHistoryPage] Starting on thread=${Thread.currentThread().name}, records=${history.size}")
         val pageItems = mutableListOf<MyListItem>()
 
         history.forEach { item ->
-            Log.d(TAG, "Processing Trakt history record: type=${item.type}")
+            Log.d(TAG, "[enrichHistoryPage] Processing Trakt history record: type=${item.type}, watchedAt=${item.watchedAt}")
             val tmdbId: Int?
             val type: String
             val title: String
@@ -271,7 +273,7 @@ fun MyListScreen(
                     traktRating = show?.rating ?: 0.0
                 }
                 else -> {
-                    Log.w(TAG, "Skipping unsupported Trakt history type=${item.type}")
+                    Log.w(TAG, "[enrichHistoryPage] Skipping unsupported Trakt history type=${item.type}")
                     onItemProcessed()
                     return@forEach
                 }
@@ -280,6 +282,7 @@ fun MyListScreen(
             if (tmdbId != null && title.isNotBlank()) {
                 val cacheKey = "$type-$tmdbId"
                 if (processedTmdbIds.add(cacheKey)) {
+                    Log.d(TAG, "[enrichHistoryPage] New unique item: $type/$tmdbId, title='$title'")
                     // Add a usable card before the slower TMDB detail request.
                     // The UI can render the title immediately and update the poster/rating later.
                     val baseItem = MyListItem(
@@ -290,35 +293,48 @@ fun MyListScreen(
                         voteAverage = traktRating
                     )
                     pageItems.add(baseItem)
+                    Log.d(TAG, "[enrichHistoryPage] About to call onItemAdded for $type/$tmdbId")
                     onItemAdded(baseItem)
+                    Log.d(TAG, "[enrichHistoryPage] Returned from onItemAdded for $type/$tmdbId, pageItems size=${pageItems.size}")
 
                     var enrichedItem = baseItem
                     try {
+                        Log.d(TAG, "[enrichHistoryPage] Before TMDB $type detail call for $tmdbId")
                         enrichedItem = if (type == "movie") {
                             val detail = tmdbApiService.getMovieDetail(tmdbId)
+                            Log.d(TAG, "[enrichHistoryPage] After TMDB movie call for $tmdbId: poster=${detail.posterPath}")
                             baseItem.copy(
                                 posterPath = detail.posterPath,
                                 voteAverage = if (traktRating == 0.0) detail.voteAverage else traktRating
                             )
                         } else {
                             val detail = tmdbApiService.getTvShowDetail(tmdbId)
+                            Log.d(TAG, "[enrichHistoryPage] After TMDB TV call for $tmdbId: poster=${detail.posterPath}")
                             baseItem.copy(
                                 posterPath = detail.posterPath,
                                 voteAverage = if (traktRating == 0.0) detail.voteAverage else traktRating
                             )
                         }
                     } catch (e: Exception) {
-                        Log.e(TAG, "TMDB detail failed for watched $type $tmdbId: ${e.message}", e)
+                        Log.e(TAG, "[enrichHistoryPage] TMDB detail failed for watched $type $tmdbId: ${e.message}", e)
                     }
 
                     if (enrichedItem != baseItem) {
+                        Log.d(TAG, "[enrichHistoryPage] Item was enriched (posterPath changed or rating filled); calling onItemUpdated for $type/$tmdbId")
                         onItemUpdated(enrichedItem)
+                        Log.d(TAG, "[enrichHistoryPage] Returned from onItemUpdated for $type/$tmdbId")
+                    } else {
+                        Log.d(TAG, "[enrichHistoryPage] No enrichment delta for $type/$tmdbId; skipping onItemUpdated")
                     }
+                } else {
+                    Log.d(TAG, "[enrichHistoryPage] Skipping duplicate item already in processedTmdbIds: $type/$tmdbId")
                 }
+            } else {
+                Log.w(TAG, "[enrichHistoryPage] Skipping item with null tmdbId or blank title: type=$type, tmdbId=$tmdbId, title='$title'")
             }
             onItemProcessed()
         }
-        Log.d(TAG, "Completed Trakt history enrichment: uniqueItems=${pageItems.size}")
+        Log.d(TAG, "[enrichHistoryPage] Completed: uniqueItems=${pageItems.size}")
         pageItems
     }
 
@@ -347,96 +363,110 @@ fun MyListScreen(
 
         coroutineScope.launch {
             try {
-                traktRepository
+                Log.d(TAG, "Collecting Trakt watched history flow on thread=${Thread.currentThread().name}")
+                val result = traktRepository
                     .getTraktWatchHistoryPage(page = nextPage, limit = WATCHED_PAGE_SIZE)
-                    .collect { result ->
-                        result.fold(
-                            onSuccess = { historyPage ->
-                                val history = historyPage.items
-                                historyPage.totalItemCount?.let {
-                                    watchedHistoryTotal = it
-                                    Log.i(TAG, "Trakt watched total item count=$it")
-                                }
-                                Log.i(
-                                    TAG,
-                                    "Received watched page=$nextPage: records=${history.size}, " +
-                                        "pageCount=${historyPage.pageCount ?: "unknown"}"
-                                )
-                                if (history.isEmpty()) {
-                                    Log.i(TAG, "Watched page=$nextPage is empty; reached end of Trakt history")
-                                    hasMoreWatched = false
-                                } else {
-                                    val newItems = enrichHistoryPage(
-                                        history = history,
-                                        onItemProcessed = {
-                                            withContext(Dispatchers.Main) {
-                                                watchedHistoryLoaded += 1
-                                                Log.d(
-                                                    TAG,
-                                                    "Watched history progress: $watchedHistoryLoaded/" +
-                                                        "${watchedHistoryTotal ?: "?"} records processed"
-                                                )
-                                            }
-                                        },
-                                        onItemAdded = { item ->
-                                            withContext(Dispatchers.Main) {
-                                                if (watchedItems.none { it.id == item.id && it.type == item.type }) {
-                                                    watchedItems = watchedItems + item
-                                                    Log.d(
-                                                        TAG,
-                                                        "Appended watched item immediately: " +
-                                                            "${item.type}/${item.id}, displayed=${watchedItems.size}"
-                                                    )
-                                                }
-                                            }
-                                        },
-                                        onItemUpdated = { item ->
-                                            withContext(Dispatchers.Main) {
-                                                watchedItems = watchedItems.map { existing ->
-                                                    if (existing.id == item.id && existing.type == item.type) item else existing
-                                                }
-                                                Log.d(TAG, "Updated watched item metadata: ${item.type}/${item.id}")
-                                            }
-                                        }
-                                    )
-                                    /*Log.i(
-                                        "MyListScreen",
-                                        "Page $nextPage: fetched=${history.size}, newUnique=${newItems.size}"
-                                    )*/
+                    .flowOn(Dispatchers.IO)
+                    .first()
+                Log.d(TAG, "Got Trakt flow result: isSuccess=${result.isSuccess}")
 
-                                    withContext(Dispatchers.Main) {
-                                        // Items were appended as soon as each TMDB enrichment
-                                        // completed. Only advance pagination here; keep the
-                                        // deduplicated list intact.
-                                        currentWatchedPage = nextPage
-                                        Log.i(
+                val historyPage = result.getOrNull()
+                if (historyPage != null) {
+                    val history = historyPage.items
+                    historyPage.totalItemCount?.let {
+                        watchedHistoryTotal = it
+                        Log.i(TAG, "Trakt watched total item count=$it")
+                    }
+                    Log.i(
+                        TAG,
+                        "Received watched page=$nextPage: records=${history.size}, " +
+                            "pageCount=${historyPage.pageCount ?: "unknown"}"
+                    )
+                    if (history.isEmpty()) {
+                        Log.i(TAG, "Watched page=$nextPage is empty; reached end of Trakt history")
+                        hasMoreWatched = false
+                    } else {
+                        val newItems = enrichHistoryPage(
+                            history = history,
+                            onItemProcessed = {
+                                withContext(Dispatchers.Main) {
+                                    watchedHistoryLoaded += 1
+                                    Log.d(
+                                        TAG,
+                                        "[onItemProcessed] watchedHistoryLoaded=$watchedHistoryLoaded/" +
+                                            "${watchedHistoryTotal ?: "?"} on thread=${Thread.currentThread().name}"
+                                    )
+                                }
+                            },
+                            onItemAdded = { item ->
+                                withContext(Dispatchers.Main) {
+                                    Log.d(
+                                        TAG,
+                                        "[onItemAdded] invoked for ${item.type}/${item.id} on thread=${Thread.currentThread().name}"
+                                    )
+                                    if (watchedItems.none { it.id == item.id && it.type == item.type }) {
+                                        watchedItems = watchedItems + item
+                                        Log.d(
                                             TAG,
-                                            "Appended watched page=$nextPage: added=${newItems.size}, " +
-                                                "displayed=${watchedItems.size}, " +
-                                                "processed=$watchedHistoryLoaded/${watchedHistoryTotal ?: "?"}"
+                                            "[onItemAdded] Appended watched item: " +
+                                                "${item.type}/${item.id}, displayed=${watchedItems.size}"
                                         )
-                                        // Trakt's page-count response header is authoritative.
-                                        // Falling back to page size preserves compatibility if a
-                                        // proxy removes the pagination header.
-                                        hasMoreWatched = historyPage.pageCount?.let {
-                                            nextPage < it
-                                        } ?: (history.size == WATCHED_PAGE_SIZE)
-                                        // Persist the merged list (best-effort)
-                                        saveWatchedCache(
-                                            context,
-                                            watchedItems,
-                                            currentWatchedPage,
-                                            hasMoreWatched
-                                        )
+                                    } else {
+                                        Log.d(TAG, "[onItemAdded] Item already in list, skipping: ${item.type}/${item.id}")
                                     }
                                 }
                             },
-                            onFailure = { error ->
-                                Log.e(TAG, "Watched page=$nextPage fetch failed: ${error.message}", error)
-                                hasMoreWatched = false
+                            onItemUpdated = { item ->
+                                withContext(Dispatchers.Main) {
+                                    Log.d(
+                                        TAG,
+                                        "[onItemUpdated] invoked for ${item.type}/${item.id} on thread=${Thread.currentThread().name}"
+                                    )
+                                    val before = watchedItems.size
+                                    watchedItems = watchedItems.map { existing ->
+                                        if (existing.id == item.id && existing.type == item.type) item else existing
+                                    }
+                                    Log.d(
+                                        TAG,
+                                        "[onItemUpdated] State map applied: size $before -> ${watchedItems.size}, " +
+                                            "item ${item.type}/${item.id} now has posterPath=${item.posterPath}, " +
+                                            "voteAverage=${item.voteAverage}"
+                                    )
+                                }
                             }
                         )
+
+                        withContext(Dispatchers.Main) {
+                            // Items were appended as soon as each TMDB enrichment
+                            // completed. Only advance pagination here; keep the
+                            // deduplicated list intact.
+                            currentWatchedPage = nextPage
+                            Log.i(
+                                TAG,
+                                "Appended watched page=$nextPage: added=${newItems.size}, " +
+                                    "displayed=${watchedItems.size}, " +
+                                    "processed=$watchedHistoryLoaded/${watchedHistoryTotal ?: "?"}"
+                            )
+                            // Trakt's page-count response header is authoritative.
+                            // Falling back to page size preserves compatibility if a
+                            // proxy removes the pagination header.
+                            hasMoreWatched = historyPage.pageCount?.let {
+                                nextPage < it
+                            } ?: (history.size == WATCHED_PAGE_SIZE)
+                            // Persist the merged list (best-effort)
+                            saveWatchedCache(
+                                context,
+                                watchedItems,
+                                currentWatchedPage,
+                                hasMoreWatched
+                            )
+                        }
                     }
+                } else {
+                    val error = result.exceptionOrNull()
+                    Log.e(TAG, "Watched page=$nextPage fetch failed: ${error?.message}", error)
+                    hasMoreWatched = false
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Error during watched pagination: ${e.message}", e)
                 hasMoreWatched = false
@@ -445,7 +475,8 @@ fun MyListScreen(
                 Log.d(
                     TAG,
                     "Watched page load finished: page=$nextPage, loaded=$watchedHistoryLoaded, " +
-                        "total=${watchedHistoryTotal ?: "unknown"}, hasMore=$hasMoreWatched"
+                        "total=${watchedHistoryTotal ?: "unknown"}, hasMore=$hasMoreWatched, " +
+                        "watchedItems.size=${watchedItems.size}"
                 )
                 isInitialLoading = false
             }
