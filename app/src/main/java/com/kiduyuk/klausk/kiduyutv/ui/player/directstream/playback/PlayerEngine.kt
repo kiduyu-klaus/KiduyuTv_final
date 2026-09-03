@@ -294,9 +294,15 @@ class PlayerEngine(context: Context) {
         if (stream.mimeType.equals(MimeTypes.VIDEO_MATROSKA, ignoreCase = true) ||
             stream.mimeType.equals("application/x-matroska", ignoreCase = true)
         ) return true
-        return stream.url.substringBefore('?').lowercase().let { path ->
-            path.endsWith(".mkv") || path.endsWith(".mka")
-        }
+        val path = stream.url.substringBefore('?').lowercase()
+        if (path.endsWith(".mkv") || path.endsWith(".mka")) return true
+
+        // Download providers such as HDHub4u can return an extensionless
+        // Googleusercontent URL while the title still carries the original
+        // `.mkv` filename. Use that metadata to select Media3's Matroska
+        // extractor explicitly instead of relying only on URL sniffing.
+        val metadata = "${stream.title} ${stream.name}".lowercase()
+        return metadata.contains(".mkv") || metadata.contains("matroska")
     }
 
     private fun isDash(stream: StreamItem): Boolean =
