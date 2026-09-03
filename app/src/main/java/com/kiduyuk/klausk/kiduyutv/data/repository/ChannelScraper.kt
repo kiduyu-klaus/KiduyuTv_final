@@ -148,6 +148,12 @@ object ChannelScraper {
 
                 val watchPageUrl = if (href.startsWith("http")) href else "$BASE_URL$href"
 
+                // Get id from href (e.g., /watch.php?id=51 -> 51)
+                // This must be extracted before building the fallback channel name.
+                val idMatch = Regex("""id=(\d+)""").find(href)
+                val channelId = idMatch?.groupValues?.get(1) ?: "0"
+                android.util.Log.i(TAG, "[${index + 1}] Channel ID: $channelId")
+
                 // Prefer the visible card title, then the page's data-title.
                 val titleElement = link.selectFirst("div.card__title")
                 val name = titleElement?.text()?.trim()
@@ -158,11 +164,6 @@ object ChannelScraper {
                     ?: link.text().trim().takeIf { it.isNotBlank() }
                     ?: "Channel $channelId"
                 android.util.Log.i(TAG, "[${index + 1}] Channel name: '$name'")
-
-                // Get id from href (e.g., /watch.php?id=51 -> 51)
-                val idMatch = Regex("""id=(\d+)""").find(href)
-                val channelId = idMatch?.groupValues?.get(1) ?: "0"
-                android.util.Log.i(TAG, "[${index + 1}] Channel ID: $channelId")
 
                 // Get additional attributes if available
                 val dataTitle = link.attr("data-title")
