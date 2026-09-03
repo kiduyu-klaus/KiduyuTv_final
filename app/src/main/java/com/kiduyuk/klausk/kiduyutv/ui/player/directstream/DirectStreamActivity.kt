@@ -1266,6 +1266,36 @@ class DirectStreamActivity : AppCompatActivity() {
         showLoadingArtwork()
         binding.playerStatus.visibility = View.GONE
         showControls()
+
+        // Some devices report E-AC-3 5.1 as supported but cannot initialize
+        // a six-channel AudioTrack. Try another loaded stream first; this is
+        // the same recovery path as manually changing streams and avoids
+        // presenting a recoverable audio-output error to the user.
+        if (code == "5001" && availableStreams.size > 1) {
+            val failedUrl = activeStream?.url
+            val fallback = availableStreams
+                .filter { it.url != failedUrl }
+                .sortedByDescending { qualityRank(it.quality) }
+                .firstOrNull()
+            if (fallback != null) {
+                val resumeMs = engine.player.currentPosition.coerceAtLeast(0L)
+                Log.w(
+                    TAG,
+                    "AudioTrack initialization failed; retrying with " +
+                        "provider=${fallback.provider} quality=${fallback.quality}"
+                )
+                Toast.makeText(
+                    this,
+                    "Audio format unavailable; trying another stream",
+                    Toast.LENGTH_LONG
+                ).show()
+                handlingPlaybackError = false
+                activeStream = fallback
+                startStreamPlayback(fallback, resumeMs)
+                return
+            }
+        }
+
         showPlaybackErrorDialog(code)
         // The ExoPlayer error name doesn't carry the underlying HTTP
         // status code, but Cloudflare-style 403 challenges are by far the

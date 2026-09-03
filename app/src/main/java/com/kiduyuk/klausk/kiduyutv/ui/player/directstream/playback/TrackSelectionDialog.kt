@@ -226,10 +226,10 @@ class TrackSelectionDialog(
                         type = type,
                         groupIndex = groupIndex,
                         trackIndex = trackIndex,
-                        title = if (isDefaultSubtitle) {
-                            "Default"
-                        } else {
-                            TrackFormatter.titleOf(format)
+                        title = when {
+                            isDefaultSubtitle -> "Default"
+                            type == C.TRACK_TYPE_AUDIO -> audioTitleOf(format)
+                            else -> TrackFormatter.titleOf(format)
                         },
                         subtitle = if (isDefaultSubtitle) {
                             ""
@@ -244,6 +244,20 @@ class TrackSelectionDialog(
             }
         }
         return rows
+    }
+
+    /**
+     * Audio manifests often expose a generic label such as "Track" while
+     * carrying the useful language in Format.language. Prefer the readable
+     * language in the primary row title and keep codec/technical details in
+     * the secondary line.
+     */
+    private fun audioTitleOf(format: androidx.media3.common.Format): String {
+        val language = TrackFormatter.languageDisplay(format.language.orEmpty())
+        val label = format.label?.trim().orEmpty()
+        if (label.isBlank() || label.equals("track", ignoreCase = true)) return language
+        if (label.equals(language, ignoreCase = true)) return language
+        return if (language.equals("Default", ignoreCase = true)) label else "$language · $label"
     }
 
     /**
