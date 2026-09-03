@@ -241,7 +241,8 @@ fun MyListScreen(
     // ── Enrichment helper: process a single Trakt history page into MyListItems ──
     suspend fun enrichHistoryPage(
         history: List<TraktHistoryItem>,
-        onItemProcessed: suspend () -> Unit
+        onItemProcessed: suspend () -> Unit,
+        onItemAdded: suspend (MyListItem) -> Unit
     ): List<MyListItem> = withContext(Dispatchers.IO) {
         Log.d(TAG, "Starting Trakt history enrichment: records=${history.size}")
         val pageItems = mutableListOf<MyListItem>()
@@ -265,15 +266,15 @@ fun MyListScreen(
                             } catch (e: Exception) {
                                 Log.e(TAG, "TMDB movie detail failed for watched movie $tmdbId: ${e.message}", e)
                             }
-                            pageItems.add(
-                                MyListItem(
-                                    id = tmdbId,
-                                    title = movie.title,
-                                    posterPath = posterPath,
-                                    type = "movie",
-                                    voteAverage = rating
-                                )
+                            val enrichedItem = MyListItem(
+                                id = tmdbId,
+                                title = movie.title,
+                                posterPath = posterPath,
+                                type = "movie",
+                                voteAverage = rating
                             )
+                            pageItems.add(enrichedItem)
+                            onItemAdded(enrichedItem)
                         }
                     }
                 }
@@ -293,15 +294,15 @@ fun MyListScreen(
                             } catch (e: Exception) {
                                 Log.e(TAG, "TMDB TV detail failed for watched show $tmdbId: ${e.message}", e)
                             }
-                            pageItems.add(
-                                MyListItem(
-                                    id = tmdbId,
-                                    title = show.title,
-                                    posterPath = posterPath,
-                                    type = "tv",
-                                    voteAverage = rating
-                                )
+                            val enrichedItem = MyListItem(
+                                id = tmdbId,
+                                title = show.title,
+                                posterPath = posterPath,
+                                type = "tv",
+                                voteAverage = rating
                             )
+                            pageItems.add(enrichedItem)
+                            onItemAdded(enrichedItem)
                         }
                     }
                 }
@@ -357,23 +358,40 @@ fun MyListScreen(
                                     Log.i(TAG, "Watched page=$nextPage is empty; reached end of Trakt history")
                                     hasMoreWatched = false
                                 } else {
-                                    val newItems = enrichHistoryPage(history) {
-                                        withContext(Dispatchers.Main) {
-                                            watchedHistoryLoaded += 1
-                                            Log.d(
-                                                TAG,
-                                                "Watched history progress: $watchedHistoryLoaded/" +
-                                                    "${watchedHistoryTotal ?: "?"} records processed"
-                                            )
+                                    val newItems = enrichHistoryPage(
+                                        history = history,
+                                        onItemProcessed = {
+                                            withContext(Dispatchers.Main) {
+                                                watchedHistoryLoaded += 1
+                                                Log.d(
+                                                    TAG,
+                                                    "Watched history progress: $watchedHistoryLoaded/" +
+                                                        "${watchedHistoryTotal ?: "?"} records processed"
+                                                )
+                                            }
+                                        },
+                                        onItemAdded = { item ->
+                                            withContext(Dispatchers.Main) {
+                                                if (watchedItems.none { it.id == item.id && it.type == item.type }) {
+                                                    watchedItems = watchedItems + item
+                                                    Log.d(
+                                                        TAG,
+                                                        "Appended watched item immediately: " +
+                                                            "${item.type}/${item.id}, displayed=${watchedItems.size}"
+                                                    )
+                                                }
+                                            }
                                         }
-                                    }
+                                    )
                                     /*Log.i(
                                         "MyListScreen",
                                         "Page $nextPage: fetched=${history.size}, newUnique=${newItems.size}"
                                     )*/
 
                                     withContext(Dispatchers.Main) {
-                                        watchedItems = watchedItems + newItems
+                                        // Items were appended as soon as each TMDB enrichment
+                                        // completed. Only advance pagination here; keep the
+                                        // deduplicated list intact.
                                         currentWatchedPage = nextPage
                                         Log.i(
                                             TAG,
