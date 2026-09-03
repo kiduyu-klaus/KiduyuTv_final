@@ -574,7 +574,7 @@ class CloudflareBypassActivity : AppCompatActivity() {
             // Direct MKV responses commonly use Content-Disposition: attachment,
             // so WebView may invoke this callback instead of navigating the main
             // frame to the final worker URL. Capture that URL for the player.
-            webView.setDownloadListener { url, _, _, _, _ ->
+            setDownloadListener { url, _, _, _, _ ->
                 Log.i(TAG, "[WebView] Download started: $url")
                 if (url.startsWith("http", ignoreCase = true)) {
                     lastMainFrameUrl = url

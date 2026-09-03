@@ -1261,7 +1261,9 @@ class DirectStreamActivity : AppCompatActivity() {
         )
         stopWatchProgressUpdates()
         engine.pause()
-        hideLoadingArtwork()
+        // Keep the movie or episode backdrop visible over the failed player
+        // surface so playback errors do not leave a black screen.
+        showLoadingArtwork()
         binding.playerStatus.visibility = View.GONE
         showControls()
         showPlaybackErrorDialog(code)
