@@ -1651,7 +1651,10 @@ class DirectStreamActivity : AppCompatActivity() {
 
         // This also covers stream switching, subtitle reloads and sniffed
         // playback paths that do not pass through playBest().
-        if (!engine.player.isPlaying && needsDahmerMoviesClearance(stream)) {
+        // DahmerMovies must resolve the browser redirect whenever an
+        // unresolved stream is selected, even if another stream is currently
+        // playing and even when a clearance cookie is already saved.
+        if (needsDahmerMoviesClearance(stream)) {
             Log.w(
                 TAG,
                 "startStreamPlayback intercepted DahmerMovies without " +
