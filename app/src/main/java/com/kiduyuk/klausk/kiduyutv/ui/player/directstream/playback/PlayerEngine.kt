@@ -81,8 +81,14 @@ class PlayerEngine(context: Context) {
     )
 
     private fun playbackHeaders(stream: StreamItem): Map<String, String> {
+        val streamCookie = stream.headers.entries
+            .firstOrNull { it.key.equals("Cookie", ignoreCase = true) }
+            ?.value
+            ?.takeIf { it.isNotBlank() }
         val headers = if (stream.provider.equals("DahmerMovies", ignoreCase = true)) {
-            dahmerMoviesHeaders()
+            dahmerMoviesHeaders().toMutableMap().apply {
+                streamCookie?.let { put("Cookie", it) }
+            }
         } else {
             sanitizeUserAgent(stream.headers)
         }

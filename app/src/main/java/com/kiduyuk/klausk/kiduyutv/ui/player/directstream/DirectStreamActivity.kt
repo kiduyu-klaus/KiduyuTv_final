@@ -217,13 +217,25 @@ class DirectStreamActivity : AppCompatActivity() {
             Toast.LENGTH_SHORT
         ).show()
         // Keep the current activity alive so availableStreams, the selected
-        // stream, subtitles, and playback state are all retained. The
-        // Cloudflare activity has already persisted the cookie; retry this
-        // exact stream directly instead of recreating and fetching streams
-        // again.
-        activeStream = stream
+        // stream, subtitles, and playback state are all retained. Use the
+        // final URL reached by the WebView (for DahmerMovies this is the
+        // cfok-122.workers.dev download URL), and carry the solved cookie on
+        // this exact retry instead of recreating and fetching streams again.
+        val finalUrl = result.data?.getStringExtra(CloudflareBypassActivity.EXTRA_URL)
+            ?.takeIf { it.startsWith("http://", ignoreCase = true) || it.startsWith("https://", ignoreCase = true) }
+            ?: stream.url
+        val retryHeaders = stream.headers.toMutableMap()
+        savedCookies?.takeIf { it.isNotBlank() }?.let {
+            retryHeaders["Cookie"] = it
+        }
+        val retryStream = stream.copy(
+            url = finalUrl,
+            headers = retryHeaders
+        )
+        Log.i(TAG, "Retrying playback with final Cloudflare URL=$finalUrl")
+        activeStream = retryStream
         handlingPlaybackError = false
-        startStreamPlayback(stream, resumeMs)
+        startStreamPlayback(retryStream, resumeMs)
     }
 
     private val watchProgressTick = object : Runnable {
@@ -1811,6 +1823,9 @@ class DirectStreamActivity : AppCompatActivity() {
 
         val intent = Intent(this, CloudflareBypassActivity::class.java).apply {
             putExtra(CloudflareBypassActivity.EXTRA_HOST, bypassHost)
+            // Let the WebView follow the original stream request so the
+            // solved result can return its final redirected media URL.
+            putExtra(CloudflareBypassActivity.EXTRA_URL, stream.url)
             putExtra(
                 CloudflareBypassActivity.EXTRA_TITLE,
                 if (stream.provider.isNotBlank()) {

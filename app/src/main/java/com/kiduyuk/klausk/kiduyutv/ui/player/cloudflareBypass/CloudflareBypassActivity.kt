@@ -280,6 +280,7 @@ class CloudflareBypassActivity : AppCompatActivity() {
 
     // ── State ───────────────────────────────────────────────────────────────
     private var targetUrl: String = ""
+    private var lastMainFrameUrl: String = ""
     private var targetHost: String = ""
     private var displayTitle: String = ""
     private var timeoutMs: Long = DEFAULT_TIMEOUT_MS
@@ -356,9 +357,22 @@ class CloudflareBypassActivity : AppCompatActivity() {
             finish()
             return
         }
-        // Resolve against the host root only. A stream URL can be a short-lived
-        // media resource that cannot render the Cloudflare challenge itself.
-        targetUrl = "https://$targetHost"
+        // Use the requested URL when it belongs to the verification host. For
+        // DahmerMovies this lets the WebView follow the post-challenge redirect
+        // to the actual worker download URL instead of returning only the
+        // p.111477.xyz bulk URL.
+        targetUrl = legacyUrl
+            .takeIf { candidate ->
+                candidate.startsWith("http://", ignoreCase = true) ||
+                    candidate.startsWith("https://", ignoreCase = true)
+            }
+            ?.takeIf { candidate ->
+                runCatching { Uri.parse(candidate).host.orEmpty() }
+                    .getOrDefault("")
+                    .equals(targetHost, ignoreCase = true)
+            }
+            ?: "https://$targetHost"
+        lastMainFrameUrl = targetUrl
         displayTitle = intent.getStringExtra(EXTRA_TITLE)?.takeIf { it.isNotBlank() }
             ?: "Verifying $targetHost"
         timeoutMs = intent.getLongExtra(EXTRA_TIMEOUT_MS, DEFAULT_TIMEOUT_MS)
@@ -564,6 +578,9 @@ class CloudflareBypassActivity : AppCompatActivity() {
                 override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                     super.onPageStarted(view, url, favicon)
                     Log.i(TAG, "[WebView] onPageStarted: $url")
+                    url?.takeIf { it.startsWith("http", ignoreCase = true) }?.let {
+                        lastMainFrameUrl = it
+                    }
                     if (isSolved) return
                     setStatus("Loading $url…", isError = false)
                 }
@@ -572,6 +589,9 @@ class CloudflareBypassActivity : AppCompatActivity() {
                     // The parent installs request interception and DOM cleanup for ads.
                     super.onPageFinished(view, url)
                     Log.i(TAG, "[WebView] onPageFinished: $url")
+                    url?.takeIf { it.startsWith("http", ignoreCase = true) }?.let {
+                        lastMainFrameUrl = it
+                    }
                     if (isSolved) return
                     // Check synchronously: the cookie is often written just
                     // before onPageFinished fires for the solved redirect.
@@ -654,6 +674,7 @@ class CloudflareBypassActivity : AppCompatActivity() {
         val cm = CookieManager.getInstance()
         val candidateUrls = linkedSetOf(
             targetUrl,
+            lastMainFrameUrl,
             "https://$targetHost",
             "http://$targetHost"
         )
@@ -688,7 +709,7 @@ class CloudflareBypassActivity : AppCompatActivity() {
         CookieManager.getInstance().flush()
 
         val cookies = captureAllCookiesForTarget().ifBlank {
-            CookieManager.getInstance().getCookie(targetUrl).orEmpty()
+            CookieManager.getInstance().getCookie(lastMainFrameUrl).orEmpty()
         }
         setStatus(
             "✓ Verified. Returning to player…",
@@ -713,7 +734,7 @@ class CloudflareBypassActivity : AppCompatActivity() {
         if (isFinishingForResult) return
         isFinishingForResult = true
         val data = Intent().apply {
-            putExtra(EXTRA_URL, targetUrl)
+            putExtra(EXTRA_URL, lastMainFrameUrl.ifBlank { targetUrl })
             putExtra(EXTRA_COOKIES, cookies)
             putExtra(EXTRA_DOMAIN, targetHost)
         }
