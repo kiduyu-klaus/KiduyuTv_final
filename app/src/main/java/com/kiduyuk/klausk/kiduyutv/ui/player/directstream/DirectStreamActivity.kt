@@ -233,6 +233,11 @@ class DirectStreamActivity : AppCompatActivity() {
             headers = retryHeaders
         )
         Log.i(TAG, "Retrying playback with final Cloudflare URL=$finalUrl")
+        // Replace the gated entry as well as the active stream so opening the
+        // stream selector later reuses the resolved worker download URL.
+        availableStreams = availableStreams.map { candidate ->
+            if (candidate.url == stream.url) retryStream else candidate
+        }
         activeStream = retryStream
         handlingPlaybackError = false
         startStreamPlayback(retryStream, resumeMs)
@@ -1344,7 +1349,7 @@ class DirectStreamActivity : AppCompatActivity() {
                     onProviderProgress = { index, total, providerName ->
                         withContext(Dispatchers.Main) {
                             showStatus(
-                                "Provider $index/$total enabled providers: $providerName\nfetching streams",
+                                "Provider $index/$total completed: $providerName\nstreams fetched",
                                 retry = false
                             )
                         }
@@ -1555,10 +1560,11 @@ class DirectStreamActivity : AppCompatActivity() {
     }
 
     /**
-     * Returns `true` when [stream] belongs to DahmerMovies and no usable
-     * `cf_clearance` cookie is available for p.111477.xyz. Cookies supplied
-     * directly with the stream response are checked before the persisted
-     * Cloudflare cookie store.
+     * Returns `true` when [stream] is an unresolved DahmerMovies URL. Even
+     * when a cookie is already available, the WebView must open the original
+     * stream and follow its post-challenge redirect so the final worker
+     * download URL can be handed to ExoPlayer. Resolved worker URLs are
+     * allowed through to avoid reopening the bypass in a loop.
      */
     private fun needsDahmerMoviesClearance(stream: StreamItem): Boolean {
         val url = stream.url.trim()
@@ -1578,25 +1584,21 @@ class DirectStreamActivity : AppCompatActivity() {
         val isDahmerStream = host.equals(DAHMER_CLEARANCE_HOST, ignoreCase = true) ||
             url.startsWith(DAHMER_CLEARANCE_URL, ignoreCase = true) ||
             stream.provider.equals(DAHMER_PROVIDER, ignoreCase = true)
-        Log.d(TAG, "needsDahmerMoviesClearance: url=$url host=$host provider=${stream.provider} isDahmer=$isDahmerStream")
-        if (!isDahmerStream) return false
-
-        val streamCookie = stream.headers.entries
-            .firstOrNull { it.key.equals("Cookie", ignoreCase = true) }
-            ?.value
-        if (containsCfClearance(streamCookie)) return false
-
-        val saved = CloudflareBypassActivity.loadCookies(
-            applicationContext,
-            DAHMER_CLEARANCE_HOST
+        Log.d(
+            TAG,
+            "needsDahmerMoviesClearance: url=$url host=$host " +
+                "provider=${stream.provider} isDahmer=$isDahmerStream"
         )
-        if (containsCfClearance(saved)) {
-            Log.i(
-                TAG,
-                "DahmerMovies clearance already saved for $DAHMER_CLEARANCE_HOST"
-            )
+        if (!isDahmerStream) return false
+        if (host.endsWith(".workers.dev", ignoreCase = true)) {
+            Log.d(TAG, "DahmerMovies URL already resolved to worker host=$host")
             return false
         }
+        Log.i(
+            TAG,
+            "DahmerMovies stream requires WebView redirect resolution; " +
+                "existing cookies do not bypass this step"
+        )
         return true
     }
 
