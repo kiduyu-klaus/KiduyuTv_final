@@ -224,18 +224,16 @@ class PlayerEngine(context: Context) {
             }
             val mediaItem = MediaItem.Builder()
                 .setUri(uri)
-                .apply {
-                    when {
-                        isHls(stream) -> setMimeType(MimeTypes.APPLICATION_M3U8)
-                        isDash(stream) -> setMimeType(MimeTypes.APPLICATION_MPD)
-                    }
-                }
+                .apply { setDetectedMimeType(stream) }
                 .setSubtitleConfigurations(subtitleConfigurations)
                 .build()
             return DefaultMediaSourceFactory(dataSourceFactory).createMediaSource(mediaItem)
         }
 
-        val mediaItem = MediaItem.fromUri(uri)
+        val mediaItem = MediaItem.Builder()
+            .setUri(uri)
+            .apply { setDetectedMimeType(stream) }
+            .build()
         val videoSource = when {
             isHls(stream) -> HlsMediaSource.Factory(dataSourceFactory)
                 .createMediaSource(mediaItem)
@@ -272,6 +270,27 @@ class PlayerEngine(context: Context) {
                 .createMediaSource(configuration, C.TIME_UNSET)
         }
         return MergingMediaSource(videoSource, *subtitleSources.toTypedArray())
+    }
+
+    private fun MediaItem.Builder.setDetectedMimeType(stream: StreamItem) {
+        when {
+            isHls(stream) -> setMimeType(MimeTypes.APPLICATION_M3U8)
+            isDash(stream) -> setMimeType(MimeTypes.APPLICATION_MPD)
+            isMatroska(stream) -> setMimeType(MimeTypes.VIDEO_MATROSKA)
+        }
+    }
+
+    private fun isMatroska(stream: StreamItem): Boolean {
+        if (stream.provider.equals("DahmerMovies", ignoreCase = true)) return true
+        if (stream.type.equals("mkv", ignoreCase = true) ||
+            stream.type.equals("matroska", ignoreCase = true)
+        ) return true
+        if (stream.mimeType.equals(MimeTypes.VIDEO_MATROSKA, ignoreCase = true) ||
+            stream.mimeType.equals("application/x-matroska", ignoreCase = true)
+        ) return true
+        return stream.url.substringBefore('?').lowercase().let { path ->
+            path.endsWith(".mkv") || path.endsWith(".mka")
+        }
     }
 
     private fun isDash(stream: StreamItem): Boolean =
