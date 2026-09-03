@@ -365,7 +365,6 @@ class PlayerEngine(context: Context) {
         // AudioTrack cannot initialize 5.1 surround and raise
         // ERROR_CODE_AUDIO_TRACK_INIT_FAILED (5001).
         val defaults = player.trackSelectionParameters.buildUpon()
-            .setSelectAudioByDefault(true)
             .setPreferredAudioMimeTypes(
                 MimeTypes.AUDIO_AAC,
                 MimeTypes.AUDIO_AC3,
@@ -523,7 +522,6 @@ class PlayerEngine(context: Context) {
         val builder = current.buildUpon()
             .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
             .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
-            .setSelectAudioByDefault(true)
             .setPreferredAudioMimeTypes(
                 MimeTypes.AUDIO_AAC,
                 MimeTypes.AUDIO_AC3,
