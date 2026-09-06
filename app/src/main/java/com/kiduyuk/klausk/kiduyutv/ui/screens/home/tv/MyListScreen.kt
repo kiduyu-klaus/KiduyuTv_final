@@ -344,7 +344,10 @@ fun MyListScreen(
             Log.i(TAG, "Skipping watched page load: Trakt is not connected")
             return
         }
-        if (isLoadingMore || isInitialLoading) {
+        // isInitialLoading describes the first-page UI state; it must not block
+        // the first-page request that set it. isLoadingMore is the request-level
+        // guard and prevents duplicate initial and pagination requests.
+        if (isLoadingMore) {
             Log.i(TAG, "Skipping watched page load: another watched load is active")
             return
         }
