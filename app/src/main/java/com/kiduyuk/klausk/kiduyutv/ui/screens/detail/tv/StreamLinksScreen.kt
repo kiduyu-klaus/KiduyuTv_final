@@ -79,12 +79,15 @@ fun StreamLinksScreen(
     timestamp: Long = 0L,
     onBackClick: () -> Unit,
     onOpenSettings: () -> Unit = {},
+    showDirectStreamPrompt: Boolean = true,
     viewModel: StreamLinksViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     var directStreamPromptResolved by remember {
-        mutableStateOf(SettingsManager(context).isDirectStreamEnabled())
+        mutableStateOf(
+            !showDirectStreamPrompt || SettingsManager(context).isDirectStreamEnabled()
+        )
     }
 
     LaunchedEffect(tmdbId) {

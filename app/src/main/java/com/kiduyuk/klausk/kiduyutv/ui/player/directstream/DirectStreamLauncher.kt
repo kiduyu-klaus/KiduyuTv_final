@@ -22,13 +22,16 @@ object DirectStreamLauncher {
     fun launch(
         context: Context,
         intent: Intent,
+        launchIntent: ((Intent) -> Unit)? = null,
         onLaunched: () -> Unit = {}
     ) {
         val activity = context.findActivity()
         val launched = AtomicBoolean(false)
         val openPlayer = {
             if (launched.compareAndSet(false, true)) {
-                if (activity != null && !activity.isFinishing && !activity.isDestroyed) {
+                if (launchIntent != null) {
+                    launchIntent(intent)
+                } else if (activity != null && !activity.isFinishing && !activity.isDestroyed) {
                     activity.startActivity(intent)
                 } else {
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

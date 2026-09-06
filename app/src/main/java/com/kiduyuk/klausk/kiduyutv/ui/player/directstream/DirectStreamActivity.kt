@@ -1436,11 +1436,13 @@ class DirectStreamActivity : AppCompatActivity() {
             .setTitle(R.string.providers_backend_down_title)
             .setMessage(R.string.providers_backend_down_message)
             .setCancelable(false)
-            .setPositiveButton(R.string.no_streams_retry) { currentDialog, _ ->
+            .setPositiveButton(R.string.disable_direct_stream) { currentDialog, _ ->
                 currentDialog.dismiss()
-                loadCurrentMedia()
+                settingsManager.setDirectStreamEnabled(false)
+                setResult(RESULT_SHOW_STREAM_LINKS)
+                finish()
             }
-            .setNegativeButton(R.string.no_streams_exit) { currentDialog, _ ->
+            .setNegativeButton(R.string.exit_player) { currentDialog, _ ->
                 currentDialog.dismiss()
                 finish()
             }
@@ -2713,6 +2715,8 @@ class DirectStreamActivity : AppCompatActivity() {
         const val EXTRA_SNIFFED_TYPE = "SNIFFED_STREAM_TYPE"
         const val EXTRA_SNIFFED_MIME_TYPE = "SNIFFED_STREAM_MIME_TYPE"
         const val EXTRA_SNIFFED_SUBTITLES = "SNIFFED_SUBTITLES"
+
+        const val RESULT_SHOW_STREAM_LINKS = android.app.Activity.RESULT_FIRST_USER + 2801
 
         fun createIntent(
             context: Context,

@@ -99,6 +99,7 @@ fun MobileStreamLinksScreen(
     onBackClick: () -> Unit,
     onProviderClick: (String) -> Unit,
     onOpenSettings: () -> Unit = {},
+    showDirectStreamPrompt: Boolean = true,
     viewModel: StreamLinksViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -106,7 +107,9 @@ fun MobileStreamLinksScreen(
     val handleBackClick = rememberPhoneInterstitialBackClick(onBackClick)
     val uiState by viewModel.uiState.collectAsState()
     var directStreamPromptResolved by remember {
-        mutableStateOf(SettingsManager(context).isDirectStreamEnabled())
+        mutableStateOf(
+            !showDirectStreamPrompt || SettingsManager(context).isDirectStreamEnabled()
+        )
     }
 
     LaunchedEffect(tmdbId) {

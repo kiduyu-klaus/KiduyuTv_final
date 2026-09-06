@@ -6,9 +6,13 @@ import android.net.Uri
 import android.os.Build
 import androidx.annotation.OptIn
 import androidx.annotation.RequiresApi
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -340,8 +344,23 @@ fun NavGraph(navController: NavHostController) {
             val voteAverage = backStackEntry.arguments?.getFloat("voteAverage")?.toDouble() ?: 0.0
             val releaseDate = backStackEntry.arguments?.getString("releaseDate")
             val timestamp = backStackEntry.arguments?.getLong("timestamp") ?: 0L
+            val showStreamLinks = remember(tmdbId, isTv, season, episode) {
+                mutableStateOf(false)
+            }
+            val directStreamResultLauncher = rememberLauncherForActivityResult(
+                ActivityResultContracts.StartActivityForResult()
+            ) { result ->
+                if (result.resultCode == DirectStreamActivity.RESULT_SHOW_STREAM_LINKS) {
+                    showStreamLinks.value = true
+                } else {
+                    navController.popBackStack()
+                }
+            }
 
-            if (SettingsManager(navController.context).isDirectStreamEnabled()) {
+            if (
+                SettingsManager(navController.context).isDirectStreamEnabled() &&
+                !showStreamLinks.value
+            ) {
                 androidx.compose.runtime.LaunchedEffect(tmdbId, season, episode) {
                     DirectStreamLauncher.launch(
                         context = navController.context,
@@ -358,7 +377,7 @@ fun NavGraph(navController: NavHostController) {
                             voteAverage = voteAverage,
                             releaseDate = releaseDate
                         ),
-                        onLaunched = { navController.popBackStack() }
+                        launchIntent = directStreamResultLauncher::launch
                     )
                 }
             } else StreamLinksScreen(
@@ -374,7 +393,8 @@ fun NavGraph(navController: NavHostController) {
                 episode = if (episode == 0) null else episode,
                 timestamp = timestamp,
                 onBackClick = { navController.popBackStack() },
-                onOpenSettings = { navController.navigate(Screen.Settings.route) }
+                onOpenSettings = { navController.navigate(Screen.Settings.route) },
+                showDirectStreamPrompt = !showStreamLinks.value
             )
         }
 
