@@ -960,7 +960,12 @@ fun MobileSettingsScreen(
                 )
             },
             text = {
-                Column {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 400.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
                     Text(
                         "Choose one enabled provider for direct-stream playback. " +
                             "Select All Providers to aggregate every enabled provider.",
@@ -1026,7 +1031,12 @@ fun MobileSettingsScreen(
                 )
             },
             text = {
-                Column {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 400.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
                     Text(
                         "Choose which provider opens automatically when you tap Play. " +
                                 "Select \"Auto\" to always see the full list.",
