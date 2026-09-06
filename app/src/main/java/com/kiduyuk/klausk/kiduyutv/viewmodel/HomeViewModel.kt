@@ -74,7 +74,12 @@ data class MyListItem(
     val type: String,
     val voteAverage: Double = 0.0,
     val character: String? = null,
-    val knownForDepartment: String? = null
+    val knownForDepartment: String? = null,
+    // Trakt watched-history records can contain multiple episodes for one show.
+    // Keep the history event identity so those records remain distinct in the grid.
+    val watchedHistoryId: Long? = null,
+    val seasonNumber: Int? = null,
+    val episodeNumber: Int? = null
 )
 
 /**
