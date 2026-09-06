@@ -50,6 +50,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamItem
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.SubtitleItem
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.SubdlSubtitleClient
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.SubdlSubtitleResult
+import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.ProvidersBackendUnavailableException
 import com.kiduyuk.klausk.kiduyutv.ui.player.webviewsniffer.SniffedSubtitle
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.PlayerEngine
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamCatalog
@@ -97,6 +98,7 @@ class DirectStreamActivity : AppCompatActivity() {
     private var streamDialog: StreamSelectionDialog? = null
     private var subtitleDialog: AlertDialog? = null
     private var noStreamsDialog: AlertDialog? = null
+    private var backendDownDialog: AlertDialog? = null
     private var quitDialog: QuitDialog? = null
     private var cloudflareDialog: AlertDialog? = null
     private var playbackErrorDialog: AlertDialog? = null
@@ -1362,6 +1364,8 @@ class DirectStreamActivity : AppCompatActivity() {
         skipSegmentsFetchJob?.cancel()
         noStreamsDialog?.takeIf { it.isShowing }?.dismiss()
         noStreamsDialog = null
+        backendDownDialog?.takeIf { it.isShowing }?.dismiss()
+        backendDownDialog = null
         availableStreams = emptyList()
         activeStream = null
         activeSubtitles = emptyList()
@@ -1414,10 +1418,42 @@ class DirectStreamActivity : AppCompatActivity() {
             }.onFailure { error ->
                 Log.w(TAG, "Stream fetch failed: ${error.message}")
                 Log.w(PROVIDER_TAG, "Stream fetch failed for provider=${provider.displayName}: ${error.message}")
-                showStatus(getString(R.string.streams_failed), retry = false)
-                showNoStreamsDialog()
+                if (error is ProvidersBackendUnavailableException) {
+                    showStatus(getString(R.string.providers_backend_down_status), retry = false)
+                    showBackendDownDialog()
+                } else {
+                    showStatus(getString(R.string.streams_failed), retry = false)
+                    showNoStreamsDialog()
+                }
             }
         }
+    }
+
+    private fun showBackendDownDialog() {
+        if (isFinishing || isDestroyed || backendDownDialog?.isShowing == true) return
+
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.providers_backend_down_title)
+            .setMessage(R.string.providers_backend_down_message)
+            .setCancelable(false)
+            .setPositiveButton(R.string.no_streams_retry) { currentDialog, _ ->
+                currentDialog.dismiss()
+                loadCurrentMedia()
+            }
+            .setNegativeButton(R.string.no_streams_exit) { currentDialog, _ ->
+                currentDialog.dismiss()
+                finish()
+            }
+            .create()
+
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.requestFocus()
+        }
+        dialog.setOnDismissListener {
+            if (backendDownDialog === dialog) backendDownDialog = null
+        }
+        backendDownDialog = dialog
+        dialog.show()
     }
 
     private fun showNoStreamsDialog() {
@@ -2638,6 +2674,8 @@ class DirectStreamActivity : AppCompatActivity() {
         subtitleDialog = null
         noStreamsDialog?.takeIf { it.isShowing }?.dismiss()
         noStreamsDialog = null
+        backendDownDialog?.takeIf { it.isShowing }?.dismiss()
+        backendDownDialog = null
         quitDialog?.takeIf { it.isShowing }?.dismiss()
         quitDialog = null
         cloudflareDialog?.takeIf { it.isShowing }?.dismiss()

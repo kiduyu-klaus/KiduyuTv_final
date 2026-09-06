@@ -12,6 +12,11 @@ import java.net.URL
 
 class ProvidersApiHttpException(val statusCode: Int) : IOException("Providers API HTTP $statusCode")
 
+class ProvidersBackendUnavailableException(
+    message: String,
+    cause: Throwable? = null
+) : IOException(message, cause)
+
 /**
  * Minimal synchronous client for the local kiduyuTv_providers
  * (TMDB-Embed-API) server. Call every public method from Dispatchers.IO.
@@ -36,6 +41,7 @@ object ProvidersApi {
     private const val TAG = "KiduyuLiteProvider"
     private const val CONNECT_TIMEOUT_MS = 30_000
     private const val PROVIDERS_READ_TIMEOUT_MS = 30_000
+    private const val BACKEND_HEALTH_TIMEOUT_MS = 8_000
 
     // Aggregate stream requests wait for several enabled providers on the
     // backend. Some valid scrapers need well over 30 seconds, so keep the
@@ -44,6 +50,63 @@ object ProvidersApi {
 
     private const val baseUrl = "https://sflatransport.com/kiduyuTv_providers"
     private const val streamApiToken = BuildConfig.STREAM_API_TOKEN
+
+    /**
+     * Verifies that the configured providers backend is reachable and is the
+     * expected KiduyuTV service. This deliberately uses a short timeout so a
+     * dead host does not make the player wait for each provider request to
+     * exhaust its much longer stream-extraction timeout.
+     *
+     * Call from Dispatchers.IO.
+     */
+    fun requireBackendAvailable() {
+        val urlString = "$baseUrl/api/health"
+        Log.i(TAG, "Checking providers backend health")
+        val connection = try {
+            (URL(urlString).openConnection() as HttpURLConnection).apply {
+                connectTimeout = BACKEND_HEALTH_TIMEOUT_MS
+                readTimeout = BACKEND_HEALTH_TIMEOUT_MS
+                requestMethod = "GET"
+                setRequestProperty("Accept", "application/json")
+                setRequestProperty("User-Agent", "KiduyuTVLite/1.0 (Android)")
+                useCaches = false
+            }
+        } catch (error: Exception) {
+            throw ProvidersBackendUnavailableException(
+                "Could not open a connection to the providers backend",
+                error
+            )
+        }
+
+        try {
+            val status = connection.responseCode
+            val body = (if (status in 200..299) connection.inputStream else connection.errorStream)
+                ?.bufferedReader()?.use { it.readText() }.orEmpty()
+            if (status !in 200..299) {
+                throw ProvidersBackendUnavailableException(
+                    "Providers backend health check returned HTTP $status"
+                )
+            }
+
+            val isHealthy = runCatching { JSONObject(body).optBoolean("ok", false) }
+                .getOrDefault(false)
+            if (!isHealthy) {
+                throw ProvidersBackendUnavailableException(
+                    "Providers backend returned an invalid health response"
+                )
+            }
+            Log.i(TAG, "Providers backend health check passed")
+        } catch (error: ProvidersBackendUnavailableException) {
+            throw error
+        } catch (error: Exception) {
+            throw ProvidersBackendUnavailableException(
+                "Providers backend is unavailable",
+                error
+            )
+        } finally {
+            connection.disconnect()
+        }
+    }
 
     /**
      * Returns the server-side keys of providers currently enabled by

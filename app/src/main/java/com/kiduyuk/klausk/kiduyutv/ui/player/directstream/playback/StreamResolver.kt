@@ -46,6 +46,11 @@ class StreamResolver {
         onProviderProgress: suspend (index: Int, total: Int, providerName: String) -> Unit = { _, _, _ -> },
         onProviderRetry: suspend (index: Int, total: Int, providerName: String) -> Unit = { _, _, _ -> }
     ): List<StreamItem> = withContext(Dispatchers.IO) {
+        // Fail fast with a distinct error before provider discovery. Aggregate
+        // extraction can legitimately take several minutes, but an unreachable
+        // backend should be reported to the player immediately.
+        ProvidersApi.requireBackendAvailable()
+
         val providerNames = if (provider.key.isBlank()) {
             ProvidersApi.enabledProviderNames()
         } else {
