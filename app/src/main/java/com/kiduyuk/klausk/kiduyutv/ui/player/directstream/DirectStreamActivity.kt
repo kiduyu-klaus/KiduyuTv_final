@@ -1585,11 +1585,11 @@ class DirectStreamActivity : AppCompatActivity() {
             Log.w(
                 TAG,
                 "DahmerMovies stream detected without cf_clearance; " +
-                    "opening $DAHMER_CLEARANCE_URL"
+                    "opening the full blocked URL"
             )
             pendingCloudflareStream = chosen
             pendingCloudflareResumeMs = resumeMs
-            launchCloudflareBypass(chosen, DAHMER_CLEARANCE_URL)
+            launchCloudflareBypass(chosen)
             return
         }
         // Proactive Cloudflare bypass for the oogachaka CDN: if the stream
@@ -1715,13 +1715,13 @@ class DirectStreamActivity : AppCompatActivity() {
             Log.w(
                 TAG,
                 "startStreamPlayback intercepted DahmerMovies without " +
-                    "cf_clearance; opening $DAHMER_CLEARANCE_URL"
+                    "cf_clearance; opening the full blocked URL"
             )
             pendingCloudflareStream = stream
             pendingCloudflareResumeMs = startPositionMs
             showStatus(getString(R.string.cloudflare_blocked_checking), retry = false)
             showLoadingArtwork()
-            launchCloudflareBypass(stream, DAHMER_CLEARANCE_URL)
+            launchCloudflareBypass(stream)
             return
         }
         // Pre-load guard: the oogachaka CDN reliably 403s fresh clients, so
@@ -1831,63 +1831,26 @@ class DirectStreamActivity : AppCompatActivity() {
      * `RESULT_OK`. Our [cloudflareBypassLauncher] picks that result up and
      * retries [stream].
      */
-    private fun resolveCloudflareBypassHost(
-        stream: StreamItem,
-        fallbackUrl: String = stream.url
-    ): String? {
-        val candidateUrl = stream.headers.entries
-            .firstOrNull { (key, _) ->
-                key.equals("Referer", ignoreCase = true) ||
-                    key.equals("Referrer", ignoreCase = true) ||
-                    key.equals("Origin", ignoreCase = true)
+    private fun launchCloudflareBypass(stream: StreamItem) {
+        // Cloudflare challenges can be scoped to a path/query rather than the
+        // host root. Always pass the exact URL that returned 403; invalid stream
+        // URLs are rejected instead of silently loading a different host page.
+        val fullVerificationUrl = stream.url.trim()
+            .takeIf {
+                it.startsWith("https://", ignoreCase = true) ||
+                    it.startsWith("http://", ignoreCase = true)
             }
-            ?.value
-            ?.trim()
-            ?.takeIf { it.isNotBlank() && it.startsWith("http", ignoreCase = true) }
-            ?: fallbackUrl.trim()
-
-        return runCatching { Uri.parse(candidateUrl).host.orEmpty() }
-            .getOrDefault("")
-            .takeIf { it.isNotBlank() }
-    }
-
-    private fun launchCloudflareBypass(
-        stream: StreamItem,
-        verificationUrl: String = stream.url
-    ) {
-        // DahmerMovies uses p.111477.xyz for its Cloudflare challenge. Force
-        // this target even when the generic 403-dialog path calls this method
-        // without an explicit verification URL and the media URL/referer still
-        // points at the old a.111477.xyz host.
-        val effectiveVerificationUrl = if (
-            stream.provider.equals(DAHMER_PROVIDER, ignoreCase = true)
-        ) {
-            DAHMER_CLEARANCE_URL
-        } else {
-            verificationUrl
-        }
-
-        // Retain explicit verification targets while reducing the final input
-        // to the host only because CloudflareBypassActivity opens the host root.
-        val bypassHost = when {
-            effectiveVerificationUrl.isBlank() ->
-                resolveCloudflareBypassHost(stream, stream.url)
-            effectiveVerificationUrl.equals(stream.url, ignoreCase = true) ->
-                resolveCloudflareBypassHost(stream, effectiveVerificationUrl)
-            else -> runCatching { Uri.parse(effectiveVerificationUrl).host.orEmpty() }
-                .getOrDefault("")
-                .takeIf { it.isNotBlank() }
-        }
+        val bypassHost = fullVerificationUrl
+            ?.let { url -> runCatching { Uri.parse(url).host.orEmpty() }.getOrDefault("") }
+            ?.takeIf { it.isNotBlank() }
         if (bypassHost == null) {
-            Log.e(TAG, "Could not resolve Cloudflare verification host for ${stream.url}")
+            Log.e(TAG, "Could not resolve a full Cloudflare verification URL")
             return
         }
 
         val intent = Intent(this, CloudflareBypassActivity::class.java).apply {
             putExtra(CloudflareBypassActivity.EXTRA_HOST, bypassHost)
-            // Let the WebView follow the original stream request so the
-            // solved result can return its final redirected media URL.
-            putExtra(CloudflareBypassActivity.EXTRA_URL, stream.url)
+            putExtra(CloudflareBypassActivity.EXTRA_URL, fullVerificationUrl)
             putExtra(
                 CloudflareBypassActivity.EXTRA_WAIT_FOR_DOWNLOAD,
                 stream.url.startsWith(DAHMER_BULK_PREFIX, ignoreCase = true)
@@ -2797,8 +2760,6 @@ class DirectStreamActivity : AppCompatActivity() {
         const val TYPE_SERIES = "series"
 
         private const val OOGACHAKA_STREAM_PREFIX = "https://serve.oogachakacdn.store"
-        private const val DAHMER_PROVIDER = "DahmerMovies"
-        private const val DAHMER_CLEARANCE_URL = "https://p.111477.xyz/"
         private const val DAHMER_BULK_PREFIX = "https://p.111477.xyz/bulk?u"
 
         private const val SKIP_SEC_MIN = 30
