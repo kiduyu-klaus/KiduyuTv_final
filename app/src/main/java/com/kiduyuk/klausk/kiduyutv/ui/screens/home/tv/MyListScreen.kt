@@ -235,6 +235,7 @@ fun MyListScreen(
     var currentWatchedPage by remember { mutableIntStateOf(0) }
     var watchedHistoryTotal by remember { mutableStateOf<Int?>(null) }
     var watchedHistoryLoaded by remember { mutableIntStateOf(0) }
+    var watchedLoadError by remember { mutableStateOf<String?>(null) }
     val processedTmdbIds = remember { mutableSetOf<String>() }
 
     // Tracks how many items we requested this page so we can show a footer spinner
@@ -358,6 +359,7 @@ fun MyListScreen(
 
         val nextPage = currentWatchedPage + 1
         isLoadingMore = true
+        watchedLoadError = null
         Log.i(
             TAG,
             "Loading watched history page=$nextPage, loaded=$watchedHistoryLoaded, " +
@@ -468,11 +470,14 @@ fun MyListScreen(
                 } else {
                     val error = result.exceptionOrNull()
                     Log.e(TAG, "Watched page=$nextPage fetch failed: ${error?.message}", error)
-                    hasMoreWatched = false
+                    // A temporary network failure is not the end of the user's
+                    // Trakt history. Keep pagination available and let the user
+                    // retry this same page from the footer.
+                    watchedLoadError = error?.message ?: "Unable to load watched history"
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error during watched pagination: ${e.message}", e)
-                hasMoreWatched = false
+                watchedLoadError = e.message ?: "Unable to load watched history"
             } finally {
                 isLoadingMore = false
                 Log.i(
@@ -497,6 +502,7 @@ fun MyListScreen(
             currentWatchedPage = 0
             watchedHistoryTotal = null
             watchedHistoryLoaded = 0
+            watchedLoadError = null
             processedTmdbIds.clear()
             clearWatchedCache(context)
             Log.i(TAG, "Cleared watched tab state and cache because Trakt is disconnected")
@@ -573,17 +579,32 @@ fun MyListScreen(
 
     // ── Infinite scroll: when user nears the end of the grid, fetch more ───
     LaunchedEffect(gridState, isTraktConnected) {
+        var userHasScrolledWatchedGrid = false
         snapshotFlow {
             val info = gridState.layoutInfo
             val total = info.totalItemsCount
             val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: 0
-            lastVisible to total
-        }.collect { (lastVisible, total) ->
+            listOf(
+                gridState.firstVisibleItemIndex,
+                gridState.firstVisibleItemScrollOffset,
+                lastVisible,
+                total
+            )
+        }.collect { gridSnapshot ->
+            val firstVisible = gridSnapshot[0]
+            val firstVisibleOffset = gridSnapshot[1]
+            val lastVisible = gridSnapshot[2]
+            val total = gridSnapshot[3]
+            if (firstVisible > 0 || firstVisibleOffset > 0) {
+                userHasScrolledWatchedGrid = true
+            }
             if (
                 isTraktConnected &&
                 hasMoreWatched &&
                 !isLoadingMore &&
                 !isInitialLoading &&
+                watchedLoadError == null &&
+                userHasScrolledWatchedGrid &&
                 total > 0 &&
                 lastVisible >= total - WATCHED_END_THRESHOLD
             ) {
@@ -742,6 +763,7 @@ fun MyListScreen(
                                     currentWatchedPage = 0
                                     watchedHistoryTotal = null
                                     watchedHistoryLoaded = 0
+                                    watchedLoadError = null
                                     isInitialLoading = true
                                     Log.i(TAG, "Manual watched-history refresh requested by user")
                                     loadNextWatchedPage()
@@ -921,7 +943,9 @@ fun MyListScreen(
                                 totalItems = watchedItems.size,
                                 loadedHistoryItems = watchedHistoryLoaded,
                                 totalHistoryItems = watchedHistoryTotal,
-                                columns = actualColumns
+                                columns = actualColumns,
+                                errorMessage = watchedLoadError,
+                                onLoadMore = { loadNextWatchedPage() }
                             )
                         }
                     }
@@ -946,7 +970,9 @@ private fun WatchedFooter(
     totalItems: Int,
     loadedHistoryItems: Int,
     totalHistoryItems: Int?,
-    columns: Int
+    columns: Int,
+    errorMessage: String?,
+    onLoadMore: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -969,6 +995,29 @@ private fun WatchedFooter(
                         loadedItems = loadedHistoryItems,
                         totalItems = totalHistoryItems
                     )
+                }
+            }
+            errorMessage != null -> {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Couldn't load more watched items",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                    Button(onClick = onLoadMore) {
+                        Text("Retry")
+                    }
+                }
+            }
+            hasMore -> {
+                // A history page can collapse to only a few cards after repeated
+                // watches are deduplicated. In that case the grid cannot scroll,
+                // so provide an explicit way to request the next page.
+                Button(onClick = onLoadMore) {
+                    Text("Load more watched items")
                 }
             }
             !hasMore && totalItems > 0 -> {
