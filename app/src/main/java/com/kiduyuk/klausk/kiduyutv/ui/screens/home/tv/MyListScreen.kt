@@ -302,9 +302,9 @@ fun MyListScreen(
             }
 
             if (tmdbId != null && title.isNotBlank()) {
-                // Every Trakt history event is a separate visible record. Do not
-                // collapse multiple episodes of the same show into one card.
-                val cacheKey = "history-${item.id}"
+                // Collapse multiple episodes of the same show into one card.
+                // We keep the first (most recent) watch event for each media item.
+                val cacheKey = "$type-$tmdbId"
                 if (processedTmdbIds.add(cacheKey)) {
                     Log.i(TAG, "[enrichHistoryPage] New unique item: $type/$tmdbId, title='$title'")
                     // Add a usable card before the slower TMDB detail request.
@@ -435,12 +435,8 @@ fun MyListScreen(
                                         TAG,
                                         "[onItemAdded] invoked for ${item.type}/${item.id} on thread=${Thread.currentThread().name}"
                                     )
-                                    val alreadyVisible = if (item.watchedHistoryId != null) {
-                                        watchedItems.any { it.watchedHistoryId == item.watchedHistoryId }
-                                    } else {
-                                        watchedItems.any {
-                                            it.watchedHistoryId == null && it.id == item.id && it.type == item.type
-                                        }
+                                    val alreadyVisible = watchedItems.any {
+                                        it.id == item.id && it.type == item.type
                                     }
                                     if (!alreadyVisible) {
                                         watchedItems = watchedItems + item
@@ -462,14 +458,7 @@ fun MyListScreen(
                                     )
                                     val before = watchedItems.size
                                     watchedItems = watchedItems.map { existing ->
-                                        if (
-                                            if (item.watchedHistoryId != null) {
-                                                existing.watchedHistoryId == item.watchedHistoryId
-                                            } else {
-                                                existing.watchedHistoryId == null &&
-                                                    existing.id == item.id && existing.type == item.type
-                                            }
-                                        ) item else existing
+                                        if (existing.id == item.id && existing.type == item.type) item else existing
                                     }
                                     Log.i(
                                         TAG,
@@ -563,7 +552,7 @@ fun MyListScreen(
             watchedHistoryTotal = null
             hasMoreWatched = cached.hasMore
             cached.items.forEach { item ->
-                processedTmdbIds.add(item.watchedHistoryId?.let { "history-$it" } ?: "${item.type}-${item.id}")
+                processedTmdbIds.add("${item.type}-${item.id}")
             }
 
             // Check for items with missing posterPath or rating and enrich them
