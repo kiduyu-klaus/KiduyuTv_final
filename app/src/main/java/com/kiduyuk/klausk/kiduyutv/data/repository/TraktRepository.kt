@@ -1,5 +1,6 @@
 package com.kiduyuk.klausk.kiduyutv.data.repository
 
+import android.util.Log
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktCollectionItem
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktIds
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktMovie
@@ -20,6 +21,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import javax.inject.Inject
 import javax.inject.Singleton
+
+private const val TAG = "TraktRepository"
 
 data class TraktWatchHistoryPage(
     val items: TraktWatchHistoryResponse,
@@ -96,26 +99,56 @@ class TraktRepository @Inject constructor(
         page: Int = 1,
         limit: Int = 20
     ): Flow<Result<TraktWatchHistoryPage>> = flow {
+        Log.i(TAG, "getTraktWatchHistoryPage started page=$page limit=$limit")
         try {
             val token = traktAuthManager.getValidAccessToken()
+            Log.d(TAG, "Trakt access token lookup completed: available=${token != null}")
             if (token == null) {
+                Log.w(TAG, "getTraktWatchHistoryPage aborted: no valid Trakt access token")
                 emit(Result.failure(Exception("Not authenticated with Trakt.tv")))
                 return@flow
             }
 
+            Log.d(TAG, "Requesting Trakt watched history page=$page limit=$limit")
             val response = traktApiService.getWatchedHistory(
                 token = "Bearer $token",
                 page = page,
                 limit = limit
             )
-            if (response.isSuccessful && response.body() != null) {
-                val pageCount = response.headers()["X-Pagination-Page-Count"]?.toIntOrNull()
-                val totalItemCount = response.headers()["X-Pagination-Item-Count"]?.toIntOrNull()
-                emit(Result.success(TraktWatchHistoryPage(response.body()!!, pageCount, totalItemCount)))
+            val requestUrl = response.raw().request.url.toString()
+            val pageCountHeader = response.headers()["X-Pagination-Page-Count"]
+            val itemCountHeader = response.headers()["X-Pagination-Item-Count"]
+            Log.i(
+                TAG,
+                "Trakt watched history response page=$page code=${response.code()} " +
+                    "successful=${response.isSuccessful} message=${response.message()} " +
+                    "url=$requestUrl pageCountHeader=$pageCountHeader itemCountHeader=$itemCountHeader"
+            )
+
+            val body = response.body()
+            if (response.isSuccessful && body != null) {
+                val pageCount = pageCountHeader?.toIntOrNull()
+                val totalItemCount = itemCountHeader?.toIntOrNull()
+                val typeCounts = body.groupingBy { it.type }.eachCount()
+                val tmdbIds = body.mapNotNull { it.movie?.ids?.tmdb ?: it.show?.ids?.tmdb }
+                Log.i(
+                    TAG,
+                    "Parsed Trakt watched history page=$page records=${body.size} " +
+                        "types=$typeCounts tmdbIds=${tmdbIds.take(10)} " +
+                        "pageCount=$pageCount totalItemCount=$totalItemCount"
+                )
+                emit(Result.success(TraktWatchHistoryPage(body, pageCount, totalItemCount)))
             } else {
+                val errorBody = response.errorBody()?.string()?.take(1_000)
+                Log.e(
+                    TAG,
+                    "Trakt watched history request failed page=$page code=${response.code()} " +
+                        "errorBody=${errorBody ?: "<empty>"}"
+                )
                 emit(Result.failure(Exception("Failed to fetch watch history: ${response.code()}")))
             }
         } catch (e: Exception) {
+            Log.e(TAG, "getTraktWatchHistoryPage threw for page=$page limit=$limit", e)
             emit(Result.failure(e))
         }
     }
