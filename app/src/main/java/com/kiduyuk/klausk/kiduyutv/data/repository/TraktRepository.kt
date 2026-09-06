@@ -121,8 +121,8 @@ class TraktRepository @Inject constructor(
             Log.i(
                 TAG,
                 "Trakt watched history response page=$page code=${response.code()} " +
-                    "successful=${response.isSuccessful} message=${response.message()} " +
-                    "url=$requestUrl pageCountHeader=$pageCountHeader itemCountHeader=$itemCountHeader"
+                        "successful=${response.isSuccessful} message=${response.message()} " +
+                        "url=$requestUrl pageCountHeader=$pageCountHeader itemCountHeader=$itemCountHeader"
             )
 
             val body = response.body()
@@ -134,8 +134,8 @@ class TraktRepository @Inject constructor(
                 Log.i(
                     TAG,
                     "Parsed Trakt watched history page=$page records=${body.size} " +
-                        "types=$typeCounts tmdbIds=${tmdbIds.take(10)} " +
-                        "pageCount=$pageCount totalItemCount=$totalItemCount"
+                            "types=$typeCounts tmdbIds=${tmdbIds.take(10)} " +
+                            "pageCount=$pageCount totalItemCount=$totalItemCount"
                 )
                 emit(Result.success(TraktWatchHistoryPage(body, pageCount, totalItemCount)))
             } else {
@@ -143,7 +143,7 @@ class TraktRepository @Inject constructor(
                 Log.e(
                     TAG,
                     "Trakt watched history request failed page=$page code=${response.code()} " +
-                        "errorBody=${errorBody ?: "<empty>"}"
+                            "errorBody=${errorBody ?: "<empty>"}"
                 )
                 emit(Result.failure(Exception("Failed to fetch watch history: ${response.code()}")))
             }
