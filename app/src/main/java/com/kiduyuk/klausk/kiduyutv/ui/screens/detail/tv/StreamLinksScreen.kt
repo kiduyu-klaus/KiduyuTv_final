@@ -42,6 +42,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -114,6 +116,13 @@ fun StreamLinksScreen(
 
     LaunchedEffect(tmdbId, isTv, season, episode) {
         viewModel.loadStreamProviders(tmdbId, isTv, season, episode, context, filterPhoneOnly = true)
+    }
+
+    val firstProviderFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(uiState.streamProviders) {
+        if (uiState.streamProviders.isNotEmpty()) {
+            firstProviderFocusRequester.requestFocus()
+        }
     }
 
     Box(
@@ -230,7 +239,8 @@ fun StreamLinksScreen(
                     itemsIndexed(uiState.streamProviders) { index, provider ->
                         StreamProviderItem(
                             index = index + 1,
-                            provider = provider
+                            provider = provider,
+                            focusRequester = if (index == 0) firstProviderFocusRequester else null
                         ) {
                             val iframeHtml = com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager.generateIframeHtml(
                                 providerName = provider.name,
@@ -289,6 +299,7 @@ fun StreamLinksScreen(
 fun StreamProviderItem(
     index: Int,
     provider: StreamProviderUi,
+    focusRequester: FocusRequester? = null,
     onClick: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -335,7 +346,7 @@ fun StreamProviderItem(
                 color = Color.White,
                 shape = RoundedCornerShape(12.dp)
             )
-            .focusable(interactionSource = interactionSource)
+            .then(focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null
