@@ -105,7 +105,12 @@ class SettingsViewModel : ViewModel() {
         viewModelScope.launch {
             // Load default provider preference
             val settingsManager = SettingsManager(context)
-            _uiState.update { it.copy(defaultProvider = settingsManager.getDefaultProvider()) }
+            _uiState.update {
+                it.copy(
+                    defaultProvider = settingsManager.getDefaultProvider(),
+                    defaultDirectStreamProvider = settingsManager.getDefaultDirectStreamProvider()
+                )
+            }
 
             // Load ads disabled setting
             _uiState.update { it.copy(isAdsDisabled = settingsManager.isAdsDisabled()) }
@@ -132,8 +137,14 @@ class SettingsViewModel : ViewModel() {
         }
     }
 
+    /** Persist the provider used for direct-stream extraction. */
+    fun setDefaultDirectStreamProvider(context: Context, provider: String) {
+        SettingsManager(context).saveDefaultDirectStreamProvider(provider)
+        _uiState.update { it.copy(defaultDirectStreamProvider = provider) }
+    }
+
     /**
-     * Persist and update the default stream provider preference.
+     * Persist and update the default WebView stream provider preference.
      */
     fun setDefaultProvider(context: Context, provider: String) {
         // Save to SharedPreferences first
@@ -777,8 +788,10 @@ data class SettingsUiState(
     val castsClearSuccess: Boolean = false,
     val isClearingWatchHistory: Boolean = false,
     val watchHistoryClearSuccess: Boolean = false,
-    // Default provider preference
+    // WebView default provider preference
     val defaultProvider: String = com.kiduyuk.klausk.kiduyutv.util.SettingsManager.AUTO,
+    // Direct-stream default provider preference
+    val defaultDirectStreamProvider: String = com.kiduyuk.klausk.kiduyutv.util.SettingsManager.AUTO,
     // Ads disabled setting
     val isAdsDisabled: Boolean = false,
     // Update check states

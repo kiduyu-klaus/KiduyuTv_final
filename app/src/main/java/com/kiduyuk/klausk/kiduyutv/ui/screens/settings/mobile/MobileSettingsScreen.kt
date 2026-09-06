@@ -104,6 +104,8 @@ import com.google.firebase.auth.FirebaseAuth
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager
+import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamCatalog
+import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamProviderChoice
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.ui.components.AdMobNativeAdView
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.findActivity
@@ -125,6 +127,8 @@ import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.LiveTvViewModel
 import com.kiduyuk.klausk.kiduyutv.viewmodel.SettingsViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -142,7 +146,15 @@ fun MobileSettingsScreen(
     val scrollState = rememberScrollState()
     val myList by MyListManager.myList.collectAsState()
     var showProviderPicker by remember { mutableStateOf(false) }
+    var showDirectProviderPicker by remember { mutableStateOf(false) }
+    var directProviderOptions by remember { mutableStateOf<List<StreamProviderChoice>>(emptyList()) }
     val settingsManager = remember(context) { SettingsManager(context) }
+
+    LaunchedEffect(Unit) {
+        directProviderOptions = runCatching {
+            withContext(Dispatchers.IO) { StreamCatalog.enabled() }
+        }.getOrElse { emptyList() }
+    }
     var directStreamEnabled by remember {
         mutableStateOf(settingsManager.isDirectStreamEnabled())
     }
@@ -743,6 +755,16 @@ fun MobileSettingsScreen(
                 )
                 SettingsItem(
                     icon = Icons.Default.PlayCircle,
+                    title = "Default Direct Stream Provider",
+                    subtitle = if (uiState.defaultDirectStreamProvider == SettingsManager.AUTO) {
+                        "All enabled providers"
+                    } else {
+                        StreamCatalog.resolve(uiState.defaultDirectStreamProvider).displayName
+                    },
+                    onClick = { showDirectProviderPicker = true }
+                )
+                SettingsItem(
+                    icon = Icons.Default.PlayCircle,
                     title = "Default Provider",
                     subtitle = if (uiState.defaultProvider == SettingsManager.AUTO)
                         "Ask each time"
@@ -922,6 +944,72 @@ fun MobileSettingsScreen(
             }
             Spacer(modifier = Modifier.height(16.dp))
         }
+    }
+
+    // ── Default direct-stream provider picker ─────────────────────────────────
+    if (showDirectProviderPicker) {
+        val options = directProviderOptions.ifEmpty { listOf(StreamCatalog.default) }
+        AlertDialog(
+            onDismissRequest = { showDirectProviderPicker = false },
+            containerColor = CardDark,
+            title = {
+                Text(
+                    "Default Direct Stream Provider",
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        "Choose one enabled provider for direct-stream playback. " +
+                            "Select All Providers to aggregate every enabled provider.",
+                        color = TextSecondary,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    options.forEach { option ->
+                        val optionValue = option.key.ifBlank { SettingsManager.AUTO }
+                        val isSelected = optionValue == uiState.defaultDirectStreamProvider
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable {
+                                    viewModel.setDefaultDirectStreamProvider(context, optionValue)
+                                    showDirectProviderPicker = false
+                                }
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = isSelected,
+                                onClick = {
+                                    viewModel.setDefaultDirectStreamProvider(context, optionValue)
+                                    showDirectProviderPicker = false
+                                },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = PrimaryRed,
+                                    unselectedColor = TextSecondary
+                                )
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = option.displayName,
+                                color = if (isSelected) TextPrimary else TextSecondary,
+                                fontSize = 15.sp,
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showDirectProviderPicker = false }) {
+                    Text("Done", color = PrimaryRed)
+                }
+            }
+        )
     }
 
     // ── Default PROVIDERSPicker Dialog ────────────────────────────────────────

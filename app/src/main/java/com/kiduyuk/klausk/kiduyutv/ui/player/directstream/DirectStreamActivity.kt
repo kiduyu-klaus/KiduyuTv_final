@@ -55,6 +55,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.player.webviewsniffer.SniffedSubtitle
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.PlayerEngine
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamCatalog
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamProviderChoice
+import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamResolver
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamSelectionDialog
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamValidator
@@ -341,7 +342,22 @@ class DirectStreamActivity : AppCompatActivity() {
         currentBackdropPath = intent.getStringExtra(EXTRA_BACKDROP_URL)
         currentVoteAverage = intent.getDoubleExtra(EXTRA_VOTE_AVERAGE, 0.0)
         currentReleaseDate = intent.getStringExtra(EXTRA_RELEASE_DATE)
-        currentProvider = StreamCatalog.resolve(intent.getStringExtra(EXTRA_PROVIDER))
+        val requestedProvider = intent.getStringExtra(EXTRA_PROVIDER)
+        val configuredDirectProvider = settingsManager.getDefaultDirectStreamProvider()
+        val providerForPlayback = requestedProvider
+            ?.takeIf {
+                it.isNotBlank() &&
+                    !it.equals(SettingsManager.AUTO, ignoreCase = true) &&
+                    !it.equals("All Providers", ignoreCase = true)
+            }
+            ?: configuredDirectProvider
+        currentProvider = StreamCatalog.resolve(providerForPlayback)
+        Log.i(
+            PROVIDER_TAG,
+            "Direct provider selection requested=${requestedProvider ?: "<none>"} " +
+                "configured=${configuredDirectProvider} " +
+                "selected=${currentProvider.key.ifEmpty { "<aggregate>" }}"
+        )
         currentImdbId = intent.getStringExtra(EXTRA_IMDB_ID)?.takeIf { it.isNotBlank() }
         updatePlayerTitle()
 

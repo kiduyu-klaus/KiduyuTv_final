@@ -103,6 +103,8 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager
+import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamCatalog
+import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamProviderChoice
 import com.kiduyuk.klausk.kiduyutv.ui.screens.trakt.TraktAuthActivity
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.CardDark
@@ -120,7 +122,9 @@ import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.LiveTvViewModel
 import com.kiduyuk.klausk.kiduyutv.viewmodel.SettingsViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.tasks.await
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -403,7 +407,11 @@ fun SettingsScreen(
                 SettingsSection.PLAYBACK -> {
                     PlaybackContent(
                         defaultProvider = uiState.defaultProvider,
-                        onProviderSelect = { viewModel.setDefaultProvider(context, it) }
+                        defaultDirectStreamProvider = uiState.defaultDirectStreamProvider,
+                        onProviderSelect = { viewModel.setDefaultProvider(context, it) },
+                        onDirectStreamProviderSelect = {
+                            viewModel.setDefaultDirectStreamProvider(context, it)
+                        }
                     )
                 }
 
@@ -1270,9 +1278,24 @@ private fun AppVersionContent(
 @Composable
 private fun PlaybackContent(
     defaultProvider: String,
-    onProviderSelect: (String) -> Unit
+    defaultDirectStreamProvider: String,
+    onProviderSelect: (String) -> Unit,
+    onDirectStreamProviderSelect: (String) -> Unit
 ) {
     val context = LocalContext.current
+    var directProviderOptions by remember { mutableStateOf<List<StreamProviderChoice>>(emptyList()) }
+    var directProviderLoadError by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        runCatching {
+            withContext(Dispatchers.IO) { StreamCatalog.enabled() }
+        }.onSuccess { providers ->
+            directProviderOptions = providers
+            directProviderLoadError = null
+        }.onFailure { error ->
+            directProviderLoadError = error.message ?: "Unable to load direct-stream providers"
+        }
+    }
     val settingsManager = remember(context) { SettingsManager(context) }
     var directStreamEnabled by remember {
         mutableStateOf(settingsManager.isDirectStreamEnabled())
@@ -1485,6 +1508,59 @@ private fun PlaybackContent(
                 },
                 colors = SwitchDefaults.colors(checkedTrackColor = PrimaryRed)
             )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        SettingsSectionLabel(text = "Default Direct Stream Provider")
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(CardDark)
+                .padding(24.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "Choose one enabled provider for direct-stream playback. " +
+                            "Set to \"All Providers\" to fetch from every enabled provider.",
+                    color = TextSecondary,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                directProviderLoadError?.let { error ->
+                    Text(
+                        text = "Provider list unavailable: $error",
+                        color = TextSecondary,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                }
+                val directOptions = directProviderOptions.ifEmpty { listOf(StreamCatalog.default) }
+                directOptions.chunked(2).forEach { rowOptions ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        rowOptions.forEach { option ->
+                            ProviderOptionItem(
+                                option = option.displayName,
+                                isSelected = option.key.ifBlank { SettingsManager.AUTO } ==
+                                    defaultDirectStreamProvider,
+                                onClick = {
+                                    onDirectStreamProviderSelect(
+                                        option.key.ifBlank { SettingsManager.AUTO }
+                                    )
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        if (rowOptions.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))

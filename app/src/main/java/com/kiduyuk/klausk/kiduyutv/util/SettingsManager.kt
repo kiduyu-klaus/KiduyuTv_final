@@ -16,9 +16,18 @@ class SettingsManager(context: Context) {
         preferences.edit().putString(KEY_DEFAULT_PROVIDER, provider).apply()
     }
 
-    /** Returns the saved default provider name, or [AUTO] if none is set. */
+    /** Returns the saved WebView default provider name, or [AUTO] if none is set. */
     fun getDefaultProvider(): String {
         return preferences.getString(KEY_DEFAULT_PROVIDER, AUTO) ?: AUTO
+    }
+
+    fun saveDefaultDirectStreamProvider(provider: String) {
+        preferences.edit().putString(KEY_DEFAULT_DIRECT_STREAM_PROVIDER, provider).apply()
+    }
+
+    /** Returns the selected direct-stream provider, or [AUTO] to aggregate enabled providers. */
+    fun getDefaultDirectStreamProvider(): String {
+        return preferences.getString(KEY_DEFAULT_DIRECT_STREAM_PROVIDER, AUTO) ?: AUTO
     }
 
     fun setDirectStreamEnabled(enabled: Boolean) {
@@ -91,6 +100,7 @@ class SettingsManager(context: Context) {
     companion object {
         private const val PREFS_NAME = "app_settings"
         private const val KEY_DEFAULT_PROVIDER = "default_provider"
+        private const val KEY_DEFAULT_DIRECT_STREAM_PROVIDER = "default_direct_stream_provider"
         private const val KEY_DEVICE_ID = "device_id"
         private const val KEY_ADS_DISABLED = "ads_disabled"
         private const val KEY_DIRECT_STREAM_ENABLED = "direct_stream_enabled"
