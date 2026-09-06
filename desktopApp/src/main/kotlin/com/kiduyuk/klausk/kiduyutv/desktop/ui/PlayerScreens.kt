@@ -9,6 +9,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -68,6 +70,13 @@ fun StreamLinksScreen(services: DesktopServices, request: PlayRequest) {
         return
     }
     val providers = StreamProviderManager.providers
+    val firstProviderFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(providers) {
+        if (providers.isNotEmpty()) {
+            delay(50L)
+            firstProviderFocusRequester.requestFocus()
+        }
+    }
     DesktopLog.logger.debug("Rendering WebView provider chooser count={}", providers.size)
     Column(Modifier.fillMaxSize()) {
         ScreenHeader("Choose a server — ${request.title}", { services.navigator.pop() })
@@ -76,7 +85,11 @@ fun StreamLinksScreen(services: DesktopServices, request: PlayRequest) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(providers, key = { it.name }) { provider ->
-                ProviderButton(provider.name, "Open ${provider.name} in WebView") {
+                ProviderButton(
+                    name = provider.name,
+                    subtitle = "Open ${provider.name} in WebView",
+                    focusRequester = if (provider == providers.firstOrNull()) firstProviderFocusRequester else null
+                ) {
                     DesktopLog.logger.info(
                         "Opening WebView provider={} title={} tmdbId={} type={}",
                         provider.name,
@@ -92,8 +105,14 @@ fun StreamLinksScreen(services: DesktopServices, request: PlayRequest) {
 }
 
 @Composable
-private fun ProviderButton(name: String, subtitle: String, onClick: () -> Unit) {
-    Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+private fun ProviderButton(
+    name: String,
+    subtitle: String,
+    focusRequester: FocusRequester? = null,
+    onClick: () -> Unit
+) {
+    val focusModifier = focusRequester?.let { Modifier.focusRequester(it) } ?: Modifier
+    Card(onClick = onClick, modifier = focusModifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(name, fontWeight = FontWeight.Bold, fontSize = 20.sp)
