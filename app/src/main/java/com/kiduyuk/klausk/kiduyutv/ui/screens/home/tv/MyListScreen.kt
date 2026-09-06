@@ -138,7 +138,7 @@ private fun saveWatchedCache(
             .putInt(KEY_CACHED_PAGE, lastLoadedPage)
             .putBoolean(KEY_CACHED_HAS_MORE, hasMore)
             .apply()
-        Log.d(TAG, "Saved watched cache: items=${items.size}, page=$lastLoadedPage, hasMore=$hasMore")
+        Log.i(TAG, "Saved watched cache: items=${items.size}, page=$lastLoadedPage, hasMore=$hasMore")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to save watched cache: ${e.message}", e)
     }
@@ -167,10 +167,10 @@ private fun loadWatchedCache(context: Context): WatchedCache? {
                     voteAverage = it.voteAverage
                 )
             }
-            Log.d(TAG, "Loaded watched cache payload: items=${items.size}")
+            Log.i(TAG, "Loaded watched cache payload: items=${items.size}")
             val lastPage = prefs.getInt(KEY_CACHED_PAGE, 0)
             val hasMore = prefs.getBoolean(KEY_CACHED_HAS_MORE, true)
-            Log.d(TAG, "Loaded watched cache metadata: page=$lastPage, hasMore=$hasMore")
+            Log.i(TAG, "Loaded watched cache metadata: page=$lastPage, hasMore=$hasMore")
             WatchedCache(items, lastPage, hasMore)
         }
     } catch (e: Exception) {
@@ -247,11 +247,11 @@ fun MyListScreen(
         onItemAdded: suspend (MyListItem) -> Unit,
         onItemUpdated: suspend (MyListItem) -> Unit
     ): List<MyListItem> = withContext(Dispatchers.IO) {
-        Log.d(TAG, "[enrichHistoryPage] Starting on thread=${Thread.currentThread().name}, records=${history.size}")
+        Log.i(TAG, "[enrichHistoryPage] Starting on thread=${Thread.currentThread().name}, records=${history.size}")
         val pageItems = mutableListOf<MyListItem>()
 
         history.forEach { item ->
-            Log.d(TAG, "[enrichHistoryPage] Processing Trakt history record: type=${item.type}, watchedAt=${item.watchedAt}")
+            Log.i(TAG, "[enrichHistoryPage] Processing Trakt history record: type=${item.type}, watchedAt=${item.watchedAt}")
             val tmdbId: Int?
             val type: String
             val title: String
@@ -282,7 +282,7 @@ fun MyListScreen(
             if (tmdbId != null && title.isNotBlank()) {
                 val cacheKey = "$type-$tmdbId"
                 if (processedTmdbIds.add(cacheKey)) {
-                    Log.d(TAG, "[enrichHistoryPage] New unique item: $type/$tmdbId, title='$title'")
+                    Log.i(TAG, "[enrichHistoryPage] New unique item: $type/$tmdbId, title='$title'")
                     // Add a usable card before the slower TMDB detail request.
                     // The UI can render the title immediately and update the poster/rating later.
                     val baseItem = MyListItem(
@@ -293,23 +293,23 @@ fun MyListScreen(
                         voteAverage = traktRating
                     )
                     pageItems.add(baseItem)
-                    Log.d(TAG, "[enrichHistoryPage] About to call onItemAdded for $type/$tmdbId")
+                    Log.i(TAG, "[enrichHistoryPage] About to call onItemAdded for $type/$tmdbId")
                     onItemAdded(baseItem)
-                    Log.d(TAG, "[enrichHistoryPage] Returned from onItemAdded for $type/$tmdbId, pageItems size=${pageItems.size}")
+                    Log.i(TAG, "[enrichHistoryPage] Returned from onItemAdded for $type/$tmdbId, pageItems size=${pageItems.size}")
 
                     var enrichedItem = baseItem
                     try {
-                        Log.d(TAG, "[enrichHistoryPage] Before TMDB $type detail call for $tmdbId")
+                        Log.i(TAG, "[enrichHistoryPage] Before TMDB $type detail call for $tmdbId")
                         enrichedItem = if (type == "movie") {
                             val detail = tmdbApiService.getMovieDetail(tmdbId)
-                            Log.d(TAG, "[enrichHistoryPage] After TMDB movie call for $tmdbId: poster=${detail.posterPath}")
+                            Log.i(TAG, "[enrichHistoryPage] After TMDB movie call for $tmdbId: poster=${detail.posterPath}")
                             baseItem.copy(
                                 posterPath = detail.posterPath,
                                 voteAverage = if (traktRating == 0.0) detail.voteAverage else traktRating
                             )
                         } else {
                             val detail = tmdbApiService.getTvShowDetail(tmdbId)
-                            Log.d(TAG, "[enrichHistoryPage] After TMDB TV call for $tmdbId: poster=${detail.posterPath}")
+                            Log.i(TAG, "[enrichHistoryPage] After TMDB TV call for $tmdbId: poster=${detail.posterPath}")
                             baseItem.copy(
                                 posterPath = detail.posterPath,
                                 voteAverage = if (traktRating == 0.0) detail.voteAverage else traktRating
@@ -320,36 +320,36 @@ fun MyListScreen(
                     }
 
                     if (enrichedItem != baseItem) {
-                        Log.d(TAG, "[enrichHistoryPage] Item was enriched (posterPath changed or rating filled); calling onItemUpdated for $type/$tmdbId")
+                        Log.i(TAG, "[enrichHistoryPage] Item was enriched (posterPath changed or rating filled); calling onItemUpdated for $type/$tmdbId")
                         onItemUpdated(enrichedItem)
-                        Log.d(TAG, "[enrichHistoryPage] Returned from onItemUpdated for $type/$tmdbId")
+                        Log.i(TAG, "[enrichHistoryPage] Returned from onItemUpdated for $type/$tmdbId")
                     } else {
-                        Log.d(TAG, "[enrichHistoryPage] No enrichment delta for $type/$tmdbId; skipping onItemUpdated")
+                        Log.i(TAG, "[enrichHistoryPage] No enrichment delta for $type/$tmdbId; skipping onItemUpdated")
                     }
                 } else {
-                    Log.d(TAG, "[enrichHistoryPage] Skipping duplicate item already in processedTmdbIds: $type/$tmdbId")
+                    Log.i(TAG, "[enrichHistoryPage] Skipping duplicate item already in processedTmdbIds: $type/$tmdbId")
                 }
             } else {
                 Log.w(TAG, "[enrichHistoryPage] Skipping item with null tmdbId or blank title: type=$type, tmdbId=$tmdbId, title='$title'")
             }
             onItemProcessed()
         }
-        Log.d(TAG, "[enrichHistoryPage] Completed: uniqueItems=${pageItems.size}")
+        Log.i(TAG, "[enrichHistoryPage] Completed: uniqueItems=${pageItems.size}")
         pageItems
     }
 
     // ── Core "load next page" function shared by initial fetch + infinite scroll ──
     fun loadNextWatchedPage() {
         if (!isTraktConnected) {
-            Log.d(TAG, "Skipping watched page load: Trakt is not connected")
+            Log.i(TAG, "Skipping watched page load: Trakt is not connected")
             return
         }
         if (isLoadingMore || isInitialLoading) {
-            Log.d(TAG, "Skipping watched page load: another watched load is active")
+            Log.i(TAG, "Skipping watched page load: another watched load is active")
             return
         }
         if (!hasMoreWatched) {
-            Log.d(TAG, "Skipping watched page load: no more watched pages")
+            Log.i(TAG, "Skipping watched page load: no more watched pages")
             return
         }
 
@@ -363,12 +363,12 @@ fun MyListScreen(
 
         coroutineScope.launch {
             try {
-                Log.d(TAG, "Collecting Trakt watched history flow on thread=${Thread.currentThread().name}")
+                Log.i(TAG, "Collecting Trakt watched history flow on thread=${Thread.currentThread().name}")
                 val result = traktRepository
                     .getTraktWatchHistoryPage(page = nextPage, limit = WATCHED_PAGE_SIZE)
                     .flowOn(Dispatchers.IO)
                     .first()
-                Log.d(TAG, "Got Trakt flow result: isSuccess=${result.isSuccess}")
+                Log.i(TAG, "Got Trakt flow result: isSuccess=${result.isSuccess}")
 
                 val historyPage = result.getOrNull()
                 if (historyPage != null) {
@@ -391,7 +391,7 @@ fun MyListScreen(
                             onItemProcessed = {
                                 withContext(Dispatchers.Main) {
                                     watchedHistoryLoaded += 1
-                                    Log.d(
+                                    Log.i(
                                         TAG,
                                         "[onItemProcessed] watchedHistoryLoaded=$watchedHistoryLoaded/" +
                                             "${watchedHistoryTotal ?: "?"} on thread=${Thread.currentThread().name}"
@@ -400,25 +400,25 @@ fun MyListScreen(
                             },
                             onItemAdded = { item ->
                                 withContext(Dispatchers.Main) {
-                                    Log.d(
+                                    Log.i(
                                         TAG,
                                         "[onItemAdded] invoked for ${item.type}/${item.id} on thread=${Thread.currentThread().name}"
                                     )
                                     if (watchedItems.none { it.id == item.id && it.type == item.type }) {
                                         watchedItems = watchedItems + item
-                                        Log.d(
+                                        Log.i(
                                             TAG,
                                             "[onItemAdded] Appended watched item: " +
                                                 "${item.type}/${item.id}, displayed=${watchedItems.size}"
                                         )
                                     } else {
-                                        Log.d(TAG, "[onItemAdded] Item already in list, skipping: ${item.type}/${item.id}")
+                                        Log.i(TAG, "[onItemAdded] Item already in list, skipping: ${item.type}/${item.id}")
                                     }
                                 }
                             },
                             onItemUpdated = { item ->
                                 withContext(Dispatchers.Main) {
-                                    Log.d(
+                                    Log.i(
                                         TAG,
                                         "[onItemUpdated] invoked for ${item.type}/${item.id} on thread=${Thread.currentThread().name}"
                                     )
@@ -426,7 +426,7 @@ fun MyListScreen(
                                     watchedItems = watchedItems.map { existing ->
                                         if (existing.id == item.id && existing.type == item.type) item else existing
                                     }
-                                    Log.d(
+                                    Log.i(
                                         TAG,
                                         "[onItemUpdated] State map applied: size $before -> ${watchedItems.size}, " +
                                             "item ${item.type}/${item.id} now has posterPath=${item.posterPath}, " +
@@ -472,7 +472,7 @@ fun MyListScreen(
                 hasMoreWatched = false
             } finally {
                 isLoadingMore = false
-                Log.d(
+                Log.i(
                     TAG,
                     "Watched page load finished: page=$nextPage, loaded=$watchedHistoryLoaded, " +
                         "total=${watchedHistoryTotal ?: "unknown"}, hasMore=$hasMoreWatched, " +
@@ -488,7 +488,7 @@ fun MyListScreen(
         Log.i(TAG, "Watched tab connection state changed: connected=$isTraktConnected")
 
         if (!isTraktConnected) {
-            Log.d(TAG, "Trakt disconnected; clearing watched history state")
+            Log.i(TAG, "Trakt disconnected; clearing watched history state")
             watchedItems = emptyList()
             hasMoreWatched = true
             currentWatchedPage = 0
@@ -584,7 +584,7 @@ fun MyListScreen(
                 total > 0 &&
                 lastVisible >= total - WATCHED_END_THRESHOLD
             ) {
-                Log.d(TAG, "Watched grid reached load threshold: lastVisible=$lastVisible, total=$total")
+                Log.i(TAG, "Watched grid reached load threshold: lastVisible=$lastVisible, total=$total")
                 loadNextWatchedPage()
             }
         }
