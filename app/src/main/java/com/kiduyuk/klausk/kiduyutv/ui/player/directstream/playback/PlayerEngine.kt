@@ -81,14 +81,22 @@ class PlayerEngine(context: Context) {
     )
 
     private fun playbackHeaders(stream: StreamItem): Map<String, String> {
-        val streamCookie = stream.headers.entries
-            .firstOrNull { it.key.equals("Cookie", ignoreCase = true) }
-            ?.value
-            ?.takeIf { it.isNotBlank() }
         val headers = if (stream.provider.equals("DahmerMovies", ignoreCase = true)) {
-            dahmerMoviesHeaders().toMutableMap().apply {
-                streamCookie?.let { put("Cookie", it) }
+            // Start with safe browser defaults, then overlay the actual headers
+            // captured by the verification WebView. The redirected download can
+            // require that exact User-Agent/Referer/Cookie combination. Range is
+            // deliberately excluded because Media3 manages it per request.
+            val merged = LinkedHashMap(dahmerMoviesHeaders())
+            sanitizeUserAgent(stream.headers).forEach { (name, value) ->
+                if (!name.equals("Range", ignoreCase = true) && value.isNotBlank()) {
+                    merged.keys
+                        .filter { it.equals(name, ignoreCase = true) }
+                        .toList()
+                        .forEach { merged.remove(it) }
+                    merged[name] = value
+                }
             }
+            merged
         } else {
             sanitizeUserAgent(stream.headers)
         }

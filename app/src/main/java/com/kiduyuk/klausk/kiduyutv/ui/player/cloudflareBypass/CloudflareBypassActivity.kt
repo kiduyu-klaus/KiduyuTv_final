@@ -36,6 +36,7 @@ import androidx.core.content.ContextCompat
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.AdBlockerWebViewClient
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.MouseCursorView
+import org.json.JSONObject
 
 /**
  * CloudflareBypassActivity
@@ -113,6 +114,15 @@ class CloudflareBypassActivity : AppCompatActivity() {
          * SharedPreferences mirror.
          */
         const val EXTRA_COOKIES = "cookies"
+
+        /** Result extra containing the captured download request headers as JSON. */
+        const val EXTRA_HEADERS = "headers"
+
+        /** Keep the WebView open after verification until a download URL is observed. */
+        const val EXTRA_WAIT_FOR_DOWNLOAD = "wait_for_download"
+
+        /** Original provider headers used when opening the gated stream URL. */
+        const val EXTRA_REQUEST_HEADERS = "request_headers"
 
         /**
          * Result extra: the host (registered domain) that the cookies apply
@@ -287,6 +297,9 @@ class CloudflareBypassActivity : AppCompatActivity() {
     private var challengeStartedAt: Long = 0L
     private var isSolved: Boolean = false
     private var isFinishingForResult: Boolean = false
+    private var waitForDownload: Boolean = false
+    private var initialRequestHeaders: Map<String, String> = emptyMap()
+    private var lastRequestHeaders: Map<String, String> = emptyMap()
 
     // ── Cursor (TV remote navigation) ───────────────────────────────────────
     /** False on phones/tablets, true on TVs/Fire TV. */
@@ -377,6 +390,11 @@ class CloudflareBypassActivity : AppCompatActivity() {
             ?: "Verifying $targetHost"
         timeoutMs = intent.getLongExtra(EXTRA_TIMEOUT_MS, DEFAULT_TIMEOUT_MS)
             .coerceAtLeast(MIN_SOLVE_TIME_MS)
+        waitForDownload = intent.getBooleanExtra(EXTRA_WAIT_FOR_DOWNLOAD, false)
+        initialRequestHeaders = parseRequestHeaders(
+            intent.getStringExtra(EXTRA_REQUEST_HEADERS).orEmpty()
+        )
+        lastRequestHeaders = initialRequestHeaders
 
         setContentView(buildLayout())
         configureCookieManager()
@@ -574,19 +592,28 @@ class CloudflareBypassActivity : AppCompatActivity() {
             // Direct MKV responses commonly use Content-Disposition: attachment,
             // so WebView may invoke this callback instead of navigating the main
             // frame to the final worker URL. Capture that URL for the player.
-            setDownloadListener { url, _, _, _, _ ->
-                Log.i(TAG, "[WebView] Download started: $url")
-                if (url.startsWith("http", ignoreCase = true)) {
+            setDownloadListener { url, userAgent, _, mimeType, _ ->
+                Log.i(TAG, "[WebView] Download captured host=${runCatching { Uri.parse(url).host }.getOrNull()}")
+                if (waitForDownload && url.startsWith("http", ignoreCase = true)) {
+                    completeWithDownload(url, userAgent, mimeType)
+                } else if (url.startsWith("http", ignoreCase = true)) {
                     lastMainFrameUrl = url
                 }
             }
             webViewClient = object : AdBlockerWebViewClient(
                 onPageFinished = {},
-                onError = {}
+                onError = {},
+                onRequest = { request ->
+                    request?.takeIf { it.isForMainFrame }
+                        ?.requestHeaders?.takeIf { it.isNotEmpty() }?.let {
+                        lastRequestHeaders = it
+                    }
+                }
             ) {
                 override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                     super.onPageStarted(view, url, favicon)
-                    Log.i(TAG, "[WebView] onPageStarted: $url")
+                    dismissLoadingDialog()
+                    Log.i(TAG, "[WebView] onPageStarted host=${url?.let { runCatching { Uri.parse(it).host }.getOrNull() }}")
                     url?.takeIf { it.startsWith("http", ignoreCase = true) }?.let {
                         lastMainFrameUrl = it
                     }
@@ -597,9 +624,14 @@ class CloudflareBypassActivity : AppCompatActivity() {
                 override fun onPageFinished(view: WebView?, url: String?) {
                     // The parent installs request interception and DOM cleanup for ads.
                     super.onPageFinished(view, url)
-                    Log.i(TAG, "[WebView] onPageFinished: $url")
+                    dismissLoadingDialog()
+                    Log.i(TAG, "[WebView] onPageFinished host=${url?.let { runCatching { Uri.parse(it).host }.getOrNull() }}")
                     url?.takeIf { it.startsWith("http", ignoreCase = true) }?.let {
                         lastMainFrameUrl = it
+                    }
+                    if (waitForDownload && isResolvedDownloadUrl(url)) {
+                        completeWithDownload(url.orEmpty(), view?.settings?.userAgentString, null)
+                        return
                     }
                     if (isSolved) return
                     // Check synchronously: the cookie is often written just
@@ -616,6 +648,10 @@ class CloudflareBypassActivity : AppCompatActivity() {
                     request: WebResourceRequest?
                 ): Boolean {
                     if (super.shouldOverrideUrlLoading(view, request)) return true
+                    request?.takeIf { it.isForMainFrame }
+                        ?.requestHeaders?.takeIf { it.isNotEmpty() }?.let {
+                        lastRequestHeaders = it
+                    }
                     Log.d(TAG, "[WebView] Navigating: ${request?.url}")
                     return false
                 }
@@ -648,9 +684,38 @@ class CloudflareBypassActivity : AppCompatActivity() {
     private fun startChallenge() {
         challengeStartedAt = System.currentTimeMillis()
         Log.i(TAG, "Starting challenge for $targetUrl (timeout=${timeoutMs}ms)")
-        webView.loadUrl(targetUrl)
+        webView.loadUrl(targetUrl, navigationHeaders())
         mainHandler.postDelayed(pollRunnable, POLL_INTERVAL_MS)
         mainHandler.postDelayed(timeoutRunnable, timeoutMs)
+    }
+
+    private fun navigationHeaders(): Map<String, String> = initialRequestHeaders
+        .filterKeys { name ->
+            !name.equals("Cookie", ignoreCase = true) &&
+                !name.equals("User-Agent", ignoreCase = true) &&
+                !name.equals("Origin", ignoreCase = true)
+        }
+
+    private fun parseRequestHeaders(raw: String): Map<String, String> {
+        if (raw.isBlank()) return emptyMap()
+        return runCatching {
+            val json = JSONObject(raw)
+            buildMap {
+                json.keys().forEach { key ->
+                    val value = json.optString(key)
+                    if (
+                        key.isNotBlank() && value.isNotBlank() &&
+                        !key.contains('\r') && !key.contains('\n') &&
+                        !value.contains('\r') && !value.contains('\n')
+                    ) {
+                        put(key, value)
+                    }
+                }
+            }
+        }.getOrElse { error ->
+            Log.w(TAG, "Could not parse initial Cloudflare request headers", error)
+            emptyMap()
+        }
     }
 
     /**
@@ -721,10 +786,14 @@ class CloudflareBypassActivity : AppCompatActivity() {
             CookieManager.getInstance().getCookie(lastMainFrameUrl).orEmpty()
         }
         setStatus(
-            "✓ Verified. Returning to player…",
+            if (waitForDownload) {
+                "✓ Verified. Waiting for the media download link…"
+            } else {
+                "✓ Verified. Returning to player…"
+            },
             isError = false
         )
-        Log.i(TAG, "Persisted cookies: $cookies")
+        Log.i(TAG, "Persisted Cloudflare cookies for $targetHost (${cookies.length} chars)")
 
         // Mirror the cookies to SharedPreferences under the target domain.
         // This is an *additional* persistence layer to the WebView's internal
@@ -735,17 +804,92 @@ class CloudflareBypassActivity : AppCompatActivity() {
             Log.w(TAG, "Could not mirror cookies to SharedPreferences for $targetHost")
         }
 
-        // Brief delay so the user can see the success state, then return OK.
-        mainHandler.postDelayed({ finishWithOk(cookies) }, 800L)
+        // DahmerMovies redirects the bulk request to a downloadable media URL
+        // after verification. Keep this WebView alive until DownloadListener
+        // captures that URL; normal cookie-only callers retain the old flow.
+        if (!waitForDownload) {
+            mainHandler.postDelayed({ finishWithOk(cookies) }, 800L)
+        } else {
+            // A challenge completed by the polling path can set its cookie
+            // before WebView resumes the original bulk navigation. Reload the
+            // gated URL in the verified browser session so DownloadListener is
+            // guaranteed another opportunity to receive the media response.
+            mainHandler.postDelayed({
+                if (!isFinishing && !isDestroyed && !isFinishingForResult) {
+                    webView.loadUrl(targetUrl, navigationHeaders())
+                }
+            }, 300L)
+        }
     }
 
-    private fun finishWithOk(cookies: String) {
+    private fun completeWithDownload(url: String, userAgent: String?, mimeType: String?) {
+        if (isFinishingForResult) return
+        val parsed = runCatching { Uri.parse(url) }.getOrNull()
+        val scheme = parsed?.scheme?.lowercase()
+        val host = parsed?.host
+        if (scheme !in setOf("http", "https") || host.isNullOrBlank()) return
+
+        lastMainFrameUrl = url
+        val cookies = captureAllCookiesForTarget().ifBlank {
+            CookieManager.getInstance().getCookie(url).orEmpty()
+        }
+        if (cookies.isNotBlank()) {
+            CookieManager.getInstance().flush()
+            saveCookies(this, targetHost, cookies, targetUrl)
+        }
+
+        val referer = webView.url
+            ?.takeIf { it.startsWith("http", ignoreCase = true) && it != url }
+            ?: targetUrl
+        val headers = linkedMapOf<String, String>()
+        lastRequestHeaders.forEach { (name, value) ->
+            if (name.isNotBlank() && value.isNotBlank()) headers[name] = value
+        }
+        headers["User-Agent"] = userAgent?.takeIf { it.isNotBlank() }
+            ?: webView.settings.userAgentString
+        if (referer.isNotBlank()) {
+            headers["Referer"] = referer
+            runCatching { Uri.parse(referer) }
+                .getOrNull()
+                ?.let { uri ->
+                    if (!uri.scheme.isNullOrBlank() && !uri.host.isNullOrBlank()) {
+                        headers["Origin"] = "${uri.scheme}://${uri.host}"
+                    }
+                }
+        }
+        if (cookies.isNotBlank()) headers["Cookie"] = cookies
+
+        Log.i(
+            TAG,
+            "Returning captured download host=$host mime=${mimeType.orEmpty()} " +
+                "headers=${headers.keys.sorted()}"
+        )
+        setStatus("✓ Download link captured. Opening player…", isError = false)
+        finishWithOk(cookies, url, headers)
+    }
+
+    private fun isResolvedDownloadUrl(url: String?): Boolean {
+        if (url.isNullOrBlank() || url.equals(targetUrl, ignoreCase = true)) return false
+        val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return false
+        val host = uri.host.orEmpty()
+        if (uri.scheme?.lowercase() !in setOf("http", "https") || host.isBlank()) return false
+        if (host.equals(targetHost, ignoreCase = true)) return false
+        if (host.equals("challenges.cloudflare.com", ignoreCase = true)) return false
+        return true
+    }
+
+    private fun finishWithOk(
+        cookies: String,
+        resolvedUrl: String = lastMainFrameUrl.ifBlank { targetUrl },
+        headers: Map<String, String> = emptyMap()
+    ) {
         if (isFinishingForResult) return
         isFinishingForResult = true
         val data = Intent().apply {
-            putExtra(EXTRA_URL, lastMainFrameUrl.ifBlank { targetUrl })
+            putExtra(EXTRA_URL, resolvedUrl)
             putExtra(EXTRA_COOKIES, cookies)
             putExtra(EXTRA_DOMAIN, targetHost)
+            if (headers.isNotEmpty()) putExtra(EXTRA_HEADERS, JSONObject(headers).toString())
         }
         setResult(RESULT_OK, data)
         finish()

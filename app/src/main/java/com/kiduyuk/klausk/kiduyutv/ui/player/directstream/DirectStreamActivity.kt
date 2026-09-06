@@ -227,6 +227,20 @@ class DirectStreamActivity : AppCompatActivity() {
             ?.takeIf { it.startsWith("http://", ignoreCase = true) || it.startsWith("https://", ignoreCase = true) }
             ?: stream.url
         val retryHeaders = stream.headers.toMutableMap()
+        result.data?.getStringExtra(CloudflareBypassActivity.EXTRA_HEADERS)
+            ?.takeIf { it.isNotBlank() }
+            ?.let { rawHeaders ->
+                runCatching {
+                    val json = JSONObject(rawHeaders)
+                    json.keys().forEach { key ->
+                        json.optString(key)
+                            .takeIf { it.isNotBlank() }
+                            ?.let { value -> retryHeaders[key] = value }
+                    }
+                }.onFailure { error ->
+                    Log.w(TAG, "Could not parse captured Cloudflare download headers", error)
+                }
+            }
         savedCookies?.takeIf { it.isNotBlank() }?.let {
             retryHeaders["Cookie"] = it
         }
@@ -1638,38 +1652,11 @@ class DirectStreamActivity : AppCompatActivity() {
      */
     private fun needsDahmerMoviesClearance(stream: StreamItem): Boolean {
         val url = stream.url.trim()
-        if (url.isBlank()) return false
-        // Immediate prefix check: if the upstream stream URL starts with
-        // the Dahmer host root, treat it as a Dahmer stream so the
-        // Cloudflare bypass flow can be launched before playback.
-        if (url.startsWith(DAHMER_CLEARANCE_URL, ignoreCase = true)) {
-            Log.d(TAG, "needsDahmerMoviesClearance: direct prefix match for url=$url")
-            return true
+        val needsResolution = url.startsWith(DAHMER_BULK_PREFIX, ignoreCase = true)
+        if (needsResolution) {
+            Log.i(TAG, "DahmerMovies bulk stream requires interactive redirect resolution")
         }
-        val host = runCatching { Uri.parse(url).host?.lowercase()?.trim() }.getOrNull().orEmpty()
-        // Consider it a Dahmer stream when either:
-        // - the host equals the known Dahmer host (p.111477.xyz),
-        // - the URL starts with the configured clearance URL (covers scheme+prefix),
-        // - or the provider name equals the Dahmer provider token.
-        val isDahmerStream = host.equals(DAHMER_CLEARANCE_HOST, ignoreCase = true) ||
-            url.startsWith(DAHMER_CLEARANCE_URL, ignoreCase = true) ||
-            stream.provider.equals(DAHMER_PROVIDER, ignoreCase = true)
-        Log.d(
-            TAG,
-            "needsDahmerMoviesClearance: url=$url host=$host " +
-                "provider=${stream.provider} isDahmer=$isDahmerStream"
-        )
-        if (!isDahmerStream) return false
-        if (host.endsWith(".workers.dev", ignoreCase = true)) {
-            Log.d(TAG, "DahmerMovies URL already resolved to worker host=$host")
-            return false
-        }
-        Log.i(
-            TAG,
-            "DahmerMovies stream requires WebView redirect resolution; " +
-                "existing cookies do not bypass this step"
-        )
-        return true
+        return needsResolution
     }
 
     private fun containsCfClearance(cookies: String?): Boolean = cookies
@@ -1901,6 +1888,14 @@ class DirectStreamActivity : AppCompatActivity() {
             // Let the WebView follow the original stream request so the
             // solved result can return its final redirected media URL.
             putExtra(CloudflareBypassActivity.EXTRA_URL, stream.url)
+            putExtra(
+                CloudflareBypassActivity.EXTRA_WAIT_FOR_DOWNLOAD,
+                stream.url.startsWith(DAHMER_BULK_PREFIX, ignoreCase = true)
+            )
+            putExtra(
+                CloudflareBypassActivity.EXTRA_REQUEST_HEADERS,
+                JSONObject(stream.headers).toString()
+            )
             putExtra(
                 CloudflareBypassActivity.EXTRA_TITLE,
                 if (stream.provider.isNotBlank()) {
@@ -2803,8 +2798,8 @@ class DirectStreamActivity : AppCompatActivity() {
 
         private const val OOGACHAKA_STREAM_PREFIX = "https://serve.oogachakacdn.store"
         private const val DAHMER_PROVIDER = "DahmerMovies"
-        private const val DAHMER_CLEARANCE_HOST = "p.111477.xyz"
         private const val DAHMER_CLEARANCE_URL = "https://p.111477.xyz/"
+        private const val DAHMER_BULK_PREFIX = "https://p.111477.xyz/bulk?u"
 
         private const val SKIP_SEC_MIN = 30
         private const val WATCH_PROGRESS_INTERVAL_MS = 15_000L
