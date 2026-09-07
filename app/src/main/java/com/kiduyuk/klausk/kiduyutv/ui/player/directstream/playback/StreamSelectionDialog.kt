@@ -56,19 +56,17 @@ class StreamSelectionDialog(
         filterEnglish = view.findViewById(R.id.btnStreamFilterEnglish)
         filterHindi = view.findViewById(R.id.btnStreamFilterHindi)
         layoutToggle = view.findViewById(R.id.btnStreamLayoutToggle)
-        streamAdapter = StreamAdapter(context, streams, activeUrl) { stream ->
-            onStreamSelected(stream)
-            dismiss()
-        }
+        streamAdapter = StreamAdapter(context, streams, activeUrl, ::selectStream)
         list.adapter = streamAdapter
+        // Keep focus on the AdapterView on TV. This lets GridView apply its
+        // selected-item handling consistently with either one or two columns,
+        // instead of a focusable descendant consuming DPAD_CENTER.
+        list.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
         // GridView keeps focus itself on many Android TV launchers. Handle its
         // selected item so DPAD_CENTER/ENTER invokes the same action as a
         // direct click on a stream card.
         list.setOnItemClickListener { _, _, position, _ ->
-            streamAdapter.getItem(position).let { stream ->
-                onStreamSelected(stream)
-                dismiss()
-            }
+            selectStream(streamAdapter.getItem(position))
         }
         filterAll.setOnClickListener { applyLanguageFilter(LanguageFilter.ALL) }
         filterEnglish.setOnClickListener { applyLanguageFilter(LanguageFilter.ENGLISH) }
@@ -131,6 +129,11 @@ class StreamSelectionDialog(
         list.setSelection(streamAdapter.indexOfUrl(activeUrl).coerceAtLeast(0))
         updateLayoutToggle()
         list.requestFocus()
+    }
+
+    private fun selectStream(stream: StreamItem) {
+        onStreamSelected(stream)
+        dismiss()
     }
 
     private fun updateLayoutToggle() {
