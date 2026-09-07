@@ -418,7 +418,10 @@ class DirectStreamActivity : AppCompatActivity() {
                 }
             }
             onIsPlayingChanged = { isPlaying ->
-                if (isPlaying) hideLoadingArtwork()
+                if (isPlaying) {
+                    hideLoadingArtwork()
+                    markActiveStreamPlayable()
+                }
             }
             onTracksChanged = { tracks ->
                 updateTracksButton(tracks)
@@ -1544,7 +1547,11 @@ class DirectStreamActivity : AppCompatActivity() {
             val validated = StreamValidator.validateAll(items)
             withContext(Dispatchers.Main) {
                 availableStreams = validated
-                streamDialog?.updateStreams(validated)
+                if (engine.player.isPlaying) {
+                    markActiveStreamPlayable()
+                } else {
+                    streamDialog?.updateStreams(validated)
+                }
                 val okCount = validated.count { it.isValid }
                 val blockedCount = validated.count { it.httpStatusCode == 403 }
                 Log.i(
@@ -1574,6 +1581,46 @@ class DirectStreamActivity : AppCompatActivity() {
                     showCloudflareBypassDialog(active, resumeMs)
                 }
             }
+        }
+    }
+
+    /**
+     * Actual decoded playback is stronger evidence than the lightweight HTTP
+     * probe. Promote the active item to a successful state and replace the
+     * list entries so an open Compose dialog observes the badge change.
+     */
+    private fun markActiveStreamPlayable() {
+        val current = activeStream ?: return
+        val wasMarkedFailed = current.isFailed || !current.isValid ||
+            availableStreams.any { candidate ->
+                candidate.url == current.url && (candidate.isFailed || !candidate.isValid)
+            }
+        val playable = current.copy(
+            isValid = true,
+            isChecking = false,
+            isFailed = false,
+            httpStatusCode = current.httpStatusCode?.takeIf { it in 200..299 } ?: 200
+        )
+        activeStream = playable
+        availableStreams = availableStreams.map { candidate ->
+            if (candidate.url == current.url) {
+                candidate.copy(
+                    isValid = true,
+                    isChecking = false,
+                    isFailed = false,
+                    httpStatusCode = candidate.httpStatusCode?.takeIf { it in 200..299 } ?: 200
+                )
+            } else {
+                candidate
+            }
+        }
+        streamDialog?.updateStreams(availableStreams)
+        if (wasMarkedFailed) {
+            Log.i(
+                PROVIDER_TAG,
+                "Playback succeeded; promoted stream validation label to stream ok " +
+                    "provider=${playable.provider.ifBlank { "?" }} quality=${playable.quality}"
+            )
         }
     }
 
