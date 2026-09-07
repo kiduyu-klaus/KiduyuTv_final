@@ -34,6 +34,7 @@ import com.google.android.gms.ads.LoadAdError
 import com.kiduyuk.klausk.kiduyutv.util.AdUnitIds
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.util.StartAppAdManager
+import com.kiduyuk.klausk.kiduyutv.util.UnityAdManager
 
 @Composable
 fun TvBannerAdView(modifier: Modifier = Modifier) {
@@ -74,8 +75,11 @@ fun TvBannerAdView(modifier: Modifier = Modifier) {
                     Log.w(TAG, "TV banner ad failed to load: ${error.message}")
                     val container = containerRef.value
                     if (activity != null && container != null) {
-                        Log.i(TAG, "Loading Start.io TV banner fallback")
-                        StartAppAdManager.loadBanner(activity, container)
+                        Log.i(TAG, "Loading Unity TV banner fallback")
+                        UnityAdManager.loadBanner(activity, container) {
+                            Log.i(TAG, "Loading Start.io TV banner fallback")
+                            StartAppAdManager.loadBanner(activity, container)
+                        }
                     }
                 }
 
@@ -124,6 +128,7 @@ fun TvBannerAdView(modifier: Modifier = Modifier) {
 
     DisposableEffect(adView) {
         onDispose {
+            UnityAdManager.destroyBanner()
             containerRef.value?.removeAllViews()
             containerRef.value = null
             adView.destroy()

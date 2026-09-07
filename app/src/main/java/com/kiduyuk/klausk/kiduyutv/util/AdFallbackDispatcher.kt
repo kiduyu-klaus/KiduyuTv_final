@@ -7,7 +7,7 @@ import android.view.ViewGroup
 /**
  * Unified ad dispatcher.
  *
- * Provides a single entry-point for AdMob with Start.io fallback. Only one
+ * Provides a single entry-point for AdMob, Unity Ads, and Start.io. Only one
  * network is shown for each request, so enabling both SDKs never produces
  * stacked interstitials or banners.
  *
@@ -21,13 +21,16 @@ object AdFallbackDispatcher {
     // ── Interstitial ──────────────────────────────────────────────────────
 
     /**
-     * Shows a ready AdMob interstitial, otherwise requests Start.io.
+     * Shows a ready AdMob interstitial, then Unity Ads, then requests Start.io.
      * Always calls [onDismissed] when the ad closes (or immediately if none ready).
      */
     fun showInterstitial(activity: Activity, onDismissed: () -> Unit) {
         if (AdManager.isInterstitialReady) {
             Log.i(TAG, "Interstitial flow: AdMob")
             AdManager.showInterstitial(activity, onDismissed)
+        } else if (UnityAdManager.isInterstitialReady) {
+            Log.i(TAG, "Interstitial flow: Unity Ads fallback")
+            UnityAdManager.showInterstitial(activity, onDismissed)
         } else {
             Log.i(TAG, "Interstitial flow: Start.io fallback")
             StartAppAdManager.showInterstitial(activity, onDismissed)
@@ -50,6 +53,9 @@ object AdFallbackDispatcher {
         if (AdManager.isRewardedReady) {
             Log.i(TAG, "Rewarded flow: AdMob")
             AdManager.showRewarded(activity, onRewarded, onDismissed)
+        } else if (UnityAdManager.isRewardedReady) {
+            Log.i(TAG, "Rewarded flow: Unity Ads fallback")
+            UnityAdManager.showRewarded(activity, onRewarded, onDismissed)
         } else {
             Log.i(TAG, "Rewarded flow: Start.io fallback")
             StartAppAdManager.showRewarded(activity, onRewarded, onDismissed)
@@ -67,6 +73,9 @@ object AdFallbackDispatcher {
         if (AdManager.isRewardedInterstitialReady) {
             Log.i(TAG, "Rewarded interstitial flow: AdMob")
             AdManager.showRewardedInterstitial(activity, onRewarded, onDismissed)
+        } else if (UnityAdManager.isRewardedReady) {
+            Log.i(TAG, "Rewarded interstitial flow: Unity rewarded fallback")
+            UnityAdManager.showRewarded(activity, onRewarded, onDismissed)
         } else {
             Log.i(TAG, "Rewarded interstitial flow: Start.io rewarded fallback")
             StartAppAdManager.showRewarded(activity, onRewarded, onDismissed)
@@ -76,8 +85,7 @@ object AdFallbackDispatcher {
     // ── Banner ────────────────────────────────────────────────────────────
 
     /**
-     * Loads the requested banner network. Unknown/legacy networks fall back
-     * to AdMob; Start.io is available to both form factors.
+     * Loads the requested banner network. Unknown/legacy networks use AdMob.
      */
     fun loadBanner(
         activity: Activity,
@@ -89,7 +97,15 @@ object AdFallbackDispatcher {
                 Log.i(TAG, "Loading banner from: Start.io")
                 StartAppAdManager.loadBanner(activity, container)
             }
-            else -> {
+            BannerNetwork.UNITY -> {
+                Log.i(TAG, "Loading banner from: Unity Ads")
+                UnityAdManager.loadBanner(activity, container)
+            }
+            BannerNetwork.WORTISE -> {
+                Log.i(TAG, "Loading banner from: Wortise")
+                WortiseAdManager.loadBanner(activity, container)
+            }
+            BannerNetwork.ADMOB, null -> {
                 Log.i(TAG, "Loading banner from: AdMob")
                 AdManager.loadBanner(activity, container)
             }

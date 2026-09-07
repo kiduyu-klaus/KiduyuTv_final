@@ -628,7 +628,7 @@ fun NavGraph(navController: NavHostController) {
         }
 
         // Overlay a non-intrusive banner at the bottom of every TV destination.
-        // TvBannerAdView loads via AdFallbackDispatcher (StartApp network).
+        // TvBannerAdView uses AdMob with Unity Ads and Start.io fallbacks.
         if (BuildConfig.FLAVOR == "tv") {
             TvBannerAdView(
                 modifier = Modifier.align(Alignment.BottomCenter)

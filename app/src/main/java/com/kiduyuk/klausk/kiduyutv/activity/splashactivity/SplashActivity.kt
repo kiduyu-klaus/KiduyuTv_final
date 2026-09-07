@@ -60,6 +60,7 @@ import com.kiduyuk.klausk.kiduyutv.util.UpdateUtil
 import com.kiduyuk.klausk.kiduyutv.util.ConsentManager
 import com.kiduyuk.klausk.kiduyutv.util.StartAppAdManager
 import com.kiduyuk.klausk.kiduyutv.util.AdManager
+import com.kiduyuk.klausk.kiduyutv.util.UnityAdManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -273,9 +274,10 @@ class SplashActivity : ComponentActivity() {
         startFirebaseSync()
 
         // Request GDPR consent before initializing ads
-        // Initialize both ad networks only after consent is resolved.
+        // Initialize all ad networks only after consent is resolved.
         ConsentManager.requestConsent(this) {
             StartAppAdManager.preloadAds(this@SplashActivity)
+            UnityAdManager.preloadAds(this@SplashActivity)
             // AdManager.init schedules MobileAds.initialize and returns
             // immediately — the actual SDK-ready callback fires later.
             // We must wait for that callback before allowing the splash

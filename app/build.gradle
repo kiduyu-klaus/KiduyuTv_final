@@ -16,6 +16,24 @@ def streamApiToken = providers.gradleProperty("STREAM_API_TOKEN")
         .getOrElse("")
 def escapedStreamApiToken = streamApiToken.replace("\\", "\\\\").replace("\"", "\\\"")
 def startIoAppId = "207814611"
+def unityAdsGameId = providers.gradleProperty("UNITY_ADS_GAME_ID")
+        .orElse(providers.environmentVariable("UNITY_ADS_GAME_ID"))
+        .getOrElse("800077880")
+def unityAdsTestMode = providers.gradleProperty("UNITY_ADS_TEST_MODE")
+        .orElse(providers.environmentVariable("UNITY_ADS_TEST_MODE"))
+        .getOrElse("false")
+def unityInterstitialPlacementId = providers.gradleProperty("UNITY_ADS_INTERSTITIAL_ID")
+        .orElse(providers.environmentVariable("UNITY_ADS_INTERSTITIAL_ID"))
+        .getOrElse("Interstitial_Android")
+def unityRewardedPlacementId = providers.gradleProperty("UNITY_ADS_REWARDED_ID")
+        .orElse(providers.environmentVariable("UNITY_ADS_REWARDED_ID"))
+        .getOrElse("Rewarded_Android")
+def unityBannerPlacementId = providers.gradleProperty("UNITY_ADS_BANNER_ID")
+        .orElse(providers.environmentVariable("UNITY_ADS_BANNER_ID"))
+        .getOrElse("Banner_Android")
+def escapedUnityInterstitialPlacementId = unityInterstitialPlacementId.replace("\\", "\\\\").replace("\"", "\\\"")
+def escapedUnityRewardedPlacementId = unityRewardedPlacementId.replace("\\", "\\\\").replace("\"", "\\\"")
+def escapedUnityBannerPlacementId = unityBannerPlacementId.replace("\\", "\\\\").replace("\"", "\\\"")
 
 android {
     namespace 'com.kiduyuk.klausk.kiduyutv'
@@ -37,9 +55,12 @@ android {
         buildConfigField "String", "SUBDL_API_KEY", "\"${escapedSubdlApiKey}\""
         buildConfigField "String", "STREAM_API_TOKEN", "\"${escapedStreamApiToken}\""
         buildConfigField "String", "START_IO_APP_ID", "\"${startIoAppId}\""
+        buildConfigField "String", "UNITY_ADS_INTERSTITIAL_ID", "\"${escapedUnityInterstitialPlacementId}\""
+        buildConfigField "String", "UNITY_ADS_REWARDED_ID", "\"${escapedUnityRewardedPlacementId}\""
+        buildConfigField "String", "UNITY_ADS_BANNER_ID", "\"${escapedUnityBannerPlacementId}\""
         manifestPlaceholders = [
-            unityAdsGameId: "800077880",
-            unityAdsTestMode: "false",
+            unityAdsGameId: unityAdsGameId,
+            unityAdsTestMode: unityAdsTestMode,
             wortiseAppId: "DEFAULT"
         ]
     }
@@ -61,8 +82,8 @@ android {
             versionNameSuffix "-phone"
             resValue "string", "app_name", "KiduyuTV"
             manifestPlaceholders = [
-                unityAdsGameId: "800077880",
-                unityAdsTestMode: "false",
+                unityAdsGameId: unityAdsGameId,
+                unityAdsTestMode: unityAdsTestMode,
                 wortiseAppId: "844b2438-d532-423c-9ac1-523ca3bbc8c4",
                 admobAppId: "ca-app-pub-3803477439180910~6736398964"
             ]
@@ -73,8 +94,8 @@ android {
             versionNameSuffix "-tv"
             resValue "string", "app_name", "KiduyuTV"
             manifestPlaceholders = [
-                unityAdsGameId: "800077880",
-                unityAdsTestMode: "false",
+                unityAdsGameId: unityAdsGameId,
+                unityAdsTestMode: unityAdsTestMode,
                 wortiseAppId: "11140b29-5f3f-4bf9-b5a8-c02d86409023",
                 admobAppId: "ca-app-pub-3803477439180910~6736398964"
             ]
@@ -254,15 +275,13 @@ dependencies {
     implementation 'com.google.android.ump:user-messaging-platform:3.2.0'
 
     // ─────────────────────────────────────────────
-    // Ads — Secondary Networks (NEW)
+    // Ads — Secondary Networks
     // ─────────────────────────────────────────────
     implementation 'com.startapp:inapp-sdk:5.3.1'
-    implementation 'com.unity3d.ads-mediation:unityads-adapter:5.5.0'
-    implementation 'com.unity3d.ads:unity-ads:4.7.0'
+    // Direct Unity Ads integration. Do not also include mediation adapters:
+    // the app performs its own network fallback in AdFallbackDispatcher.
+    implementation 'com.unity3d.ads:unity-ads:4.19.0'
     implementation 'com.wortise:android-sdk:1.7.2'
-
-    // Optional: AdMob mediation adapters for Unity & Wortise
-    implementation 'com.google.ads.mediation:unity:4.12.2.0'
 
 
     // ─────────────────────────────────────────────
@@ -319,6 +338,5 @@ configurations.all {
         force "androidx.activity:activity-ktx:1.9.3"
         force "androidx.fragment:fragment-ktx:1.8.5"
         force 'com.startapp:inapp-sdk:5.3.1'
-        force 'com.unity3d.ads:unity-ads:4.12.2'
     }
 }

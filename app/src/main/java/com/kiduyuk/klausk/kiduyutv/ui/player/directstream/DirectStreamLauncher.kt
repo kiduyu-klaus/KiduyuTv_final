@@ -6,6 +6,7 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.util.Log
 import com.kiduyuk.klausk.kiduyutv.util.AdManager
+import com.kiduyuk.klausk.kiduyutv.util.UnityAdManager
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -45,11 +46,14 @@ object DirectStreamLauncher {
             openPlayer()
         } else if (AdManager.isInterstitialReady) {
             AdManager.showInterstitial(activity) { openPlayer() }
+        } else if (UnityAdManager.isInterstitialReady) {
+            UnityAdManager.showInterstitial(activity) { openPlayer() }
         } else {
             // Do not wait for an ad network to load while the user is opening
             // playback. Start a background preload for a future launch instead.
             Log.i(TAG, "No ready interstitial — opening DirectStreamActivity immediately")
             AdManager.preloadInterstitial(activity)
+            UnityAdManager.preloadAds(activity)
             openPlayer()
         }
     }

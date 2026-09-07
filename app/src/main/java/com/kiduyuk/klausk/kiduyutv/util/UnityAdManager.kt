@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.util.Log
 import android.view.ViewGroup
-import com.kiduyuk.klausk.kiduyutv.util.UnityAdManager.MIN_INTERSTITIAL_INTERVAL_MS
+import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.unity3d.ads.IUnityAdsInitializationListener
 import com.unity3d.ads.IUnityAdsLoadListener
 import com.unity3d.ads.IUnityAdsShowListener
@@ -14,6 +14,7 @@ import com.unity3d.ads.UnityAdsShowOptions
 import com.unity3d.services.banners.BannerErrorInfo
 import com.unity3d.services.banners.BannerView
 import com.unity3d.services.banners.UnityBannerSize
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Unity Ads Manager — singleton.
@@ -28,11 +29,19 @@ object UnityAdManager {
 
     private const val TAG = "UnityAdManager"
     private const val MIN_INTERSTITIAL_INTERVAL_MS = 3 * 60 * 1000L
-    private const val PLACEMENT_REWARDED = "Rewarded_Android"
-    private const val PLACEMENT_INTERSTITIAL = "Interstitial_Android"
-    private const val PLACEMENT_BANNER = "Banner_Android"
     private const val UNITY_GAME_ID_META = "com.unity3d.ads.UNITY_ADS_GAME_ID"
     private const val UNITY_TEST_MODE_META = "com.unity3d.ads.UNITY_ADS_TEST_MODE"
+
+    private val rewardedPlacementId: String
+        get() = BuildConfig.UNITY_ADS_REWARDED_ID
+    private val interstitialPlacementId: String
+        get() = BuildConfig.UNITY_ADS_INTERSTITIAL_ID
+    private val bannerPlacementId: String
+        get() = BuildConfig.UNITY_ADS_BANNER_ID
+
+    private val initializationInProgress = AtomicBoolean(false)
+    private val interstitialLoadInProgress = AtomicBoolean(false)
+    private val rewardedLoadInProgress = AtomicBoolean(false)
 
     @Volatile
     var isInitialised = false
@@ -62,8 +71,14 @@ object UnityAdManager {
         override fun onUnityAdsAdLoaded(placementId: String) {
             Log.i(TAG, "Unity ad successfully loaded: $placementId")
             when (placementId) {
-                PLACEMENT_INTERSTITIAL -> _isInterstitialReady = true
-                PLACEMENT_REWARDED -> _isRewardedReady = true
+                interstitialPlacementId -> {
+                    interstitialLoadInProgress.set(false)
+                    _isInterstitialReady = true
+                }
+                rewardedPlacementId -> {
+                    rewardedLoadInProgress.set(false)
+                    _isRewardedReady = true
+                }
             }
         }
 
@@ -74,8 +89,14 @@ object UnityAdManager {
         ) {
             Log.w(TAG, "Unity ad failed to load: $placementId, error: $error, message: $message")
             when (placementId) {
-                PLACEMENT_INTERSTITIAL -> _isInterstitialReady = false
-                PLACEMENT_REWARDED -> _isRewardedReady = false
+                interstitialPlacementId -> {
+                    interstitialLoadInProgress.set(false)
+                    _isInterstitialReady = false
+                }
+                rewardedPlacementId -> {
+                    rewardedLoadInProgress.set(false)
+                    _isRewardedReady = false
+                }
             }
         }
     }
@@ -113,7 +134,7 @@ object UnityAdManager {
     }
 
     /**
-     * Pre-load Unity Ads placements. Call from [KiduyuTvApp.onInitializationComplete].
+     * Initialize and pre-load Unity Ads after the app's consent flow completes.
      */
     fun preloadAds(context: Context) {
         if (!shouldShowAds(context)) {
@@ -122,6 +143,7 @@ object UnityAdManager {
         }
         try {
             if (UnityAds.isInitialized) {
+                initializationInProgress.set(false)
                 isInitialised = true
                 loadFullscreenPlacements()
                 return
@@ -133,12 +155,18 @@ object UnityAdManager {
                 return
             }
 
+            if (!initializationInProgress.compareAndSet(false, true)) {
+                Log.d(TAG, "Unity Ads initialization already in progress")
+                return
+            }
+
             UnityAds.initialize(
                 context.applicationContext,
                 gameId,
                 readUnityTestMode(context),
                 object : IUnityAdsInitializationListener {
                     override fun onInitializationComplete() {
+                        initializationInProgress.set(false)
                         isInitialised = true
                         Log.i(TAG, "Unity Ads initialized")
                         loadFullscreenPlacements()
@@ -148,6 +176,7 @@ object UnityAdManager {
                         error: UnityAds.UnityAdsInitializationError,
                         message: String
                     ) {
+                        initializationInProgress.set(false)
                         isInitialised = false
                         _isInterstitialReady = false
                         _isRewardedReady = false
@@ -157,14 +186,35 @@ object UnityAdManager {
             )
             Log.i(TAG, "Unity Ads initialization requested")
         } catch (e: Exception) {
+            initializationInProgress.set(false)
             Log.e(TAG, "Unity preload failed", e)
         }
     }
 
     private fun loadFullscreenPlacements() {
-        UnityAds.load(PLACEMENT_INTERSTITIAL, loadListener)
-        UnityAds.load(PLACEMENT_REWARDED, loadListener)
+        requestInterstitial()
+        requestRewarded()
         Log.i(TAG, "Unity ad preload requested")
+    }
+
+    private fun requestInterstitial() {
+        if (_isInterstitialReady || !interstitialLoadInProgress.compareAndSet(false, true)) return
+        try {
+            UnityAds.load(interstitialPlacementId, loadListener)
+        } catch (e: Exception) {
+            interstitialLoadInProgress.set(false)
+            Log.w(TAG, "Unable to request Unity interstitial", e)
+        }
+    }
+
+    private fun requestRewarded() {
+        if (_isRewardedReady || !rewardedLoadInProgress.compareAndSet(false, true)) return
+        try {
+            UnityAds.load(rewardedPlacementId, loadListener)
+        } catch (e: Exception) {
+            rewardedLoadInProgress.set(false)
+            Log.w(TAG, "Unable to request Unity rewarded ad", e)
+        }
     }
 
     // ── Banner ────────────────────────────────────────────────────────────
@@ -172,10 +222,16 @@ object UnityAdManager {
     /**
      * Loads a Unity banner into the supplied [container].
      */
-    fun loadBanner(activity: Activity, container: ViewGroup) {
+    fun loadBanner(
+        activity: Activity,
+        container: ViewGroup,
+        onFailed: () -> Unit = {}
+    ) {
         if (!shouldShowAds(activity)) return
         if (!isInitialised || !UnityAds.isInitialized) {
             Log.w(TAG, "Unity banner skipped - SDK not initialized")
+            preloadAds(activity)
+            onFailed()
             return
         }
         try {
@@ -183,7 +239,7 @@ object UnityAdManager {
             container.removeAllViews()
             val bannerView = BannerView(
                 activity,
-                PLACEMENT_BANNER,
+                bannerPlacementId,
                 UnityBannerSize(320, 50)
             )
             bannerView.listener = object : BannerView.IListener {
@@ -196,6 +252,12 @@ object UnityAdManager {
                     errorInfo: BannerErrorInfo
                 ) {
                     Log.w(TAG, "Unity banner failed: ${errorInfo.errorMessage}")
+                    if (currentBannerView === bannerAdView) {
+                        currentBannerView = null
+                    }
+                    (bannerAdView.parent as? ViewGroup)?.removeView(bannerAdView)
+                    bannerAdView.destroy()
+                    onFailed()
                 }
 
                 override fun onBannerClick(bannerAdView: BannerView) {
@@ -210,6 +272,7 @@ object UnityAdManager {
                     Log.i(TAG, "Unity banner shown")
                 }
             }
+            currentBannerView = bannerView
             container.addView(
                 bannerView,
                 ViewGroup.LayoutParams(
@@ -218,9 +281,9 @@ object UnityAdManager {
                 )
             )
             bannerView.load()
-            currentBannerView = bannerView
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load Unity banner", e)
+            onFailed()
         }
     }
 
@@ -264,14 +327,14 @@ object UnityAdManager {
         if (!isInterstitialReady) {
             Log.i(TAG, "Unity interstitial not ready")
             onDismissed()
-            UnityAds.load(PLACEMENT_INTERSTITIAL, loadListener)
+            requestInterstitial()
             return
         }
         try {
             _isInterstitialReady = false // Mark consumed immediately before showing
             UnityAds.show(
                 activity,
-                PLACEMENT_INTERSTITIAL,
+                interstitialPlacementId,
                 UnityAdsShowOptions(),
                 object : IUnityAdsShowListener {
                     override fun onUnityAdsShowFailure(
@@ -280,7 +343,7 @@ object UnityAdManager {
                         message: String
                     ) {
                         Log.w(TAG, "Unity interstitial show failed: $message")
-                        UnityAds.load(PLACEMENT_INTERSTITIAL, loadListener)
+                        requestInterstitial()
                         onDismissed()
                     }
 
@@ -298,13 +361,14 @@ object UnityAdManager {
                     ) {
                         Log.i(TAG, "Unity interstitial complete: $state")
                         lastInterstitialShownAt = System.currentTimeMillis()
-                        UnityAds.load(PLACEMENT_INTERSTITIAL, loadListener)
+                        requestInterstitial()
                         onDismissed()
                     }
                 }
             )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to show Unity interstitial", e)
+            requestInterstitial()
             onDismissed()
         }
     }
@@ -334,14 +398,14 @@ object UnityAdManager {
         if (!isRewardedReady) {
             Log.i(TAG, "Unity rewarded not ready")
             onDismissed()
-            UnityAds.load(PLACEMENT_REWARDED, loadListener)
+            requestRewarded()
             return
         }
         try {
             _isRewardedReady = false // Mark consumed immediately before showing
             UnityAds.show(
                 activity,
-                PLACEMENT_REWARDED,
+                rewardedPlacementId,
                 UnityAdsShowOptions(),
                 object : IUnityAdsShowListener {
                     override fun onUnityAdsShowFailure(
@@ -350,7 +414,7 @@ object UnityAdManager {
                         message: String
                     ) {
                         Log.w(TAG, "Unity rewarded show failed: $message")
-                        UnityAds.load(PLACEMENT_REWARDED, loadListener)
+                        requestRewarded()
                         onDismissed()
                     }
 
@@ -367,7 +431,7 @@ object UnityAdManager {
                         state: UnityAds.UnityAdsShowCompletionState
                     ) {
                         Log.i(TAG, "Unity rewarded complete: $state")
-                        UnityAds.load(PLACEMENT_REWARDED, loadListener)
+                        requestRewarded()
                         if (state == UnityAds.UnityAdsShowCompletionState.COMPLETED) {
                             onRewarded()
                         }
@@ -377,6 +441,7 @@ object UnityAdManager {
             )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to show Unity rewarded", e)
+            requestRewarded()
             onDismissed()
         }
     }
