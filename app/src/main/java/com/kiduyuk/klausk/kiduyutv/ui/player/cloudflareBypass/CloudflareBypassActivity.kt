@@ -296,10 +296,35 @@ class CloudflareBypassActivity : AppCompatActivity() {
     private var timeoutMs: Long = DEFAULT_TIMEOUT_MS
     private var challengeStartedAt: Long = 0L
     private var isSolved: Boolean = false
+    private var isDownloadLocked: Boolean = false
     private var isFinishingForResult: Boolean = false
     private var waitForDownload: Boolean = false
     private var initialRequestHeaders: Map<String, String> = emptyMap()
     private var lastRequestHeaders: Map<String, String> = emptyMap()
+
+    // ── Javascript Interface ────────────────────────────────────────────────
+    private inner class KiduyuBypassInterface {
+        @android.webkit.JavascriptInterface
+        fun onDownloadLocked() {
+            mainHandler.post {
+                if (isFinishing || isDestroyed) return@post
+                isDownloadLocked = true
+                setStatus("Download locked. Please solve the captcha on screen.", isError = false)
+                dismissLoadingDialog()
+                Log.i(TAG, "[JS] Download Locked detected")
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun onDownloadUnlocked() {
+            mainHandler.post {
+                if (isFinishing || isDestroyed) return@post
+                isDownloadLocked = false
+                setStatus("✓ Unlocked! Waiting for media link...", isError = false)
+                Log.i(TAG, "[JS] Download Unlocked detected")
+            }
+        }
+    }
 
     // ── Cursor (TV remote navigation) ───────────────────────────────────────
     /** False on phones/tablets, true on TVs/Fire TV. */
@@ -582,6 +607,9 @@ class CloudflareBypassActivity : AppCompatActivity() {
             // target host.
             CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
 
+            // Inject interface for detecting "Download Locked" state.
+            addJavascriptInterface(KiduyuBypassInterface(), "KiduyuBypass")
+
             webChromeClient = object : WebChromeClient() {
                 override fun onProgressChanged(view: WebView?, newProgress: Int) {
                     super.onProgressChanged(view, newProgress)
@@ -629,6 +657,39 @@ class CloudflareBypassActivity : AppCompatActivity() {
                     url?.takeIf { it.startsWith("http", ignoreCase = true) }?.let {
                         lastMainFrameUrl = it
                     }
+
+                    // Inject script to detect "Download Locked" and "Unlocked" states.
+                    view?.evaluateJavascript(
+                        """
+                        (function() {
+                            var h1s = document.getElementsByTagName('h1');
+                            var isLocked = false;
+                            for (var i = 0; i < h1s.length; i++) {
+                                if (h1s[i].innerText.trim() === 'Download Locked') {
+                                    isLocked = true;
+                                    break;
+                                }
+                            }
+                            
+                            if (isLocked) {
+                                KiduyuBypass.onDownloadLocked();
+                                
+                                var observer = new MutationObserver(function(mutations) {
+                                    var successDiv = document.getElementById('success');
+                                    if (successDiv && window.getComputedStyle(successDiv).display === 'block' && 
+                                        successDiv.innerText.indexOf('Unlocked!') !== -1) {
+                                        KiduyuBypass.onDownloadUnlocked();
+                                        observer.disconnect();
+                                    }
+                                });
+                                
+                                observer.observe(document.body, { attributes: true, childList: true, subtree: true });
+                            }
+                        })();
+                        """.trimIndent(),
+                        null
+                    )
+
                     if (waitForDownload && isResolvedDownloadUrl(url)) {
                         completeWithDownload(url.orEmpty(), view?.settings?.userAgentString, null)
                         return
@@ -823,7 +884,12 @@ class CloudflareBypassActivity : AppCompatActivity() {
     }
 
     private fun completeWithDownload(url: String, userAgent: String?, mimeType: String?) {
-        if (isFinishingForResult) return
+        if (isFinishingForResult || isDownloadLocked) {
+            if (isDownloadLocked) {
+                Log.d(TAG, "Download captured but page is currently LOCKED; ignoring URL=$url")
+            }
+            return
+        }
         val parsed = runCatching { Uri.parse(url) }.getOrNull()
         val scheme = parsed?.scheme?.lowercase()
         val host = parsed?.host

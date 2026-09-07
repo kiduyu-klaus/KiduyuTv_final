@@ -22,12 +22,14 @@ import android.widget.Toast
 
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.OptIn
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.Tracks
+import androidx.media3.common.util.UnstableApi
 import com.kiduyuk.klausk.kiduyutv.data.model.SkipSegment
 import com.kiduyuk.klausk.kiduyutv.data.model.SkipSegmentQuality
 import com.kiduyuk.klausk.kiduyutv.data.model.SkipSegmentType
@@ -88,6 +90,7 @@ import org.json.JSONArray
  *   4. Map D-pad keys to native player actions: left/right ramp-seek,
  *      center play/pause, back to finish.
  */
+@UnstableApi
 class DirectStreamActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityDirectStreamBinding
@@ -600,6 +603,8 @@ class DirectStreamActivity : AppCompatActivity() {
         }.getOrDefault(emptyList())
     }
 
+    @OptIn(androidx.media3.common.util.UnstableApi::class)
+    @UnstableApi
     private fun applyResizeMode() {
         val mode = resizeModes[resizeModeIndex]
         binding.playerView.resizeMode = mode.resizeMode
@@ -1598,10 +1603,9 @@ class DirectStreamActivity : AppCompatActivity() {
         // resulting cookie is persisted by CloudflareBypassActivity and is
         // attached by PlayerEngine when this stream is retried.
         if (needsDahmerMoviesClearance(chosen)) {
-            Log.w(
+            Log.i(
                 TAG,
-                "DahmerMovies stream detected without cf_clearance; " +
-                    "opening the full blocked URL"
+                "DahmerMovies bulk stream detected; always resolving via CloudflareBypassActivity"
             )
             pendingCloudflareStream = chosen
             pendingCloudflareResumeMs = resumeMs
@@ -1692,6 +1696,9 @@ class DirectStreamActivity : AppCompatActivity() {
      */
     private fun needsCloudflareBypass(stream: StreamItem): Boolean {
         if (stream.url.isBlank()) return false
+        if (stream.url.startsWith(DAHMER_BULK_PREFIX, ignoreCase = true)) {
+            return true
+        }
         val host = runCatching { Uri.parse(stream.url).host }
             .getOrNull()
             ?.takeIf { it.isNotBlank() }
