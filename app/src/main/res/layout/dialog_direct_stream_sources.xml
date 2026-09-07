@@ -138,7 +138,6 @@
         android:layout_height="360dp"
         android:layout_marginTop="14dp"
         android:cacheColorHint="@android:color/transparent"
-        android:clickable="true"
         android:columnWidth="280dp"
         android:focusable="true"
         android:horizontalSpacing="10dp"
