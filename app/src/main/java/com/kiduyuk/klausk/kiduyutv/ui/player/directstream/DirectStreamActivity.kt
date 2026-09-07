@@ -347,13 +347,22 @@ class DirectStreamActivity : AppCompatActivity() {
         currentReleaseDate = intent.getStringExtra(EXTRA_RELEASE_DATE)
         val requestedProvider = intent.getStringExtra(EXTRA_PROVIDER)
         val configuredDirectProvider = settingsManager.getDefaultDirectStreamProvider()
-        val providerForPlayback = requestedProvider
-            ?.takeIf {
-                it.isNotBlank() &&
-                    !it.equals(SettingsManager.AUTO, ignoreCase = true) &&
-                    !it.equals("All Providers", ignoreCase = true)
-            }
-            ?: configuredDirectProvider
+        val configuredProviderIsSet = configuredDirectProvider.isNotBlank() &&
+            !configuredDirectProvider.equals(SettingsManager.AUTO, ignoreCase = true) &&
+            !configuredDirectProvider.equals("All Providers", ignoreCase = true)
+        val requestedProviderValue = requestedProvider?.takeIf {
+            it.isNotBlank() &&
+                !it.equals(SettingsManager.AUTO, ignoreCase = true) &&
+                !it.equals("All Providers", ignoreCase = true)
+        }
+        // A saved direct-stream provider is the user's explicit default and
+        // must be used before fetching streams. The intent provider remains a
+        // fallback for launches where no default has been configured.
+        val providerForPlayback = if (configuredProviderIsSet) {
+            configuredDirectProvider
+        } else {
+            requestedProviderValue
+        }
         currentProvider = StreamCatalog.resolve(providerForPlayback)
         Log.i(
             PROVIDER_TAG,
