@@ -61,6 +61,15 @@ class StreamSelectionDialog(
             dismiss()
         }
         list.adapter = streamAdapter
+        // GridView keeps focus itself on many Android TV launchers. Handle its
+        // selected item so DPAD_CENTER/ENTER invokes the same action as a
+        // direct click on a stream card.
+        list.setOnItemClickListener { _, _, position, _ ->
+            streamAdapter.getItem(position).let { stream ->
+                onStreamSelected(stream)
+                dismiss()
+            }
+        }
         filterAll.setOnClickListener { applyLanguageFilter(LanguageFilter.ALL) }
         filterEnglish.setOnClickListener { applyLanguageFilter(LanguageFilter.ENGLISH) }
         filterHindi.setOnClickListener { applyLanguageFilter(LanguageFilter.HINDI) }
@@ -199,6 +208,7 @@ class StreamSelectionDialog(
             view.isActivated = active
             view.isFocusable = true
             view.isClickable = true
+            view.isFocusableInTouchMode = false
             view.setOnClickListener { onStreamClick(stream) }
             // Render the validation status badge. We only show "stream ok"
             // when the upstream probe reported 2xx with valid video stream
