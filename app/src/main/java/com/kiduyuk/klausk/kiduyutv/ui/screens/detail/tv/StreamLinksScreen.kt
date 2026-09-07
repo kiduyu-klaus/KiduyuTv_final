@@ -86,6 +86,7 @@ fun StreamLinksScreen(
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
+    var providerLaunchPending by remember { mutableStateOf(false) }
     var directStreamPromptResolved by remember {
         mutableStateOf(
             !showDirectStreamPrompt || SettingsManager(context).isDirectStreamEnabled()
@@ -242,6 +243,8 @@ fun StreamLinksScreen(
                             provider = provider,
                             focusRequester = if (index == 0) firstProviderFocusRequester else null
                         ) {
+                            if (providerLaunchPending) return@StreamProviderItem
+                            providerLaunchPending = true
                             val iframeHtml = com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager.generateIframeHtml(
                                 providerName = provider.name,
                                 tmdbId = tmdbId,
@@ -282,10 +285,14 @@ fun StreamLinksScreen(
                             // Show TV interstitial before launching player (TV flavour only)
                             if (BuildConfig.FLAVOR == "tv") {
                                 TvInterstitialManager.showAndThenLaunch(context as android.app.Activity) {
-                                    context.startActivity(intent)
+                                    if (providerLaunchPending) {
+                                        context.startActivity(intent)
+                                        providerLaunchPending = false
+                                    }
                                 }
                             } else {
                                 context.startActivity(intent)
+                                providerLaunchPending = false
                             }
                         }
                     }

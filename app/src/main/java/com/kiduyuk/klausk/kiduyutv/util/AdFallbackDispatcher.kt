@@ -21,8 +21,9 @@ object AdFallbackDispatcher {
     // ── Interstitial ──────────────────────────────────────────────────────
 
     /**
-     * Shows a ready AdMob interstitial, then Unity Ads, then requests Start.io.
-     * Always calls [onDismissed] when the ad closes (or immediately if none ready).
+     * Shows a ready AdMob interstitial, then a ready Unity ad. If neither is
+     * already loaded, playback/navigation continues immediately; this method
+     * never starts an on-demand ad load that can hold the caller's callback.
      */
     fun showInterstitial(activity: Activity, onDismissed: () -> Unit) {
         if (AdManager.isInterstitialReady) {
@@ -32,8 +33,10 @@ object AdFallbackDispatcher {
             Log.i(TAG, "Interstitial flow: Unity Ads fallback")
             UnityAdManager.showInterstitial(activity, onDismissed)
         } else {
-            Log.i(TAG, "Interstitial flow: Start.io fallback")
-            StartAppAdManager.showInterstitial(activity, onDismissed)
+            Log.i(TAG, "Interstitial flow: no ad ready; continuing immediately")
+            onDismissed()
+            AdManager.preloadInterstitial(activity)
+            UnityAdManager.preloadAds(activity)
         }
     }
 
