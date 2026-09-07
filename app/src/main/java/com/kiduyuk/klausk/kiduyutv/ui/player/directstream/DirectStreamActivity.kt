@@ -1254,7 +1254,7 @@ class DirectStreamActivity : AppCompatActivity() {
             "Loading external subtitle label=${subtitle.label.orEmpty()} " +
                 "language=${subtitle.language.orEmpty()} mimeType=${subtitle.mimeType}"
         )
-        pendingReadySeekPositionMs = positionMs
+        pendingReadySeekPositionMs = playableStartPosition(stream, positionMs)
         showStatus(getString(R.string.buffering), retry = false)
         engine.play(stream, 0L, activeSubtitles)
     }
@@ -1778,7 +1778,8 @@ class DirectStreamActivity : AppCompatActivity() {
     }
 
     private fun startStreamPlayback(stream: StreamItem, startPositionMs: Long = 0L) {
-        val streamKey = "${stream.url}|${stream.provider}|${startPositionMs}"
+        val playableStartPositionMs = playableStartPosition(stream, startPositionMs)
+        val streamKey = "${stream.url}|${stream.provider}|${playableStartPositionMs}"
         if (lastStreamPlaybackKey == streamKey && engine.player.currentMediaItem != null) return
         lastStreamPlaybackKey = streamKey
         skipSegmentsFetchJob?.cancel()
@@ -1795,7 +1796,7 @@ class DirectStreamActivity : AppCompatActivity() {
                     "cf_clearance; opening the full blocked URL"
             )
             pendingCloudflareStream = stream
-            pendingCloudflareResumeMs = startPositionMs
+            pendingCloudflareResumeMs = playableStartPositionMs
             showStatus(getString(R.string.cloudflare_blocked_checking), retry = false)
             showLoadingArtwork()
             launchCloudflareBypass(stream)
@@ -1812,7 +1813,7 @@ class DirectStreamActivity : AppCompatActivity() {
                     "saved cookies; launching CloudflareBypassActivity"
             )
             pendingCloudflareStream = stream
-            pendingCloudflareResumeMs = startPositionMs
+            pendingCloudflareResumeMs = playableStartPositionMs
             showStatus(getString(R.string.cloudflare_blocked_checking), retry = false)
             showLoadingArtwork()
             launchCloudflareBypass(stream)
@@ -1826,7 +1827,28 @@ class DirectStreamActivity : AppCompatActivity() {
         // source's buffered marker so the seek bar reflects the new source
         // as Media3 fills it.
         binding.seekBar.secondaryProgress = 0
-        engine.play(stream, startPositionMs, activeSubtitles)
+        engine.play(stream, playableStartPositionMs, activeSubtitles)
+    }
+
+    /**
+     * Google Drive's video-download endpoint ignores Range requests and sends
+     * the entire file with HTTP 200. Seeking before preparation makes Media3
+     * discard hundreds of megabytes sequentially and look permanently stuck
+     * in buffering, so these links must begin at byte/time zero.
+     */
+    private fun playableStartPosition(stream: StreamItem, requestedPositionMs: Long): Long {
+        if (requestedPositionMs <= 0L) return 0L
+        val host = runCatching { Uri.parse(stream.url).host.orEmpty() }
+            .getOrDefault("")
+        if (host.equals(GOOGLE_DOWNLOADS_HOST, ignoreCase = true)) {
+            Log.i(
+                PROVIDER_TAG,
+                "Ignoring ${requestedPositionMs}ms resume/transfer position for non-seekable " +
+                    "$GOOGLE_DOWNLOADS_HOST stream"
+            )
+            return 0L
+        }
+        return requestedPositionMs
     }
 
     /**
@@ -2000,6 +2022,8 @@ class DirectStreamActivity : AppCompatActivity() {
         val requestedPosition = pendingReadySeekPositionMs
         if (requestedPosition <= 0L) return
         pendingReadySeekPositionMs = 0L
+        val stream = activeStream
+        if (stream != null && playableStartPosition(stream, requestedPosition) == 0L) return
         val duration = engine.player.duration
         val target = if (duration > 0L) {
             requestedPosition.coerceAtMost((duration - 1_000L).coerceAtLeast(0L))
@@ -2838,6 +2862,7 @@ class DirectStreamActivity : AppCompatActivity() {
 
         private const val OOGACHAKA_STREAM_PREFIX = "https://serve.oogachakacdn.store"
         private const val DAHMER_BULK_PREFIX = "https://p.111477.xyz/bulk?u"
+        private const val GOOGLE_DOWNLOADS_HOST = "video-downloads.googleusercontent.com"
 
         private const val SKIP_SEC_MIN = 30
         private const val WATCH_PROGRESS_INTERVAL_MS = 15_000L
