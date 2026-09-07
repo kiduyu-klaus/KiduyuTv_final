@@ -27,8 +27,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -44,6 +46,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -149,9 +152,24 @@ class StreamSelectionDialog(
         val firstStreamFocusRequester = remember { FocusRequester() }
         val closeFocusRequester = remember { FocusRequester() }
         val filterFocusRequester = remember { FocusRequester() }
+        val listState = rememberLazyListState()
+        val gridState = rememberLazyGridState()
+        val streamFocusRequesters = remember(filteredStreams) {
+            List(filteredStreams.size) { FocusRequester() }
+        }
+        val playingIndex = filteredStreams.indexOfFirst { it.url == activeUrl }
 
         LaunchedEffect(filteredStreams, activeUrl, isGridLayout) {
-            if (filteredStreams.isNotEmpty()) {
+            if (playingIndex >= 0) {
+                if (isGridLayout) {
+                    gridState.scrollToItem(playingIndex)
+                } else {
+                    listState.scrollToItem(playingIndex)
+                }
+                // Let the lazy container compose the target item before requesting focus.
+                withFrameNanos { }
+                streamFocusRequesters[playingIndex].requestFocus()
+            } else if (filteredStreams.isNotEmpty()) {
                 firstStreamFocusRequester.requestFocus()
             } else {
                 closeFocusRequester.requestFocus()
@@ -229,29 +247,39 @@ class StreamSelectionDialog(
                     } else if (isGridLayout) {
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(2),
+                            state = gridState,
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            items(filteredStreams, key = { it.url }) { stream ->
+                            itemsIndexed(
+                                items = filteredStreams,
+                                key = { index, stream -> streamKey(index, stream) }
+                            ) { index, stream ->
                                 StreamCard(
                                     stream = stream,
-                                    active = stream.url == activeUrl,
-                                    firstFocusRequester = if (stream == filteredStreams.first()) firstStreamFocusRequester else null,
+                                    active = index == playingIndex,
+                                    focusRequester = streamFocusRequesters[index],
+                                    firstFocusRequester = if (index == 0) firstStreamFocusRequester else null,
                                     onClick = { onStreamSelected(stream) }
                                 )
                             }
                         }
                     } else {
                         LazyColumn(
+                            state = listState,
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            items(filteredStreams, key = { it.url }) { stream ->
+                            itemsIndexed(
+                                items = filteredStreams,
+                                key = { index, stream -> streamKey(index, stream) }
+                            ) { index, stream ->
                                 StreamCard(
                                     stream = stream,
-                                    active = stream.url == activeUrl,
-                                    firstFocusRequester = if (stream == filteredStreams.first()) firstStreamFocusRequester else null,
+                                    active = index == playingIndex,
+                                    focusRequester = streamFocusRequesters[index],
+                                    firstFocusRequester = if (index == 0) firstStreamFocusRequester else null,
                                     onClick = { onStreamSelected(stream) }
                                 )
                             }
@@ -302,6 +330,7 @@ class StreamSelectionDialog(
     private fun StreamCard(
         stream: StreamItem,
         active: Boolean,
+        focusRequester: FocusRequester,
         firstFocusRequester: FocusRequester?,
         onClick: () -> Unit
     ) {
@@ -326,6 +355,7 @@ class StreamSelectionDialog(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
+                .focusRequester(focusRequester)
                 .then(if (firstFocusRequester != null) Modifier.focusRequester(firstFocusRequester) else Modifier)
                 .onFocusChanged { focused = it.isFocused }
                 .focusable()
@@ -368,14 +398,27 @@ class StreamSelectionDialog(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
-                    Text(
-                        text = status,
-                        color = TextPrimary,
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier
-                            .background(statusColor, RoundedCornerShape(6.dp))
-                            .padding(horizontal = 7.dp, vertical = 4.dp)
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (active) {
+                            Text(
+                                text = "Playing",
+                                color = ComposeColor(0xFF81C784),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Text(
+                            text = status,
+                            color = TextPrimary,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier
+                                .background(statusColor, RoundedCornerShape(6.dp))
+                                .padding(horizontal = 7.dp, vertical = 4.dp)
+                        )
+                    }
                 }
                 Text(
                     text = context.getString(
@@ -391,6 +434,10 @@ class StreamSelectionDialog(
     }
 
     private enum class LanguageFilter { ALL, ENGLISH, HINDI }
+
+    private fun streamKey(index: Int, stream: StreamItem): String {
+        return "$index|${stream.provider}|${stream.quality}|${stream.type}|${stream.url}"
+    }
 
     companion object {
         private val LANGUAGE_PATTERNS = listOf(
