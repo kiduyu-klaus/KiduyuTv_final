@@ -51,10 +51,19 @@ class StreamResolver {
         // backend should be reported to the player immediately.
         ProvidersApi.requireBackendAvailable()
 
-        val providerNames = if (provider.key.isBlank()) {
-            ProvidersApi.enabledProviderNames()
-        } else {
-            listOf(provider.key)
+        val enabledProviderNames = ProvidersApi.enabledProviderNames()
+        val selectedProvider = provider.key.takeIf { selected ->
+            enabledProviderNames.any { it.equals(selected, ignoreCase = true) }
+        }
+        val providerNames = selectedProvider?.let { selected ->
+            listOf(enabledProviderNames.first { it.equals(selected, ignoreCase = true) })
+        } ?: enabledProviderNames
+
+        if (provider.key.isNotBlank() && selectedProvider == null) {
+            Log.w(
+                tag,
+                "Saved provider ${provider.key} is not enabled by the backend; using all enabled providers"
+            )
         }
 
         if (providerNames.isEmpty()) {
