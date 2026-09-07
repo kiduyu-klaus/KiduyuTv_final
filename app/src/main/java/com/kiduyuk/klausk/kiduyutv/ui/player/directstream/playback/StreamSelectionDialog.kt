@@ -14,6 +14,7 @@ import android.view.Window
 import android.view.WindowManager
 import android.widget.BaseAdapter
 import android.widget.GridView
+import android.widget.ImageButton
 import android.widget.TextView
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamItem
@@ -31,8 +32,10 @@ class StreamSelectionDialog(
     private val filterAll: TextView
     private val filterEnglish: TextView
     private val filterHindi: TextView
+    private val layoutToggle: ImageButton
     private val streamAdapter: StreamAdapter
     private var selectedLanguage = LanguageFilter.ALL
+    private var isGridLayout = false
 
     init {
         requestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -52,6 +55,7 @@ class StreamSelectionDialog(
         filterAll = view.findViewById(R.id.btnStreamFilterAll)
         filterEnglish = view.findViewById(R.id.btnStreamFilterEnglish)
         filterHindi = view.findViewById(R.id.btnStreamFilterHindi)
+        layoutToggle = view.findViewById(R.id.btnStreamLayoutToggle)
         streamAdapter = StreamAdapter(context, streams, activeUrl) { stream ->
             onStreamSelected(stream)
             dismiss()
@@ -66,8 +70,10 @@ class StreamSelectionDialog(
         filterAll.setOnClickListener { applyLanguageFilter(LanguageFilter.ALL) }
         filterEnglish.setOnClickListener { applyLanguageFilter(LanguageFilter.ENGLISH) }
         filterHindi.setOnClickListener { applyLanguageFilter(LanguageFilter.HINDI) }
+        layoutToggle.setOnClickListener { toggleLayout() }
         close.setOnClickListener { dismiss() }
         applyLanguageFilter(LanguageFilter.ALL)
+        updateLayoutToggle()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -114,6 +120,23 @@ class StreamSelectionDialog(
         if (!isShowing) return
         streams = updated
         applyLanguageFilter(selectedLanguage)
+    }
+
+    private fun toggleLayout() {
+        isGridLayout = !isGridLayout
+        list.numColumns = if (isGridLayout) 2 else 1
+        list.setSelection(streamAdapter.indexOfUrl(activeUrl).coerceAtLeast(0))
+        updateLayoutToggle()
+        list.requestFocus()
+    }
+
+    private fun updateLayoutToggle() {
+        layoutToggle.setImageResource(
+            if (isGridLayout) R.drawable.ic_layout_list else R.drawable.ic_layout_grid
+        )
+        layoutToggle.contentDescription = context.getString(
+            if (isGridLayout) R.string.stream_layout_list else R.string.stream_layout_grid
+        )
     }
 
     private fun applyLanguageFilter(filter: LanguageFilter) {

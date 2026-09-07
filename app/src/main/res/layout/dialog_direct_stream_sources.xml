@@ -112,6 +112,24 @@
             android:text="@string/stream_filter_hindi"
             android:textColor="@color/text_primary"
             android:textStyle="bold" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <ImageButton
+            android:id="@+id/btnStreamLayoutToggle"
+            android:layout_width="48dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="10dp"
+            android:background="@drawable/bg_direct_stream_track_tab"
+            android:contentDescription="@string/stream_layout_grid"
+            android:focusable="true"
+            android:nextFocusDown="@id/listStreams"
+            android:padding="8dp"
+            android:src="@drawable/ic_layout_grid"
+            android:tint="@color/text_primary" />
     </LinearLayout>
 
     <GridView
@@ -126,7 +144,7 @@
         android:horizontalSpacing="10dp"
         android:nextFocusDown="@id/btnCloseStreams"
         android:nextFocusUp="@id/btnStreamFilterEnglish"
-        android:numColumns="2"
+        android:numColumns="1"
         android:stretchMode="columnWidth"
         android:verticalSpacing="10dp"
         android:listSelector="@drawable/bg_direct_stream_source_focus" />

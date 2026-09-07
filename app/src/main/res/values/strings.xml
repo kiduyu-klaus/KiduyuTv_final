@@ -75,6 +75,8 @@
     <string name="stream_filter_all">All</string>
     <string name="stream_filter_english">English</string>
     <string name="stream_filter_hindi">Hindi</string>
+    <string name="stream_layout_grid">Switch to grid layout</string>
+    <string name="stream_layout_list">Switch to list layout</string>
     <string name="stream_language_label">Language: %1$s</string>
     <string name="stream_playing">PLAYING</string>
     <string name="stream_ok">stream ok</string>
