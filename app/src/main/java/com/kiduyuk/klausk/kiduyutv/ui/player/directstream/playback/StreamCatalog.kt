@@ -1,6 +1,7 @@
 package com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback
 
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.ProvidersApi
+import java.util.Locale
 
 /**
  * Display name + server-side key for one of the providers the local
@@ -51,11 +52,24 @@ object StreamCatalog {
                 ?: StreamProviderChoice(formatDisplayName(key), key)
         }
 
-    fun resolve(name: String?): StreamProviderChoice =
-        known.firstOrNull {
-            it.displayName.equals(name, ignoreCase = true) ||
-                it.key.equals(name, ignoreCase = true)
-        } ?: default
+    fun resolve(name: String?): StreamProviderChoice {
+        val value = name?.trim().orEmpty()
+        if (
+            value.isBlank() ||
+            value.equals("Auto", ignoreCase = true) ||
+            value.equals(aggregate.displayName, ignoreCase = true)
+        ) {
+            return default
+        }
+
+        return known.firstOrNull {
+            it.displayName.equals(value, ignoreCase = true) ||
+                it.key.equals(value, ignoreCase = true)
+        } ?: StreamProviderChoice(
+            displayName = formatDisplayName(value),
+            key = value.lowercase(Locale.ROOT)
+        )
+    }
 
     private fun formatDisplayName(key: String): String =
         key.split('-', '_')
