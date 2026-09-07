@@ -186,7 +186,8 @@ private fun loadWatchedCache(context: Context): WatchedCache? {
             val lastPage = prefs.getInt(KEY_CACHED_PAGE, 0)
             val hasMore = prefs.getBoolean(KEY_CACHED_HAS_MORE, true)
             Log.i(TAG, "Loaded watched cache metadata: page=$lastPage, hasMore=$hasMore")
-            WatchedCache(items, lastPage, hasMore)
+            // Ensure no duplicates in the loaded cache items
+            WatchedCache(items.distinctBy { "${it.type}-${it.id}" }, lastPage, hasMore)
         }
     } catch (e: Exception) {
         Log.e(TAG, "Failed to load watched cache: ${e.message}", e)
@@ -251,7 +252,10 @@ fun MyListScreen(
     var watchedHistoryTotal by remember { mutableStateOf<Int?>(null) }
     var watchedHistoryLoaded by remember { mutableIntStateOf(0) }
     var watchedLoadError by remember { mutableStateOf<String?>(null) }
-    val processedTmdbIds = remember { mutableSetOf<String>() }
+    // Thread-safe set to track processed items across IO and Main threads
+    val processedTmdbIds = remember { 
+        java.util.concurrent.ConcurrentHashMap.newKeySet<String>() 
+    }
 
     // Tracks how many items we requested this page so we can show a footer spinner
     val gridState = rememberLazyGridState()
@@ -305,56 +309,60 @@ fun MyListScreen(
                 // Collapse multiple episodes of the same show into one card.
                 // We keep the first (most recent) watch event for each media item.
                 val cacheKey = "$type-$tmdbId"
-                if (processedTmdbIds.add(cacheKey)) {
-                    Log.i(TAG, "[enrichHistoryPage] New unique item: $type/$tmdbId, title='$title'")
-                    // Add a usable card before the slower TMDB detail request.
-                    // The UI can render the title immediately and update the poster/rating later.
-                    val baseItem = MyListItem(
-                        id = tmdbId,
-                        title = title,
-                        posterPath = null,
-                        type = type,
-                        voteAverage = traktRating,
-                        watchedHistoryId = item.id,
-                        seasonNumber = episode?.season,
-                        episodeNumber = episode?.number
-                    )
-                    pageItems.add(baseItem)
-                    Log.i(TAG, "[enrichHistoryPage] About to call onItemAdded for $type/$tmdbId")
-                    onItemAdded(baseItem)
-                    Log.i(TAG, "[enrichHistoryPage] Returned from onItemAdded for $type/$tmdbId, pageItems size=${pageItems.size}")
+                
+                // Fast-skip if we already know about this item
+                if (processedTmdbIds.contains(cacheKey)) {
+                    Log.i(TAG, "[enrichHistoryPage] Skipping duplicate item: $cacheKey")
+                    onItemProcessed()
+                    return@forEach
+                }
 
-                    var enrichedItem = baseItem
-                    try {
-                        Log.i(TAG, "[enrichHistoryPage] Before TMDB $type detail call for $tmdbId")
-                        enrichedItem = if (type == "movie") {
-                            val detail = tmdbApiService.getMovieDetail(tmdbId)
-                            Log.i(TAG, "[enrichHistoryPage] After TMDB movie call for $tmdbId: poster=${detail.posterPath}")
-                            baseItem.copy(
-                                posterPath = detail.posterPath,
-                                voteAverage = if (traktRating == 0.0) detail.voteAverage else traktRating
-                            )
-                        } else {
-                            val detail = tmdbApiService.getTvShowDetail(tmdbId)
-                            Log.i(TAG, "[enrichHistoryPage] After TMDB TV call for $tmdbId: poster=${detail.posterPath}")
-                            baseItem.copy(
-                                posterPath = detail.posterPath,
-                                voteAverage = if (traktRating == 0.0) detail.voteAverage else traktRating
-                            )
-                        }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "[enrichHistoryPage] TMDB detail failed for watched $type $tmdbId: ${e.message}", e)
-                    }
+                Log.i(TAG, "[enrichHistoryPage] New unique item: $type/$tmdbId, title='$title'")
+                // Add a usable card before the slower TMDB detail request.
+                // The UI can render the title immediately and update the poster/rating later.
+                val baseItem = MyListItem(
+                    id = tmdbId,
+                    title = title,
+                    posterPath = null,
+                    type = type,
+                    voteAverage = traktRating,
+                    watchedHistoryId = item.id,
+                    seasonNumber = episode?.season,
+                    episodeNumber = episode?.number
+                )
+                pageItems.add(baseItem)
+                Log.i(TAG, "[enrichHistoryPage] About to call onItemAdded for $type/$tmdbId")
+                onItemAdded(baseItem)
+                Log.i(TAG, "[enrichHistoryPage] Returned from onItemAdded for $type/$tmdbId, pageItems size=${pageItems.size}")
 
-                    if (enrichedItem != baseItem) {
-                        Log.i(TAG, "[enrichHistoryPage] Item was enriched (posterPath changed or rating filled); calling onItemUpdated for $type/$tmdbId")
-                        onItemUpdated(enrichedItem)
-                        Log.i(TAG, "[enrichHistoryPage] Returned from onItemUpdated for $type/$tmdbId")
+                var enrichedItem = baseItem
+                try {
+                    Log.i(TAG, "[enrichHistoryPage] Before TMDB $type detail call for $tmdbId")
+                    enrichedItem = if (type == "movie") {
+                        val detail = tmdbApiService.getMovieDetail(tmdbId)
+                        Log.i(TAG, "[enrichHistoryPage] After TMDB movie call for $tmdbId: poster=${detail.posterPath}")
+                        baseItem.copy(
+                            posterPath = detail.posterPath,
+                            voteAverage = if (traktRating == 0.0) detail.voteAverage else traktRating
+                        )
                     } else {
-                        Log.i(TAG, "[enrichHistoryPage] No enrichment delta for $type/$tmdbId; skipping onItemUpdated")
+                        val detail = tmdbApiService.getTvShowDetail(tmdbId)
+                        Log.i(TAG, "[enrichHistoryPage] After TMDB TV call for $tmdbId: poster=${detail.posterPath}")
+                        baseItem.copy(
+                            posterPath = detail.posterPath,
+                            voteAverage = if (traktRating == 0.0) detail.voteAverage else traktRating
+                        )
                     }
+                } catch (e: Exception) {
+                    Log.e(TAG, "[enrichHistoryPage] TMDB detail failed for watched $type $tmdbId: ${e.message}", e)
+                }
+
+                if (enrichedItem != baseItem) {
+                    Log.i(TAG, "[enrichHistoryPage] Item was enriched (posterPath changed or rating filled); calling onItemUpdated for $type/$tmdbId")
+                    onItemUpdated(enrichedItem)
+                    Log.i(TAG, "[enrichHistoryPage] Returned from onItemUpdated for $type/$tmdbId")
                 } else {
-                    Log.i(TAG, "[enrichHistoryPage] Skipping duplicate item already in processedTmdbIds: $type/$tmdbId")
+                    Log.i(TAG, "[enrichHistoryPage] No enrichment delta for $type/$tmdbId; skipping onItemUpdated")
                 }
             } else {
                 Log.w(TAG, "[enrichHistoryPage] Skipping item with null tmdbId or blank title: type=$type, tmdbId=$tmdbId, title='$title'")
@@ -435,18 +443,15 @@ fun MyListScreen(
                                         TAG,
                                         "[onItemAdded] invoked for ${item.type}/${item.id} on thread=${Thread.currentThread().name}"
                                     )
-                                    val alreadyVisible = watchedItems.any {
-                                        it.id == item.id && it.type == item.type
-                                    }
-                                    if (!alreadyVisible) {
+                                    val cacheKey = "${item.type}-${item.id}"
+                                    if (processedTmdbIds.add(cacheKey)) {
                                         watchedItems = watchedItems + item
                                         Log.i(
                                             TAG,
-                                            "[onItemAdded] Appended watched item: " +
-                                                "${item.type}/${item.id}, displayed=${watchedItems.size}"
+                                            "[onItemAdded] Appended watched item: $cacheKey, displayed=${watchedItems.size}"
                                         )
                                     } else {
-                                        Log.i(TAG, "[onItemAdded] Item already in list, skipping: ${item.type}/${item.id}")
+                                        Log.i(TAG, "[onItemAdded] Item already in list, skipping: $cacheKey")
                                     }
                                 }
                             },
