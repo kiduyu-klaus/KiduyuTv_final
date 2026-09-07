@@ -18,7 +18,7 @@ def escapedStreamApiToken = streamApiToken.replace("\\", "\\\\").replace("\"", "
 def startIoAppId = "207814611"
 def unityAdsGameId = providers.gradleProperty("UNITY_ADS_GAME_ID")
         .orElse(providers.environmentVariable("UNITY_ADS_GAME_ID"))
-        .getOrElse("800077880")
+        .getOrElse("6186149")
 def unityAdsTestMode = providers.gradleProperty("UNITY_ADS_TEST_MODE")
         .orElse(providers.environmentVariable("UNITY_ADS_TEST_MODE"))
         .getOrElse("false")
