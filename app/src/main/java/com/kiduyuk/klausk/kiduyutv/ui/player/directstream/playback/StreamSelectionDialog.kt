@@ -13,7 +13,7 @@ import android.view.ViewGroup
 import android.view.Window
 import android.view.WindowManager
 import android.widget.BaseAdapter
-import android.widget.ListView
+import android.widget.GridView
 import android.widget.TextView
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamItem
@@ -25,7 +25,7 @@ class StreamSelectionDialog(
     private val onStreamSelected: (StreamItem) -> Unit
 ) : Dialog(context) {
 
-    private val list: ListView
+    private val list: GridView
     private val close: TextView
     private val streamCount: TextView
     private val streamAdapter: StreamAdapter
@@ -140,6 +140,11 @@ class StreamSelectionDialog(
                 text = metadata.joinToString("  •  ")
                 visibility = if (metadata.isEmpty()) View.GONE else View.VISIBLE
             }
+            view.findViewById<TextView>(R.id.streamSourceLanguage).text =
+                context.getString(
+                    R.string.stream_language_label,
+                    detectLanguages(stream)
+                )
             val active = stream.url == activeUrl
             view.findViewById<View>(R.id.streamSourceActive).visibility =
                 if (active) View.VISIBLE else View.GONE
@@ -177,6 +182,24 @@ class StreamSelectionDialog(
                 }
             }
             return view
+        }
+
+        private fun detectLanguages(stream: StreamItem): String {
+            val searchableText = "${stream.name} ${stream.title}"
+            val languages = LANGUAGE_PATTERNS.mapNotNull { (label, pattern) ->
+                label.takeIf { pattern.containsMatchIn(searchableText) }
+            }
+            return languages.joinToString(" • ")
+                .ifBlank { context.getString(R.string.stream_language_unknown) }
+        }
+
+        companion object {
+            private val LANGUAGE_PATTERNS = listOf(
+                "English" to Regex("\\benglish\\b", RegexOption.IGNORE_CASE),
+                "Hindi" to Regex("\\bhindi\\b", RegexOption.IGNORE_CASE),
+                "Telugu" to Regex("\\btelugu\\b", RegexOption.IGNORE_CASE),
+                "Tamil" to Regex("\\btamil\\b", RegexOption.IGNORE_CASE)
+            )
         }
     }
 }

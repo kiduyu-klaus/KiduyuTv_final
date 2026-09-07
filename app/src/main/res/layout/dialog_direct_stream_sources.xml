@@ -59,17 +59,20 @@
         android:textColor="@color/text_secondary"
         android:textSize="13sp" />
 
-    <ListView
+    <GridView
         android:id="@+id/listStreams"
         android:layout_width="match_parent"
         android:layout_height="360dp"
         android:layout_marginTop="14dp"
         android:cacheColorHint="@android:color/transparent"
         android:clickable="true"
-        android:divider="@android:color/transparent"
-        android:dividerHeight="8dp"
+        android:columnWidth="280dp"
         android:focusable="true"
+        android:horizontalSpacing="10dp"
         android:nextFocusDown="@id/btnCloseStreams"
+        android:numColumns="2"
+        android:stretchMode="columnWidth"
+        android:verticalSpacing="10dp"
         android:listSelector="@drawable/bg_direct_stream_source_focus" />
 
     <View
