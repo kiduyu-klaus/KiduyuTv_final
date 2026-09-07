@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.Window
 import android.view.WindowManager
+import androidx.activity.ComponentDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -67,7 +68,7 @@ class StreamSelectionDialog(
     streams: List<StreamItem>,
     activeUrl: String?,
     private val onStreamSelected: (StreamItem) -> Unit
-) : Dialog(context) {
+) : ComponentDialog(context) {
 
     private val streamsState = mutableStateOf(streams)
     private val activeUrlState = mutableStateOf(activeUrl)
