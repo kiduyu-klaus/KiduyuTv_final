@@ -61,12 +61,6 @@ class StreamSelectionDialog(
             dismiss()
         }
         list.adapter = streamAdapter
-        list.setOnItemClickListener { _, _, position, _ ->
-            streamAdapter.getItem(position).let {
-                onStreamSelected(it)
-                dismiss()
-            }
-        }
         filterAll.setOnClickListener { applyLanguageFilter(LanguageFilter.ALL) }
         filterEnglish.setOnClickListener { applyLanguageFilter(LanguageFilter.ENGLISH) }
         filterHindi.setOnClickListener { applyLanguageFilter(LanguageFilter.HINDI) }
