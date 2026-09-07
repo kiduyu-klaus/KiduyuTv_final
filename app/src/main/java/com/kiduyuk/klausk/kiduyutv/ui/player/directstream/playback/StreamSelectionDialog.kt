@@ -190,7 +190,7 @@ class StreamSelectionDialog(
                 label.takeIf { pattern.containsMatchIn(searchableText) }
             }
             return languages.joinToString(" • ")
-                .ifBlank { context.getString(R.string.stream_language_unknown) }
+                .ifBlank { "English" }
         }
 
         companion object {

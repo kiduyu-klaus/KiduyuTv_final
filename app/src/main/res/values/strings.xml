@@ -73,7 +73,6 @@
     <string name="stream_choose_hint">Select another playback source</string>
     <string name="stream_source_count">%1$d sources available</string>
     <string name="stream_language_label">Language: %1$s</string>
-    <string name="stream_language_unknown">Unknown</string>
     <string name="stream_playing">PLAYING</string>
     <string name="stream_ok">stream ok</string>
     <string name="stream_checking">checking…</string>
