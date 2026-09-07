@@ -405,7 +405,7 @@ class StreamSelectionDialog(
                         if (active) {
                             Text(
                                 text = "Playing",
-                                color = ComposeColor(0xFF81C784),
+                                color = ComposeColor(0xFFE53935),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold
                             )
