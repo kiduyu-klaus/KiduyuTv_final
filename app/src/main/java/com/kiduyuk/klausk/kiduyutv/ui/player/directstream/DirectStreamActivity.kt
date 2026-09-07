@@ -209,12 +209,10 @@ class DirectStreamActivity : AppCompatActivity() {
             )
             return@registerForActivityResult
         }
-        val savedCookies = result.data?.getStringExtra(CloudflareBypassActivity.EXTRA_COOKIES)
         val domain = result.data?.getStringExtra(CloudflareBypassActivity.EXTRA_DOMAIN)
         Log.i(
             TAG,
-            "CloudflareBypass solved; cookies=${savedCookies?.length ?: 0} chars " +
-                "domain=$domain stream=${stream.provider} ${stream.quality} " +
+            "CloudflareBypass solved; domain=$domain stream=${stream.provider} ${stream.quality} " +
                 "url=${stream.url}"
         )
         Toast.makeText(
@@ -230,24 +228,24 @@ class DirectStreamActivity : AppCompatActivity() {
         val finalUrl = result.data?.getStringExtra(CloudflareBypassActivity.EXTRA_URL)
             ?.takeIf { it.startsWith("http://", ignoreCase = true) || it.startsWith("https://", ignoreCase = true) }
             ?: stream.url
-        val retryHeaders = stream.headers.toMutableMap()
+        var capturedUserAgent: String? = null
         result.data?.getStringExtra(CloudflareBypassActivity.EXTRA_HEADERS)
             ?.takeIf { it.isNotBlank() }
             ?.let { rawHeaders ->
                 runCatching {
                     val json = JSONObject(rawHeaders)
                     json.keys().forEach { key ->
-                        json.optString(key)
-                            .takeIf { it.isNotBlank() }
-                            ?.let { value -> retryHeaders[key] = value }
+                        if (key.equals("User-Agent", ignoreCase = true)) {
+                            capturedUserAgent = json.optString(key).takeIf { it.isNotBlank() }
+                        }
                     }
                 }.onFailure { error ->
                     Log.w(TAG, "Could not parse captured Cloudflare download headers", error)
                 }
             }
-        savedCookies?.takeIf { it.isNotBlank() }?.let {
-            retryHeaders["Cookie"] = it
-        }
+        val retryHeaders = capturedUserAgent
+            ?.let { userAgent -> mapOf("User-Agent" to userAgent) }
+            .orEmpty()
         val retryStream = stream.copy(
             url = finalUrl,
             headers = retryHeaders

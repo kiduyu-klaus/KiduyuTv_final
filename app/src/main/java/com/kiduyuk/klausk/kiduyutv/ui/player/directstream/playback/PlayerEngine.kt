@@ -81,6 +81,18 @@ class PlayerEngine(context: Context) {
     )
 
     private fun playbackHeaders(stream: StreamItem): Map<String, String> {
+        if (
+            stream.provider.equals("DahmerMovies", ignoreCase = true) &&
+            !stream.url.startsWith(DAHMER_MOVIES_BULK_PREFIX, ignoreCase = true)
+        ) {
+            val userAgent = stream.headers.entries
+                .firstOrNull { it.key.equals("User-Agent", ignoreCase = true) }
+                ?.value
+                ?.takeIf { it.isNotBlank() }
+                ?: REAL_BROWSER_USER_AGENT
+            return mapOf("User-Agent" to userAgent)
+        }
+
         val headers = if (stream.provider.equals("DahmerMovies", ignoreCase = true)) {
             // Start with safe browser defaults, then overlay the actual headers
             // captured by the verification WebView. The redirected download can
@@ -735,6 +747,7 @@ class PlayerEngine(context: Context) {
          */
         private const val USER_AGENT = REAL_BROWSER_USER_AGENT
         private const val DAHMER_MOVIES_REFERER = "https://a.111477.xyz/"
+        private const val DAHMER_MOVIES_BULK_PREFIX = "https://p.111477.xyz/bulk?u"
         private const val DAHMER_MOVIES_RAW_PREFIX =
             "https://p.111477.xyz/bulk?u=https://a.111477.xyz"
         private const val DAHMER_MOVIES_ENCODED_PREFIX =

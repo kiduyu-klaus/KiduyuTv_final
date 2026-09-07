@@ -297,6 +297,7 @@ class CloudflareBypassActivity : AppCompatActivity() {
     private var challengeStartedAt: Long = 0L
     private var isSolved: Boolean = false
     private var isDownloadLocked: Boolean = false
+    private var isReturningDownload: Boolean = false
     private var isFinishingForResult: Boolean = false
     private var waitForDownload: Boolean = false
     private var initialRequestHeaders: Map<String, String> = emptyMap()
@@ -836,13 +837,6 @@ class CloudflareBypassActivity : AppCompatActivity() {
         mainHandler.removeCallbacks(pollRunnable)
         mainHandler.removeCallbacks(timeoutRunnable)
 
-        // Force the WebView's internal cookie store to flush to disk so the
-        // cookies survive the activity finishing. flush() is async; the
-        // call returns immediately and the write happens on a background
-        // thread, but the cookies are guaranteed to be persisted before the
-        // process is allowed to exit cleanly.
-        CookieManager.getInstance().flush()
-
         val cookies = captureAllCookiesForTarget().ifBlank {
             CookieManager.getInstance().getCookie(lastMainFrameUrl).orEmpty()
         }
@@ -854,15 +848,14 @@ class CloudflareBypassActivity : AppCompatActivity() {
             },
             isError = false
         )
-        Log.i(TAG, "Persisted Cloudflare cookies for $targetHost (${cookies.length} chars)")
-
-        // Mirror the cookies to SharedPreferences under the target domain.
-        // This is an *additional* persistence layer to the WebView's internal
-        // cookie DB, so the entire cookie set can be re-injected into any other
-        // WebView (e.g. the player) even after a process death.
-        val saved = saveCookies(this, targetHost, cookies, targetUrl)
-        if (!saved) {
-            Log.w(TAG, "Could not mirror cookies to SharedPreferences for $targetHost")
+        if (!waitForDownload) {
+            CookieManager.getInstance().flush()
+            val saved = saveCookies(this, targetHost, cookies, targetUrl)
+            if (!saved) {
+                Log.w(TAG, "Could not mirror cookies to SharedPreferences for $targetHost")
+            }
+        } else {
+            Log.i(TAG, "Download flow verified; keeping cookies in memory only until URL capture")
         }
 
         // DahmerMovies redirects the bulk request to a downloadable media URL
@@ -884,7 +877,7 @@ class CloudflareBypassActivity : AppCompatActivity() {
     }
 
     private fun completeWithDownload(url: String, userAgent: String?, mimeType: String?) {
-        if (isFinishingForResult || isDownloadLocked) {
+        if (isFinishingForResult || isReturningDownload || isDownloadLocked) {
             if (isDownloadLocked) {
                 Log.d(TAG, "Download captured but page is currently LOCKED; ignoring URL=$url")
             }
@@ -896,34 +889,12 @@ class CloudflareBypassActivity : AppCompatActivity() {
         if (scheme !in setOf("http", "https") || host.isNullOrBlank()) return
 
         lastMainFrameUrl = url
-        val cookies = captureAllCookiesForTarget().ifBlank {
-            CookieManager.getInstance().getCookie(url).orEmpty()
-        }
-        if (cookies.isNotBlank()) {
-            CookieManager.getInstance().flush()
-            saveCookies(this, targetHost, cookies, targetUrl)
-        }
-
-        val referer = webView.url
-            ?.takeIf { it.startsWith("http", ignoreCase = true) && it != url }
-            ?: targetUrl
-        val headers = linkedMapOf<String, String>()
-        lastRequestHeaders.forEach { (name, value) ->
-            if (name.isNotBlank() && value.isNotBlank()) headers[name] = value
-        }
-        headers["User-Agent"] = userAgent?.takeIf { it.isNotBlank() }
-            ?: webView.settings.userAgentString
-        if (referer.isNotBlank()) {
-            headers["Referer"] = referer
-            runCatching { Uri.parse(referer) }
-                .getOrNull()
-                ?.let { uri ->
-                    if (!uri.scheme.isNullOrBlank() && !uri.host.isNullOrBlank()) {
-                        headers["Origin"] = "${uri.scheme}://${uri.host}"
-                    }
-                }
-        }
-        if (cookies.isNotBlank()) headers["Cookie"] = cookies
+        val headers = mapOf(
+            "User-Agent" to (
+                userAgent?.takeIf { it.isNotBlank() }
+                    ?: webView.settings.userAgentString
+                )
+        )
 
         Log.i(
             TAG,
@@ -931,7 +902,15 @@ class CloudflareBypassActivity : AppCompatActivity() {
                 "headers=${headers.keys.sorted()}"
         )
         setStatus("✓ Download link captured. Opening player…", isError = false)
-        finishWithOk(cookies, url, headers)
+        isReturningDownload = true
+        clearCookies(this, targetHost)
+        CookieManager.getInstance().removeAllCookies {
+            mainHandler.post {
+                CookieManager.getInstance().flush()
+                Log.i(TAG, "Cleared WebView and saved cookies before returning download URL")
+                finishWithOk("", url, headers)
+            }
+        }
     }
 
     private fun isResolvedDownloadUrl(url: String?): Boolean {
