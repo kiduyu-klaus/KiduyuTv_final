@@ -173,7 +173,9 @@ class HomeViewModel : ViewModel() {
                         WatchHistoryEnricher.enrichAllMissingItems(context)
 
                         // Refresh the watch history after enrichment to get updated items
-                        val enrichedWatchHistory = WatchHistoryEnricher.getEnrichedWatchHistory(context)
+                        val enrichedWatchHistory = WatchHistoryEnricher
+                            .getEnrichedWatchHistory(context)
+                            .sortedByDescending { it.lastWatched }
                         _uiState.value = _uiState.value.copy(continueWatching = enrichedWatchHistory)
                     } catch (e: Exception) {
                         // Log error but don't fail the entire home screen load
@@ -196,7 +198,9 @@ class HomeViewModel : ViewModel() {
                             }
                         }
                         // Refresh the watch history after individual enrichment
-                        val enrichedWatchHistory = WatchHistoryEnricher.getEnrichedWatchHistory(context)
+                        val enrichedWatchHistory = WatchHistoryEnricher
+                            .getEnrichedWatchHistory(context)
+                            .sortedByDescending { it.lastWatched }
                         _uiState.value = _uiState.value.copy(continueWatching = enrichedWatchHistory)
                     } catch (e: Exception) {
                         // Log error but don't fail the entire home screen load

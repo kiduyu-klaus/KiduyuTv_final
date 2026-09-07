@@ -26,13 +26,13 @@ class StreamResolver {
     private val tag = "KiduyuLiteProvider"
 
     private companion object {
-        const val MAX_CONCURRENT_PROVIDER_REQUESTS = 3
+        const val MAX_CONCURRENT_PROVIDER_REQUESTS = 5
     }
 
     /**
      * Returns the combined stream list in provider response order. For series
      * titles, both [season] and [episode] are required and must be > 0.
-     * At most three provider requests are active at once. [onProviderProgress]
+     * At most five provider requests are active at once. [onProviderProgress]
      * is invoked after each provider completes, so its [index] is the number
      * of completed providers. [onProviderRetry] is invoked before retrying a
      * failed or empty request.
