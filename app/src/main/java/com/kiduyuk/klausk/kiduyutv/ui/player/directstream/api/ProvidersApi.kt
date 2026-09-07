@@ -13,6 +13,7 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.net.URL
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 class ProvidersApiHttpException(val statusCode: Int) : IOException("Providers API HTTP $statusCode")
@@ -251,6 +252,7 @@ object ProvidersApi {
                 val s = arr.getJSONObject(i)
                 val url = s.optString("url").takeIf { it.isNotBlank() } ?: continue
                 val provider = s.optString("provider", "")
+                    .ifBlank { json.optString("provider", "") }
                 val type = s.optString("type", "")
                 val isMovieBoxDirect = provider.equals("MovieBox", ignoreCase = true) &&
                     type.equals("direct", ignoreCase = true)
@@ -271,6 +273,13 @@ object ProvidersApi {
                     h.keys().forEach { k -> map[k] = h.optString(k) }
                     map
                 } ?: linkedMapOf()
+                if (provider.lowercase(Locale.ROOT) in PROVIDERS_WITHOUT_SOURCE_HEADERS) {
+                    headers.keys.removeAll { headerName ->
+                        headerName.equals("Origin", ignoreCase = true) ||
+                            headerName.equals("Referer", ignoreCase = true) ||
+                            headerName.equals("Referrer", ignoreCase = true)
+                    }
+                }
                 val cookie = when {
                     s.optJSONObject("cookies") != null -> {
                         val cookies = s.getJSONObject("cookies")
@@ -306,4 +315,12 @@ object ProvidersApi {
     }
 
     private const val HLS_MIME_TYPE = "application/vnd.apple.mpegurl"
+
+    private val PROVIDERS_WITHOUT_SOURCE_HEADERS = setOf(
+        "cinesrc_provider",
+        "uhdmovies",
+        "vegamovies",
+        "vidlove",
+        "webstreamr"
+    )
 }
