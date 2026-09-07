@@ -22,6 +22,7 @@
     <string name="no_streams_dialog_title">No streams found</string>
     <string name="no_streams_dialog_message">No playable streams were found for this media. Would you like to try again or exit the player?</string>
     <string name="no_streams_retry">Retry</string>
+    <string name="no_streams_try_all_providers">Try all providers</string>
     <string name="no_streams_exit">Exit</string>
     <string name="streams_failed">Could not load streams. Select to retry.</string>
     <string name="providers_backend_down_status">The providers backend is unavailable.</string>

@@ -39,6 +39,25 @@ class WebViewStreamSniffer(
         if (url.contains(IGNORED_DEMO_VIDEO, ignoreCase = true)) return
         val headers = requestHeaders(requestValue)
         val cookie = cookieFor(url)
+        // Detect playable media before subtitles. Some provider URLs contain
+        // format-like query parameters in signed tokens; an HLS manifest must
+        // never be handed to Media3 as a WebVTT subtitle.
+        val mediaType = detectMediaType(url)
+        if (mediaType != null) {
+            if (shouldIgnoreStream(url)) return
+            if (!captured.compareAndSet(false, true)) return
+
+            onStreamCaptured(
+                SniffedStream(
+                    url = url,
+                    headers = headers,
+                    cookie = cookie,
+                    type = mediaType.first,
+                    mimeType = mediaType.second
+                )
+            )
+            return
+        }
         detectSubtitleMimeType(url)?.let { mimeType ->
             synchronized(capturedSubtitles) {
                 if (!capturedSubtitles.add(url)) return
@@ -46,19 +65,6 @@ class WebViewStreamSniffer(
             onSubtitleCaptured(SniffedSubtitle(url, headers, cookie, mimeType))
             return
         }
-        val mediaType = detectMediaType(url) ?: return
-        if (shouldIgnoreStream(url)) return
-        if (!captured.compareAndSet(false, true)) return
-
-        onStreamCaptured(
-            SniffedStream(
-                url = url,
-                headers = headers,
-                cookie = cookie,
-                type = mediaType.first,
-                mimeType = mediaType.second
-            )
-        )
     }
 
     private fun requestHeaders(request: WebResourceRequest): Map<String, String> =
@@ -72,6 +78,11 @@ class WebViewStreamSniffer(
 
     private fun detectSubtitleMimeType(url: String): String? {
         val normalized = url.lowercase()
+        // An HLS URL can contain misleading query text in signed parameters;
+        // never classify it as a subtitle request.
+        if (normalized.contains(".m3u8") || normalized.contains("/m3u8-proxy")) {
+            return null
+        }
         val path = normalized.substringBefore('?')
         return when {
             path.endsWith(".vtt") || ".vtt" in normalized || "format=vtt" in normalized ->

@@ -128,6 +128,7 @@ class DirectStreamActivity : AppCompatActivity() {
     private var currentVoteAverage: Double = 0.0
     private var currentReleaseDate: String? = null
     private var currentProvider: StreamProviderChoice = StreamCatalog.default
+    private var configuredDirectProviderIsSet = false
     private var currentImdbId: String? = null
     private var skipData: SkipSegmentsResponse? = null
     private var shownSkipType: SkipSegmentType? = null
@@ -361,6 +362,7 @@ class DirectStreamActivity : AppCompatActivity() {
         } else {
             requestedProviderValue
         }
+        configuredDirectProviderIsSet = configuredProviderIsSet
         currentProvider = StreamCatalog.resolve(providerForPlayback)
         Log.i(
             PROVIDER_TAG,
@@ -555,20 +557,38 @@ class DirectStreamActivity : AppCompatActivity() {
             ?.takeIf { it.isNotBlank() && headers.keys.none { key -> key.equals("Cookie", true) } }
             ?.let { headers["Cookie"] = it }
 
+        val normalizedUrl = url.trim()
+        val isHlsUrl = normalizedUrl.lowercase().let {
+            it.contains(".m3u8") ||
+                it.contains("/m3u8-proxy") ||
+                it.contains("/m3u8_proxy")
+        }
         val stream = StreamItem(
             name = "Web Sniffer",
             title = intent.getStringExtra(EXTRA_TITLE).orEmpty().ifBlank { "Captured WebView stream" },
-            url = url,
+            url = normalizedUrl,
             quality = "Auto",
             provider = "WebSniffer",
-            type = intent.getStringExtra(EXTRA_SNIFFED_TYPE).orEmpty(),
-            mimeType = intent.getStringExtra(EXTRA_SNIFFED_MIME_TYPE).orEmpty(),
+            // The URL is authoritative for sniffed HLS captures. This prevents
+            // a stale/misreported WebView MIME value such as text/vtt from
+            // sending the manifest through the subtitle decoder.
+            type = if (isHlsUrl) "hls" else intent.getStringExtra(EXTRA_SNIFFED_TYPE).orEmpty(),
+            mimeType = if (isHlsUrl) "application/vnd.apple.mpegurl"
+            else intent.getStringExtra(EXTRA_SNIFFED_MIME_TYPE).orEmpty(),
             headers = headers
         )
         availableStreams = listOf(stream)
         activeStream = stream
         showStatus(getString(R.string.buffering), retry = false)
-        activeSubtitles = parseSniffedSubtitles()
+        activeSubtitles = parseSniffedSubtitles().filterNot { subtitle ->
+            val subtitleUrl = subtitle.url.trim()
+            subtitleUrl.equals(normalizedUrl, ignoreCase = true) ||
+                subtitleUrl.lowercase().let {
+                    it.contains(".m3u8") ||
+                        it.contains("/m3u8-proxy") ||
+                        it.contains("/m3u8_proxy")
+                }
+        }
         // A non-zero seek while Media3 is still resolving a sniffed video's
         // external subtitle timelines can trigger ERROR_CODE_FAILED_RUNTIME_CHECK.
         // Prepare the merged source first, then restore progress at STATE_READY.
@@ -1506,12 +1526,20 @@ class DirectStreamActivity : AppCompatActivity() {
     private fun showNoStreamsDialog() {
         if (isFinishing || isDestroyed || noStreamsDialog?.isShowing == true) return
 
+        val retryLabel = if (configuredDirectProviderIsSet) {
+            R.string.no_streams_try_all_providers
+        } else {
+            R.string.no_streams_retry
+        }
         val dialog = AlertDialog.Builder(this)
             .setTitle(R.string.no_streams_dialog_title)
             .setMessage(R.string.no_streams_dialog_message)
             .setCancelable(false)
-            .setPositiveButton(R.string.no_streams_retry) { currentDialog, _ ->
+            .setPositiveButton(retryLabel) { currentDialog, _ ->
                 currentDialog.dismiss()
+                if (configuredDirectProviderIsSet) {
+                    currentProvider = StreamCatalog.default
+                }
                 loadCurrentMedia()
             }
             .setNegativeButton(R.string.no_streams_exit) { currentDialog, _ ->
