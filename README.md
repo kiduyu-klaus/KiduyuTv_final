@@ -210,7 +210,7 @@ The application follows an MVVM-style structure:
 | Web content | Android WebView, AndroidX WebKit, Jsoup |
 | Cloud | Firebase Auth, Analytics, Realtime Database, Firestore, Messaging |
 | Integrations | TMDB, Trakt, SubDL |
-| Advertising | StartApp, AdMob, Wortise, Unity, UMP |
+| Advertising | AdMob with Meta Audience Network bidding, Start.io, Wortise, Unity, UMP |
 | Android | minSdk 24, targetSdk 35, compileSdk 35, Java 17 |
 
 ## Project map

@@ -119,6 +119,23 @@ object AdManager {
             val statuses = initStatus.adapterStatusMap.entries
                 .joinToString { "${it.key}: ${it.value.initializationState}" }
             Log.i(TAG, "MobileAds initialised — $statuses")
+            val metaStatus = initStatus.adapterStatusMap.entries.firstOrNull { entry ->
+                entry.key.contains("facebook", ignoreCase = true) ||
+                    entry.key.contains("audience", ignoreCase = true)
+            }
+            if (metaStatus == null) {
+                Log.w(
+                    TAG,
+                    "Meta Audience Network adapter was not reported by Mobile Ads; " +
+                        "check the adapter dependency and AdMob mediation configuration"
+                )
+            } else {
+                Log.i(
+                    TAG,
+                    "Meta Audience Network adapter: ${metaStatus.value.initializationState} " +
+                        "(${metaStatus.value.description})"
+                )
+            }
             // Pre-load interstitial immediately after init
             preloadInterstitial(context)
             if (BuildConfig.FLAVOR == "phone") {
@@ -214,6 +231,7 @@ object AdManager {
             override fun onAdFailedToLoad(error: LoadAdError) {
                 interstitialAd = null
                 Log.w(TAG, "Interstitial failed to load: ${error.message}")
+                logMetaMediationFailure("interstitial", error)
             }
         })
     }
@@ -295,6 +313,7 @@ object AdManager {
                 override fun onAdFailedToLoad(error: LoadAdError) {
                     rewardedAd = null
                     Log.w(TAG, "Rewarded ad failed: ${error.message}")
+                    logMetaMediationFailure("rewarded", error)
                 }
             })
     }
@@ -390,6 +409,7 @@ object AdManager {
                     rewardedInterstitialAd = null
                     isRewardedInterstitialLoading = false
                     Log.w(TAG, "Rewarded interstitial failed to load: ${error.message}")
+                    logMetaMediationFailure("rewarded interstitial", error)
                 }
             }
         )
@@ -481,6 +501,7 @@ object AdManager {
                     appOpenAd = null
                     isAppOpenLoading = false
                     Log.w(TAG, "App open ad failed to load: ${error.message}")
+                    logMetaMediationFailure("app open", error)
                 }
             }
         )
@@ -589,6 +610,7 @@ object AdManager {
                 object : AdListener() {
                     override fun onAdFailedToLoad(error: LoadAdError) {
                         Log.w(TAG, "Native ad failed to load: ${error.message}")
+                        logMetaMediationFailure("native", error)
                         onFailed(error)
                     }
 
@@ -604,6 +626,23 @@ object AdManager {
             .build()
 
         adLoader.loadAd(AdRequest.Builder().build())
+    }
+
+    /** Logs Meta's underlying mediation error without exposing request identifiers. */
+    fun logMetaMediationFailure(format: String, error: LoadAdError) {
+        val metaResponses = error.responseInfo?.adapterResponses.orEmpty().filter { response ->
+            response.adapterClassName.contains("facebook", ignoreCase = true) ||
+                response.adapterClassName.contains("audience", ignoreCase = true)
+        }
+        metaResponses.forEach { response ->
+            val adapterError = response.adError
+            Log.w(
+                TAG,
+                "Meta $format response: adapter=${response.adapterClassName}, " +
+                    "latencyMs=${response.latencyMillis}, error=${adapterError?.code}, " +
+                    "message=${adapterError?.message ?: "none"}"
+            )
+        }
     }
 
     // ── Banner (AdMob) ────────────────────────────────────────────────────
@@ -641,4 +680,3 @@ object AdManager {
         doLoad()
     }
 }
-

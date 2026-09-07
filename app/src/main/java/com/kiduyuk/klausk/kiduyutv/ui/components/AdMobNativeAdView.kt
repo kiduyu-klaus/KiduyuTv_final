@@ -96,7 +96,15 @@ private fun populateNativeAdView(nativeAd: NativeAd, nativeAdView: NativeAdView)
     nativeAdView.advertiserView = advertiserView
 
     headlineView.text = nativeAd.headline
-    nativeAd.mediaContent?.let { mediaView.setMediaContent(it) }
+    val mediaContent = nativeAd.mediaContent
+    if (mediaContent == null) {
+        // Meta Native Banner placements do not provide a MediaView asset. The
+        // registered app icon below is their required impression asset.
+        mediaView.visibility = View.GONE
+    } else {
+        mediaView.visibility = View.VISIBLE
+        mediaView.setMediaContent(mediaContent)
+    }
 
     setTextAsset(bodyView, nativeAd.body)
     setTextAsset(callToActionView, nativeAd.callToAction)
@@ -118,7 +126,7 @@ private fun populateNativeAdView(nativeAd: NativeAd, nativeAdView: NativeAdView)
         starRatingView.visibility = View.VISIBLE
     }
 
-    nativeAd.mediaContent?.videoController?.videoLifecycleCallbacks =
+    mediaContent?.videoController?.videoLifecycleCallbacks =
         object : com.google.android.gms.ads.VideoController.VideoLifecycleCallbacks() {
             override fun onVideoEnd() {
                 super.onVideoEnd()

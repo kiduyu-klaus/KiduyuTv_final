@@ -65,6 +65,7 @@ fun BannerAdView(modifier: Modifier = Modifier) {
 
                 override fun onAdFailedToLoad(error: LoadAdError) {
                     Log.w(TAG, "Phone banner ad failed to load: ${error.message}")
+                    AdManager.logMetaMediationFailure("phone banner", error)
                     val container = containerRef.value
                     if (activity != null && container != null) {
                         Log.i(TAG, "Loading Unity phone banner fallback")

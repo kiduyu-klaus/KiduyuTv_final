@@ -270,6 +270,9 @@ dependencies {
     // Ads
     // ─────────────────────────────────────────────
     implementation 'com.google.android.gms:play-services-ads:24.6.0'
+    // Meta Audience Network is bidding-only. This adapter version is the
+    // release verified against Google Mobile Ads 24.6.0 and FAN SDK 6.20.0.
+    implementation 'com.google.ads.mediation:facebook:6.20.0.1'
 
     // ── Consent SDK (both flavours, required for EEA users) ───────────────
     implementation 'com.google.android.ump:user-messaging-platform:3.2.0'
