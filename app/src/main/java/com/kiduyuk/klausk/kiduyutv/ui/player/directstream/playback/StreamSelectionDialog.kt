@@ -183,6 +183,18 @@ class StreamSelectionDialog(
             view.isFocusable = true
             view.isClickable = true
             view.setOnClickListener { onStreamClick(stream) }
+            view.setOnKeyListener { _, keyCode, event ->
+                if (event.action == android.view.KeyEvent.ACTION_DOWN &&
+                    (keyCode == android.view.KeyEvent.KEYCODE_DPAD_CENTER ||
+                        keyCode == android.view.KeyEvent.KEYCODE_ENTER ||
+                        keyCode == android.view.KeyEvent.KEYCODE_NUMPAD_ENTER)
+                ) {
+                    onStreamClick(stream)
+                    true
+                } else {
+                    false
+                }
+            }
 
             // Render the validation status badge. We only show "stream ok"
             // when the upstream probe reported 2xx with valid video stream
