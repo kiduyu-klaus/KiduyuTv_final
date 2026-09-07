@@ -28,7 +28,11 @@ class StreamSelectionDialog(
     private val list: GridView
     private val close: TextView
     private val streamCount: TextView
+    private val filterAll: TextView
+    private val filterEnglish: TextView
+    private val filterHindi: TextView
     private val streamAdapter: StreamAdapter
+    private var selectedLanguage = LanguageFilter.ALL
 
     init {
         requestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -45,17 +49,25 @@ class StreamSelectionDialog(
         list = view.findViewById(R.id.listStreams)
         close = view.findViewById(R.id.btnCloseStreams)
         streamCount = view.findViewById(R.id.tvStreamCount)
-        streamCount.text =
-            context.getString(R.string.stream_source_count, streams.size)
-        streamAdapter = StreamAdapter(context, streams, activeUrl)
+        filterAll = view.findViewById(R.id.btnStreamFilterAll)
+        filterEnglish = view.findViewById(R.id.btnStreamFilterEnglish)
+        filterHindi = view.findViewById(R.id.btnStreamFilterHindi)
+        streamAdapter = StreamAdapter(context, streams, activeUrl) { stream ->
+            onStreamSelected(stream)
+            dismiss()
+        }
         list.adapter = streamAdapter
         list.setOnItemClickListener { _, _, position, _ ->
-            streams.getOrNull(position)?.let {
+            streamAdapter.getItem(position).let {
                 onStreamSelected(it)
                 dismiss()
             }
         }
+        filterAll.setOnClickListener { applyLanguageFilter(LanguageFilter.ALL) }
+        filterEnglish.setOnClickListener { applyLanguageFilter(LanguageFilter.ENGLISH) }
+        filterHindi.setOnClickListener { applyLanguageFilter(LanguageFilter.HINDI) }
         close.setOnClickListener { dismiss() }
+        applyLanguageFilter(LanguageFilter.ALL)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -81,7 +93,7 @@ class StreamSelectionDialog(
             WindowManager.LayoutParams.WRAP_CONTENT
         )
 
-        val activeIndex = streams.indexOfFirst { it.url == activeUrl }.coerceAtLeast(0)
+        val activeIndex = streamAdapter.indexOfUrl(activeUrl).coerceAtLeast(0)
         list.setSelection(activeIndex)
         list.requestFocus()
     }
@@ -101,14 +113,31 @@ class StreamSelectionDialog(
     fun updateStreams(updated: List<StreamItem>) {
         if (!isShowing) return
         streams = updated
-        streamCount.text = context.getString(R.string.stream_source_count, updated.size)
-        streamAdapter.replace(updated, activeUrl)
+        applyLanguageFilter(selectedLanguage)
+    }
+
+    private fun applyLanguageFilter(filter: LanguageFilter) {
+        selectedLanguage = filter
+        val filteredStreams = streams.filter { stream ->
+            when (filter) {
+                LanguageFilter.ALL -> true
+                LanguageFilter.ENGLISH -> detectLanguages(stream).contains("English")
+                LanguageFilter.HINDI -> detectLanguages(stream).contains("Hindi")
+            }
+        }
+        streamAdapter.replace(filteredStreams, activeUrl)
+        streamCount.text = context.getString(R.string.stream_source_count, filteredStreams.size)
+        filterAll.isSelected = filter == LanguageFilter.ALL
+        filterEnglish.isSelected = filter == LanguageFilter.ENGLISH
+        filterHindi.isSelected = filter == LanguageFilter.HINDI
+        list.setSelection(streamAdapter.indexOfUrl(activeUrl).coerceAtLeast(0))
     }
 
     private class StreamAdapter(
         private val context: Context,
         private var streams: List<StreamItem>,
-        private var activeUrl: String?
+        private var activeUrl: String?,
+        private val onStreamClick: (StreamItem) -> Unit
     ) : BaseAdapter() {
         override fun getCount(): Int = streams.size
         override fun getItem(position: Int): StreamItem = streams[position]
@@ -119,6 +148,8 @@ class StreamSelectionDialog(
             activeUrl = newActiveUrl
             notifyDataSetChanged()
         }
+
+        fun indexOfUrl(url: String?): Int = streams.indexOfFirst { it.url == url }
 
         override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
             val stream = getItem(position)
@@ -143,12 +174,15 @@ class StreamSelectionDialog(
             view.findViewById<TextView>(R.id.streamSourceLanguage).text =
                 context.getString(
                     R.string.stream_language_label,
-                    detectLanguages(stream)
+                    detectLanguages(stream).joinToString(" • ")
                 )
             val active = stream.url == activeUrl
             view.findViewById<View>(R.id.streamSourceActive).visibility =
                 if (active) View.VISIBLE else View.GONE
             view.isActivated = active
+            view.isFocusable = true
+            view.isClickable = true
+            view.setOnClickListener { onStreamClick(stream) }
 
             // Render the validation status badge. We only show "stream ok"
             // when the upstream probe reported 2xx with valid video stream
@@ -184,22 +218,23 @@ class StreamSelectionDialog(
             return view
         }
 
-        private fun detectLanguages(stream: StreamItem): String {
-            val searchableText = "${stream.name} ${stream.title}"
-            val languages = LANGUAGE_PATTERNS.mapNotNull { (label, pattern) ->
-                label.takeIf { pattern.containsMatchIn(searchableText) }
-            }
-            return languages.joinToString(" • ")
-                .ifBlank { "English" }
-        }
+    }
 
-        companion object {
-            private val LANGUAGE_PATTERNS = listOf(
-                "English" to Regex("\\benglish\\b", RegexOption.IGNORE_CASE),
-                "Hindi" to Regex("\\bhindi\\b", RegexOption.IGNORE_CASE),
-                "Telugu" to Regex("\\btelugu\\b", RegexOption.IGNORE_CASE),
-                "Tamil" to Regex("\\btamil\\b", RegexOption.IGNORE_CASE)
-            )
+    private enum class LanguageFilter { ALL, ENGLISH, HINDI }
+
+    companion object {
+        private val LANGUAGE_PATTERNS = listOf(
+            "English" to Regex("\\benglish\\b", RegexOption.IGNORE_CASE),
+            "Hindi" to Regex("\\bhindi\\b", RegexOption.IGNORE_CASE),
+            "Telugu" to Regex("\\btelugu\\b", RegexOption.IGNORE_CASE),
+            "Tamil" to Regex("\\btamil\\b", RegexOption.IGNORE_CASE)
+        )
+
+        private fun detectLanguages(stream: StreamItem): List<String> {
+            val searchableText = "${stream.name} ${stream.title}"
+            return LANGUAGE_PATTERNS.mapNotNull { (label, pattern) ->
+                label.takeIf { pattern.containsMatchIn(searchableText) }
+            }.ifEmpty { listOf("English") }
         }
     }
 }
