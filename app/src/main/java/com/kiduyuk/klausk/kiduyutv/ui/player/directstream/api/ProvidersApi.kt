@@ -317,8 +317,8 @@ object ProvidersApi {
     private const val HLS_MIME_TYPE = "application/vnd.apple.mpegurl"
 
     private val PROVIDERS_WITHOUT_SOURCE_HEADERS = setOf(
-        "cinesrc_provider",
-        "uhdmovies",
+        // "cinesrc_provider",
+        // "uhdmovies",
         "vegamovies",
         "vidlove",
         "webstreamr"
