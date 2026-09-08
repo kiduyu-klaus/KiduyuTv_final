@@ -5,7 +5,6 @@ import android.app.ProgressDialog
 import android.app.UiModeManager
 import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.net.Uri
@@ -33,6 +32,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import java.util.concurrent.ConcurrentHashMap
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.AdBlockerWebViewClient
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.MouseCursorView
@@ -147,77 +147,53 @@ class CloudflareBypassActivity : AppCompatActivity() {
         /** Secondary cookie sometimes set immediately on first visit. */
         const val CF_BM_COOKIE = "__cf_bm"
 
-        // ── SharedPreferences persistence ────────────────────────────────────
-        /** Name of the SharedPreferences file that stores captured cookies. */
-        const val PREFS_NAME = "cf_cookies"
+        // ── Process-local cookie storage ─────────────────────────────────────
+        // Cookies are intentionally never persisted to disk or SharedPreferences.
+        private data class SessionCookie(
+            val value: String,
+            val capturedAt: Long,
+            val originalUrl: String
+        )
 
-        /** Suffix used to store the capture timestamp for a domain. */
-        const val KEY_TS_SUFFIX = "_ts"
-
-        /** Suffix used to store the original URL for a domain. */
-        const val KEY_URL_SUFFIX = "_url"
+        private val sessionCookies = ConcurrentHashMap<String, SessionCookie>()
 
         /**
-         * Persists the raw `Cookie:` header string for [domain] to
-         * SharedPreferences so the cookies survive the process and can be
-         * re-injected into any future WebView.
+         * Keeps the raw `Cookie:` header string for [domain] in memory for
+         * the current process so it can be re-injected into a WebView or native
+         * playback request without writing it to disk.
          *
          * @return true if the write succeeded.
          */
         @JvmStatic
         fun saveCookies(context: Context, domain: String, cookies: String, originalUrl: String): Boolean {
             if (domain.isBlank() || cookies.isBlank()) return false
-            return try {
-                val prefs = context.applicationContext
-                    .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                prefs.edit()
-                    .putString(domain, cookies)
-                    .putLong("$domain$KEY_TS_SUFFIX", System.currentTimeMillis())
-                    .putString("$domain$KEY_URL_SUFFIX", originalUrl)
-                    .apply()
-                Log.i(TAG, "Saved ${cookies.length}-char cookie blob to prefs for domain=$domain")
-                true
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to save cookies for $domain: ${e.message}")
-                false
-            }
+            sessionCookies[domain.lowercase()] = SessionCookie(
+                value = cookies,
+                capturedAt = System.currentTimeMillis(),
+                originalUrl = originalUrl
+            )
+            Log.i(TAG, "Stored ${cookies.length}-char cookie blob in memory for domain=$domain")
+            return true
         }
 
         /**
-         * Retrieves the previously saved cookie blob for [domain], or null if
+         * Retrieves the current-process cookie blob for [domain], or null if
          * nothing is stored (or the stored value is empty).
          */
         @JvmStatic
-        fun loadCookies(context: Context, domain: String): String? {
-            if (domain.isBlank()) return null
-            return try {
-                val prefs = context.applicationContext
-                    .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                prefs.getString(domain, null)?.takeIf { it.isNotBlank() }
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to load cookies for $domain: ${e.message}")
-                null
-            }
-        }
+        fun loadCookies(context: Context, domain: String): String? =
+            sessionCookies[domain.lowercase()]?.value?.takeIf { it.isNotBlank() }
 
         /**
          * @return the epoch-ms timestamp at which [domain]'s cookies were
          * captured, or 0 if unknown / never captured.
          */
         @JvmStatic
-        fun loadCookiesTimestamp(context: Context, domain: String): Long {
-            if (domain.isBlank()) return 0L
-            return try {
-                val prefs = context.applicationContext
-                    .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                prefs.getLong("$domain$KEY_TS_SUFFIX", 0L)
-            } catch (e: Exception) {
-                0L
-            }
-        }
+        fun loadCookiesTimestamp(context: Context, domain: String): Long =
+            sessionCookies[domain.lowercase()]?.capturedAt ?: 0L
 
         /**
-         * Re-injects cookies previously stored by [saveCookies] into the
+         * Re-injects cookies stored by [saveCookies] in the current process into the
          * platform [CookieManager] so a WebView loading a request right now
          * can use them immediately. Each cookie pair in the blob is set
          * individually; values are URL-encoded if necessary.
@@ -246,35 +222,19 @@ class CloudflareBypassActivity : AppCompatActivity() {
             return count
         }
 
-        /** Removes the stored cookies for [domain] only. */
+        /** Removes the in-memory cookies for [domain] only. */
         @JvmStatic
         fun clearCookies(context: Context, domain: String) {
             if (domain.isBlank()) return
-            try {
-                val prefs = context.applicationContext
-                    .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                prefs.edit()
-                    .remove(domain)
-                    .remove("$domain$KEY_TS_SUFFIX")
-                    .remove("$domain$KEY_URL_SUFFIX")
-                    .apply()
-                Log.i(TAG, "Cleared saved cookies for domain=$domain")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to clear cookies for $domain: ${e.message}")
-            }
+            sessionCookies.remove(domain.lowercase())
+            Log.i(TAG, "Cleared in-memory cookies for domain=$domain")
         }
 
-        /** Removes every captured cookie in the file. */
+        /** Removes every captured in-memory cookie. */
         @JvmStatic
         fun clearAllCookies(context: Context) {
-            try {
-                val prefs = context.applicationContext
-                    .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                prefs.edit().clear().apply()
-                Log.i(TAG, "Cleared all saved Cloudflare cookies")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to clear all cookies: ${e.message}")
-            }
+            sessionCookies.clear()
+            Log.i(TAG, "Cleared all in-memory Cloudflare cookies")
         }
     }
 
@@ -832,7 +792,7 @@ class CloudflareBypassActivity : AppCompatActivity() {
         if (isSolved) return
         isSolved = true
         val elapsed = System.currentTimeMillis() - challengeStartedAt
-        Log.i(TAG, "Challenge solved in ${elapsed}ms — persisting cookies")
+        Log.i(TAG, "Challenge solved in ${elapsed}ms — keeping cookies for the current session")
 
         mainHandler.removeCallbacks(pollRunnable)
         mainHandler.removeCallbacks(timeoutRunnable)
@@ -848,12 +808,11 @@ class CloudflareBypassActivity : AppCompatActivity() {
             },
             isError = false
         )
+        // Keep the solved cookie in memory and return it to the caller, but do
+        // not persist it to SharedPreferences or other on-disk storage.
         if (!waitForDownload) {
             CookieManager.getInstance().flush()
-            val saved = saveCookies(this, targetHost, cookies, targetUrl)
-            if (!saved) {
-                Log.w(TAG, "Could not mirror cookies to SharedPreferences for $targetHost")
-            }
+            saveCookies(this, targetHost, cookies, targetUrl)
         } else {
             Log.i(TAG, "Download flow verified; keeping cookies in memory only until URL capture")
         }
@@ -889,12 +848,29 @@ class CloudflareBypassActivity : AppCompatActivity() {
         if (scheme !in setOf("http", "https") || host.isNullOrBlank()) return
 
         lastMainFrameUrl = url
-        val headers = mapOf(
-            "User-Agent" to (
-                userAgent?.takeIf { it.isNotBlank() }
-                    ?: webView.settings.userAgentString
-                )
-        )
+        val cookies = captureAllCookiesForTarget().ifBlank {
+            CookieManager.getInstance().getCookie(url).orEmpty()
+        }
+        val referer = webView.url
+            ?.takeIf { it.startsWith("http", ignoreCase = true) && it != url }
+            ?: targetUrl
+        val headers = linkedMapOf<String, String>()
+        lastRequestHeaders.forEach { (name, value) ->
+            if (name.isNotBlank() && value.isNotBlank()) headers[name] = value
+        }
+        headers["User-Agent"] = userAgent?.takeIf { it.isNotBlank() }
+            ?: webView.settings.userAgentString
+        if (referer.isNotBlank()) {
+            headers["Referer"] = referer
+            runCatching { Uri.parse(referer) }
+                .getOrNull()
+                ?.let { uri ->
+                    if (!uri.scheme.isNullOrBlank() && !uri.host.isNullOrBlank()) {
+                        headers["Origin"] = "${uri.scheme}://${uri.host}"
+                    }
+                }
+        }
+        if (cookies.isNotBlank()) headers["Cookie"] = cookies
 
         Log.i(
             TAG,
@@ -903,14 +879,12 @@ class CloudflareBypassActivity : AppCompatActivity() {
         )
         setStatus("✓ Download link captured. Opening player…", isError = false)
         isReturningDownload = true
-        clearCookies(this, targetHost)
-        CookieManager.getInstance().removeAllCookies {
-            mainHandler.post {
-                CookieManager.getInstance().flush()
-                Log.i(TAG, "Cleared WebView and saved cookies before returning download URL")
-                finishWithOk("", url, headers)
-            }
-        }
+        // Preserve the solved WebView cookies and the captured Referer/Origin
+        // for the native player. They are returned in-memory only and are not
+        // persisted to SharedPreferences.
+        CookieManager.getInstance().flush()
+        saveCookies(this, targetHost, cookies, targetUrl)
+        finishWithOk(cookies, url, headers)
     }
 
     private fun isResolvedDownloadUrl(url: String?): Boolean {
