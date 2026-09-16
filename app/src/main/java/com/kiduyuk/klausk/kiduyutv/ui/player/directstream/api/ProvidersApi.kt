@@ -295,6 +295,19 @@ object ProvidersApi {
                 if (cookie.isNotBlank() && headers.keys.none { it.equals("Cookie", true) }) {
                     headers["Cookie"] = cookie
                 }
+                if (
+                    provider.equals("moviebox", ignoreCase = true) &&
+                    headers.none { (name, value) ->
+                        name.equals("Cookie", ignoreCase = true) && value.isNotBlank()
+                    }
+                ) {
+                    Log.w(
+                        TAG,
+                        "Dropping MovieBox stream without a Cookie header " +
+                            "quality=${s.optString("quality", "?")}"
+                    )
+                    continue
+                }
                 val subtitles = parseSubtitles(
                     s.optJSONArray("subtitles") ?: s.optJSONArray("captions")
                 )
