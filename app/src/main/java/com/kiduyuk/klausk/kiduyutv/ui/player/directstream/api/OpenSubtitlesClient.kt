@@ -158,7 +158,10 @@ class OpenSubtitlesClient(
                     .firstOrNull { it.optLong("file_id", 0L) > 0L }
                     ?: continue
                 val fileName = file.optString("file_name").trim().takeIf { it.isNotBlank() }
-                if (fileName != null && !isSupportedSubtitle(fileName)) continue
+                // OpenSubtitles file_name values are often release-style
+                // names such as "Show.S01E01.720p.WEB-DL" and may contain
+                // several dots without a real extension. Trust the file_id;
+                // the downloaded bytes are validated and typed later.
                 val feature = attributes.optJSONObject("feature_details")
                 add(
                     OpenSubtitlesResult(
