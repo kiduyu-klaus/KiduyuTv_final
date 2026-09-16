@@ -147,6 +147,9 @@ tasks.matching {
 // tasks have completed so the Finish dialog offers a checked Open KiduyuTV action.
 def jpackageResourcesDir = layout.buildDirectory.dir('compose/tmp/resources')
 def customWixTemplate = file('packaging/main.wxs')
+def customWixArtwork = ['kiduyutv-banner.bmp', 'kiduyutv-dialog.bmp'].collectEntries { artworkName ->
+    [(artworkName): file("packaging/${artworkName}")]
+}
 tasks.matching { it.name == 'packageMsi' || it.name == 'packageExe' }.configureEach {
     doFirst {
         File jpackageResources = jpackageResourcesDir.get().asFile
@@ -156,9 +159,9 @@ tasks.matching { it.name == 'packageMsi' || it.name == 'packageExe' }.configureE
             new File(jpackageResources, 'main.wxs').toPath(),
             java.nio.file.StandardCopyOption.REPLACE_EXISTING
         )
-        ['kiduyutv-banner.bmp', 'kiduyutv-dialog.bmp'].each { artworkName ->
+        customWixArtwork.each { artworkName, artworkFile ->
             java.nio.file.Files.copy(
-                project.file("packaging/${artworkName}").toPath(),
+                artworkFile.toPath(),
                 new File(jpackageResources, artworkName).toPath(),
                 java.nio.file.StandardCopyOption.REPLACE_EXISTING
             )
