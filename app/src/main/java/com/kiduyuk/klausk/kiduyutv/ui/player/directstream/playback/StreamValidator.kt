@@ -78,12 +78,21 @@ object StreamValidator {
                         }
                     }.awaitAll()
                 }
+
+                streams.filter { it.httpStatusCode == 404 }.forEach { stream ->
+                    Log.i(
+                        TAG,
+                        "Removing stream after HTTP 404 " +
+                            "provider=${stream.provider.ifBlank { "?" }} " +
+                            "quality=${stream.quality} url=${stream.url}"
+                    )
+                }
             } catch (error: Throwable) {
                 Log.w(TAG, "validateAll failed: ${error.message}")
             } finally {
                 streams.forEach { it.isChecking = false }
             }
-            streams
+            streams.filterNot { it.httpStatusCode == 404 }
         }
 
     /**
