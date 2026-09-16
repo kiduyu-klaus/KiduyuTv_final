@@ -23,7 +23,6 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
-import androidx.media3.exoplayer.source.SingleSampleMediaSource
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamItem
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.SubtitleItem
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.HttpCookieStore
@@ -224,7 +223,10 @@ class PlayerEngine(context: Context) {
         //
         // Header-free subtitles cover SubDL's downloaded cache files and can
         // use the supported factory path. Keep the manual merge below for
-        // sniffed remote subtitle tracks that require per-track headers.
+        // remote subtitle tracks that require per-track headers, but build
+        // those tracks with ProgressiveMediaSource. SingleSampleMediaSource
+        // uses Media3's removed legacy subtitle-decoder path and crashes on
+        // valid application/x-subrip samples in Media3 1.4+.
         if (validSubtitles.isNotEmpty() && validSubtitles.all { it.headers.isEmpty() }) {
             val subtitleConfigurations = validSubtitles.mapIndexed { index, subtitle ->
                 MediaItem.SubtitleConfiguration.Builder(Uri.parse(subtitle.url))
@@ -258,7 +260,7 @@ class PlayerEngine(context: Context) {
         }
         if (validSubtitles.isEmpty()) return videoSource
 
-        val subtitleSources = validSubtitles.mapIndexed { index, subtitle ->
+        val subtitleSources = validSubtitles.map { subtitle ->
             val subtitleUri = Uri.parse(subtitle.url)
             val subtitleDataSource = if (
                 subtitleUri.scheme.equals("http", ignoreCase = true) ||
@@ -272,16 +274,12 @@ class PlayerEngine(context: Context) {
             } else {
                 DefaultDataSource.Factory(appContext)
             }
-            val configuration = MediaItem.SubtitleConfiguration.Builder(subtitleUri)
+            val subtitleMediaItem = MediaItem.Builder()
+                .setUri(subtitleUri)
                 .setMimeType(subtitle.mimeType)
-                .apply {
-                    subtitle.language?.let { setLanguage(it) }
-                    subtitle.label?.let { setLabel(it) }
-                    if (index == 0) setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
-                }
                 .build()
-            SingleSampleMediaSource.Factory(subtitleDataSource)
-                .createMediaSource(configuration, C.TIME_UNSET)
+            ProgressiveMediaSource.Factory(subtitleDataSource)
+                .createMediaSource(subtitleMediaItem)
         }
         return MergingMediaSource(videoSource, *subtitleSources.toTypedArray())
     }

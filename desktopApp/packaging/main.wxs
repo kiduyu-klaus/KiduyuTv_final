@@ -96,6 +96,10 @@
     <Icon Id="JpARPPRODUCTICON" SourceFile="$(var.JpIcon)"/>
     <?endif?>
 
+    <!-- Branded WiX UI artwork. These replace the stock red setup bitmap. -->
+    <WixVariable Id="WixUIBannerBmp" Value="$(var.JpConfigDir)/kiduyutv-banner.bmp" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(var.JpConfigDir)/kiduyutv-dialog.bmp" />
+
     <!-- Show a checked launch option on the final installer dialog. -->
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Open KiduyuTV" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />

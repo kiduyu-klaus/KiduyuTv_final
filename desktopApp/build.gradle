@@ -156,6 +156,13 @@ tasks.matching { it.name == 'packageMsi' || it.name == 'packageExe' }.configureE
             new File(jpackageResources, 'main.wxs').toPath(),
             java.nio.file.StandardCopyOption.REPLACE_EXISTING
         )
+        ['kiduyutv-banner.bmp', 'kiduyutv-dialog.bmp'].each { artworkName ->
+            java.nio.file.Files.copy(
+                project.file("packaging/${artworkName}").toPath(),
+                new File(jpackageResources, artworkName).toPath(),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING
+            )
+        }
     }
 }
 
