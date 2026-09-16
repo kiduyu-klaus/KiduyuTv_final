@@ -181,23 +181,72 @@ object StreamValidator {
             ?.trim()
             ?.lowercase()
             ?: ""
-        val isVideoMime = contentType.startsWith("video/") ||
-            contentType == "application/x-mpegurl" ||
-            contentType == "application/vnd.apple.mpegurl" ||
-            contentType == "application/x-mpeg-url"
+
+        val isVideoMime = contentType in setOf(
+            // Standard video MIME types
+            "video/mp4",
+            "video/mpeg",
+            "video/webm",
+            "video/ogg",
+            "video/x-matroska",
+            "video/x-msvideo",
+            "video/x-ms-wmv",
+            "video/quicktime",
+            "video/x-flv",
+            "video/x-m4v",
+            "video/3gpp",
+            "video/3gpp2",
+            "video/mp2t",
+            "video/h264",
+            "video/h265",
+            "video/hevc",
+            "video/av1",
+
+            // HLS
+            "application/vnd.apple.mpegurl",
+            "application/x-mpegurl",
+            "application/x-mpeg-url",
+
+            // DASH
+            "application/dash+xml",
+
+            // Common generic media/container types
+            "application/octet-stream",
+            "application/mp4",
+            "application/matroska",
+            "application/x-matroska",
+            "application/x-tar"
+        ) || contentType.startsWith("video/")
+
         if (isVideoMime) return true
 
-        // Accept-Ranges: bytes signals a seekable binary stream even when
-        // Content-Type is absent or generic (e.g. application/octet-stream).
+        // Some servers return a generic Content-Type for a valid media file.
         val acceptRanges = response.header("Accept-Ranges", "")
             ?.trim()
             ?.lowercase()
             ?: ""
+
         if (acceptRanges == "bytes") return true
 
-        // Non-empty body is a positive signal for progressive streams.
-        val contentLength = response.header("Content-Length", "0")?.trim()?.toLongOrNull() ?: 0L
-        if (contentLength > 0L) return true
+        // A positive Content-Length is useful for progressive media, but do
+        // not treat it as sufficient by itself for clearly text/HTML/JSON.
+        val contentLength = response.header("Content-Length")
+            ?.trim()
+            ?.toLongOrNull()
+            ?: 0L
+
+        val clearlyNonMedia = contentType in setOf(
+            "text/html",
+            "text/plain",
+            "application/json",
+            "application/xml",
+            "text/xml",
+            "text/css",
+            "application/javascript",
+            "text/javascript"
+        )
+
+        if (contentLength > 0L && !clearlyNonMedia) return true
 
         return false
     }
