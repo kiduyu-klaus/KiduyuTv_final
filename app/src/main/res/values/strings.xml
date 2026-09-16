@@ -68,6 +68,14 @@
     <string name="subdl_search_failed">Subtitle search failed: %1$s</string>
     <string name="subdl_download_failed">Subtitle download failed: %1$s</string>
     <string name="subdl_loaded">Subtitle loaded: %1$s</string>
+    <string name="subtitle_provider_key_missing">No subtitle provider is configured.</string>
+    <string name="subtitle_searching">Searching SubDL and OpenSubtitles…</string>
+    <string name="subtitle_downloading">Downloading subtitle…</string>
+    <string name="subtitle_choose">Choose Subtitle</string>
+    <string name="subtitle_no_results">No subtitles found for this title.</string>
+    <string name="subtitle_search_failed">Subtitle search failed: %1$s</string>
+    <string name="subtitle_download_failed">Subtitle download failed: %1$s</string>
+    <string name="subtitle_loaded">Subtitle loaded: %1$s</string>
     <string name="stream_sources">Streams</string>
     <string name="stream_sources_cd">Choose playback stream</string>
     <string name="stream_choose">Choose Stream</string>

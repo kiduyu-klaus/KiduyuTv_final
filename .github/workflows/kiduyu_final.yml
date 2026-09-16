@@ -173,6 +173,7 @@ jobs:
       - name: Build ${{ matrix.flavor }} Release APK
         env:
           SUBDL_API_KEY: ${{ secrets.SUBDL_API_KEY }}
+          OPENSUBTITLES_API_KEY: ${{ secrets.OPENSUBTITLES_API_KEY }}
           STREAM_API_TOKEN: ${{ secrets.STREAM_API_TOKEN }}
         run: ./gradlew assemble${{ matrix.flavor_task }}Release --build-cache --configuration-cache --parallel -x lint -x test
 

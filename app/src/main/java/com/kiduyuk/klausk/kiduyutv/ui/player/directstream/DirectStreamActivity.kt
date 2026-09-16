@@ -50,8 +50,8 @@ import com.kiduyuk.klausk.kiduyutv.databinding.ActivityDirectStreamBinding
 import com.kiduyuk.klausk.kiduyutv.ui.player.cloudflareBypass.CloudflareBypassActivity
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamItem
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.SubtitleItem
+import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.OpenSubtitlesClient
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.SubdlSubtitleClient
-import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.SubdlSubtitleResult
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.ProvidersBackendUnavailableException
 import com.kiduyuk.klausk.kiduyutv.ui.player.webviewsniffer.SniffedSubtitle
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.PlayerEngine
@@ -111,6 +111,10 @@ class DirectStreamActivity : AppCompatActivity() {
     private var availableStreams: List<StreamItem> = emptyList()
     private var activeStream: StreamItem? = null
     private var activeSubtitles: List<SubtitleItem> = emptyList()
+    private data class SubtitleChoice(
+        val label: String,
+        val download: suspend () -> SubtitleItem
+    )
     private val uiHandler = Handler(Looper.getMainLooper())
     private var controlsLockedVisible = false
     private var userSeeking = false
@@ -448,7 +452,7 @@ class DirectStreamActivity : AppCompatActivity() {
         binding.btnSkipSegment.setOnClickListener { onSkipClicked() }
         binding.btnPlayerTracks.setOnClickListener { showTrackDialog() }
         binding.btnPlayerStreams.setOnClickListener { showStreamDialog() }
-        binding.btnPlayerSubtitles.setOnClickListener { searchSubdlSubtitles() }
+        binding.btnPlayerSubtitles.setOnClickListener { searchExternalSubtitles() }
         binding.playerView.setOnClickListener { showControls() }
         binding.overlayControls.setOnClickListener { showControls() }
         binding.btnRewind.setOnClickListener { engine.seekBy(-30_000L); showControls() }
@@ -1168,59 +1172,88 @@ class DirectStreamActivity : AppCompatActivity() {
         streamDialog?.show()
     }
 
-    private fun searchSubdlSubtitles() {
+    private fun searchExternalSubtitles() {
         if (subtitleJob?.isActive == true || subtitleDialog?.isShowing == true) return
-        val client = SubdlSubtitleClient(applicationContext)
-        if (!client.isConfigured) {
-            Toast.makeText(this, R.string.subdl_key_missing, Toast.LENGTH_LONG).show()
+        val subdlClient = SubdlSubtitleClient(applicationContext)
+        val openSubtitlesClient = OpenSubtitlesClient(applicationContext)
+        if (!subdlClient.isConfigured && !openSubtitlesClient.isConfigured) {
+            Toast.makeText(this, R.string.subtitle_provider_key_missing, Toast.LENGTH_LONG).show()
             return
         }
 
-        Toast.makeText(this, R.string.subdl_searching, Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, R.string.subtitle_searching, Toast.LENGTH_SHORT).show()
         subtitleJob = lifecycleScope.launch {
-            runCatching {
-                client.search(
-                    tmdbId = currentTmdbId,
-                    isTv = currentMediaType == TYPE_SERIES,
-                    season = currentSeason,
-                    episode = currentEpisode
-                )
-            }.onSuccess { results ->
-                Log.i(TAG, "SubDL search returned ${results.size} selectable subtitles")
-                if (results.isEmpty()) {
-                    Toast.makeText(
-                        this@DirectStreamActivity,
-                        R.string.subdl_no_results,
-                        Toast.LENGTH_LONG
-                    ).show()
-                } else {
-                    showSubdlResults(results, client)
+            val choices = mutableListOf<SubtitleChoice>()
+            val failures = mutableListOf<Throwable>()
+
+            if (subdlClient.isConfigured) {
+                runCatching {
+                    subdlClient.search(
+                        tmdbId = currentTmdbId,
+                        isTv = currentMediaType == TYPE_SERIES,
+                        season = currentSeason,
+                        episode = currentEpisode
+                    )
+                }.onSuccess { results ->
+                    Log.i(TAG, "SubDL search returned ${results.size} selectable subtitles")
+                    choices += results.map { result ->
+                        SubtitleChoice(
+                            label = "SubDL • ${result.displayName}",
+                            download = { subdlClient.download(result) }
+                        )
+                    }
+                }.onFailure { error ->
+                    failures += error
+                    Log.e(TAG, "SubDL subtitle search failed", error)
                 }
-            }.onFailure { error ->
-                Log.e(TAG, "SubDL subtitle search failed", error)
+            }
+
+            if (openSubtitlesClient.isConfigured) {
+                runCatching {
+                    openSubtitlesClient.search(
+                        tmdbId = currentTmdbId,
+                        isTv = currentMediaType == TYPE_SERIES,
+                        season = currentSeason,
+                        episode = currentEpisode
+                    )
+                }.onSuccess { results ->
+                    Log.i(TAG, "OpenSubtitles search returned ${results.size} selectable subtitles")
+                    choices += results.map { result ->
+                        SubtitleChoice(
+                            label = "OpenSubtitles • ${result.displayName}",
+                            download = { openSubtitlesClient.download(result) }
+                        )
+                    }
+                }.onFailure { error ->
+                    failures += error
+                    Log.e(TAG, "OpenSubtitles subtitle search failed", error)
+                }
+            }
+
+            if (choices.isEmpty()) {
                 Toast.makeText(
                     this@DirectStreamActivity,
-                    getString(
-                        R.string.subdl_search_failed,
-                        error.message ?: error.javaClass.simpleName
+                    if (failures.isEmpty()) R.string.subtitle_no_results
+                    else getString(
+                        R.string.subtitle_search_failed,
+                        failures.first().message ?: failures.first().javaClass.simpleName
                     ),
                     Toast.LENGTH_LONG
                 ).show()
+            } else {
+                showSubtitleResults(choices)
             }
         }
     }
 
-    private fun showSubdlResults(
-        results: List<SubdlSubtitleResult>,
-        client: SubdlSubtitleClient
-    ) {
-        val labels = results.map { it.displayName }.toTypedArray()
+    private fun showSubtitleResults(choices: List<SubtitleChoice>) {
+        val labels = choices.map { it.label }.toTypedArray()
         val dialog = MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.subdl_choose)
+            .setTitle(R.string.subtitle_choose)
             .setIcon(R.drawable.ic_closed_caption)
             .setSingleChoiceItems(labels, -1) { chooser, index ->
                 chooser.dismiss()
-                downloadAndLoadSubtitle(results[index], client)
+                downloadAndLoadSubtitle(choices[index])
             }
             .setNegativeButton(android.R.string.cancel, null)
             .create()
@@ -1230,28 +1263,25 @@ class DirectStreamActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    private fun downloadAndLoadSubtitle(
-        result: SubdlSubtitleResult,
-        client: SubdlSubtitleClient
-    ) {
+    private fun downloadAndLoadSubtitle(choice: SubtitleChoice) {
         subtitleJob?.cancel()
-        Toast.makeText(this, R.string.subdl_downloading, Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, R.string.subtitle_downloading, Toast.LENGTH_SHORT).show()
         subtitleJob = lifecycleScope.launch {
-            runCatching { client.download(result) }
+            runCatching { choice.download() }
                 .onSuccess { subtitle ->
                     loadExternalSubtitle(subtitle)
                     Toast.makeText(
                         this@DirectStreamActivity,
-                        getString(R.string.subdl_loaded, result.language.ifBlank { "SubDL" }),
+                        getString(R.string.subtitle_loaded, subtitle.language ?: "subtitle"),
                         Toast.LENGTH_SHORT
                     ).show()
                 }
                 .onFailure { error ->
-                    Log.e(TAG, "SubDL subtitle download failed", error)
+                    Log.e(TAG, "External subtitle download failed", error)
                     Toast.makeText(
                         this@DirectStreamActivity,
                         getString(
-                            R.string.subdl_download_failed,
+                            R.string.subtitle_download_failed,
                             error.message ?: error.javaClass.simpleName
                         ),
                         Toast.LENGTH_LONG
@@ -1267,7 +1297,8 @@ class DirectStreamActivity : AppCompatActivity() {
         }
         val positionMs = engine.player.currentPosition.coerceAtLeast(0L)
         activeSubtitles = listOf(subtitle) + activeSubtitles.filterNot {
-            it.label?.startsWith("SubDL", ignoreCase = true) == true
+            it.label?.startsWith("SubDL", ignoreCase = true) == true ||
+                it.label?.startsWith("OpenSubtitles", ignoreCase = true) == true
         }
         Log.i(
             TAG,

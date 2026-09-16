@@ -11,6 +11,10 @@ def subdlApiKey = providers.gradleProperty("SUBDL_API_KEY")
         .orElse(providers.environmentVariable("SUBDL_API_KEY"))
         .getOrElse("")
 def escapedSubdlApiKey = subdlApiKey.replace("\\", "\\\\").replace("\"", "\\\"")
+def openSubtitlesApiKey = providers.gradleProperty("OPENSUBTITLES_API_KEY")
+        .orElse(providers.environmentVariable("OPENSUBTITLES_API_KEY"))
+        .getOrElse("")
+def escapedOpenSubtitlesApiKey = openSubtitlesApiKey.replace("\\", "\\\\").replace("\"", "\\\"")
 def streamApiToken = providers.gradleProperty("STREAM_API_TOKEN")
         .orElse(providers.environmentVariable("STREAM_API_TOKEN"))
         .getOrElse("")
@@ -53,6 +57,7 @@ android {
         }
         multiDexEnabled = true
         buildConfigField "String", "SUBDL_API_KEY", "\"${escapedSubdlApiKey}\""
+        buildConfigField "String", "OPENSUBTITLES_API_KEY", "\"${escapedOpenSubtitlesApiKey}\""
         buildConfigField "String", "STREAM_API_TOKEN", "\"${escapedStreamApiToken}\""
         buildConfigField "String", "START_IO_APP_ID", "\"${startIoAppId}\""
         buildConfigField "String", "UNITY_ADS_INTERSTITIAL_ID", "\"${escapedUnityInterstitialPlacementId}\""
