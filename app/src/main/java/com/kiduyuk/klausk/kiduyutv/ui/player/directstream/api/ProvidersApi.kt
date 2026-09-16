@@ -390,7 +390,6 @@ object ProvidersApi {
         // "cinesrc_provider",
         // "uhdmovies",
         "vegamovies",
-        "vidlove",
         "webstreamr"
     )
 }

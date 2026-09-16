@@ -354,6 +354,7 @@ jobs:
       - name: Build Desktop Release EXE
         shell: bash
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           KIDUYUTV_STREAM_API_TOKEN: ${{ secrets.STREAM_API_TOKEN }}
           KIDUYUTV_TMDB_TOKEN: ${{ secrets.TMDB_BEARER_TOKEN }}
           KIDUYUTV_TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
@@ -368,6 +369,7 @@ jobs:
       - name: Build Desktop Release MSI
         shell: bash
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           KIDUYUTV_STREAM_API_TOKEN: ${{ secrets.STREAM_API_TOKEN }}
           KIDUYUTV_TMDB_TOKEN: ${{ secrets.TMDB_BEARER_TOKEN }}
           KIDUYUTV_TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
