@@ -1236,13 +1236,17 @@ class DirectStreamActivity : AppCompatActivity() {
             }
 
             if (choices.isEmpty()) {
-                Toast.makeText(
-                    this@DirectStreamActivity,
-                    if (failures.isEmpty()) R.string.subtitle_no_results
-                    else getString(
+                val message = if (failures.isEmpty()) {
+                    getString(R.string.subtitle_no_results)
+                } else {
+                    getString(
                         R.string.subtitle_search_failed,
                         failures.first().message ?: failures.first().javaClass.simpleName
-                    ),
+                    )
+                }
+                Toast.makeText(
+                    this@DirectStreamActivity,
+                    message,
                     Toast.LENGTH_LONG
                 ).show()
             } else {
