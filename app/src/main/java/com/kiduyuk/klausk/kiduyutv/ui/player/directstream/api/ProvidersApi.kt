@@ -5,6 +5,7 @@ import android.util.Log
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamItem
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamResponse
+import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.SubtitleItem
 import okhttp3.CacheControl
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -254,9 +255,6 @@ object ProvidersApi {
                 val provider = s.optString("provider", "")
                     .ifBlank { json.optString("provider", "") }
                 val type = s.optString("type", "")
-                val isMovieBoxDirect = provider.equals("MovieBox", ignoreCase = true) &&
-                    type.equals("direct", ignoreCase = true)
-                if (isMovieBoxDirect) continue
                 val isVixsrcHls = provider.equals("vixsrc", ignoreCase = true) &&
                     url.contains("vixsrc.to/playlist/", ignoreCase = true)
                 val normalizedType = type.ifBlank {
@@ -297,6 +295,9 @@ object ProvidersApi {
                 if (cookie.isNotBlank() && headers.keys.none { it.equals("Cookie", true) }) {
                     headers["Cookie"] = cookie
                 }
+                val subtitles = parseSubtitles(
+                    s.optJSONArray("subtitles") ?: s.optJSONArray("captions")
+                )
                 add(
                     StreamItem(
                         title = s.optString("title", s.optString("name", "Stream")),
@@ -306,12 +307,81 @@ object ProvidersApi {
                         provider = provider,
                         type = normalizedType,
                         mimeType = mimeType,
-                        headers = headers
+                        headers = headers,
+                        subtitles = subtitles
                     )
                 )
             }
         }
         return StreamResponse(tmdbId, imdbId, items)
+    }
+
+    /**
+     * Normalizes the subtitle shapes emitted by the provider plugins. MovieBox
+     * currently returns `{ url, name, language, headers }`, while other
+     * providers may use `file`, `label`, `lang`, `format`, or `mimeType`.
+     * Media3 can reliably side-load SRT and WebVTT, so discard unsupported
+     * formats rather than adding a track that fails only after playback starts.
+     */
+    private fun parseSubtitles(array: org.json.JSONArray?): List<SubtitleItem> = buildList {
+        if (array == null) return@buildList
+        for (index in 0 until array.length()) {
+            val subtitle = array.optJSONObject(index) ?: continue
+            val url = subtitle.optString("url")
+                .ifBlank { subtitle.optString("file") }
+                .trim()
+            if (!url.startsWith("http://", ignoreCase = true) &&
+                !url.startsWith("https://", ignoreCase = true)
+            ) continue
+
+            val mimeType = subtitleMimeType(
+                subtitle.optString("mimeType")
+                    .ifBlank { subtitle.optString("contentType") }
+                    .ifBlank { subtitle.optString("format") },
+                url
+            ) ?: continue
+            val headers = subtitle.optJSONObject("headers")?.let { rawHeaders ->
+                LinkedHashMap<String, String>(rawHeaders.length()).apply {
+                    rawHeaders.keys().forEach { key ->
+                        rawHeaders.optString(key).takeIf { it.isNotBlank() }?.let { value ->
+                            put(key, value)
+                        }
+                    }
+                }
+            } ?: linkedMapOf()
+            val cookie = subtitle.optString("cookie")
+                .ifBlank { subtitle.optString("cookies") }
+                .trim()
+            if (cookie.isNotBlank() && headers.keys.none { it.equals("Cookie", ignoreCase = true) }) {
+                headers["Cookie"] = cookie
+            }
+            add(
+                SubtitleItem(
+                    url = url,
+                    mimeType = mimeType,
+                    language = subtitle.optString("language")
+                        .ifBlank { subtitle.optString("lang") }
+                        .ifBlank { subtitle.optString("language_name") }
+                        .takeIf { it.isNotBlank() },
+                    label = subtitle.optString("label")
+                        .ifBlank { subtitle.optString("name") }
+                        .ifBlank { subtitle.optString("title") }
+                        .takeIf { it.isNotBlank() },
+                    headers = headers
+                )
+            )
+        }
+    }.distinctBy { it.url }
+
+    private fun subtitleMimeType(rawMimeType: String, url: String): String? {
+        val value = rawMimeType.lowercase(Locale.ROOT)
+        val path = url.substringBefore('?').lowercase(Locale.ROOT)
+        return when {
+            value.contains("vtt") || path.endsWith(".vtt") -> "text/vtt"
+            value.contains("srt") || value.contains("subrip") || path.endsWith(".srt") ->
+                "application/x-subrip"
+            else -> null
+        }
     }
 
     private const val HLS_MIME_TYPE = "application/vnd.apple.mpegurl"

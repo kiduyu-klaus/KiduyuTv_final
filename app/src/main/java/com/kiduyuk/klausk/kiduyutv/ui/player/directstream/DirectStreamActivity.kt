@@ -110,7 +110,12 @@ class DirectStreamActivity : AppCompatActivity() {
     private var subtitleJob: Job? = null
     private var availableStreams: List<StreamItem> = emptyList()
     private var activeStream: StreamItem? = null
-    private var activeSubtitles: List<SubtitleItem> = emptyList()
+    /** Tracks supplied by the currently selected provider stream. */
+    private var providerSubtitles: List<SubtitleItem> = emptyList()
+    /** Tracks explicitly added by the viewer, such as a downloaded SubDL file. */
+    private var supplementalSubtitles: List<SubtitleItem> = emptyList()
+    private val activeSubtitles: List<SubtitleItem>
+        get() = (supplementalSubtitles + providerSubtitles).distinctBy { it.url }
     private data class SubtitleChoice(
         val label: String,
         val download: suspend () -> SubtitleItem
@@ -584,7 +589,7 @@ class DirectStreamActivity : AppCompatActivity() {
         availableStreams = listOf(stream)
         activeStream = stream
         showStatus(getString(R.string.buffering), retry = false)
-        activeSubtitles = parseSniffedSubtitles().filterNot { subtitle ->
+        providerSubtitles = parseSniffedSubtitles().filterNot { subtitle ->
             val subtitleUrl = subtitle.url.trim()
             subtitleUrl.equals(normalizedUrl, ignoreCase = true) ||
                 subtitleUrl.lowercase().let {
@@ -1296,7 +1301,7 @@ class DirectStreamActivity : AppCompatActivity() {
             return
         }
         val positionMs = engine.player.currentPosition.coerceAtLeast(0L)
-        activeSubtitles = listOf(subtitle) + activeSubtitles.filterNot {
+        supplementalSubtitles = listOf(subtitle) + supplementalSubtitles.filterNot {
             it.label?.startsWith("SubDL", ignoreCase = true) == true ||
                 it.label?.startsWith("OpenSubtitles", ignoreCase = true) == true
         }
@@ -1464,7 +1469,8 @@ class DirectStreamActivity : AppCompatActivity() {
         backendDownDialog = null
         availableStreams = emptyList()
         activeStream = null
-        activeSubtitles = emptyList()
+        providerSubtitles = emptyList()
+        supplementalSubtitles = emptyList()
         pendingReadySeekPositionMs = 0L
         handlingPlaybackError = false
         binding.btnPlayerStreams.visibility = View.GONE
@@ -1879,6 +1885,7 @@ class DirectStreamActivity : AppCompatActivity() {
             return
         }
         handlingPlaybackError = false
+        providerSubtitles = stream.subtitles
         stopWatchProgressUpdates()
         showLoadingArtwork()
         showStatus(getString(R.string.buffering), retry = false)

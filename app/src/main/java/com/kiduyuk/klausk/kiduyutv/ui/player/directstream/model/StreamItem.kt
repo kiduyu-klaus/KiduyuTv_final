@@ -26,6 +26,12 @@ data class StreamItem(
     /** HTTP headers to attach when fetching the manifest and segments. */
     val headers: Map<String, String> = emptyMap(),
     /**
+     * Provider-supplied side-loaded subtitle tracks for this exact stream.
+     * These are kept with the stream because a source switch can require a
+     * different caption host, headers, or language list.
+     */
+    val subtitles: List<SubtitleItem> = emptyList(),
+    /**
      * Mutable validation status. Set to `true` after a successful HEAD/Range
      * probe confirms the upstream is reachable and returns 2xx. The
      * `StreamSelectionDialog` reads this flag to render the "stream ok"
