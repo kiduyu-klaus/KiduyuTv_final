@@ -298,8 +298,11 @@ class PlayerEngine(context: Context) {
             stream.type.equals("matroska", ignoreCase = true)
         ) return true
         if (stream.mimeType.equals(MimeTypes.VIDEO_MATROSKA, ignoreCase = true) ||
-            stream.mimeType.equals("application/x-matroska", ignoreCase = true)
+            stream.mimeType.equals("application/x-matroska", ignoreCase = true) ||
+            stream.mimeType.equals("video/mkv", ignoreCase = true)
         ) return true
+        val lowerUrl = stream.url.lowercase()
+        if (lowerUrl.contains("video-downloads.googleusercontent.com")) return true
         val path = stream.url.substringBefore('?').lowercase()
         if (path.endsWith(".mkv") || path.endsWith(".mka")) return true
 

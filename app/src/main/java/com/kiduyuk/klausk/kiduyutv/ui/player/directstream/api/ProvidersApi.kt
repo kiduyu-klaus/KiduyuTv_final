@@ -257,14 +257,21 @@ object ProvidersApi {
                 val type = s.optString("type", "")
                 val isVixsrcHls = provider.equals("vixsrc", ignoreCase = true) &&
                     url.contains("vixsrc.to/playlist/", ignoreCase = true)
+                // Some providers disguise HLS playlists with a `.gif` URL
+                // suffix. The response is still an M3U8 playlist, so force
+                // Media3 onto its HLS path instead of treating it as a GIF
+                // or progressive stream.
+                val isGifPlaylist = url.substringBefore('?').endsWith(".gif", ignoreCase = true)
                 val normalizedType = type.ifBlank {
-                    if (isVixsrcHls) "hls" else ""
+                    if (isVixsrcHls || isGifPlaylist) "hls" else ""
                 }
                 val mimeType = s.optString(
                     "mimeType",
                     s.optString("contentType", "")
                 ).ifBlank {
-                    if (isVixsrcHls) HLS_MIME_TYPE else ""
+                    if (isVixsrcHls || isGifPlaylist) HLS_MIME_TYPE else ""
+                }.let { parsedMimeType ->
+                    if (isGifPlaylist) HLS_MIME_TYPE else parsedMimeType
                 }
                 val headers = s.optJSONObject("headers")?.let { h ->
                     val map = LinkedHashMap<String, String>(h.length())
