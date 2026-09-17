@@ -892,7 +892,14 @@ class CloudflareBypassActivity : AppCompatActivity() {
         val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return false
         val host = uri.host.orEmpty()
         if (uri.scheme?.lowercase() !in setOf("http", "https") || host.isBlank()) return false
-        if (host.equals(targetHost, ignoreCase = true)) return false
+        // Googleusercontent download URLs can remain on the same host while
+        // changing from the original gated URL to a resolved signed/download
+        // URL. Other same-host navigations are still treated as challenge
+        // pages rather than media downloads.
+        if (
+            host.equals(targetHost, ignoreCase = true) &&
+            !targetHost.equals("video-downloads.googleusercontent.com", ignoreCase = true)
+        ) return false
         if (host.equals("challenges.cloudflare.com", ignoreCase = true)) return false
         return true
     }

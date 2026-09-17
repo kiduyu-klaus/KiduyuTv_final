@@ -170,6 +170,8 @@ class DirectStreamActivity : AppCompatActivity() {
      * after a successful Cloudflare bypass resumes from the same point.
      */
     private var pendingCloudflareResumeMs: Long = 0L
+    /** Googleusercontent URLs already resolved by CloudflareBypassActivity. */
+    private val resolvedGoogleusercontentUrls = mutableSetOf<String>()
     private var lastLoadSignature: String? = null
     private var lastStreamPlaybackKey: String? = null
     private var lastFocusChainSignature: String? = null
@@ -263,6 +265,10 @@ class DirectStreamActivity : AppCompatActivity() {
             url = finalUrl,
             headers = retryHeaders
         )
+        if (isGoogleusercontentHost(finalUrl)) {
+            resolvedGoogleusercontentUrls += finalUrl
+            Log.i(TAG, "Marked Googleusercontent URL as resolved for this session")
+        }
         Log.i(TAG, "Retrying playback with final Cloudflare URL=$finalUrl")
         // Replace the gated entry as well as the active stream so opening the
         // stream selector later reuses the resolved worker download URL.
@@ -1778,7 +1784,10 @@ class DirectStreamActivity : AppCompatActivity() {
     }
 
     private fun isGoogleusercontentStream(stream: StreamItem): Boolean =
-        runCatching { Uri.parse(stream.url).host.orEmpty() }
+        isGoogleusercontentHost(stream.url) && stream.url !in resolvedGoogleusercontentUrls
+
+    private fun isGoogleusercontentHost(url: String): Boolean =
+        runCatching { Uri.parse(url).host.orEmpty() }
             .getOrDefault("")
             .equals(GOOGLE_DOWNLOADS_HOST, ignoreCase = true)
 
