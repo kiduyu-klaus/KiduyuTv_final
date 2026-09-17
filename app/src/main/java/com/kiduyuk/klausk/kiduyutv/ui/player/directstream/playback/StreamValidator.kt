@@ -322,9 +322,9 @@ object StreamValidator {
             client.newCall(requestBuilder.build()).execute().use { response ->
                 val body = response.body?.source()
                 val bytes = body?.let { source ->
-                    source.request(128 * 1024L)
+                    source.request(LOCK_PAGE_PROBE_BYTES.toLong())
                     source.buffer.clone().readByteArray()
-                }.orEmpty()
+                } ?: ByteArray(0)
                 response.code to bytes.toString(Charsets.UTF_8).contains(marker, ignoreCase = false)
             }
         }.getOrElse { null to false }
