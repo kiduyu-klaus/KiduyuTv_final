@@ -52,6 +52,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.player.cloudflareBypass.CloudflareBypassAc
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamItem
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.SubtitleItem
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.OpenSubtitlesClient
+import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.ProvidersApi
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.SubdlSubtitleClient
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.ProvidersBackendUnavailableException
 import com.kiduyuk.klausk.kiduyutv.ui.player.webviewsniffer.SniffedSubtitle
@@ -1334,13 +1335,55 @@ class DirectStreamActivity : AppCompatActivity() {
     private fun switchStream(stream: StreamItem) {
         if (stream.url == activeStream?.url) return
         val positionMs = engine.player.currentPosition.coerceAtLeast(0L)
-        activeStream = stream
         Log.i(
             PROVIDER_TAG,
             "Switching stream provider=${stream.provider.ifBlank { "?" }} " +
                 "quality=${stream.quality} positionMs=$positionMs"
         )
-        startStreamPlayback(stream, positionMs)
+        if (!stream.provider.equals("vidlink", ignoreCase = true)) {
+            activeStream = stream
+            startStreamPlayback(stream, positionMs)
+            return
+        }
+
+        showStatus("Refreshing Vidlink stream", retry = false)
+        lifecycleScope.launch {
+            val refreshed = withContext(Dispatchers.IO) {
+                runCatching {
+                    ProvidersApi.streams(
+                        type = currentMediaType,
+                        tmdbId = currentTmdbId,
+                        season = currentSeason,
+                        episode = currentEpisode,
+                        provider = stream.provider
+                    ).streams.firstOrNull { candidate ->
+                        candidate.provider.equals("vidlink", ignoreCase = true) &&
+                            candidate.quality.equals(stream.quality, ignoreCase = true)
+                    }
+                }.onFailure { error ->
+                    Log.w(
+                        PROVIDER_TAG,
+                        "Could not refresh Vidlink ${stream.quality} stream before playback",
+                        error
+                    )
+                }.getOrNull()
+            }
+            if (refreshed == null) {
+                showStatus(getString(R.string.playback_link_unavailable), retry = true)
+                return@launch
+            }
+
+            availableStreams = availableStreams.map { candidate ->
+                if (
+                    candidate.provider.equals("vidlink", ignoreCase = true) &&
+                    candidate.quality.equals(stream.quality, ignoreCase = true)
+                ) refreshed else candidate
+            }
+            streamDialog?.updateStreams(availableStreams, activeUrl = refreshed.url)
+            activeStream = refreshed
+            showStatus(getString(R.string.buffering), retry = false)
+            startStreamPlayback(refreshed, positionMs)
+        }
     }
 
     private fun showPlaybackErrorDialog(errorMessage: String) {
