@@ -448,6 +448,7 @@ class StreamSelectionDialog(
         )
 
         private fun detectLanguages(stream: StreamItem): List<String> {
+            if (stream.language.isNotBlank()) return listOf(stream.language)
             val searchableText = "${stream.name} ${stream.title}"
             return LANGUAGE_PATTERNS.mapNotNull { (label, pattern) ->
                 label.takeIf { pattern.containsMatchIn(searchableText) }

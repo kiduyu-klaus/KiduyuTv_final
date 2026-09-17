@@ -315,15 +315,17 @@ object ProvidersApi {
                     )
                     continue
                 }
+                val title = s.optString("title", s.optString("name", "Stream"))
                 val subtitles = parseSubtitles(
                     s.optJSONArray("subtitles") ?: s.optJSONArray("captions")
                 )
                 add(
                     StreamItem(
-                        title = s.optString("title", s.optString("name", "Stream")),
+                        title = title,
                         name = s.optString("name"),
                         url = url,
                         quality = s.optString("quality", "Auto"),
+                        language = extractMovieBoxLanguage(provider, title),
                         provider = provider,
                         type = normalizedType,
                         mimeType = mimeType,
@@ -334,6 +336,19 @@ object ProvidersApi {
             }
         }
         return StreamResponse(tmdbId, imdbId, items)
+    }
+
+    private fun extractMovieBoxLanguage(provider: String, title: String): String {
+        if (!provider.equals("moviebox", ignoreCase = true)) return ""
+        val value = Regex("\\(([^()]*)\\)")
+            .find(title)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.trim()
+            .orEmpty()
+        return value.replaceFirstChar { char ->
+            if (char.isLowerCase()) char.titlecase(Locale.ROOT) else char.toString()
+        }
     }
 
     /**

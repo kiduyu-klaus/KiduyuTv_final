@@ -17,6 +17,8 @@ data class StreamItem(
     val url: String,
     /** Quality hint, e.g. `"1080p"`, `"720p"`, `"Auto"`. */
     val quality: String,
+    /** Optional audio/subtitle language or variant label supplied by a provider. */
+    val language: String = "",
     /** Originating provider key, e.g. `"vidfast"`, `"vixsrc"`. */
     val provider: String,
     /** Optional backend media hint such as `"hls"` or `"progressive"`. */
