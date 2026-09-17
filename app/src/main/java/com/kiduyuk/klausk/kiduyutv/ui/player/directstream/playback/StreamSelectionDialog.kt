@@ -120,9 +120,10 @@ class StreamSelectionDialog(
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() = dismiss()
 
-    fun updateStreams(updated: List<StreamItem>) {
+    fun updateStreams(updated: List<StreamItem>, activeUrl: String? = activeUrlState.value) {
         if (!isShowing) return
         streamsState.value = updated
+        activeUrlState.value = activeUrl
     }
 
     private fun selectStream(stream: StreamItem) {
@@ -336,9 +337,14 @@ class StreamSelectionDialog(
     ) {
         var focused by remember { mutableStateOf(false) }
         val host = runCatching { Uri.parse(stream.url).host }.getOrNull().orEmpty()
+        val location = if (host.equals("video-downloads.googleusercontent.com", ignoreCase = true)) {
+            stream.url
+        } else {
+            host
+        }
         val title = stream.name.ifBlank { stream.title.ifBlank { "Stream" } }
         val provider = stream.provider.ifBlank { title }
-        val metadata = listOf(provider, stream.quality, stream.type.uppercase(), host)
+        val metadata = listOf(provider, stream.quality, stream.type.uppercase(), location)
             .filter { it.isNotBlank() }
             .distinctBy { it.lowercase() }
         val status = when {

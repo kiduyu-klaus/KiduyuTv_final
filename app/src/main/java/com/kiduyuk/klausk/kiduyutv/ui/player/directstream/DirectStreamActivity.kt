@@ -269,7 +269,10 @@ class DirectStreamActivity : AppCompatActivity() {
         availableStreams = availableStreams.map { candidate ->
             if (candidate.url == stream.url) retryStream else candidate
         }
+        streamDialog?.updateStreams(availableStreams, activeUrl = retryStream.url)
         activeStream = retryStream
+        lastStreamPlaybackKey = null
+        engine.player.stop()
         handlingPlaybackError = false
         startStreamPlayback(retryStream, resumeMs)
     }
