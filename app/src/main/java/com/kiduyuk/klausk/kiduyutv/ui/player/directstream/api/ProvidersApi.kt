@@ -255,6 +255,15 @@ object ProvidersApi {
                 val url = s.optString("url").takeIf { it.isNotBlank() } ?: continue
                 val provider = s.optString("provider", "")
                     .ifBlank { json.optString("provider", "") }
+                if (provider.equals("vidlink", ignoreCase = true) && !hasVidlinkSignature(url)) {
+                    Log.w(
+                        TAG,
+                        "Dropping unsigned Vidlink stream " +
+                            "quality=${s.optString("quality", "?")} " +
+                            "path=${runCatching { Uri.parse(url).path }.getOrNull() ?: "?"}"
+                    )
+                    continue
+                }
                 val type = s.optString("type", "")
                 val isVixsrcHls = provider.equals("vixsrc", ignoreCase = true) &&
                     url.contains("vixsrc.to/playlist/", ignoreCase = true)
@@ -353,6 +362,19 @@ object ProvidersApi {
         return value.replaceFirstChar { char ->
             if (char.isLowerCase()) char.titlecase(Locale.ROOT) else char.toString()
         }
+    }
+
+    /**
+     * Vidlink media URLs are signed CDN URLs. Without both query parameters,
+     * the CDN returns HTTP 428 and Media3 reports ERROR_CODE_IO_BAD_HTTP_STATUS.
+     */
+    private fun hasVidlinkSignature(url: String): Boolean {
+        val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return false
+        if (!uri.scheme.equals("https", ignoreCase = true)) return false
+        val host = uri.host.orEmpty()
+        if (!host.equals("bcdn.hakunaymatata.com", ignoreCase = true)) return false
+        return !uri.getQueryParameter("sign").isNullOrBlank() &&
+            !uri.getQueryParameter("t").isNullOrBlank()
     }
 
     /**
