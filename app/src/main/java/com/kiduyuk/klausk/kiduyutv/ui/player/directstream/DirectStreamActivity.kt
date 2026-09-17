@@ -239,24 +239,26 @@ class DirectStreamActivity : AppCompatActivity() {
         val finalUrl = result.data?.getStringExtra(CloudflareBypassActivity.EXTRA_URL)
             ?.takeIf { it.startsWith("http://", ignoreCase = true) || it.startsWith("https://", ignoreCase = true) }
             ?: stream.url
-        var capturedUserAgent: String? = null
+        val capturedHeaders = linkedMapOf<String, String>()
         result.data?.getStringExtra(CloudflareBypassActivity.EXTRA_HEADERS)
             ?.takeIf { it.isNotBlank() }
             ?.let { rawHeaders ->
                 runCatching {
                     val json = JSONObject(rawHeaders)
                     json.keys().forEach { key ->
-                        if (key.equals("User-Agent", ignoreCase = true)) {
-                            capturedUserAgent = json.optString(key).takeIf { it.isNotBlank() }
-                        }
+                        json.optString(key)
+                            .takeIf { it.isNotBlank() }
+                            ?.let { value -> capturedHeaders[key] = value }
                     }
                 }.onFailure { error ->
                     Log.w(TAG, "Could not parse captured Cloudflare download headers", error)
                 }
             }
-        val retryHeaders = capturedUserAgent
-            ?.let { userAgent -> mapOf("User-Agent" to userAgent) }
-            .orEmpty()
+        val retryHeaders = if (capturedHeaders.isNotEmpty()) {
+            capturedHeaders
+        } else {
+            stream.headers
+        }
         val retryStream = stream.copy(
             url = finalUrl,
             headers = retryHeaders
@@ -1726,6 +1728,17 @@ class DirectStreamActivity : AppCompatActivity() {
         // page first so Cloudflare can complete its browser challenge. The
         // resulting cookie is persisted by CloudflareBypassActivity and is
         // attached by PlayerEngine when this stream is retried.
+        if (isGoogleusercontentStream(chosen)) {
+            Log.i(
+                TAG,
+                "Googleusercontent stream detected; resolving download URL through " +
+                    "CloudflareBypassActivity"
+            )
+            pendingCloudflareStream = chosen
+            pendingCloudflareResumeMs = resumeMs
+            launchCloudflareBypass(chosen)
+            return
+        }
         if (needsDahmerMoviesClearance(chosen)) {
             Log.i(
                 TAG,
@@ -1760,6 +1773,11 @@ class DirectStreamActivity : AppCompatActivity() {
             startStreamPlayback(chosen, resumeMs)
         }
     }
+
+    private fun isGoogleusercontentStream(stream: StreamItem): Boolean =
+        runCatching { Uri.parse(stream.url).host.orEmpty() }
+            .getOrDefault("")
+            .equals(GOOGLE_DOWNLOADS_HOST, ignoreCase = true)
 
     /**
      * Detects streams hosted on the oogachaka CDN
@@ -1859,6 +1877,19 @@ class DirectStreamActivity : AppCompatActivity() {
         // DahmerMovies must resolve the browser redirect whenever an
         // unresolved stream is selected, even if another stream is currently
         // playing and even when a clearance cookie is already saved.
+        if (isGoogleusercontentStream(stream)) {
+            Log.i(
+                TAG,
+                "Googleusercontent stream selected; resolving download URL through " +
+                    "CloudflareBypassActivity"
+            )
+            pendingCloudflareStream = stream
+            pendingCloudflareResumeMs = playableStartPositionMs
+            showStatus(getString(R.string.cloudflare_blocked_checking), retry = false)
+            showLoadingArtwork()
+            launchCloudflareBypass(stream)
+            return
+        }
         if (needsDahmerMoviesClearance(stream)) {
             Log.w(
                 TAG,
@@ -2023,7 +2054,8 @@ class DirectStreamActivity : AppCompatActivity() {
             putExtra(CloudflareBypassActivity.EXTRA_URL, fullVerificationUrl)
             putExtra(
                 CloudflareBypassActivity.EXTRA_WAIT_FOR_DOWNLOAD,
-                stream.url.startsWith(DAHMER_BULK_PREFIX, ignoreCase = true)
+                stream.url.startsWith(DAHMER_BULK_PREFIX, ignoreCase = true) ||
+                    isGoogleusercontentStream(stream)
             )
             putExtra(
                 CloudflareBypassActivity.EXTRA_REQUEST_HEADERS,
