@@ -124,18 +124,16 @@ object StreamValidator {
                 stream.httpStatusCode = response.code
                 when {
                     response.isSuccessful -> {
-                        if (!hasVideoStreamHeaders(response)) {
-                            Log.w(
-                                TAG,
-                                "probe 2xx but no video stream headers for ${stream.url} " +
-                                    "contentType=${response.header("Content-Type")} " +
-                                    "contentLength=${response.header("Content-Length")} " +
-                                    "acceptRanges=${response.header("Accept-Ranges")}"
-                            )
-                            stream.isFailed = true
-                            return false
+                        if (hasVideoStreamHeaders(response)) {
+                            return true
                         }
-                        return true
+                        Log.i(
+                            TAG,
+                            "HEAD 2xx inconclusive; retrying ranged GET for ${stream.url} " +
+                                "contentType=${response.header("Content-Type")} " +
+                                "contentLength=${response.header("Content-Length")} " +
+                                "acceptRanges=${response.header("Accept-Ranges")}"
+                        )
                     }
                     response.code == 405 || response.code == 501 -> {
                         // Method not allowed/implemented — retry with a Range GET.
@@ -157,7 +155,11 @@ object StreamValidator {
         return runCatching {
             client.newCall(getRequest).execute().use { response ->
                 stream.httpStatusCode = response.code
-                if (response.isSuccessful && !hasVideoStreamHeaders(response)) {
+                if (
+                    response.isSuccessful &&
+                    !hasVideoStreamHeaders(response) &&
+                    !hasPlayableMediaSignature(response)
+                ) {
                     Log.w(
                         TAG,
                         "probe Range-GET 2xx but no video stream headers for ${stream.url} " +
@@ -258,6 +260,45 @@ object StreamValidator {
         if (contentLength > 0L && !clearlyNonMedia) return true
 
         return false
+    }
+
+    /**
+     * Checks the first bytes returned by a ranged request. This covers CDNs
+     * that report application/octet-stream or omit useful media headers while
+     * still returning a valid Matroska, MP4, HLS, or DASH resource.
+     */
+    private fun hasPlayableMediaSignature(response: okhttp3.Response): Boolean {
+        val body = response.body ?: return false
+        val prefix = ByteArray(8192)
+        val count = runCatching { body.byteStream().use { it.read(prefix) } }
+            .getOrDefault(-1)
+        if (count <= 0) return false
+
+        fun startsWithAscii(value: String): Boolean {
+            val bytes = value.toByteArray(Charsets.UTF_8)
+            return count >= bytes.size && prefix.copyOf(bytes.size).contentEquals(bytes)
+        }
+
+        val isMatroska = count >= 4 && prefix[0] == 0x1A.toByte() &&
+            prefix[1] == 0x45.toByte() &&
+            prefix[2] == 0xDF.toByte() &&
+            prefix[3] == 0xA3.toByte()
+        val isMp4 = count >= 8 && prefix.copyOfRange(4, 8).contentEquals("ftyp".toByteArray())
+        val textPrefix = prefix.copyOf(count).toString(Charsets.UTF_8)
+            .trimStart('\uFEFF', ' ', '\t', '\r', '\n')
+        val isHls = startsWithAscii("#EXTM3U")
+        val isDash = textPrefix.startsWith("<?xml", ignoreCase = true) ||
+            textPrefix.startsWith("<MPD", ignoreCase = true)
+
+        val playable = isMatroska || isMp4 || isHls || isDash
+        if (playable) {
+            Log.i(
+                TAG,
+                "Range-GET media signature detected: " +
+                    "matroska=$isMatroska mp4=$isMp4 hls=$isHls dash=$isDash"
+            )
+        }
+        return playable
     }
 
     /**
