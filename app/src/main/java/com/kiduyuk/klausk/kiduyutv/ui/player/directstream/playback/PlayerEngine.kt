@@ -222,12 +222,16 @@ class PlayerEngine(context: Context) {
         // error when a local SubDL subtitle is added.
         //
         // Header-free subtitles cover SubDL's downloaded cache files and can
-        // use the supported factory path. Keep the manual merge below for
-        // remote subtitle tracks that require per-track headers, but build
-        // those tracks with ProgressiveMediaSource. SingleSampleMediaSource
-        // uses Media3's removed legacy subtitle-decoder path and crashes on
-        // valid application/x-subrip samples in Media3 1.4+.
-        if (validSubtitles.isNotEmpty() && validSubtitles.all { it.headers.isEmpty() }) {
+        // use the supported factory path. DASH streams also use this path even
+        // when their subtitle entries contain headers. The stream data source
+        // already carries the MovieBox Origin, Referer, User-Agent, and Cookie,
+        // while DefaultMediaSourceFactory uses the explicit MPD MIME type to
+        // keep the video on DashMediaSource instead of routing it through a
+        // progressive extractor when subtitles are attached.
+        if (
+            validSubtitles.isNotEmpty() &&
+            (validSubtitles.all { it.headers.isEmpty() } || isDash(stream))
+        ) {
             val subtitleConfigurations = validSubtitles.mapIndexed { index, subtitle ->
                 MediaItem.SubtitleConfiguration.Builder(Uri.parse(subtitle.url))
                     .setMimeType(subtitle.mimeType)
