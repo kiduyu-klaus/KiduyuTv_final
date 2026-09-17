@@ -1,5 +1,6 @@
 package com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api
 
+import android.net.Uri
 import java.net.CookieHandler
 import java.net.CookieManager
 import java.net.CookiePolicy
@@ -17,8 +18,31 @@ object HttpCookieStore {
         CookieHandler.setDefault(manager)
     }
 
+    private fun toSafeUri(url: String): URI {
+        return try {
+            URI(url)
+        } catch (_: Exception) {
+            try {
+                val parsed = Uri.parse(url)
+                URI(
+                    parsed.scheme,
+                    parsed.userInfo,
+                    parsed.host,
+                    parsed.port,
+                    parsed.path,
+                    parsed.query,
+                    parsed.fragment
+                )
+            } catch (_: Exception) {
+                // Fallback to a basic URI if all else fails to avoid crashing
+                URI("http://invalid.url")
+            }
+        }
+    }
+
     fun applyTo(connection: HttpURLConnection, url: String) {
-        manager.get(URI(url), emptyMap()).forEach { (name, values) ->
+        val uri = toSafeUri(url)
+        manager.get(uri, emptyMap()).forEach { (name, values) ->
             if (name.isNotBlank() && values.isNotEmpty()) {
                 connection.setRequestProperty(name, values.joinToString("; "))
             }
@@ -26,14 +50,17 @@ object HttpCookieStore {
     }
 
     fun captureFrom(connection: HttpURLConnection, url: String) {
-        manager.put(URI(url), connection.headerFields)
+        val uri = toSafeUri(url)
+        manager.put(uri, connection.headerFields)
     }
 
-    fun cookieHeader(url: String): String? =
-        manager.get(URI(url), emptyMap())
+    fun cookieHeader(url: String): String? {
+        val uri = toSafeUri(url)
+        return manager.get(uri, emptyMap())
             .entries
             .firstOrNull { it.key.equals("Cookie", ignoreCase = true) }
             ?.value
             ?.joinToString("; ")
             ?.takeIf { it.isNotBlank() }
+    }
 }
