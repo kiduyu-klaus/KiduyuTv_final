@@ -36,6 +36,9 @@ object StreamValidator {
     /** Number of bytes requested when we have to fall back from HEAD to GET. */
     private const val RANGE_FALLBACK_BYTES = "8192"
 
+    /** Maximum body read when checking a provider's 429 lock page. */
+    private const val LOCK_PAGE_PROBE_BYTES = 128 * 1024
+
     private val client: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .connectTimeout(PROBE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -299,6 +302,32 @@ object StreamValidator {
             )
         }
         return playable
+    }
+
+    /**
+     * Fetches a small response body for provider error pages. This is used
+     * after Media3 reports HTTP 429 to distinguish a CFOK locked-download
+     * page from an ordinary rate-limit response.
+     */
+    suspend fun responseBodyContains(stream: StreamItem, marker: String): Pair<Int?, Boolean> {
+        if (stream.url.isBlank()) return null to false
+        val requestBuilder = Request.Builder()
+            .url(stream.url)
+            .get()
+            .header("Range", "bytes=0-${LOCK_PAGE_PROBE_BYTES - 1}")
+        stream.headers.forEach { (key, value) ->
+            runCatching { requestBuilder.header(key, value) }
+        }
+        return runCatching {
+            client.newCall(requestBuilder.build()).execute().use { response ->
+                val body = response.body?.source()
+                val bytes = body?.let { source ->
+                    source.request(128 * 1024L)
+                    source.buffer.clone().readByteArray()
+                }.orEmpty()
+                response.code to bytes.toString(Charsets.UTF_8).contains(marker, ignoreCase = false)
+            }
+        }.getOrElse { null to false }
     }
 
     /**

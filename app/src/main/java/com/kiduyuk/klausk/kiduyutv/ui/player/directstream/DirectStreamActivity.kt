@@ -1481,6 +1481,24 @@ class DirectStreamActivity : AppCompatActivity() {
                     StreamValidator.probeStatus(active)
                 }
                 if (isFinishing || isDestroyed) return@launch
+                if (statusCode == 429) {
+                    val (_, isLocked) = withContext(Dispatchers.IO) {
+                        StreamValidator.responseBodyContains(active, "<h1>Download Locked</h1>")
+                    }
+                    if (isLocked && cloudflareDialog?.isShowing != true) {
+                        Log.w(
+                            TAG,
+                            "Playback returned HTTP 429 with a locked-download page; " +
+                                "opening CloudflareBypassActivity"
+                        )
+                        playbackErrorDialog?.dismiss()
+                        pendingCloudflareStream = active
+                        pendingCloudflareResumeMs = engine.player.currentPosition.coerceAtLeast(0L)
+                        engine.player.stop()
+                        launchCloudflareBypass(active)
+                        return@launch
+                    }
+                }
                 if (
                     statusCode == 403 &&
                     cloudflareDialog?.isShowing != true &&
@@ -1883,6 +1901,12 @@ class DirectStreamActivity : AppCompatActivity() {
         return needsResolution
     }
 
+    private fun isCfokDownloadStream(stream: StreamItem): Boolean {
+        val host = runCatching { Uri.parse(stream.url).host.orEmpty() }.getOrDefault("")
+        return host.endsWith(".workers.dev", ignoreCase = true) &&
+            host.contains("cfok-", ignoreCase = true)
+    }
+
     private fun containsCfClearance(cookies: String?): Boolean = cookies
         ?.split(';')
         ?.any { entry ->
@@ -2117,7 +2141,8 @@ class DirectStreamActivity : AppCompatActivity() {
             putExtra(
                 CloudflareBypassActivity.EXTRA_WAIT_FOR_DOWNLOAD,
                 stream.provider.equals("DahmerMovies", ignoreCase = true) ||
-                    isGoogleusercontentStream(stream)
+                    isGoogleusercontentStream(stream) ||
+                    isCfokDownloadStream(stream)
             )
             putExtra(
                 CloudflareBypassActivity.EXTRA_REQUEST_HEADERS,
