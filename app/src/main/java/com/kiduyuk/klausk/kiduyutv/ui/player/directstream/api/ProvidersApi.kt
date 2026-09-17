@@ -279,6 +279,11 @@ object ProvidersApi {
                     h.keys().forEach { k -> map[k] = h.optString(k) }
                     map
                 } ?: linkedMapOf()
+                val hasMovieBoxCookieHeader =
+                    provider.equals("moviebox", ignoreCase = true) &&
+                        headers.any { (name, value) ->
+                            name.equals("Cookie", ignoreCase = true) && value.isNotBlank()
+                        }
                 if (provider.lowercase(Locale.ROOT) in PROVIDERS_WITHOUT_SOURCE_HEADERS) {
                     headers.keys.removeAll { headerName ->
                         headerName.equals("Origin", ignoreCase = true) ||
@@ -305,9 +310,7 @@ object ProvidersApi {
                 }
                 if (
                     provider.equals("moviebox", ignoreCase = true) &&
-                    headers.none { (name, value) ->
-                        name.equals("Cookie", ignoreCase = true) && value.isNotBlank()
-                    }
+                    !hasMovieBoxCookieHeader
                 ) {
                     Log.w(
                         TAG,
