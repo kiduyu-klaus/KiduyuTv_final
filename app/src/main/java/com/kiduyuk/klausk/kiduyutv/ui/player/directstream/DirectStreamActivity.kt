@@ -18,6 +18,7 @@ import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.TextView
+import com.kiduyuk.klausk.kiduyutv.util.UrlUtils
 import android.widget.Toast
 
 import androidx.activity.OnBackPressedCallback
@@ -566,7 +567,7 @@ class DirectStreamActivity : AppCompatActivity() {
             ?.takeIf { it.isNotBlank() && headers.keys.none { key -> key.equals("Cookie", true) } }
             ?.let { headers["Cookie"] = it }
 
-        val normalizedUrl = url.trim()
+        val normalizedUrl = UrlUtils.normalize(url)
         val isHlsUrl = normalizedUrl.lowercase().let {
             it.contains(".m3u8") ||
                 it.contains("/m3u8-proxy") ||
@@ -629,7 +630,7 @@ class DirectStreamActivity : AppCompatActivity() {
                         ?.let { headers["Cookie"] = it }
                     add(
                         SubtitleItem(
-                            url = url,
+                            url = UrlUtils.normalize(url),
                             mimeType = mimeType,
                             label = "Subtitle ${index + 1}",
                             headers = headers

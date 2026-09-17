@@ -1,6 +1,6 @@
 package com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api
 
-import android.net.Uri
+import com.kiduyuk.klausk.kiduyutv.util.UrlUtils
 import java.net.CookieHandler
 import java.net.CookieManager
 import java.net.CookiePolicy
@@ -20,23 +20,10 @@ object HttpCookieStore {
 
     private fun toSafeUri(url: String): URI {
         return try {
-            URI(url)
+            URI(UrlUtils.normalize(url))
         } catch (_: Exception) {
-            try {
-                val parsed = Uri.parse(url)
-                URI(
-                    parsed.scheme,
-                    parsed.userInfo,
-                    parsed.host,
-                    parsed.port,
-                    parsed.path,
-                    parsed.query,
-                    parsed.fragment
-                )
-            } catch (_: Exception) {
-                // Fallback to a basic URI if all else fails to avoid crashing
-                URI("http://invalid.url")
-            }
+            // Fallback to a basic URI if all else fails to avoid crashing
+            URI("http://invalid.url")
         }
     }
 

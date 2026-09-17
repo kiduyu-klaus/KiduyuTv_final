@@ -6,6 +6,7 @@ import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamItem
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamResponse
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.SubtitleItem
+import com.kiduyuk.klausk.kiduyutv.util.UrlUtils
 import okhttp3.CacheControl
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -323,7 +324,7 @@ object ProvidersApi {
                     StreamItem(
                         title = title,
                         name = s.optString("name"),
-                        url = url,
+                        url = UrlUtils.normalize(url),
                         quality = s.optString("quality", "Auto"),
                         language = extractMovieBoxLanguage(provider, title),
                         provider = provider,
@@ -392,7 +393,7 @@ object ProvidersApi {
             }
             add(
                 SubtitleItem(
-                    url = url,
+                    url = UrlUtils.normalize(url),
                     mimeType = mimeType,
                     language = subtitle.optString("language")
                         .ifBlank { subtitle.optString("lang") }
