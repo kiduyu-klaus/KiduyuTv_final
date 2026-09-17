@@ -173,6 +173,8 @@ class DirectStreamActivity : AppCompatActivity() {
     private var pendingCloudflareResumeMs: Long = 0L
     /** Googleusercontent URLs already resolved by CloudflareBypassActivity. */
     private val resolvedGoogleusercontentUrls = mutableSetOf<String>()
+    /** DahmerMovies URLs already resolved to a final download URL this session. */
+    private val resolvedDahmerMoviesUrls = mutableSetOf<String>()
     private var lastLoadSignature: String? = null
     private var lastStreamPlaybackKey: String? = null
     private var lastFocusChainSignature: String? = null
@@ -269,6 +271,10 @@ class DirectStreamActivity : AppCompatActivity() {
         if (isGoogleusercontentHost(finalUrl)) {
             resolvedGoogleusercontentUrls += finalUrl
             Log.i(TAG, "Marked Googleusercontent URL as resolved for this session")
+        }
+        if (stream.provider.equals("DahmerMovies", ignoreCase = true)) {
+            resolvedDahmerMoviesUrls += finalUrl
+            Log.i(TAG, "Marked DahmerMovies URL as resolved for this session")
         }
         Log.i(TAG, "Retrying playback with final Cloudflare URL=$finalUrl")
         // Replace the gated entry as well as the active stream so opening the
@@ -1869,9 +1875,10 @@ class DirectStreamActivity : AppCompatActivity() {
      */
     private fun needsDahmerMoviesClearance(stream: StreamItem): Boolean {
         val url = stream.url.trim()
-        val needsResolution = url.startsWith(DAHMER_BULK_PREFIX, ignoreCase = true)
+        val isDahmerMovies = stream.provider.equals("DahmerMovies", ignoreCase = true)
+        val needsResolution = isDahmerMovies && url !in resolvedDahmerMoviesUrls
         if (needsResolution) {
-            Log.i(TAG, "DahmerMovies bulk stream requires interactive redirect resolution")
+            Log.i(TAG, "DahmerMovies stream requires interactive download-link resolution")
         }
         return needsResolution
     }
@@ -2109,7 +2116,7 @@ class DirectStreamActivity : AppCompatActivity() {
             putExtra(CloudflareBypassActivity.EXTRA_URL, fullVerificationUrl)
             putExtra(
                 CloudflareBypassActivity.EXTRA_WAIT_FOR_DOWNLOAD,
-                stream.url.startsWith(DAHMER_BULK_PREFIX, ignoreCase = true) ||
+                stream.provider.equals("DahmerMovies", ignoreCase = true) ||
                     isGoogleusercontentStream(stream)
             )
             putExtra(
