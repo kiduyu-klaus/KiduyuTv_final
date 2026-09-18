@@ -1885,9 +1885,8 @@ class DirectStreamActivity : AppCompatActivity() {
     }
 
     /**
-     * Every DahmerMovies entry must pass through the WebView download flow,
-     * even when a Cloudflare cookie is already available. The resolved retry
-     * skips this guard exactly once via [skipDahmerMoviesBypass].
+     * Only DahmerMovies bulk URLs use the WebView download flow. The resolved
+     * retry skips this guard exactly once via [skipDahmerMoviesBypass].
      */
     private fun needsDahmerMoviesClearance(stream: StreamItem): Boolean {
         val isDahmerMovies = isDahmerMoviesStream(stream)
@@ -1899,8 +1898,7 @@ class DirectStreamActivity : AppCompatActivity() {
     }
 
     private fun isDahmerMoviesStream(stream: StreamItem): Boolean =
-        stream.provider.equals("DahmerMovies", ignoreCase = true) ||
-            stream.url.startsWith(DAHMER_BULK_PREFIX, ignoreCase = true)
+        stream.url.startsWith(DAHMER_BULK_PREFIX, ignoreCase = true)
 
     private fun isCfokDownloadStream(stream: StreamItem): Boolean {
         val host = runCatching { Uri.parse(stream.url).host.orEmpty() }.getOrDefault("")
@@ -3047,7 +3045,7 @@ class DirectStreamActivity : AppCompatActivity() {
         const val TYPE_SERIES = "series"
 
         private const val OOGACHAKA_STREAM_PREFIX = "https://serve.oogachakacdn.store"
-        private const val DAHMER_BULK_PREFIX = "https://p.111477.xyz/bulk?u"
+        private const val DAHMER_BULK_PREFIX = "https://p.111477.xyz/bulk?u="
         private const val GOOGLE_DOWNLOADS_HOST = "video-downloads.googleusercontent.com"
 
         private const val SKIP_SEC_MIN = 30
