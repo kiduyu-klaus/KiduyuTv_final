@@ -850,15 +850,20 @@ class CloudflareBypassActivity : AppCompatActivity() {
         lastMainFrameUrl = url
         val resolvedUserAgent = userAgent?.takeIf { it.isNotBlank() }
             ?: webView.settings.userAgentString
+        val referer = webView.url
+            ?.takeIf { it.startsWith("http", ignoreCase = true) && it != url }
+            ?: targetUrl
         if (host.equals("video-downloads.googleusercontent.com", ignoreCase = true)) {
-            // Googleusercontent signed download URLs play without provider
-            // headers. Forwarding the WebView's Referer, Origin, cookies, or
-            // navigation headers can leave the native player buffering even
-            // though the same URL plays directly in external players.
-            val headers = mapOf("User-Agent" to resolvedUserAgent)
+            // Googleusercontent signed download URLs need only the browser
+            // identity and the page that produced the resolved URL. Do not
+            // forward cookies, Origin, or any WebView navigation headers.
+            val headers = linkedMapOf(
+                "User-Agent" to resolvedUserAgent,
+                "Referer" to referer
+            )
             Log.i(
                 TAG,
-                "Returning Googleusercontent download with User-Agent only"
+                "Returning Googleusercontent download with User-Agent and Referer only"
             )
             setStatus("✓ Download link captured. Opening player…", isError = false)
             isReturningDownload = true
@@ -869,9 +874,6 @@ class CloudflareBypassActivity : AppCompatActivity() {
         val cookies = captureAllCookiesForTarget().ifBlank {
             CookieManager.getInstance().getCookie(url).orEmpty()
         }
-        val referer = webView.url
-            ?.takeIf { it.startsWith("http", ignoreCase = true) && it != url }
-            ?: targetUrl
         val headers = linkedMapOf<String, String>()
         lastRequestHeaders.forEach { (name, value) ->
             if (
