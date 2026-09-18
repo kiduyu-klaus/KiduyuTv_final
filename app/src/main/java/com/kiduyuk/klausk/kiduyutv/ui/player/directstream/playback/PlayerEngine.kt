@@ -68,12 +68,7 @@ class PlayerEngine(context: Context) {
         return DefaultDataSource.Factory(appContext, httpFactory)
     }
 
-    /**
-     * DahmerMovies' Cloudflare worker expects a browser-shaped request.
-     * Do not copy its server-supplied `Range: bytes=0-` value: Media3
-     * generates a precise Range header for every progressive-media read,
-     * seek and reconnect.
-     */
+    /** Browser defaults used when DahmerMovies did not capture a value. */
     private fun dahmerMoviesHeaders(): Map<String, String> = linkedMapOf(
         "User-Agent" to REAL_BROWSER_USER_AGENT,
         "Accept" to "*/*",
@@ -82,19 +77,11 @@ class PlayerEngine(context: Context) {
 
     private fun playbackHeaders(stream: StreamItem): Map<String, String> {
         val headers = if (stream.provider.equals("DahmerMovies", ignoreCase = true)) {
-            // Start with safe browser defaults, then overlay the actual headers
-            // captured by the verification WebView. The redirected download can
-            // require that exact User-Agent/Referer/Cookie combination. Range is
-            // deliberately excluded because Media3 manages it per request.
+            // Preserve the complete captured WebView request context for the
+            // resolved download, including request-specific headers.
             val merged = LinkedHashMap(dahmerMoviesHeaders())
-            sanitizeUserAgent(stream.headers).forEach { (name, value) ->
-                if (!name.equals("Range", ignoreCase = true) && value.isNotBlank()) {
-                    merged.keys
-                        .filter { it.equals(name, ignoreCase = true) }
-                        .toList()
-                        .forEach { merged.remove(it) }
-                    merged[name] = value
-                }
+            stream.headers.forEach { (name, value) ->
+                if (name.isNotBlank() && value.isNotBlank()) merged[name] = value
             }
             merged
         } else {

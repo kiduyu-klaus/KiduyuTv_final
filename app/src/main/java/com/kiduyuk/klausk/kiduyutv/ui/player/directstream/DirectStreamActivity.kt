@@ -287,7 +287,7 @@ class DirectStreamActivity : AppCompatActivity() {
         lastStreamPlaybackKey = null
         engine.player.stop()
         handlingPlaybackError = false
-        startStreamPlayback(retryStream, resumeMs)
+        startStreamPlayback(retryStream, resumeMs, skipDahmerMoviesBypass = true)
     }
 
     private val watchProgressTick = object : Runnable {
@@ -1885,21 +1885,22 @@ class DirectStreamActivity : AppCompatActivity() {
     }
 
     /**
-     * Returns `true` when [stream] is an unresolved DahmerMovies URL. Even
-     * when a cookie is already available, the WebView must open the original
-     * stream and follow its post-challenge redirect so the final worker
-     * download URL can be handed to ExoPlayer. Resolved worker URLs are
-     * allowed through to avoid reopening the bypass in a loop.
+     * Every DahmerMovies entry must pass through the WebView download flow,
+     * even when a Cloudflare cookie is already available. The resolved retry
+     * skips this guard exactly once via [skipDahmerMoviesBypass].
      */
     private fun needsDahmerMoviesClearance(stream: StreamItem): Boolean {
-        val url = stream.url.trim()
-        val isDahmerMovies = stream.provider.equals("DahmerMovies", ignoreCase = true)
-        val needsResolution = isDahmerMovies && url !in resolvedDahmerMoviesUrls
+        val isDahmerMovies = isDahmerMoviesStream(stream)
+        val needsResolution = isDahmerMovies
         if (needsResolution) {
             Log.i(TAG, "DahmerMovies stream requires interactive download-link resolution")
         }
         return needsResolution
     }
+
+    private fun isDahmerMoviesStream(stream: StreamItem): Boolean =
+        stream.provider.equals("DahmerMovies", ignoreCase = true) ||
+            stream.url.startsWith(DAHMER_BULK_PREFIX, ignoreCase = true)
 
     private fun isCfokDownloadStream(stream: StreamItem): Boolean {
         val host = runCatching { Uri.parse(stream.url).host.orEmpty() }.getOrDefault("")
@@ -1951,7 +1952,11 @@ class DirectStreamActivity : AppCompatActivity() {
         return false
     }
 
-    private fun startStreamPlayback(stream: StreamItem, startPositionMs: Long = 0L) {
+    private fun startStreamPlayback(
+        stream: StreamItem,
+        startPositionMs: Long = 0L,
+        skipDahmerMoviesBypass: Boolean = false
+    ) {
         val playableStartPositionMs = playableStartPosition(stream, startPositionMs)
         val streamKey = "${stream.url}|${stream.provider}|${playableStartPositionMs}"
         if (lastStreamPlaybackKey == streamKey && engine.player.currentMediaItem != null) return
@@ -1976,7 +1981,7 @@ class DirectStreamActivity : AppCompatActivity() {
             launchCloudflareBypass(stream)
             return
         }
-        if (needsDahmerMoviesClearance(stream)) {
+        if (!skipDahmerMoviesBypass && needsDahmerMoviesClearance(stream)) {
             Log.w(
                 TAG,
                 "startStreamPlayback intercepted DahmerMovies without " +
@@ -2133,7 +2138,7 @@ class DirectStreamActivity : AppCompatActivity() {
             putExtra(CloudflareBypassActivity.EXTRA_URL, fullVerificationUrl)
             putExtra(
                 CloudflareBypassActivity.EXTRA_WAIT_FOR_DOWNLOAD,
-                stream.provider.equals("DahmerMovies", ignoreCase = true) ||
+                isDahmerMoviesStream(stream) ||
                     isGoogleusercontentStream(stream) ||
                     isCfokDownloadStream(stream)
             )
