@@ -58,9 +58,12 @@ class PlayerEngine(context: Context) {
         // 403 any UA that claims a browser version newer than the latest
         // stable release; vixsrc.to in particular ships "Chrome/150"
         // which doesn't exist and triggers 403 on the manifest request.
+        val noHeaders = isVegamoviesGoogleusercontent(stream)
         val safeHeaders = playbackHeaders(stream)
         val httpFactory = DefaultHttpDataSource.Factory()
-            .setUserAgent(USER_AGENT)
+            .apply {
+                if (!noHeaders) setUserAgent(USER_AGENT)
+            }
             .setConnectTimeoutMs(HTTP_CONNECT_TIMEOUT_MS)
             .setReadTimeoutMs(HTTP_READ_TIMEOUT_MS)
             .setAllowCrossProtocolRedirects(true)
@@ -81,6 +84,7 @@ class PlayerEngine(context: Context) {
     )
 
     private fun playbackHeaders(stream: StreamItem): Map<String, String> {
+        if (isVegamoviesGoogleusercontent(stream)) return emptyMap()
         val headers = if (stream.provider.equals("DahmerMovies", ignoreCase = true)) {
             // Start with safe browser defaults, then overlay the actual headers
             // captured by the verification WebView. The redirected download can
@@ -130,6 +134,12 @@ class PlayerEngine(context: Context) {
         }
         return LinkedHashMap(headers).apply { put("Cookie", storedCookie) }
     }
+
+    private fun isVegamoviesGoogleusercontent(stream: StreamItem): Boolean =
+        stream.provider.equals("Vegamovies", ignoreCase = true) &&
+            runCatching { Uri.parse(stream.url).host.orEmpty() }
+                .getOrDefault("")
+                .equals("video-downloads.googleusercontent.com", ignoreCase = true)
 
     /**
      * Reads the Cloudflare cookie blob previously stored by

@@ -259,7 +259,13 @@ class DirectStreamActivity : AppCompatActivity() {
                     Log.w(TAG, "Could not parse captured Cloudflare download headers", error)
                 }
             }
-        val retryHeaders = if (capturedHeaders.isNotEmpty()) {
+        val isVegamoviesGoogleusercontent =
+            stream.provider.equals("Vegamovies", ignoreCase = true) &&
+                isGoogleusercontentHost(finalUrl)
+        val retryHeaders = if (isVegamoviesGoogleusercontent) {
+            // Test the resolved Vegamovies URL without provider headers.
+            emptyMap()
+        } else if (capturedHeaders.isNotEmpty()) {
             capturedHeaders
         } else {
             stream.headers
