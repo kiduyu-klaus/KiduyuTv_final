@@ -853,24 +853,6 @@ class CloudflareBypassActivity : AppCompatActivity() {
         val referer = webView.url
             ?.takeIf { it.startsWith("http", ignoreCase = true) && it != url }
             ?: targetUrl
-        if (host.equals("video-downloads.googleusercontent.com", ignoreCase = true)) {
-            // Googleusercontent signed download URLs need only the browser
-            // identity and the page that produced the resolved URL. Do not
-            // forward cookies, Origin, or any WebView navigation headers.
-            val headers = linkedMapOf(
-                "User-Agent" to resolvedUserAgent,
-                "Referer" to referer
-            )
-            Log.i(
-                TAG,
-                "Returning Googleusercontent download with User-Agent and Referer only"
-            )
-            setStatus("✓ Download link captured. Opening player…", isError = false)
-            isReturningDownload = true
-            finishWithOk(cookies = "", resolvedUrl = url, headers = headers)
-            return
-        }
-
         val cookies = captureAllCookiesForTarget().ifBlank {
             CookieManager.getInstance().getCookie(url).orEmpty()
         }
@@ -879,7 +861,10 @@ class CloudflareBypassActivity : AppCompatActivity() {
             if (
                 name.isNotBlank() &&
                 value.isNotBlank() &&
-                shouldForwardToMediaRequest(name)
+                (
+                    host.equals("video-downloads.googleusercontent.com", ignoreCase = true) ||
+                        shouldForwardToMediaRequest(name)
+                )
             ) {
                 headers[name] = value
             }
