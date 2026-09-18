@@ -90,6 +90,7 @@
     <string name="stream_playing">PLAYING</string>
     <string name="stream_ok">stream ok</string>
     <string name="stream_checking">checking…</string>
+    <string name="stream_unverified">unverified</string>
     <string name="stream_failed">stream failed</string>
     <string name="skip_back">Rewind</string>
     <string name="skip_forward">Fast forward</string>

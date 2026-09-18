@@ -100,9 +100,10 @@ object StreamValidator {
 
     /**
      * Run a single probe against [stream]. The probe first tries a HEAD
-     * request (cheap: no body transfer) and, if the server rejects HEAD with
-     * 405/501, falls back to a tiny Range GET so we still see a real status
-     * code without downloading the entire media.
+     * request (cheap: no body transfer), but HEAD is advisory only: CDNs may
+     * reject HEAD while allowing the actual media request. Any HEAD response
+     * that does not positively identify the stream therefore falls back to a
+     * tiny Range GET so we test the request Media3 will actually make.
      *
      * The most recent HTTP response code is written back to
      * [StreamItem.httpStatusCode] so callers can distinguish 403 (Cloudflare
@@ -140,15 +141,12 @@ object StreamValidator {
                                 "acceptRanges=${response.header("Accept-Ranges")}"
                         )
                     }
-                    response.code == 405 || response.code == 501 -> {
-                        // Method not allowed/implemented — retry with a Range GET.
-                    }
                     else -> {
                         Log.w(
                             TAG,
-                            "HEAD ${stream.url} -> HTTP ${response.code}"
+                            "HEAD ${stream.url} -> HTTP ${response.code}; " +
+                                "retrying with Range GET"
                         )
-                        return false
                     }
                 }
             }
@@ -160,7 +158,13 @@ object StreamValidator {
         return runCatching {
             client.newCall(getRequest).execute().use { response ->
                 stream.httpStatusCode = response.code
-                if (!response.isSuccessful) return@use false
+                if (!response.isSuccessful) {
+                    Log.w(
+                        TAG,
+                        "Range-GET ${stream.url} -> HTTP ${response.code}"
+                    )
+                    return@use false
+                }
 
                 val hasHeaders = hasVideoStreamHeaders(response)
                 val hasSignature = if (hasHeaders) {
