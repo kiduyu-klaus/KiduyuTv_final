@@ -2135,6 +2135,11 @@ class DirectStreamActivity : AppCompatActivity() {
             return
         }
 
+        // Always begin a fresh challenge. A stale or invalid cf_clearance
+        // cookie can cause CloudflareBypassActivity to skip the challenge or
+        // repeatedly return a blocked download URL.
+        CloudflareBypassActivity.clearCookies(applicationContext, bypassHost)
+
         val intent = Intent(this, CloudflareBypassActivity::class.java).apply {
             putExtra(CloudflareBypassActivity.EXTRA_HOST, bypassHost)
             putExtra(CloudflareBypassActivity.EXTRA_URL, fullVerificationUrl)

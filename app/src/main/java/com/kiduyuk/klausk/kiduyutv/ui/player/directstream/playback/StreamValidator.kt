@@ -108,9 +108,11 @@ object StreamValidator {
      * [StreamItem.httpStatusCode] so callers can distinguish 403 (Cloudflare
      * challenge) from other 4xx/5xx failures without re-issuing the request.
      *
-     * [StreamItem.isFailed] is set to `true` when the server replied 2xx but
-     * the response headers do not indicate a playable video stream (no
-     * recognized Content-Type, no Accept-Ranges, and zero Content-Length).
+     * [StreamItem.isFailed] is set to `true` only when the server replied 2xx
+     * with a clearly non-media document body, such as an HTML or JSON error
+     * page. Ambiguous CDN headers are kept playable because valid media
+     * endpoints often omit Content-Length or use generic text/octet-stream
+     * content types.
      */
     private suspend fun probe(stream: StreamItem): Boolean {
         if (stream.url.isBlank()) {
@@ -158,22 +160,40 @@ object StreamValidator {
         return runCatching {
             client.newCall(getRequest).execute().use { response ->
                 stream.httpStatusCode = response.code
-                if (
-                    response.isSuccessful &&
-                    !hasVideoStreamHeaders(response) &&
-                    !hasPlayableMediaSignature(response)
-                ) {
+                if (!response.isSuccessful) return@use false
+
+                val hasHeaders = hasVideoStreamHeaders(response)
+                val hasSignature = if (hasHeaders) {
+                    true
+                } else {
+                    hasPlayableMediaSignature(response)
+                }
+
+                // A successful CDN response is not necessarily self-describing.
+                // Many valid HLS/progressive endpoints return text/plain or
+                // application/octet-stream, omit Content-Length, ignore Range,
+                // or put a BOM/whitespace before the playlist signature. Media3
+                // can still resolve these streams successfully. Only mark a
+                // stream failed when the response is clearly an HTML/JSON/text
+                // error page; an ambiguous 2xx response should remain playable.
+                if (!hasHeaders && !hasSignature && isClearlyNonMediaResponse(response)) {
                     Log.w(
                         TAG,
-                        "probe Range-GET 2xx but no video stream headers for ${stream.url} " +
-                            "contentType=${response.header("Content-Type")} " +
-                            "contentLength=${response.header("Content-Length")} " +
-                            "acceptRanges=${response.header("Accept-Ranges")}"
+                        "probe Range-GET 2xx returned a clear non-media response for ${stream.url} " +
+                            "contentType=${response.header("Content-Type")}"
                     )
                     stream.isFailed = true
                     return@use false
                 }
-                response.isSuccessful
+
+                if (!hasHeaders && !hasSignature) {
+                    Log.i(
+                        TAG,
+                        "probe Range-GET 2xx has ambiguous media headers; keeping stream playable " +
+                            "for ${stream.url} contentType=${response.header("Content-Type")}"
+                    )
+                }
+                true
             }
         }.getOrDefault(false)
     }
@@ -271,16 +291,10 @@ object StreamValidator {
      * still returning a valid Matroska, MP4, HLS, or DASH resource.
      */
     private fun hasPlayableMediaSignature(response: okhttp3.Response): Boolean {
-        val body = response.body ?: return false
-        val prefix = ByteArray(8192)
-        val count = runCatching { body.byteStream().use { it.read(prefix) } }
-            .getOrDefault(-1)
+        val prefix = runCatching { response.peekBody(8 * 1024L).bytes() }
+            .getOrDefault(ByteArray(0))
+        val count = prefix.size
         if (count <= 0) return false
-
-        fun startsWithAscii(value: String): Boolean {
-            val bytes = value.toByteArray(Charsets.UTF_8)
-            return count >= bytes.size && prefix.copyOf(bytes.size).contentEquals(bytes)
-        }
 
         val isMatroska = count >= 4 && prefix[0] == 0x1A.toByte() &&
             prefix[1] == 0x45.toByte() &&
@@ -289,7 +303,7 @@ object StreamValidator {
         val isMp4 = count >= 8 && prefix.copyOfRange(4, 8).contentEquals("ftyp".toByteArray())
         val textPrefix = prefix.copyOf(count).toString(Charsets.UTF_8)
             .trimStart('\uFEFF', ' ', '\t', '\r', '\n')
-        val isHls = startsWithAscii("#EXTM3U")
+        val isHls = textPrefix.startsWith("#EXTM3U", ignoreCase = false)
         val isDash = textPrefix.startsWith("<?xml", ignoreCase = true) ||
             textPrefix.startsWith("<MPD", ignoreCase = true)
 
@@ -302,6 +316,43 @@ object StreamValidator {
             )
         }
         return playable
+    }
+
+    /**
+     * Returns true only when the response looks like an error/document body,
+     * rather than merely having incomplete or provider-specific media headers.
+     * `peekBody` does not consume the response body, so the normal Media3-style
+     * probe remains safe for callers and the response can still be closed.
+     */
+    private fun isClearlyNonMediaResponse(response: okhttp3.Response): Boolean {
+        val contentType = response.header("Content-Type", "")
+            ?.substringBefore(';')
+            ?.trim()
+            ?.lowercase()
+            ?: ""
+        val prefix = runCatching {
+            response.peekBody(8 * 1024L)
+                .string()
+                .trimStart('\uFEFF', ' ', '\t', '\r', '\n')
+                .lowercase()
+        }.getOrDefault("")
+
+        val clearlyTextContentType = contentType in setOf(
+            "text/html",
+            "application/json",
+            "application/xml",
+            "text/xml",
+            "text/css",
+            "application/javascript",
+            "text/javascript"
+        )
+        val clearlyDocumentBody = prefix.startsWith("<!doctype html") ||
+            prefix.startsWith("<html") ||
+            prefix.startsWith("{\"") ||
+            prefix.startsWith("[{\"") ||
+            prefix.startsWith("{\n")
+
+        return clearlyTextContentType || clearlyDocumentBody
     }
 
     /**

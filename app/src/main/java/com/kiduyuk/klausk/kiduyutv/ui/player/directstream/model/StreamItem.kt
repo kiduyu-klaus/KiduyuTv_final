@@ -43,12 +43,12 @@ data class StreamItem(
     /** `true` while a background validity check is in progress for this stream. */
     var isChecking: Boolean = false,
     /**
-     * Set to `true` when the probe completed (either 2xx or non-2xx) but the
-     * response did not contain a valid video stream Content-Type header. The
-     * `StreamSelectionDialog` renders a "stream failed" badge for these entries.
+     * Set to `true` only when a successful probe returns a clearly non-media
+     * document body, such as an HTML or JSON error page. Generic or incomplete
+     * CDN headers are not enough to mark a stream failed because valid media
+     * endpoints can still play through Media3 without self-describing headers.
      * A stream can be both `isFailed` and `isValid` is `false` — they are not
-     * mutually exclusive; `isFailed` is `true` only when the HTTP probe itself
-     * succeeded but the response body is not a recognized video stream.
+     * mutually exclusive.
      */
     var isFailed: Boolean = false,
     /**
