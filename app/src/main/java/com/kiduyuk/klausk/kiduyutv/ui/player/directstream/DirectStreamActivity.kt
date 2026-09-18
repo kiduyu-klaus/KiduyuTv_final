@@ -2019,24 +2019,12 @@ class DirectStreamActivity : AppCompatActivity() {
     }
 
     /**
-     * Google Drive's video-download endpoint ignores Range requests and sends
-     * the entire file with HTTP 200. Seeking before preparation makes Media3
-     * discard hundreds of megabytes sequentially and look permanently stuck
-     * in buffering, so these links must begin at byte/time zero.
+     * Keep a requested resume position unless the caller has no saved
+     * position. Googleusercontent/Vegamovies streams support byte ranges, so
+     * Media3 can seek during preparation and resume normally.
      */
     private fun playableStartPosition(stream: StreamItem, requestedPositionMs: Long): Long {
-        if (requestedPositionMs <= 0L) return 0L
-        val host = runCatching { Uri.parse(stream.url).host.orEmpty() }
-            .getOrDefault("")
-        if (host.equals(GOOGLE_DOWNLOADS_HOST, ignoreCase = true)) {
-            Log.i(
-                PROVIDER_TAG,
-                "Ignoring ${requestedPositionMs}ms resume/transfer position for non-seekable " +
-                    "$GOOGLE_DOWNLOADS_HOST stream"
-            )
-            return 0L
-        }
-        return requestedPositionMs
+        return requestedPositionMs.coerceAtLeast(0L)
     }
 
     /**
@@ -2217,8 +2205,6 @@ class DirectStreamActivity : AppCompatActivity() {
         val requestedPosition = pendingReadySeekPositionMs
         if (requestedPosition <= 0L) return
         pendingReadySeekPositionMs = 0L
-        val stream = activeStream
-        if (stream != null && playableStartPosition(stream, requestedPosition) == 0L) return
         val duration = engine.player.duration
         val target = if (duration > 0L) {
             requestedPosition.coerceAtMost((duration - 1_000L).coerceAtLeast(0L))
