@@ -303,6 +303,9 @@ dependencies {
     implementation("androidx.media3:media3-ui:$media3Version")
     implementation("androidx.media3:media3-common:$media3Version")
     implementation("androidx.media3:media3-datasource:$media3Version")
+    // Local Media3 FFmpeg extension for software decoding of DTS/DTS-HD and
+    // other codecs that may not be available through the device decoder.
+    implementation files('libs/lib-decoder-ffmpeg-release.aar')
 
     // ─────────────────────────────────────────────
     // Testing

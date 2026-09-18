@@ -16,6 +16,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.dash.DashMediaSource
@@ -361,7 +362,11 @@ class PlayerEngine(context: Context) {
         return false
     }
 
+    private val renderersFactory: DefaultRenderersFactory = DefaultRenderersFactory(appContext)
+        .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+
     val player: ExoPlayer = ExoPlayer.Builder(appContext)
+        .setRenderersFactory(renderersFactory)
         .setLoadControl(buildLoadControl())
         .setSeekBackIncrementMs(SEEK_STEP_MS)
         .setSeekForwardIncrementMs(SEEK_STEP_MS)
@@ -382,6 +387,7 @@ class PlayerEngine(context: Context) {
                 MimeTypes.AUDIO_AAC,
                 MimeTypes.AUDIO_AC3,
                 MimeTypes.AUDIO_E_AC3,
+                MimeTypes.AUDIO_DTS,
                 MimeTypes.AUDIO_MPEG,
                 MimeTypes.AUDIO_MPEG_L2,
                 MimeTypes.AUDIO_RAW
@@ -391,7 +397,7 @@ class PlayerEngine(context: Context) {
         Log.i(
             TAG,
             "Default TrackSelectionParameters initialised with preferred audio " +
-                "MIME types: AAC > AC3 > E-AC3 > MPEG > MPEG-L2 > RAW"
+                "MIME types: AAC > AC3 > E-AC3 > DTS > MPEG > MPEG-L2 > RAW"
         )
     }
 
@@ -539,6 +545,7 @@ class PlayerEngine(context: Context) {
                 MimeTypes.AUDIO_AAC,
                 MimeTypes.AUDIO_AC3,
                 MimeTypes.AUDIO_E_AC3,
+                MimeTypes.AUDIO_DTS,
                 MimeTypes.AUDIO_MPEG,
                 MimeTypes.AUDIO_MPEG_L2,
                 MimeTypes.AUDIO_RAW
@@ -547,7 +554,7 @@ class PlayerEngine(context: Context) {
         val chosen = describeCurrentAudioTrack(tracks)
         Log.i(
             TAG,
-            "Applied Playlist audio track=auto (preferred AAC > AC3 > E-AC3). " +
+            "Applied Playlist audio track=auto (preferred AAC > AC3 > E-AC3 > DTS). " +
                 "Active audio track after selection: ${chosen ?: "<none>"}"
         )
     }
