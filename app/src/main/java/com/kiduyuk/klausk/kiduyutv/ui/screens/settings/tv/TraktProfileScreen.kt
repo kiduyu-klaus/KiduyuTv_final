@@ -63,6 +63,7 @@ import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktCollectionItem
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktMovie
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktShow
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktUser
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktUserStats
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktWatchlistItem
 import com.kiduyuk.klausk.kiduyutv.data.remote.TraktApiClient
 import com.kiduyuk.klausk.kiduyutv.data.repository.TraktRepository
@@ -91,7 +92,7 @@ fun TraktProfileScreen(
 ) {
     val context = LocalContext.current
     var selectedTabIndex by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Collection", "Watchlist", "Recommended")
+    val tabs = listOf("Collection", "Watchlist", "Recommended", "Stats")
 
     var isLoadingProfile by remember { mutableStateOf(true) }
     var profile by remember { mutableStateOf<TraktUser?>(null) }
@@ -299,10 +300,77 @@ fun TraktProfileScreen(
                         onMovieClick = onMovieClick,
                         onTvShowClick = onTvShowClick
                     )
+                    3 -> TraktStatsTabContent()
                 }
             }
         }
     }
+}
+
+@Composable
+private fun TraktStatsTabContent() {
+    var stats by remember { mutableStateOf<TraktUserStats?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        isLoading = true
+        error = null
+        try {
+            val token = TraktAuthManager.getValidAccessToken()
+                ?: throw IllegalStateException("Not authenticated with Trakt.tv")
+            val response = TraktApiClient.apiService.getUserStats("Bearer $token")
+            if (response.isSuccessful) {
+                stats = response.body()
+            } else {
+                error = "Failed to load stats: ${response.code()}"
+            }
+        } catch (exception: Exception) {
+            error = exception.message ?: "Unable to load Trakt stats"
+        } finally {
+            isLoading = false
+        }
+    }
+
+    when {
+        isLoading -> LoadingIndicator("Loading stats...")
+        error != null -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(error!!, color = Color.Red, textAlign = TextAlign.Center)
+        }
+        stats != null -> LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = 220.dp),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item { TraktStatCard("Movies watched", stats!!.movies.watched.toString(), "${stats!!.movies.plays} plays · ${formatTraktMinutes(stats!!.movies.minutes)}") }
+            item { TraktStatCard("Shows watched", stats!!.shows.watched.toString(), "${stats!!.shows.collected} collected") }
+            item { TraktStatCard("Episodes watched", stats!!.episodes.watched.toString(), "${stats!!.episodes.plays} plays · ${formatTraktMinutes(stats!!.episodes.minutes)}") }
+            item { TraktStatCard("Ratings", stats!!.ratings.total.toString(), "Movies ${stats!!.movies.ratings} · Shows ${stats!!.shows.ratings}") }
+            item { TraktStatCard("Followers", stats!!.network.followers.toString(), "Following ${stats!!.network.following} · Friends ${stats!!.network.friends}") }
+        }
+    }
+}
+
+@Composable
+private fun TraktStatCard(label: String, value: String, detail: String) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(CardDark)
+            .padding(18.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text(label, color = TextSecondary, fontSize = 14.sp)
+        Text(value, color = TextPrimary, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+        Text(detail, color = TextSecondary, fontSize = 12.sp)
+    }
+}
+
+private fun formatTraktMinutes(minutes: Int): String {
+    val hours = minutes / 60
+    return if (hours >= 24) "${hours / 24}d ${hours % 24}h" else "${hours}h"
 }
 
 @Composable

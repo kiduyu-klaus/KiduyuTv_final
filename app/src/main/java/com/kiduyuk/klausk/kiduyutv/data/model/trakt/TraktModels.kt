@@ -18,6 +18,35 @@ data class TraktUser(
     @SerializedName("avatar_url") val avatarUrl: String?
 )
 
+/** Aggregate statistics returned by Trakt's authenticated `users/me/stats` endpoint. */
+data class TraktUserStats(
+    @SerializedName("movies") val movies: TraktMediaStats = TraktMediaStats(),
+    @SerializedName("shows") val shows: TraktMediaStats = TraktMediaStats(),
+    @SerializedName("seasons") val seasons: TraktMediaStats = TraktMediaStats(),
+    @SerializedName("episodes") val episodes: TraktMediaStats = TraktMediaStats(),
+    @SerializedName("network") val network: TraktNetworkStats = TraktNetworkStats(),
+    @SerializedName("ratings") val ratings: TraktRatingStats = TraktRatingStats()
+)
+
+data class TraktMediaStats(
+    @SerializedName("plays") val plays: Int = 0,
+    @SerializedName("watched") val watched: Int = 0,
+    @SerializedName("minutes") val minutes: Int = 0,
+    @SerializedName("collected") val collected: Int = 0,
+    @SerializedName("ratings") val ratings: Int = 0,
+    @SerializedName("comments") val comments: Int = 0
+)
+
+data class TraktNetworkStats(
+    @SerializedName("friends") val friends: Int = 0,
+    @SerializedName("followers") val followers: Int = 0,
+    @SerializedName("following") val following: Int = 0
+)
+
+data class TraktRatingStats(
+    @SerializedName("total") val total: Int = 0
+)
+
 /**
  * Trakt ID mappings (TMDB, IMDB, TVDB, etc.)
  */

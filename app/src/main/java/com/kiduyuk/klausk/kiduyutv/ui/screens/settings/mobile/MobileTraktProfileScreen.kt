@@ -62,6 +62,7 @@ import com.kiduyuk.klausk.kiduyutv.data.api.ApiClient
 import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktUser
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktUserStats
 import com.kiduyuk.klausk.kiduyutv.data.remote.TraktApiClient
 import com.kiduyuk.klausk.kiduyutv.data.repository.TraktRepository
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
@@ -91,7 +92,7 @@ fun MobileTraktProfileScreen(
 ) {
     val context = LocalContext.current
     var selectedTabIndex by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Collection", "Watchlist", "Recommended")
+    val tabs = listOf("Collection", "Watchlist", "Recommended", "Stats")
     val handleBackClick = rememberPhoneInterstitialBackClick(onBackClick)
 
     BackHandler(onBack = handleBackClick)
@@ -222,10 +223,79 @@ fun MobileTraktProfileScreen(
                         onMovieClick = onMovieClick,
                         onTvShowClick = onTvShowClick
                     )
+                    3 -> MobileTraktStatsTabContent()
                 }
             }
         }
     }
+}
+
+@Composable
+private fun MobileTraktStatsTabContent() {
+    var stats by remember { mutableStateOf<TraktUserStats?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        isLoading = true
+        error = null
+        try {
+            val token = TraktAuthManager.getValidAccessToken()
+                ?: throw IllegalStateException("Not authenticated with Trakt.tv")
+            val response = TraktApiClient.apiService.getUserStats("Bearer $token")
+            if (response.isSuccessful) {
+                stats = response.body()
+            } else {
+                error = "Failed to load stats: ${response.code()}"
+            }
+        } catch (exception: Exception) {
+            error = exception.message ?: "Unable to load Trakt stats"
+        } finally {
+            isLoading = false
+        }
+    }
+
+    when {
+        isLoading -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = PrimaryRed, modifier = Modifier.size(32.dp))
+        }
+        error != null -> Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+            Text(error!!, color = Color.Red, textAlign = TextAlign.Center)
+        }
+        stats != null -> LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = 150.dp),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            item { MobileTraktStatCard("Movies watched", stats!!.movies.watched.toString(), "${stats!!.movies.plays} plays · ${formatMobileTraktMinutes(stats!!.movies.minutes)}") }
+            item { MobileTraktStatCard("Shows watched", stats!!.shows.watched.toString(), "${stats!!.shows.collected} collected") }
+            item { MobileTraktStatCard("Episodes watched", stats!!.episodes.watched.toString(), "${stats!!.episodes.plays} plays · ${formatMobileTraktMinutes(stats!!.episodes.minutes)}") }
+            item { MobileTraktStatCard("Ratings", stats!!.ratings.total.toString(), "Movies ${stats!!.movies.ratings} · Shows ${stats!!.shows.ratings}") }
+            item { MobileTraktStatCard("Followers", stats!!.network.followers.toString(), "Following ${stats!!.network.following} · Friends ${stats!!.network.friends}") }
+        }
+    }
+}
+
+@Composable
+private fun MobileTraktStatCard(label: String, value: String, detail: String) {
+    Column(
+        modifier = Modifier
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+            .background(CardDark)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(label, color = TextSecondary, fontSize = 12.sp)
+        Text(value, color = TextPrimary, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+        Text(detail, color = TextSecondary, fontSize = 11.sp)
+    }
+}
+
+private fun formatMobileTraktMinutes(minutes: Int): String {
+    val hours = minutes / 60
+    return if (hours >= 24) "${hours / 24}d ${hours % 24}h" else "${hours}h"
 }
 
 @Composable

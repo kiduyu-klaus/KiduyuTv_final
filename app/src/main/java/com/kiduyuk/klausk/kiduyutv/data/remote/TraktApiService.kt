@@ -11,6 +11,7 @@ import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktShow
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktSyncItems
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktSyncResponse
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktUser
+import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktUserStats
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktWatchedMovie
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktWatchedShow
 import com.kiduyuk.klausk.kiduyutv.data.model.trakt.TraktWatchlistItem
@@ -37,6 +38,12 @@ interface TraktApiService {
         @Header("Authorization") token: String,
         @Query("extended") extended: String = "full" // Defaults to "full" to always pull the bio
     ): Response<TraktUser>
+
+    /** Get aggregate watch, collection, rating, and social totals for the signed-in user. */
+    @GET("users/me/stats")
+    suspend fun getUserStats(
+        @Header("Authorization") token: String
+    ): Response<TraktUserStats>
 
     /**
      * Get user settings
