@@ -51,6 +51,24 @@ object StreamValidator {
     }
 
     /**
+     * DASH is the one stream family where a successful HTTP response is not
+     * enough. Media3 will parse the response as XML, so a provider endpoint
+     * that returns HTML/JSON/progressive media under a stale `dash` hint
+     * becomes ERROR_CODE_PARSING_MANIFEST_MALFORMED (3002).
+     */
+    fun isDashCandidate(stream: StreamItem): Boolean =
+        stream.type.equals("dash", ignoreCase = true) ||
+            stream.mimeType.equals("application/dash+xml", ignoreCase = true) ||
+            stream.url.substringBefore('?').endsWith(".mpd", ignoreCase = true)
+
+    /** Performs a body-aware DASH manifest check before automatic playback. */
+    suspend fun validateDashManifest(stream: StreamItem): Boolean =
+        withContext(Dispatchers.IO) {
+            if (!isDashCandidate(stream)) return@withContext true
+            probe(stream)
+        }
+
+    /**
      * Probe every stream in [streams] in parallel. Each item is mutated
      * in place: [StreamItem.isChecking] is toggled on/off and
      * [StreamItem.isValid] is set to the probe result.
@@ -120,6 +138,7 @@ object StreamValidator {
             stream.httpStatusCode = -1
             return false
         }
+        val requiresDashManifest = isDashCandidate(stream)
         val baseBuilder = Request.Builder().url(stream.url)
         stream.headers.forEach { (key, value) ->
             runCatching { baseBuilder.header(key, value) }
@@ -130,7 +149,9 @@ object StreamValidator {
                 stream.httpStatusCode = response.code
                 when {
                     response.isSuccessful -> {
-                        if (hasVideoStreamHeaders(response)) {
+                        // HEAD cannot prove that a DASH endpoint returned an
+                        // MPD. Always follow it with a small GET for DASH.
+                        if (!requiresDashManifest && hasVideoStreamHeaders(response)) {
                             return true
                         }
                         Log.i(
@@ -167,8 +188,19 @@ object StreamValidator {
                 }
 
                 val hasHeaders = hasVideoStreamHeaders(response)
+                if (requiresDashManifest && !hasDashManifestSignature(response)) {
+                    stream.isFailed = true
+                    val contentType = response.header("Content-Type").orEmpty()
+                    Log.w(
+                        TAG,
+                        "DASH candidate returned no MPD manifest; rejecting provider=" +
+                            "${stream.provider.ifBlank { "?" }} quality=${stream.quality} " +
+                            "contentType=$contentType"
+                    )
+                    return@use false
+                }
                 val hasSignature = if (hasHeaders) {
-                    true
+                    !requiresDashManifest || hasDashManifestSignature(response)
                 } else {
                     hasPlayableMediaSignature(response)
                 }
@@ -308,8 +340,7 @@ object StreamValidator {
         val textPrefix = prefix.copyOf(count).toString(Charsets.UTF_8)
             .trimStart('\uFEFF', ' ', '\t', '\r', '\n')
         val isHls = textPrefix.startsWith("#EXTM3U", ignoreCase = false)
-        val isDash = textPrefix.startsWith("<?xml", ignoreCase = true) ||
-            textPrefix.startsWith("<MPD", ignoreCase = true)
+        val isDash = DASH_MPD_TAG.containsMatchIn(textPrefix)
 
         val playable = isMatroska || isMp4 || isHls || isDash
         if (playable) {
@@ -320,6 +351,13 @@ object StreamValidator {
             )
         }
         return playable
+    }
+
+    private fun hasDashManifestSignature(response: okhttp3.Response): Boolean {
+        val prefix = runCatching { response.peekBody(8 * 1024L).string() }
+            .getOrDefault("")
+            .trimStart('\uFEFF', ' ', '\t', '\r', '\n')
+        return DASH_MPD_TAG.containsMatchIn(prefix)
     }
 
     /**
@@ -421,4 +459,6 @@ object StreamValidator {
             }
         }.getOrNull()
     }
+
+    private val DASH_MPD_TAG = Regex("<(?:(?:[A-Za-z_][\\w.-]*):)?MPD\\b", RegexOption.IGNORE_CASE)
 }

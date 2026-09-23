@@ -1348,7 +1348,11 @@ class DirectStreamActivity : AppCompatActivity() {
         )
         if (!stream.provider.equals("vidlink", ignoreCase = true)) {
             activeStream = stream
-            startStreamPlayback(stream, positionMs)
+            if (StreamValidator.isDashCandidate(stream)) {
+                preflightDashAndPlay(stream, positionMs)
+            } else {
+                startStreamPlayback(stream, positionMs)
+            }
             return
         }
 
@@ -1843,10 +1847,60 @@ class DirectStreamActivity : AppCompatActivity() {
         // Pre-flight 403 detection. If the manifest URL is gated by
         // Cloudflare, give the user the option to open the bypass screen
         // *before* ExoPlayer emits a generic "Playback failed" toast.
-        if (needsCloudflareBypass(chosen)) {
+        if (StreamValidator.isDashCandidate(chosen)) {
+            preflightDashAndPlay(chosen, resumeMs)
+        } else if (needsCloudflareBypass(chosen)) {
             offerCloudflareBypass(chosen, resumeMs)
         } else {
             startStreamPlayback(chosen, resumeMs)
+        }
+    }
+
+    /**
+     * A provider's `dash` hint is only trustworthy after its response begins
+     * with an MPD element. This avoids forwarding provider error pages and
+     * stale proxy responses into DashMediaSource, which reports opaque 3002
+     * malformed-manifest failures.
+     */
+    private fun preflightDashAndPlay(stream: StreamItem, resumeMs: Long) {
+        showStatus("Checking DASH manifest", retry = false)
+        lifecycleScope.launch {
+            val validManifest = withContext(Dispatchers.IO) {
+                StreamValidator.validateDashManifest(stream)
+            }
+            if (isFinishing || isDestroyed) return@launch
+            if (validManifest) {
+                startStreamPlayback(stream, resumeMs)
+                return@launch
+            }
+
+            val fallback = availableStreams
+                .asSequence()
+                .filter { it.url != stream.url && !it.isFailed }
+                .sortedByDescending { qualityRank(it.quality) }
+                .firstOrNull()
+            if (fallback != null) {
+                Log.w(
+                    PROVIDER_TAG,
+                    "DASH manifest rejected; trying fallback provider=${fallback.provider} " +
+                        "quality=${fallback.quality}"
+                )
+                Toast.makeText(
+                    this@DirectStreamActivity,
+                    "DASH source was invalid; trying another stream",
+                    Toast.LENGTH_LONG
+                ).show()
+                activeStream = fallback
+                if (StreamValidator.isDashCandidate(fallback)) {
+                    preflightDashAndPlay(fallback, resumeMs)
+                } else {
+                    startStreamPlayback(fallback, resumeMs)
+                }
+            } else {
+                activeStream = stream
+                showStatus("This source returned an invalid DASH manifest", retry = true)
+                showPlaybackErrorDialog("Invalid DASH manifest. Choose another stream or retry later.")
+            }
         }
     }
 
