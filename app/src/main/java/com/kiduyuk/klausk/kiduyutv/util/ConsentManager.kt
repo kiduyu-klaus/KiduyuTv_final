@@ -20,7 +20,7 @@ import com.unity3d.ads.metadata.MetaData
 object ConsentManager {
 
     private const val TAG = "ConsentManager"
-    @Volatile private var publisherMisconfigured = false
+    @Volatile private var consentResolved = false
 
     fun interface OnConsentGatheringCompleteListener {
         fun consentGatheringComplete(error: FormError?)
@@ -41,7 +41,9 @@ object ConsentManager {
             if (formError != null) {
                 Log.w(TAG, "Consent gathering completed with error: ${formError.message}")
             }
-            propagateConsentToAllNetworks(activity)
+            if (consentResolved && canRequestAds(activity)) {
+                propagateConsentToAllNetworks(activity)
+            }
             onComplete()
         }
     }
@@ -64,27 +66,23 @@ object ConsentManager {
             activity,
             params,
             {
-                publisherMisconfigured = false
                 UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity) { formError ->
-                    if (formError != null) {
-                        publisherMisconfigured = isPublisherConfigurationError(formError.message)
-                    }
+                    // A completed UMP flow may permit personalized or
+                    // non-personalized requests. A form/load error is not
+                    // permission to initialize an advertising SDK.
+                    consentResolved = formError == null
                     onConsentGatheringCompleteListener.consentGatheringComplete(formError)
                 }
             },
             { formError ->
-                publisherMisconfigured = isPublisherConfigurationError(formError.message)
+                consentResolved = false
                 Log.w(TAG, "Consent info update failed: ${formError.message}")
                 onConsentGatheringCompleteListener.consentGatheringComplete(formError)
             }
         )
     }
 
-    private fun isPublisherConfigurationError(message: String): Boolean {
-        return message.contains("form", ignoreCase = true) &&
-            (message.contains("configured", ignoreCase = true) ||
-                message.contains("configuration", ignoreCase = true))
-    }
+    fun hasResolvedConsent(): Boolean = consentResolved
 
     /**
      * Forwards the UMP consent decision to supported secondary networks.
@@ -130,7 +128,7 @@ object ConsentManager {
             info.canRequestAds()
         } catch (e: Exception) {
             Log.w(TAG, "Error checking consent status: ${e.message}")
-            true // Assume true if error occurs
+            false
         }
     }
 
@@ -189,19 +187,11 @@ object ConsentManager {
         try {
             val info = UserMessagingPlatform.getConsentInformation(context)
             info.reset()
-            publisherMisconfigured = false
+            consentResolved = false
             Log.i(TAG, "Consent reset")
         } catch (e: Exception) {
             Log.w(TAG, "Error resetting consent: ${e.message}")
         }
     }
 
-    /**
-     * True when the most recent UMP request failed because the AdMob app ID
-     * has no consent form configured in the publisher console. When true,
-     * `canRequestAds()` returns false but that is *not* a user opt-out —
-     * callers should still initialize the ad SDK and serve non-personalized
-     * ads rather than blocking the app entirely.
-     */
-    fun isPublisherMisconfigured(): Boolean = publisherMisconfigured
 }

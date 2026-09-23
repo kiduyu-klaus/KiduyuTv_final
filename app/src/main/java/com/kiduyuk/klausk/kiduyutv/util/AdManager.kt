@@ -32,8 +32,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 object AdManager {
 
     private const val TAG = "AdManager"
-    private const val MIN_INTERSTITIAL_INTERVAL_MS = 1 * 60 * 1000L  // 3 minutes
-
     @Volatile private var isInitialised = false
     private val isMobileAdsInitializeCalled = AtomicBoolean(false)
     @Volatile private var interstitialAd: InterstitialAd? = null
@@ -44,7 +42,6 @@ object AdManager {
     @Volatile private var isAppOpenLoading = false
     @Volatile private var appOpenShowing = false
     @Volatile private var appOpenLoadTime = 0L
-    @Volatile private var lastInterstitialShownAt = 0L
     private val pendingInitCallbacks = mutableListOf<() -> Unit>()
 
     /**
@@ -173,36 +170,11 @@ object AdManager {
     /**
      * Check if ads should be shown based on user settings and consent state.
      *
-     * Only an explicit user opt-out (the in-app "Disable ads" toggle) blocks
-     * ad serving. Publisher-side UMP misconfiguration does NOT block ads —
-     * it just means we'll serve non-personalized ads. This is important
-     * because once UMP fails with "no form configured", `canRequestAds()`
-     * permanently returns false until consent is reset, which would
-     * otherwise prevent any ad from ever loading.
+     * Eligibility is shared by every SDK wrapper and fails closed until UMP
+     * completes. A publisher configuration error must be fixed in the
+     * console; it is not consent to request ads.
      */
-    private fun shouldShowAds(context: Context): Boolean {
-        return try {
-            if (SettingsManager(context).isAdsDisabled()) {
-                Log.i(TAG, "Ads disabled by user setting — skipping initialization")
-                return false
-            }
-            if (ConsentManager.canRequestAds(context)) {
-                true
-            } else if (ConsentManager.isPublisherMisconfigured()) {
-                Log.w(
-                    TAG,
-                    "AdMob consent form not configured for app ID; serving non-personalized ads. " +
-                        "Configure one in the AdMob console (Privacy & messaging) to silence this warning."
-                )
-                true
-            } else {
-                Log.i(TAG, "User denied consent — skipping ad initialization")
-                false
-            }
-        } catch (e: Exception) {
-            true
-        }
-    }
+    private fun shouldShowAds(context: Context): Boolean = AdEligibility.canRequestAds(context)
 
     // ── Interstitial ──────────────────────────────────────────────────────
 
@@ -248,8 +220,7 @@ object AdManager {
             onDismissed()
             return
         }
-        val now = System.currentTimeMillis()
-        if (now - lastInterstitialShownAt < MIN_INTERSTITIAL_INTERVAL_MS) {
+        if (!FullscreenAdPolicy.canShowInterstitial(activity)) {
             Log.i(TAG, "Interstitial skipped - too soon since last show")
             onDismissed()
             return
@@ -263,7 +234,7 @@ object AdManager {
         }
         ad.fullScreenContentCallback = object : FullScreenContentCallback() {
             override fun onAdShowedFullScreenContent() {
-                lastInterstitialShownAt = System.currentTimeMillis()
+                FullscreenAdPolicy.recordInterstitialShown(activity)
                 Log.i(TAG, "Interstitial shown")
             }
 

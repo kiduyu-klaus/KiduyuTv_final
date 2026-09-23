@@ -22,7 +22,7 @@ import com.google.android.gms.ads.nativead.NativeAd
 import com.google.android.gms.ads.nativead.NativeAdView
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.util.AdManager
-import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
+import com.kiduyuk.klausk.kiduyutv.util.AdEligibility
 
 @Composable
 fun AdMobNativeAdView(
@@ -33,7 +33,7 @@ fun AdMobNativeAdView(
     val isPreviewMode = LocalInspectionMode.current
     var nativeAd by remember { mutableStateOf<NativeAd?>(null) }
 
-    if (isPreviewMode || SettingsManager(context).isAdsDisabled()) {
+    if (isPreviewMode || !AdEligibility.canRequestAds(context)) {
         Box(modifier = modifier)
         return
     }

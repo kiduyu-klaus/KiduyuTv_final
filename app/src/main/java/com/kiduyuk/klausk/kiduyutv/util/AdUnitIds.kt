@@ -1,6 +1,7 @@
 package com.kiduyuk.klausk.kiduyutv.util
 
 import android.util.Log
+import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
@@ -111,7 +112,14 @@ object AdUnitIds {
     }
 
     private fun parseConfig(snapshot: DataSnapshot): GoogleAdsConfig {
-        val useTestAds = snapshot.boolean("enable_test_ads") || snapshot.boolean("use_test_ads")
+        val remoteRequestedTestAds =
+            snapshot.boolean("enable_test_ads") || snapshot.boolean("use_test_ads")
+        // A live database value must never route release users to sample
+        // inventory. Release testing belongs in a dedicated internal build.
+        val useTestAds = BuildConfig.DEBUG && remoteRequestedTestAds
+        if (remoteRequestedTestAds && !BuildConfig.DEBUG) {
+            Log.w(TAG, "Ignoring remote test-ad flag in a release build")
+        }
 
         return GoogleAdsConfig(
             useTestAds = useTestAds,
@@ -168,7 +176,7 @@ object AdUnitIds {
     }
 
     private fun String.isValidAdUnitId(): Boolean {
-        return matches(Regex("^ca-app-pub-\\d{16}/\\d+$"))
+        return matches(Regex("^ca-app-pub-\\d{16}/\\d{10}$"))
     }
 
     private val GoogleAdsConfig.phoneIds: DeviceAdUnitIds

@@ -33,7 +33,7 @@ import com.google.android.gms.ads.AdView
 import com.google.android.gms.ads.LoadAdError
 import com.kiduyuk.klausk.kiduyutv.util.AdManager
 import com.kiduyuk.klausk.kiduyutv.util.AdUnitIds
-import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
+import com.kiduyuk.klausk.kiduyutv.util.AdEligibility
 import com.kiduyuk.klausk.kiduyutv.util.StartAppAdManager
 import com.kiduyuk.klausk.kiduyutv.util.UnityAdManager
 
@@ -47,7 +47,7 @@ fun TvBannerAdView(modifier: Modifier = Modifier) {
     val density = LocalResources.current.displayMetrics.density
     val screenWidthDp = (screenWidthPx / density).toInt().takeIf { it > 0 } ?: 360
 
-    if (SettingsManager(context).isAdsDisabled()) {
+    if (!AdEligibility.canRequestAds(context)) {
         Box(modifier = modifier)
         return
     }

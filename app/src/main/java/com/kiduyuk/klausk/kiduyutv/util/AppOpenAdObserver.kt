@@ -22,10 +22,18 @@ class AppOpenAdObserver private constructor(private val application: Application
         @Volatile
         private var installed = false
 
+        @Volatile
+        private var initialLaunchComplete = false
+
         fun install(application: Application) {
             if (installed) return
             installed = true
             AppOpenAdObserver(application)
+        }
+
+        /** Splash owns the initial route; this observer owns later foregrounds. */
+        fun markInitialLaunchComplete() {
+            initialLaunchComplete = true
         }
     }
 
@@ -37,6 +45,7 @@ class AppOpenAdObserver private constructor(private val application: Application
     }
 
     override fun onStart(owner: LifecycleOwner) {
+        if (!initialLaunchComplete) return
         currentActivity?.let { activity ->
             Log.i(TAG, "App moved to foreground, checking app open ad")
             AdManager.showAppOpenIfAvailable(activity)

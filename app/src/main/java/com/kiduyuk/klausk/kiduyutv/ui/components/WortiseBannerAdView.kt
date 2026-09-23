@@ -12,7 +12,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.kiduyuk.klausk.kiduyutv.util.AdFallbackDispatcher
-import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
+import com.kiduyuk.klausk.kiduyutv.util.AdEligibility
 import com.kiduyuk.klausk.kiduyutv.util.WortiseAdManager
 
 /**
@@ -38,7 +38,7 @@ fun WortiseBannerAdView(
     val activity = context as? Activity ?: return
 
     // Skip rendering if ads are disabled
-    if (SettingsManager(context).isAdsDisabled()) return
+    if (!AdEligibility.canRequestAds(context)) return
 
     DisposableEffect(activity) {
         onDispose {

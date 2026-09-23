@@ -23,19 +23,14 @@ import com.startapp.sdk.adsbase.adlisteners.AdEventListener
  * All public methods are safe to call even if the SDK failed to initialise:
  * they simply no-op and invoke the callback so the app flow continues.
  *
- * Interstitial frequency is guarded by [MIN_INTERSTITIAL_INTERVAL_MS] (3 min).
+ * Interstitial frequency is guarded by [FullscreenAdPolicy] (3 min globally).
  */
 object StartAppAdManager {
 
     private const val TAG = "StartAppAdManager"
-    private const val MIN_INTERSTITIAL_INTERVAL_MS = 3 * 60 * 1000L
-
     @Volatile
     var isInitialised = false
         private set
-
-    @Volatile
-    private var lastInterstitialShownAt = 0L
 
     /**
      * Initialize Start.io once after UMP consent has resolved.
@@ -71,11 +66,7 @@ object StartAppAdManager {
         }
     }
 
-    private fun shouldShowAds(context: Context): Boolean = try {
-        !SettingsManager(context).isAdsDisabled()
-    } catch (e: Exception) {
-        true
-    }
+    private fun shouldShowAds(context: Context): Boolean = AdEligibility.canRequestAds(context)
 
     // ── Banner ────────────────────────────────────────────────────────────
 
@@ -135,8 +126,7 @@ object StartAppAdManager {
             onDismissed()
             return
         }
-        val now = System.currentTimeMillis()
-        if (now - lastInterstitialShownAt < MIN_INTERSTITIAL_INTERVAL_MS) {
+        if (!FullscreenAdPolicy.canShowInterstitial(activity)) {
             onDismissed()
             return
         }
@@ -149,7 +139,7 @@ object StartAppAdManager {
                     startAppAd.showAd(object : AdDisplayListener {
                         override fun adDisplayed(ad: Ad?) {
                             Log.i(TAG, "StartApp interstitial displayed")
-                            lastInterstitialShownAt = System.currentTimeMillis()
+                            FullscreenAdPolicy.recordInterstitialShown(activity)
                         }
 
                         override fun adHidden(ad: Ad?) {

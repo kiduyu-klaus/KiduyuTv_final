@@ -23,12 +23,11 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Safe to call even if the SDK failed to initialise: methods no-op and
  * invoke callbacks so the app flow continues.
  *
- * Interstitial frequency is guarded by [MIN_INTERSTITIAL_INTERVAL_MS] (3 min).
+ * Interstitial frequency is guarded by [FullscreenAdPolicy] (3 min globally).
  */
 object UnityAdManager {
 
     private const val TAG = "UnityAdManager"
-    private const val MIN_INTERSTITIAL_INTERVAL_MS = 3 * 60 * 1000L
     private const val UNITY_GAME_ID_META = "com.unity3d.ads.UNITY_ADS_GAME_ID"
     private const val UNITY_TEST_MODE_META = "com.unity3d.ads.UNITY_ADS_TEST_MODE"
 
@@ -46,9 +45,6 @@ object UnityAdManager {
     @Volatile
     var isInitialised = false
         private set
-
-    @Volatile
-    private var lastInterstitialShownAt = 0L
 
     @Volatile
     private var currentBannerView: BannerView? = null
@@ -101,11 +97,7 @@ object UnityAdManager {
         }
     }
 
-    private fun shouldShowAds(context: Context): Boolean = try {
-        !SettingsManager(context).isAdsDisabled()
-    } catch (e: Exception) {
-        true
-    }
+    private fun shouldShowAds(context: Context): Boolean = AdEligibility.canRequestAds(context)
 
     private fun readUnityGameId(context: Context): String? = try {
         val ai = context.packageManager.getApplicationInfo(
@@ -319,8 +311,7 @@ object UnityAdManager {
             preloadAds(activity)
             return
         }
-        val now = System.currentTimeMillis()
-        if (now - lastInterstitialShownAt < MIN_INTERSTITIAL_INTERVAL_MS) {
+        if (!FullscreenAdPolicy.canShowInterstitial(activity)) {
             onDismissed()
             return
         }
@@ -360,7 +351,7 @@ object UnityAdManager {
                         state: UnityAds.UnityAdsShowCompletionState
                     ) {
                         Log.i(TAG, "Unity interstitial complete: $state")
-                        lastInterstitialShownAt = System.currentTimeMillis()
+                        FullscreenAdPolicy.recordInterstitialShown(activity)
                         requestInterstitial()
                         onDismissed()
                     }

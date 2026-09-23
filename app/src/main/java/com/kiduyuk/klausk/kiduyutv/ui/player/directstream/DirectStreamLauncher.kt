@@ -4,9 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
-import android.util.Log
-import com.kiduyuk.klausk.kiduyutv.util.AdManager
-import com.kiduyuk.klausk.kiduyutv.util.UnityAdManager
+import com.kiduyuk.klausk.kiduyutv.util.AdFallbackDispatcher
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -17,8 +15,6 @@ import java.util.concurrent.atomic.AtomicBoolean
  * the background.
  */
 object DirectStreamLauncher {
-
-    private const val TAG = "DirectStreamLauncher"
 
     fun launch(
         context: Context,
@@ -44,17 +40,12 @@ object DirectStreamLauncher {
 
         if (activity == null || activity.isFinishing || activity.isDestroyed) {
             openPlayer()
-        } else if (AdManager.isInterstitialReady) {
-            AdManager.showInterstitial(activity) { openPlayer() }
-        } else if (UnityAdManager.isInterstitialReady) {
-            UnityAdManager.showInterstitial(activity) { openPlayer() }
         } else {
-            // Do not wait for an ad network to load while the user is opening
-            // playback. Start a background preload for a future launch instead.
-            Log.i(TAG, "No ready interstitial — opening DirectStreamActivity immediately")
-            AdManager.preloadInterstitial(activity)
-            UnityAdManager.preloadAds(activity)
-            openPlayer()
+            AdFallbackDispatcher.showInterstitial(
+                activity = activity,
+                placement = AdFallbackDispatcher.AdPlacement.PLAYER_LAUNCH,
+                onDismissed = openPlayer
+            )
         }
     }
 

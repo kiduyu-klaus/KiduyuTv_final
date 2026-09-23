@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.util.Log
 import android.view.ViewGroup
-import com.kiduyuk.klausk.kiduyutv.util.WortiseAdManager.MIN_INTERSTITIAL_INTERVAL_MS
 import com.wortise.ads.AdError
 import com.wortise.ads.AdSize
 import com.wortise.ads.RevenueData
@@ -24,7 +23,7 @@ import com.wortise.ads.rewarded.models.Reward
  * Safe to call even if the SDK failed to initialise: methods no-op and
  * invoke callbacks so the app flow continues.
  *
- * Interstitial frequency is guarded by [MIN_INTERSTITIAL_INTERVAL_MS] (3 min).
+ * Interstitial frequency is guarded by [FullscreenAdPolicy] (3 min globally).
  *
  * **IMPORTANT:** Replace the placeholder [AD_UNIT_…] constants with your
  * actual Wortise dashboard ad unit IDs before release.
@@ -40,8 +39,6 @@ import com.wortise.ads.rewarded.models.Reward
 object WortiseAdManager {
 
     private const val TAG = "WortiseAdManager"
-    private const val MIN_INTERSTITIAL_INTERVAL_MS = 3 * 60 * 1000L
-
     // TODO: Replace these placeholders with your real Wortise ad unit IDs
     private const val AD_UNIT_BANNER = "90713170-a74f-4ccd-becd-324bb010b89a"
     private const val AD_UNIT_INTERSTITIAL = "2c5fbdcc-a843-4540-90cf-e6f2ccbfb4e8"
@@ -64,9 +61,6 @@ object WortiseAdManager {
         private set
 
     @Volatile
-    private var lastInterstitialShownAt = 0L
-
-    @Volatile
     private var interstitialAd: InterstitialAd? = null
 
     @Volatile
@@ -81,11 +75,7 @@ object WortiseAdManager {
     @Volatile
     private var appContext: Context? = null
 
-    private fun shouldShowAds(context: Context): Boolean = try {
-        !SettingsManager(context).isAdsDisabled()
-    } catch (e: Exception) {
-        true
-    }
+    private fun shouldShowAds(context: Context): Boolean = AdEligibility.canRequestAds(context)
 
     /**
      * Reads the Wortise App ID from the manifest <meta-data> tag.
@@ -265,8 +255,7 @@ object WortiseAdManager {
             onDismissed()
             return
         }
-        val now = System.currentTimeMillis()
-        if (now - lastInterstitialShownAt < MIN_INTERSTITIAL_INTERVAL_MS) {
+        if (!FullscreenAdPolicy.canShowInterstitial(activity)) {
             onDismissed()
             return
         }
@@ -281,7 +270,6 @@ object WortiseAdManager {
         try {
             ad.listener = createInterstitialListener(activity, onDismissed)
             ad.showAd(activity)
-            lastInterstitialShownAt = System.currentTimeMillis()
         } catch (e: com.wortise.ads.SdkNotInitializedException) {
             Log.w(TAG, "Interstitial show skipped — SDK init race: ${e.message}")
             interstitialAd = null
@@ -321,6 +309,7 @@ object WortiseAdManager {
 
             override fun onInterstitialShown(ad: InterstitialAd) {
                 Log.i(TAG, "Wortise interstitial shown")
+                activity?.let(FullscreenAdPolicy::recordInterstitialShown)
             }
 
             override fun onInterstitialImpression(ad: InterstitialAd) {

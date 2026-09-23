@@ -17,16 +17,18 @@ object TvInterstitialManager {
      */
     fun showAndThenLaunch(activity: Activity, onDismissed: () -> Unit) {
         Log.i(TAG, "Requesting interstitial via AdFallbackDispatcher")
-        AdFallbackDispatcher.showInterstitial(activity, onDismissed)
+        AdFallbackDispatcher.showInterstitial(
+            activity,
+            AdFallbackDispatcher.AdPlacement.TV_PLAYER_LAUNCH,
+            onDismissed
+        )
     }
 
     /**
-     * Shows an interstitial ad, then calls [onDismissed].
-     * Used for back navigation on TV detail screens.
+     * Back navigation is never monetized; return immediately.
      */
     fun showAndThen(activity: Activity, onDismissed: () -> Unit) {
-        Log.i(TAG, "Requesting interstitial via AdFallbackDispatcher")
-        AdFallbackDispatcher.showInterstitial(activity, onDismissed)
+        onDismissed()
     }
 
     val isReady: Boolean

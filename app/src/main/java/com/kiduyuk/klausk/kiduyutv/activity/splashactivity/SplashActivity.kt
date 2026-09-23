@@ -60,6 +60,7 @@ import com.kiduyuk.klausk.kiduyutv.util.UpdateUtil
 import com.kiduyuk.klausk.kiduyutv.util.ConsentManager
 import com.kiduyuk.klausk.kiduyutv.util.StartAppAdManager
 import com.kiduyuk.klausk.kiduyutv.util.AdManager
+import com.kiduyuk.klausk.kiduyutv.util.AppOpenAdObserver
 import com.kiduyuk.klausk.kiduyutv.util.UnityAdManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -528,9 +529,10 @@ class SplashActivity : ComponentActivity() {
         mainNavigationStarted = true
 
         Log.i(TAG, "Navigating to MainActivity...")
-        AdManager.showAppOpenIfAvailable(this) {
-            openMainActivity()
-        }
+        // AppOpenAdObserver owns foreground app-open opportunities after the
+        // initial route. Never stack an app-open ad on the splash transition.
+        AppOpenAdObserver.markInitialLaunchComplete()
+        openMainActivity()
     }
 
     private fun openMainActivity() {
