@@ -270,6 +270,7 @@ dependencies {
     // ─────────────────────────────────────────────
     implementation 'com.google.android.material:material:1.12.0'      // Material Design components
     implementation 'com.airbnb.android:lottie-compose:6.6.2'          // JSON-based animations
+    implementation 'com.github.skydoves:balloon:1.7.6'
 
     // ─────────────────────────────────────────────
     // Ads

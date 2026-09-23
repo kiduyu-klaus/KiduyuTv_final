@@ -39,6 +39,10 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.skydoves.balloon.ArrowPositionRules
+import com.skydoves.balloon.Balloon
+import com.skydoves.balloon.BalloonAnimation
+import com.skydoves.balloon.BalloonSizeSpec
 import com.kiduyuk.klausk.kiduyutv.data.local.database.DatabaseManager
 import com.kiduyuk.klausk.kiduyutv.data.model.Episode
 import com.kiduyuk.klausk.kiduyutv.data.model.SeasonDetail
@@ -108,6 +112,8 @@ class DirectStreamActivity : AppCompatActivity() {
     private var quitDialog: QuitDialog? = null
     private var cloudflareDialog: AlertDialog? = null
     private var playbackErrorDialog: AlertDialog? = null
+    private val playerTooltips = mutableMapOf<View, Balloon>()
+    private var activePlayerTooltip: Balloon? = null
     private var cloudflareProbeJob: Job? = null
     private var subtitleJob: Job? = null
     private var availableStreams: List<StreamItem> = emptyList()
@@ -509,6 +515,7 @@ class DirectStreamActivity : AppCompatActivity() {
         binding.btnEpisodes.setOnClickListener { toggleEpisodesPanel() }
         binding.btnCloseEpisodesPanel.setOnClickListener { closeEpisodesPanel() }
         binding.episodesPanelScrim.setOnClickListener { closeEpisodesPanel() }
+        installPlayerControlTooltips()
 
         // Pre-position the panel off-screen; openEpisodesPanel() will animate it in.
         binding.episodesPanelContainer.translationX = -binding.episodesPanelContainer.width.toFloat()
@@ -1182,6 +1189,78 @@ class DirectStreamActivity : AppCompatActivity() {
         )
         trackDialog?.setOnDismissListener { trackDialog = null }
         trackDialog?.show()
+    }
+
+    /**
+     * Shows short, focus-driven labels for the player chrome. This is aimed
+     * at TV/D-pad navigation, while touch users get the same hint whenever a
+     * button takes focus. Balloon is lifecycle-bound and auto-dismisses so a
+     * tooltip never obscures controls after selection moves on.
+     */
+    private fun installPlayerControlTooltips() {
+        listOf(
+            binding.btnPlayerBack,
+            binding.btnRewind,
+            binding.btnPlayPause,
+            binding.btnForward,
+            binding.btnSkipSegment,
+            binding.btnPreviousEpisode,
+            binding.btnFill,
+            binding.btnPlayerSubtitles,
+            binding.btnPlayerTracks,
+            binding.btnPlayerStreams,
+            binding.btnVolume,
+            binding.btnNextEpisode,
+            binding.btnEpisodes,
+            binding.btnCloseEpisodesPanel
+        ).forEach { button ->
+            button.setOnFocusChangeListener { view, hasFocus ->
+                if (hasFocus) {
+                    showPlayerTooltip(view)
+                } else {
+                    playerTooltips[view]?.dismiss()
+                }
+            }
+        }
+    }
+
+    private fun showPlayerTooltip(anchor: View) {
+        if (!anchor.isShown || !anchor.hasFocus()) return
+        val label = anchor.contentDescription?.toString()?.trim().orEmpty()
+        if (label.isBlank()) return
+
+        anchor.post {
+            if (!anchor.isShown || !anchor.hasFocus() || isFinishing || isDestroyed) return@post
+            val balloon = playerTooltips.getOrPut(anchor) {
+                Balloon.Builder(this)
+                    .setWidth(BalloonSizeSpec.WRAP)
+                    .setHeight(BalloonSizeSpec.WRAP)
+                    .setText(label)
+                    .setTextSize(14f)
+                    .setTextColorResource(R.color.text_primary)
+                    .setPadding(10)
+                    .setCornerRadius(8f)
+                    .setBackgroundColorResource(R.color.direct_stream_surface_high)
+                    .setArrowSize(8)
+                    .setArrowPositionRules(ArrowPositionRules.ALIGN_ANCHOR)
+                    .setBalloonAnimation(BalloonAnimation.FADE)
+                    .setAutoDismissDuration(1_800L)
+                    // A player-control hint must not take D-pad focus or block the
+                    // control's established click listener while it is visible.
+                    .setFocusable(false)
+                    .setLifecycleOwner(this)
+                    .build()
+            }
+            if (activePlayerTooltip !== balloon) {
+                activePlayerTooltip?.dismiss()
+                activePlayerTooltip = balloon
+            }
+            if (anchor === binding.btnPlayerBack || anchor === binding.btnSkipSegment) {
+                balloon.showAlignBottom(anchor)
+            } else {
+                balloon.showAlignTop(anchor)
+            }
+        }
     }
 
     private fun showStreamDialog() {
@@ -2981,6 +3060,9 @@ class DirectStreamActivity : AppCompatActivity() {
         cloudflareDialog = null
         playbackErrorDialog?.takeIf { it.isShowing }?.dismiss()
         playbackErrorDialog = null
+        playerTooltips.values.forEach(Balloon::dismiss)
+        playerTooltips.clear()
+        activePlayerTooltip = null
         pendingCloudflareStream = null
         pendingCloudflareResumeMs = 0L
         uiHandler.removeCallbacksAndMessages(null)
