@@ -39,8 +39,7 @@
                 android:type="radial"
                 android:centerX="256"
                 android:centerY="230"
-                android:gradientRadius="230"
-                android:type="radial">
+                android:gradientRadius="230">
                 <item android:offset="0.0" android:color="#FFB5701A" />
                 <item android:offset="0.6" android:color="#FF8A4E10" />
                 <item android:offset="1.0" android:color="#FF5C320A" />

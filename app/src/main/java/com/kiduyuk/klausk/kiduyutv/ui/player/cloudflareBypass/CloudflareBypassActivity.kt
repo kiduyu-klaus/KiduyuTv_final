@@ -279,6 +279,12 @@ class CloudflareBypassActivity : AppCompatActivity() {
             mainHandler.post {
                 if (isFinishing || isDestroyed) return@post
                 isDownloadLocked = true
+                // The lock page is authoritative. It may be reached after
+                // the original bulk URL has already redirected to a CFOK
+                // worker, so do not rely on the URL/mode supplied at launch.
+                // Once this page is detected, a successful CAPTCHA can return
+                // the same resolved URL with refreshed headers and cookies.
+                if (waitForDownload) completeOnUnlock = true
                 setStatus("Download locked. Please solve the captcha on screen.", isError = false)
                 dismissLoadingDialog()
                 Log.i(TAG, "[JS] Download Locked detected")
@@ -762,16 +768,38 @@ class CloudflareBypassActivity : AppCompatActivity() {
                     )
 
                     if (waitForDownload && isResolvedDownloadUrl(url)) {
-                        // The unlock callback and page-finished callback can
-                        // arrive in either order. This URL has already passed
-                        // isResolvedDownloadUrl(), so do not let the stale
-                        // lock flag suppress the result.
-                        completeWithDownload(
-                            url.orEmpty(),
-                            view?.settings?.userAgentString,
-                            null,
-                            allowWhileLocked = true
-                        )
+                        // A resolved CFOK URL can be either a playable media
+                        // response or a Download Locked HTML page. Inspect
+                        // the DOM before completing; otherwise the second
+                        // stream can close/return before its lock CAPTCHA is
+                        // solved, while the JS bridge is still initializing.
+                        view?.evaluateJavascript(
+                            """
+                            (function() {
+                                var h1s = document.getElementsByTagName('h1');
+                                for (var i = 0; i < h1s.length; i++) {
+                                    if ((h1s[i].innerText || h1s[i].textContent || '').trim() === 'Download Locked') return true;
+                                }
+                                return false;
+                            })();
+                            """.trimIndent()
+                        ) { rawResult ->
+                            val lockPage = rawResult?.trim() == "true"
+                            if (
+                                !lockPage && !isDownloadLocked &&
+                                !isFinishingForResult && !isReturningDownload &&
+                                !isFinishing && !isDestroyed
+                            ) {
+                                completeWithDownload(
+                                    url.orEmpty(),
+                                    view?.settings?.userAgentString,
+                                    null,
+                                    allowWhileLocked = true
+                                )
+                            } else if (lockPage) {
+                                Log.i(TAG, "Resolved URL is a Download Locked page; waiting for CAPTCHA")
+                            }
+                        }
                         return
                     }
                     if (isSolved) return
