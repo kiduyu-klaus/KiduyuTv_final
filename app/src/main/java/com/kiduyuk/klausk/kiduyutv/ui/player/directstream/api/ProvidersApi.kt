@@ -68,22 +68,92 @@ object ProvidersApi {
      * Current enabled-provider routing map. These categories are used only to
      * select among providers the backend says are currently enabled.
      */
-    private val providerPreferences: Map<String, Set<String>> = buildMap {
-        val movieAndTv = setOf(
-            "4khdhub", "showbox", "castletv", "cinejoy", "dahmermovies",
-            "hdhub4u", "hdmovie2", "meowtv", "movieblast", "netmirror",
-            "peachify", "playimdb", "vaplayer", "vegamovies", "vidbox",
-            "vidcore", "videasy", "vidlink", "vidlove", "vidrock", "vidup",
-            "webstreamr", "zxcstreams"
-        )
-        movieAndTv.forEach { put(it, setOf(MOVIES_CATEGORY, TV_CATEGORY)) }
-        setOf(
-            "anikage", "anikoto", "animegg", "animekai", "animeparadise",
-            "aniwaves", "hianime", "allwish", "animepahe"
-        ).forEach { put(it, setOf(ANIME_CATEGORY)) }
-        put("moviebox", setOf(MOVIES_CATEGORY, TV_CATEGORY, ANIME_CATEGORY))
-    }
-
+    private val providerPreferences: Map<String, Set<String>> = mapOf(
+        "2dhive" to setOf(ANIME_CATEGORY),
+        "4khdhub" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "showbox" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "allwish" to setOf(ANIME_CATEGORY),
+        "anibd" to setOf(ANIME_CATEGORY),
+        "anichan" to setOf(ANIME_CATEGORY),
+        "anidoor" to setOf(ANIME_CATEGORY),
+        "anikage" to setOf(ANIME_CATEGORY),
+        "anikai" to setOf(ANIME_CATEGORY),
+        "anikoto" to setOf(ANIME_CATEGORY),
+        "anikototv" to setOf(ANIME_CATEGORY),
+        "animeflix" to setOf(ANIME_CATEGORY),
+        "animegg" to setOf(ANIME_CATEGORY),
+        "animekai" to setOf(ANIME_CATEGORY),
+        "animepahe" to setOf(ANIME_CATEGORY),
+        "animeparadise" to setOf(ANIME_CATEGORY),
+        "animesalt" to setOf(ANIME_CATEGORY),
+        "animesdigital" to setOf(ANIME_CATEGORY),
+        "animesuge" to setOf(ANIME_CATEGORY),
+        "animezey" to setOf(ANIME_CATEGORY),
+        "animotvslash" to setOf(ANIME_CATEGORY),
+        "aniwaves" to setOf(ANIME_CATEGORY),
+        "antarctica" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "bollyflix" to setOf(MOVIES_CATEGORY),
+        "castletv" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "cineby" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "cinefreak" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "cinejoy" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "cinemacity" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "cinemaos" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "cinesrc" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "cinesrc_provider" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "cinewave" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "dahmermovies" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "desiflix" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "flixcloud" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "framextv" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "hdghartv" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "hdhub4u" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "hdmovie2" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "hexa" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "hianime" to setOf(ANIME_CATEGORY),
+        "hindmoviez" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "imdbplay" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "kisskh" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "kmmovies" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "lordflix" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "meowtv" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "movieblast" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "moviebox" to setOf(MOVIES_CATEGORY, TV_CATEGORY, ANIME_CATEGORY),
+        "movielinkbd" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "moviesdrive" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "movieshunt" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "necro" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "netlio" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "netmirror" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "nikastream" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "notorrent" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "pantyflix" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "peachify" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "playimdb" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "primeshows" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "raflix" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "stellar" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "streamflix" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "streamxtv" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "uhdmovies" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "vaplayer" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "vegamovies" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "vidbox" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "vidcore" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "videasy" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "vidfast" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "vidking" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "vidlink" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "vidlove" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "vidlux" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "vidrock" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "vidsrcsbs" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "vidup" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "vixsrc" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "watchseries" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "webstreamr" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "zxcstreams" to setOf(MOVIES_CATEGORY, TV_CATEGORY)
+)
     private val backendHealthClient by lazy {
         OkHttpClient.Builder()
             // callTimeout bounds DNS, connection, TLS, request and response as
