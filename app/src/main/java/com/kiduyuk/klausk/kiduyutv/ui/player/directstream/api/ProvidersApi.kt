@@ -79,7 +79,7 @@ object ProvidersApi {
         movieAndTv.forEach { put(it, setOf(MOVIES_CATEGORY, TV_CATEGORY)) }
         setOf(
             "anikage", "anikoto", "animegg", "animekai", "animeparadise",
-            "aniwaves", "hianime", "kisskh"
+            "aniwaves", "hianime", "allwish", "animepahe"
         ).forEach { put(it, setOf(ANIME_CATEGORY)) }
         put("moviebox", setOf(MOVIES_CATEGORY, TV_CATEGORY, ANIME_CATEGORY))
     }
