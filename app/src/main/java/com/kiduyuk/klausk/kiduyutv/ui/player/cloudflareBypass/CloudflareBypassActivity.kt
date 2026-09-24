@@ -353,6 +353,9 @@ class CloudflareBypassActivity : AppCompatActivity() {
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
+
     /** Polls CookieManager for `cf_clearance` while the challenge is open. */
     private val pollRunnable = object : Runnable {
         override fun run() {
