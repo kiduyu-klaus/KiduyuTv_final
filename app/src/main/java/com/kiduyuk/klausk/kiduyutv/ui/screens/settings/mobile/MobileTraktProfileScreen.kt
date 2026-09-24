@@ -239,25 +239,41 @@ private fun MobileTraktStatsTabContent() {
     LaunchedEffect(Unit) {
         isLoading = true
         error = null
+        Log.i("MobileTraktProfile", "Stats tab opened; requesting Trakt user stats")
         try {
             val token = TraktAuthManager.getValidAccessToken()
                 ?: throw IllegalStateException("Not authenticated with Trakt.tv")
             val response = TraktApiClient.apiService.getUserStats("Bearer $token")
             if (response.isSuccessful) {
                 stats = response.body()
+                if (stats == null) {
+                    error = "Trakt returned an empty stats response"
+                    Log.w("MobileTraktProfile", "Stats request succeeded but response body was empty")
+                } else {
+                    Log.i(
+                        "MobileTraktProfile",
+                        "Stats loaded: movies=${stats!!.movies.watched}, shows=${stats!!.shows.watched}, episodes=${stats!!.episodes.watched}"
+                    )
+                }
             } else {
                 error = "Failed to load stats: ${response.code()}"
+                Log.w("MobileTraktProfile", "Stats request failed: HTTP ${response.code()} ${response.message()}")
             }
         } catch (exception: Exception) {
             error = exception.message ?: "Unable to load Trakt stats"
+            Log.e("MobileTraktProfile", "Stats request threw an exception", exception)
         } finally {
             isLoading = false
+            Log.d("MobileTraktProfile", "Stats request finished; loading=$isLoading, hasStats=${stats != null}, error=${error != null}")
         }
     }
 
     when {
         isLoading -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = PrimaryRed, modifier = Modifier.size(32.dp))
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                CircularProgressIndicator(color = PrimaryRed, modifier = Modifier.size(32.dp))
+                Text("Loading Trakt stats…", color = TextSecondary, fontSize = 14.sp)
+            }
         }
         error != null -> Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
             Text(error!!, color = Color.Red, textAlign = TextAlign.Center)

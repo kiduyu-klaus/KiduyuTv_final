@@ -316,19 +316,32 @@ private fun TraktStatsTabContent() {
     LaunchedEffect(Unit) {
         isLoading = true
         error = null
+        Log.i("TraktProfileScreen", "Stats tab opened; requesting Trakt user stats")
         try {
             val token = TraktAuthManager.getValidAccessToken()
                 ?: throw IllegalStateException("Not authenticated with Trakt.tv")
             val response = TraktApiClient.apiService.getUserStats("Bearer $token")
             if (response.isSuccessful) {
                 stats = response.body()
+                if (stats == null) {
+                    error = "Trakt returned an empty stats response"
+                    Log.w("TraktProfileScreen", "Stats request succeeded but response body was empty")
+                } else {
+                    Log.i(
+                        "TraktProfileScreen",
+                        "Stats loaded: movies=${stats!!.movies.watched}, shows=${stats!!.shows.watched}, episodes=${stats!!.episodes.watched}"
+                    )
+                }
             } else {
                 error = "Failed to load stats: ${response.code()}"
+                Log.w("TraktProfileScreen", "Stats request failed: HTTP ${response.code()} ${response.message()}")
             }
         } catch (exception: Exception) {
             error = exception.message ?: "Unable to load Trakt stats"
+            Log.e("TraktProfileScreen", "Stats request threw an exception", exception)
         } finally {
             isLoading = false
+            Log.d("TraktProfileScreen", "Stats request finished; loading=$isLoading, hasStats=${stats != null}, error=${error != null}")
         }
     }
 
