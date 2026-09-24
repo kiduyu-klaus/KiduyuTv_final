@@ -1568,6 +1568,19 @@ class DirectStreamActivity : AppCompatActivity() {
                     StreamValidator.probeStatus(active)
                 }
                 if (isFinishing || isDestroyed) return@launch
+                if (statusCode == 429 && cloudflareDialog?.isShowing != true) {
+                    Log.w(
+                        TAG,
+                        "Playback returned HTTP 429; opening CloudflareBypassActivity " +
+                            "to refresh the locked download link"
+                    )
+                    playbackErrorDialog?.dismiss()
+                    pendingCloudflareStream = active
+                    pendingCloudflareResumeMs = engine.player.currentPosition.coerceAtLeast(0L)
+                    engine.player.stop()
+                    launchCloudflareBypass(active, preserveCookies = true)
+                    return@launch
+                }
                 if (statusCode == 426) {
                     val (_, isLocked) = withContext(Dispatchers.IO) {
                         StreamValidator.responseBodyContains(active, "<h1>Download Locked</h1>")

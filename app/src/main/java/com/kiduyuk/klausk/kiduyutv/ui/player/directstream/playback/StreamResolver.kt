@@ -51,7 +51,11 @@ class StreamResolver {
         // backend should be reported to the player immediately.
         ProvidersApi.requireBackendAvailable()
 
-        val enabledProviderNames = ProvidersApi.enabledProviderNamesForMedia(type, tmdbId)
+        // Category-based routing is intentionally disabled for now. Query all
+        // enabled providers for every movie/series so providers are not lost
+        // when TMDB genre metadata is missing or incomplete. An explicitly
+        // selected/default provider is still narrowed below.
+        val enabledProviderNames = ProvidersApi.enabledProviderNames()
         val selectedProvider = provider.key.takeIf { selected ->
             enabledProviderNames.any { it.equals(selected, ignoreCase = true) }
         }
