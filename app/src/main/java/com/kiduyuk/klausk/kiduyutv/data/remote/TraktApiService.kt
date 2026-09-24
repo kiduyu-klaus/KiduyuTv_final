@@ -46,6 +46,18 @@ interface TraktApiService {
     ): Response<TraktUserStats>
 
     /**
+     * Get aggregate stats for a concrete Trakt username.
+     *
+     * Some API/proxy combinations acknowledge the me alias but return an empty
+     * response body, so callers that already know the profile should use this endpoint.
+     */
+    @GET("users/{username}/stats")
+    suspend fun getUserStatsForUser(
+        @Path("username") username: String,
+        @Header("Authorization") token: String
+    ): Response<TraktUserStats>
+
+    /**
      * Get user settings
      */
     @GET("users/me/settings")

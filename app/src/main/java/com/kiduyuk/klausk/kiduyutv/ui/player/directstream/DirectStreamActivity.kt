@@ -104,6 +104,7 @@ class DirectStreamActivity : AppCompatActivity() {
     private lateinit var resolver: StreamResolver
 
     private var streamJob: Job? = null
+    private val providerFetchControlVisibility = LinkedHashMap<View, Int>()
     private var trackDialog: TrackSelectionDialog? = null
     private var streamDialog: StreamSelectionDialog? = null
     private var subtitleDialog: AlertDialog? = null
@@ -1641,6 +1642,7 @@ class DirectStreamActivity : AppCompatActivity() {
         handlingPlaybackError = false
         binding.btnPlayerStreams.visibility = View.GONE
         updateBottomFocusChain()
+        showProviderFetchProgress()
         showStatus("Fetching enabled providers", retry = false)
         streamJob = lifecycleScope.launch {
             val result = runCatching {
@@ -1652,6 +1654,7 @@ class DirectStreamActivity : AppCompatActivity() {
                     provider = provider,
                     onProviderProgress = { index, total, providerName ->
                         withContext(Dispatchers.Main) {
+                            updateProviderFetchProgress(index, total)
                             showStatus(
                                 "Provider $index/$total completed: $providerName\nstreams fetched",
                                 retry = false
@@ -1669,6 +1672,7 @@ class DirectStreamActivity : AppCompatActivity() {
                 )
             }
             result.onSuccess { items ->
+                hideProviderFetchProgress()
                 Log.i(PROVIDER_TAG, "loadAndPlay received ${items.size} streams for provider=${provider.displayName}")
                 if (items.isEmpty()) {
                     Log.w(PROVIDER_TAG, "Empty stream list for provider=${provider.displayName}")
@@ -1684,6 +1688,7 @@ class DirectStreamActivity : AppCompatActivity() {
                     validateStreamsInBackground(items)
                 }
             }.onFailure { error ->
+                hideProviderFetchProgress()
                 Log.w(TAG, "Stream fetch failed: ${error.message}")
                 Log.w(PROVIDER_TAG, "Stream fetch failed for provider=${provider.displayName}: ${error.message}")
                 if (error is ProvidersBackendUnavailableException) {
@@ -2378,6 +2383,58 @@ class DirectStreamActivity : AppCompatActivity() {
         } else {
             binding.playerStatus.setOnClickListener(null)
         }
+    }
+
+    /**
+     * Replaces all player buttons with the provider-fetch progress indicator.
+     * Each control's original visibility is retained so feature-specific
+     * controls (episodes, tracks, and streams) return to the correct state.
+     */
+    private fun showProviderFetchProgress() {
+        if (providerFetchControlVisibility.isEmpty()) {
+            listOf(
+                binding.topBar,
+                binding.btnRewind,
+                binding.btnPlayPause,
+                binding.btnForward,
+                binding.skipOverlayContainer,
+                binding.videoBottomStrip
+            ).forEach { control ->
+                providerFetchControlVisibility[control] = control.visibility
+                control.visibility = View.GONE
+            }
+            binding.providerFetchProgress.reset()
+            binding.providerFetchProgress.alpha = 1f
+            binding.providerFetchProgress.visibility = View.VISIBLE
+        }
+        binding.providerFetchProgress.setProviderProgress(completed = 0, total = 0)
+    }
+
+    private fun updateProviderFetchProgress(completed: Int, total: Int) {
+        if (binding.providerFetchProgress.visibility == View.VISIBLE) {
+            binding.providerFetchProgress.setProviderProgress(completed, total)
+        }
+    }
+
+    /**
+     * The controls are restored only after the indicator's dismiss animation
+     * completes, keeping the loading UI free of actionable player buttons.
+     */
+    private fun hideProviderFetchProgress() {
+        if (providerFetchControlVisibility.isEmpty()) return
+        binding.providerFetchProgress.animate()
+            .alpha(0f)
+            .setDuration(180L)
+            .withEndAction {
+                binding.providerFetchProgress.visibility = View.GONE
+                binding.providerFetchProgress.alpha = 1f
+                providerFetchControlVisibility.forEach { (control, visibility) ->
+                    control.visibility = visibility
+                }
+                providerFetchControlVisibility.clear()
+                updateBottomFocusChain()
+            }
+            .start()
     }
 
     private fun showLoadingArtwork() {

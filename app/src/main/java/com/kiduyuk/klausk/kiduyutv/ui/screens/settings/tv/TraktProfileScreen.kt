@@ -320,21 +320,41 @@ private fun TraktStatsTabContent() {
         try {
             val token = TraktAuthManager.getValidAccessToken()
                 ?: throw IllegalStateException("Not authenticated with Trakt.tv")
-            val response = TraktApiClient.apiService.getUserStats("Bearer $token")
-            if (response.isSuccessful) {
-                stats = response.body()
-                if (stats == null) {
-                    error = "Trakt returned an empty stats response"
-                    Log.w("TraktProfileScreen", "Stats request succeeded but response body was empty")
-                } else {
-                    Log.i(
-                        "TraktProfileScreen",
-                        "Stats loaded: movies=${stats!!.movies.watched}, shows=${stats!!.shows.watched}, episodes=${stats!!.episodes.watched}"
-                    )
-                }
+            val authorization = "Bearer $token"
+            val profileResponse = TraktApiClient.apiService.getUserProfile(authorization)
+            if (!profileResponse.isSuccessful) {
+                error = "Failed to identify Trakt profile: ${profileResponse.code()}"
+                Log.w(
+                    "TraktProfileScreen",
+                    "Stats profile request failed: HTTP ${profileResponse.code()} ${profileResponse.message()}"
+                )
             } else {
-                error = "Failed to load stats: ${response.code()}"
-                Log.w("TraktProfileScreen", "Stats request failed: HTTP ${response.code()} ${response.message()}")
+                val username = profileResponse.body()?.username?.trim().orEmpty()
+                if (username.isBlank()) {
+                    error = "Trakt profile did not include a username"
+                    Log.w("TraktProfileScreen", "Stats profile request succeeded without a username")
+                } else {
+                    Log.i("TraktProfileScreen", "Stats: resolved Trakt username=$username; requesting concrete stats endpoint")
+                    val response = TraktApiClient.apiService.getUserStatsForUser(username, authorization)
+                    if (response.isSuccessful) {
+                        stats = response.body()
+                        if (stats == null) {
+                            error = "Trakt returned an empty stats response"
+                            Log.w(
+                                "TraktProfileScreen",
+                                "Stats request for username=$username succeeded but response body was empty: HTTP ${response.code()}"
+                            )
+                        } else {
+                            Log.i(
+                                "TraktProfileScreen",
+                                "Stats loaded: movies=${stats!!.movies.watched}, shows=${stats!!.shows.watched}, episodes=${stats!!.episodes.watched}"
+                            )
+                        }
+                    } else {
+                        error = "Failed to load stats: ${response.code()}"
+                        Log.w("TraktProfileScreen", "Stats request for username=$username failed: HTTP ${response.code()} ${response.message()}")
+                    }
+                }
             }
         } catch (exception: Exception) {
             error = exception.message ?: "Unable to load Trakt stats"

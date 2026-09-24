@@ -65,23 +65,20 @@ object ProvidersApi {
     private const val streamApiToken = BuildConfig.STREAM_API_TOKEN
 
     /**
-     * Android copy of kiduyu-providers/map.json. These categories are used
-     * only to select among providers the backend says are currently enabled.
+     * Current enabled-provider routing map. These categories are used only to
+     * select among providers the backend says are currently enabled.
      */
     private val providerPreferences: Map<String, Set<String>> = buildMap {
         val movieAndTv = setOf(
-            "4khdhub", "castletv", "cinejoy", "cinemacity", "cinemaos",
-            "cinesrc", "cinesrc_provider", "dahmermovies", "hdghartv",
-            "hdhub4u", "hdmovie2", "hexa", "kisskh", "lordflix", "meowtv",
-            "movieblast", "netmirror", "notorrent", "peachify", "playimdb",
-            "showbox", "streamflix", "uhdmovies", "vaplayer", "vegamovies",
-            "vidbox", "vidcore", "videasy", "vidfast", "vidlink", "vidlove",
-            "vidlux", "vidrock", "vidup", "vixsrc", "webstreamr", "zxcstreams"
+            "4khdhub", "showbox", "castletv", "cinejoy", "dahmermovies",
+            "hdhub4u", "hdmovie2", "meowtv", "movieblast", "netmirror",
+            "peachify", "playimdb", "vaplayer", "vegamovies", "vidbox",
+            "vidcore", "videasy", "vidlink", "vidlove", "vidrock", "vidup",
+            "webstreamr", "zxcstreams"
         )
         movieAndTv.forEach { put(it, setOf(MOVIES_CATEGORY, TV_CATEGORY)) }
         setOf(
-            "allwish", "anikai", "anikoto", "animekai", "animepahe",
-            "animesalt", "animezey", "aniwaves", "flixcloud"
+            "anikoto", "animekai", "aniwaves", "kisskh"
         ).forEach { put(it, setOf(ANIME_CATEGORY)) }
         put("moviebox", setOf(MOVIES_CATEGORY, TV_CATEGORY, ANIME_CATEGORY))
     }

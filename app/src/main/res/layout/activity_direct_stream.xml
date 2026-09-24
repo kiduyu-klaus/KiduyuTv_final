@@ -462,6 +462,16 @@
 
     <!-- Kept outside overlayControls so buffering remains visible after
          the playback controls automatically hide. -->
+    <com.kiduyuk.klausk.kiduyutv.ui.player.directstream.AnimatedSemiCircleProgressView
+        android:id="@+id/providerFetchProgress"
+        android:layout_width="260dp"
+        android:layout_height="170dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="28dp"
+        android:contentDescription="@string/streams_loading"
+        android:elevation="14dp"
+        android:visibility="gone" />
+
     <TextView
         android:id="@+id/playerStatus"
         android:layout_width="wrap_content"
