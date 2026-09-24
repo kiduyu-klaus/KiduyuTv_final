@@ -26,7 +26,7 @@ class StreamResolver {
     private val tag = "KiduyuLiteProvider"
 
     private companion object {
-        const val MAX_CONCURRENT_PROVIDER_REQUESTS = 10
+        const val MAX_CONCURRENT_PROVIDER_REQUESTS = 7
     }
 
     /**

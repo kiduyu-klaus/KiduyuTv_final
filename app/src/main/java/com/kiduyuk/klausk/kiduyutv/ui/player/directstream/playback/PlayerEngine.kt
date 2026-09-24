@@ -333,7 +333,12 @@ class PlayerEngine(context: Context) {
         ) return true
 
         val lower = stream.url.lowercase()
-        if (lower.contains(".m3u8")) return true
+        val path = lower.substringBefore('?')
+        if (
+            lower.contains(".m3u8") ||
+                path.contains("/m3u8/") ||
+                path.endsWith("/m3u8")
+        ) return true
         if (lower.contains("/m3u8-proxy") || lower.contains("/m3u8_proxy")) return true
         // Hexa's CDN serves HLS playlists through extensionless signed proxy
         // URLs. Deployed backends predating the explicit type field still

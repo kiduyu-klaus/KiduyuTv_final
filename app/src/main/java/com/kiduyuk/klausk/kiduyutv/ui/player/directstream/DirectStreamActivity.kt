@@ -1568,21 +1568,21 @@ class DirectStreamActivity : AppCompatActivity() {
                     StreamValidator.probeStatus(active)
                 }
                 if (isFinishing || isDestroyed) return@launch
-                if (statusCode == 429) {
+                if (statusCode == 426) {
                     val (_, isLocked) = withContext(Dispatchers.IO) {
                         StreamValidator.responseBodyContains(active, "<h1>Download Locked</h1>")
                     }
                     if (isLocked && cloudflareDialog?.isShowing != true) {
                         Log.w(
                             TAG,
-                            "Playback returned HTTP 429 with a locked-download page; " +
+                            "Playback returned HTTP 426 with a locked-download page; " +
                                 "opening CloudflareBypassActivity"
                         )
                         playbackErrorDialog?.dismiss()
                         pendingCloudflareStream = active
                         pendingCloudflareResumeMs = engine.player.currentPosition.coerceAtLeast(0L)
                         engine.player.stop()
-                        launchCloudflareBypass(active)
+                        launchCloudflareBypass(active, preserveCookies = true)
                         return@launch
                     }
                 }
@@ -2250,7 +2250,10 @@ class DirectStreamActivity : AppCompatActivity() {
      * `RESULT_OK`. Our [cloudflareBypassLauncher] picks that result up and
      * retries [stream].
      */
-    private fun launchCloudflareBypass(stream: StreamItem) {
+    private fun launchCloudflareBypass(
+        stream: StreamItem,
+        preserveCookies: Boolean = false
+    ) {
         // Cloudflare challenges can be scoped to a path/query rather than the
         // host root. Always pass the exact URL that returned 403; invalid stream
         // URLs are rejected instead of silently loading a different host page.
@@ -2267,14 +2270,15 @@ class DirectStreamActivity : AppCompatActivity() {
             return
         }
 
+        val waitForDownload = isDahmerMoviesStream(stream) ||
+            isGoogleusercontentStream(stream) ||
+            isCfokDownloadStream(stream)
         val intent = Intent(this, CloudflareBypassActivity::class.java).apply {
             putExtra(CloudflareBypassActivity.EXTRA_HOST, bypassHost)
             putExtra(CloudflareBypassActivity.EXTRA_URL, fullVerificationUrl)
             putExtra(
                 CloudflareBypassActivity.EXTRA_WAIT_FOR_DOWNLOAD,
-                isDahmerMoviesStream(stream) ||
-                    isGoogleusercontentStream(stream) ||
-                    isCfokDownloadStream(stream)
+                waitForDownload
             )
             putExtra(
                 CloudflareBypassActivity.EXTRA_REQUEST_HEADERS,
@@ -2294,6 +2298,26 @@ class DirectStreamActivity : AppCompatActivity() {
             "Launching CloudflareBypassActivity for ${stream.provider} " +
                 "${stream.quality} verificationHost=$bypassHost"
         )
+        if (preserveCookies) {
+            Log.i(
+                TAG,
+                "Resolved-stream download-lock bypass: preserving existing cookies before " +
+                    "opening CloudflareBypassActivity"
+            )
+            runCatching {
+                cloudflareBypassLauncher.launch(intent)
+            }.onFailure { error ->
+                Log.e(TAG, "Failed to launch CloudflareBypassActivity", error)
+                Toast.makeText(
+                    this,
+                    R.string.cloudflare_bypass_open_failed,
+                    Toast.LENGTH_LONG
+                ).show()
+                pendingCloudflareStream = null
+                pendingCloudflareResumeMs = 0L
+            }
+            return
+        }
         if (isClearingCookiesForCloudflareBypass) {
             Log.w(TAG, "Cloudflare bypass launch already waiting for cookie deletion")
             return
