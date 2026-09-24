@@ -428,15 +428,34 @@ class StreamSelectionDialog(
                         )
                     }
                 }
-                Text(
-                    text = context.getString(
-                        R.string.stream_language_label,
-                        detectLanguages(stream).joinToString(" • ")
-                    ),
-                    color = TextSecondary,
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = context.getString(
+                            R.string.stream_language_label,
+                            detectLanguages(stream).joinToString(" • ")
+                        ),
+                        color = TextSecondary,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (stream.subtitles.isNotEmpty()) {
+                        Text(
+                            text = context.getString(R.string.stream_with_srt),
+                            color = TextPrimary,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .background(ComposeColor(0xFF2E7D32), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 7.dp, vertical = 4.dp)
+                        )
+                    }
+                }
             }
         }
     }

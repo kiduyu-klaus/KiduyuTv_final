@@ -1411,14 +1411,30 @@ class DirectStreamActivity : AppCompatActivity() {
             it.label?.startsWith("SubDL", ignoreCase = true) == true ||
                 it.label?.startsWith("OpenSubtitles", ignoreCase = true) == true
         }
+        val updatedStream = stream.copy(
+            subtitles = (stream.subtitles + subtitle).distinctBy { it.url }
+        )
+        activeStream = updatedStream
+        availableStreams = availableStreams.map { candidate ->
+            if (candidate.url == stream.url) {
+                candidate.copy(
+                    subtitles = (candidate.subtitles + subtitle).distinctBy { it.url }
+                )
+            } else {
+                candidate
+            }
+        }
+        // Refresh an open selector immediately so the stream receives the
+        // "with SRT" badge as soon as the downloaded track is attached.
+        streamDialog?.updateStreams(availableStreams, activeUrl = updatedStream.url)
         Log.i(
             TAG,
             "Loading external subtitle label=${subtitle.label.orEmpty()} " +
                 "language=${subtitle.language.orEmpty()} mimeType=${subtitle.mimeType}"
         )
-        pendingReadySeekPositionMs = playableStartPosition(stream, positionMs)
+        pendingReadySeekPositionMs = playableStartPosition(updatedStream, positionMs)
         showStatus(getString(R.string.buffering), retry = false)
-        engine.play(stream, 0L, activeSubtitles)
+        engine.play(updatedStream, 0L, activeSubtitles)
     }
 
     private fun switchStream(stream: StreamItem) {

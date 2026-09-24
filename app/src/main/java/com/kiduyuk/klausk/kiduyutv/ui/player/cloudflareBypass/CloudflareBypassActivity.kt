@@ -283,6 +283,25 @@ class CloudflareBypassActivity : AppCompatActivity() {
                 isDownloadLocked = false
                 setStatus("✓ Unlocked! Waiting for media link...", isError = false)
                 Log.i(TAG, "[JS] Download Unlocked detected")
+                if (waitForDownload && !isFinishingForResult && !isReturningDownload) {
+                    // Some download-lock pages unlock the existing media URL
+                    // in place instead of redirecting to a new URL. Return
+                    // that same URL immediately with the refreshed WebView
+                    // headers/cookies so the caller can replace the stream
+                    // request context and resume playback.
+                    val unlockedUrl = targetUrl.ifBlank { lastMainFrameUrl }
+                    Log.i(
+                        TAG,
+                        "[JS] Download lock solved without URL change; returning refreshed " +
+                            "headers for ${Uri.parse(unlockedUrl).host.orEmpty()}"
+                    )
+                    completeWithDownload(
+                        unlockedUrl,
+                        webView.settings.userAgentString,
+                        null,
+                        allowWhileLocked = true
+                    )
+                }
             }
         }
     }
