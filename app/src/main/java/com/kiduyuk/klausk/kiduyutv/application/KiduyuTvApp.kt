@@ -26,8 +26,6 @@ import com.kiduyuk.klausk.kiduyutv.util.LogcatManager
 import com.kiduyuk.klausk.kiduyutv.util.NotificationHelper
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager
-import java.util.concurrent.TimeUnit
-
 /**
  * A Custom Application class for KiduyuTv.
  * This class handles app-wide initializations and provides a centralized
@@ -139,8 +137,9 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
         // Start network connectivity monitoring
         NetworkConnectivityChecker.startMonitoring(this)
 
-        // Start logcat capture for debugging purposes
-        LogcatManager.deleteLogsOlderThan(this, TimeUnit.HOURS.toMillis(1))
+        // Start each app session with a clean log directory so old captures
+        // cannot accumulate across launches.
+        LogcatManager.clearAllLogs(this)
         LogcatManager.start(this)
     }
 

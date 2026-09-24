@@ -33,6 +33,31 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="#99000000" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <com.airbnb.lottie.LottieAnimationView
+                android:id="@+id/bufferingAnimation"
+                android:layout_width="96dp"
+                android:layout_height="96dp"
+                android:contentDescription="@string/buffering_animation"
+                app:lottie_autoPlay="true"
+                app:lottie_loop="true"
+                app:lottie_rawRes="@raw/loading_buffering" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/wait_a_moment"
+                android:textColor="@android:color/white"
+                android:textSize="16sp" />
+        </LinearLayout>
     </FrameLayout>
 
     <FrameLayout
