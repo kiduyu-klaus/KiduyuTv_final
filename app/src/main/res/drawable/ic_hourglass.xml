@@ -1,0 +1,66 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="512dp"
+    android:height="512dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+
+    <!-- Top orange cap -->
+    <path
+        android:pathData="M164,60
+            L348,60
+            C358,60 366,68 366,78
+            C366,88 358,96 348,96
+            L164,96
+            C154,96 146,88 146,78
+            C146,68 154,60 164,60 Z"
+        android:fillColor="#EE9C43" />
+
+    <!-- Bottom orange cap -->
+    <path
+        android:pathData="M164,416
+            L348,416
+            C358,416 366,424 366,434
+            C366,444 358,452 348,452
+            L164,452
+            C154,452 146,444 146,434
+            C146,424 154,416 164,416 Z"
+        android:fillColor="#EE9C43" />
+
+    <!-- Glass body (light teal) -->
+    <path
+        android:pathData="M172,96
+            L340,96
+            L340,150
+            C340,190 320,222 256,266
+            C192,222 172,190 172,150 Z
+            M172,416
+            L340,416
+            L340,362
+            C340,322 320,290 256,246
+            C192,290 172,322 172,362 Z"
+        android:fillColor="#7FC1C9" />
+
+    <!-- Neck line connecting top and bottom -->
+    <path
+        android:pathData="M253,262 L253,250 L259,250 L259,262 Z
+            M253,262 C253,290 253,310 253,330 L259,330 C259,310 259,290 259,262 Z"
+        android:fillColor="#1C8A8F" />
+
+    <!-- Top sand mound (dark teal) -->
+    <path
+        android:pathData="M188,140
+            C230,118 282,118 324,140
+            C332,144 332,156 324,168
+            C300,204 276,228 256,250
+            C236,228 212,204 188,168
+            C180,156 180,144 188,140 Z"
+        android:fillColor="#1C8A8F" />
+
+    <!-- Bottom sand pile (dark teal) -->
+    <path
+        android:pathData="M186,412
+            C196,360 224,328 256,330
+            C288,328 316,360 326,412 Z"
+        android:fillColor="#1C8A8F" />
+
+</vector>

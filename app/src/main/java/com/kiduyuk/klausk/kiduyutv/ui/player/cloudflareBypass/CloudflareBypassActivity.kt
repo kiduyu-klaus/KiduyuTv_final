@@ -28,7 +28,9 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -246,6 +248,9 @@ class CloudflareBypassActivity : AppCompatActivity() {
     private lateinit var topBar: LinearLayout
     private lateinit var backButton: ImageButton
     private lateinit var titleView: TextView
+    private lateinit var headerStatusView: TextView
+    private lateinit var headerDescriptionView: TextView
+    private lateinit var timeoutProgress: ProgressBar
     private lateinit var statusView: TextView
     private lateinit var webView: WebView
     private lateinit var loadingDialog: ProgressDialog
@@ -347,6 +352,7 @@ class CloudflareBypassActivity : AppCompatActivity() {
         override fun run() {
             if (isFinishing || isDestroyed) return
             if (isSolved) return
+            updateTimeoutProgress()
             if (hasCfClearance()) {
                 onChallengeSolved()
                 return
@@ -366,6 +372,10 @@ class CloudflareBypassActivity : AppCompatActivity() {
             if (isFinishing || isDestroyed || isSolved) return@run
             Log.w(TAG, "Challenge did not solve within ${timeoutMs}ms")
             setStatus("Cloudflare challenge timed out. Tap retry or close.", isError = true)
+            if (::headerStatusView.isInitialized) {
+                headerStatusView.text = "Timed out — close and try again"
+            }
+            if (::timeoutProgress.isInitialized) timeoutProgress.progress = 0
         }
     }
 
@@ -493,7 +503,20 @@ class CloudflareBypassActivity : AppCompatActivity() {
             setBackgroundColor(0xFF000000.toInt())
         }
 
-        // ── Top bar ────────────────────────────────────────────────────────
+        // ── Material-inspired header ───────────────────────────────────────
+        // Keep the WebView visually central: the header is compact, the
+        // challenge occupies the large middle card, and status is separated
+        // into a quiet footer like the reference design.
+        val shield = ImageView(this).apply {
+            setImageResource(R.drawable.ic_shield_gold)
+            contentDescription = "Cloudflare security"
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+        }
+        val hourglass = ImageView(this).apply {
+            setImageResource(R.drawable.ic_hourglass)
+            contentDescription = "Waiting"
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+        }
         backButton = ImageButton(this).apply {
             setImageResource(R.drawable.ic_arrow_back)
             setBackgroundColor(0x00000000)
@@ -502,44 +525,82 @@ class CloudflareBypassActivity : AppCompatActivity() {
             setOnClickListener { finishWithCancel() }
         }
         titleView = TextView(this).apply {
-            text = displayTitle
-            setTextColor(0xFFFFFFFF.toInt())
+            text = "Cloudflare Bypass"
+            setTextColor(0xFFF4F3FA.toInt())
+            textSize = 22f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        headerStatusView = TextView(this).apply {
+            text = "Waiting for cookies…"
+            setTextColor(0xFFB8B6C8.toInt())
             textSize = 16f
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
             gravity = Gravity.CENTER_VERTICAL
         }
+        headerDescriptionView = TextView(this).apply {
+            text = "Solve any CAPTCHA shown below. The dialog will close automatically once done."
+            setTextColor(0xFF77758A.toInt())
+            textSize = 13f
+            maxLines = 2
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        }
+        timeoutProgress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            max = 1000
+            progress = 1000
+            progressTintList = android.content.res.ColorStateList.valueOf(0xFF536DFF.toInt())
+            progressBackgroundTintList = android.content.res.ColorStateList.valueOf(0xFF252442.toInt())
+        }
         topBar = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setBackgroundColor(0xFF1A1A1A.toInt())
-            setPadding(dp(12), dp(12), dp(12), dp(12))
-            gravity = Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(0xFF19182E.toInt())
+            setPadding(dp(24), dp(14), dp(24), dp(10))
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 Gravity.TOP
             )
         }
-        val backLp = LinearLayout.LayoutParams(dp(32), dp(32))
-        backButton.layoutParams = backLp
-        val titleLp = LinearLayout.LayoutParams(
-            0,
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            1f
-        ).apply { leftMargin = dp(12) }
-        titleView.layoutParams = titleLp
-        topBar.addView(backButton)
-        topBar.addView(titleView)
+        val titleRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        titleRow.addView(shield, LinearLayout.LayoutParams(dp(30), dp(30)))
+        titleRow.addView(titleView, LinearLayout.LayoutParams(0, dp(34), 1f).apply {
+            leftMargin = dp(10)
+        })
+        titleRow.addView(backButton, LinearLayout.LayoutParams(dp(34), dp(34)))
+        topBar.addView(titleRow)
+
+        val statusRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(5), 0, 0)
+        }
+        statusRow.addView(hourglass, LinearLayout.LayoutParams(dp(24), dp(24)))
+        statusRow.addView(headerStatusView, LinearLayout.LayoutParams(0, dp(28), 1f).apply {
+            leftMargin = dp(8)
+        })
+        topBar.addView(statusRow)
+        topBar.addView(headerDescriptionView, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(2) })
+        topBar.addView(timeoutProgress, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, dp(4)
+        ).apply { topMargin = dp(10) })
 
         // ── Status bar (below WebView) ────────────────────────────────────
         statusView = TextView(this).apply {
             text = "Connecting to $targetHost…"
-            setTextColor(0xFFCCCCCC.toInt())
-            textSize = 13f
+            setTextColor(0xFFB8B6C8.toInt())
+            textSize = 12f
             maxLines = 2
             ellipsize = android.text.TextUtils.TruncateAt.END
             setPadding(dp(16), dp(12), dp(16), dp(12))
-            setBackgroundColor(0xFF1A1A1A.toInt())
+            setBackgroundColor(0xFF19182E.toInt())
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -578,8 +639,10 @@ class CloudflareBypassActivity : AppCompatActivity() {
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
             ).apply {
-                topMargin = topBar.height
-                bottomMargin = statusView.height
+                leftMargin = dp(24)
+                rightMargin = dp(24)
+                topMargin = dp(12)
+                bottomMargin = dp(12)
             }
             // Insert above the status bar but below the top bar visually.
             (layoutParams as FrameLayout.LayoutParams).gravity = Gravity.TOP
@@ -753,6 +816,14 @@ class CloudflareBypassActivity : AppCompatActivity() {
 
         // Insert between the top bar and the status bar.
         rootLayout.addView(webView, 1)
+        rootLayout.post {
+            if (isFinishing || isDestroyed) return@post
+            (webView.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
+                params.topMargin = topBar.height + dp(12)
+                params.bottomMargin = statusView.height + dp(12)
+                webView.layoutParams = params
+            }
+        }
     }
 
     // ════════════════════════════════════════════════════════════════════════
@@ -1195,9 +1266,29 @@ class CloudflareBypassActivity : AppCompatActivity() {
         runOnUiThread {
             if (isFinishing || isDestroyed) return@runOnUiThread
             statusView.text = message
+            if (::headerStatusView.isInitialized) {
+                headerStatusView.text = message
+            }
             statusView.setTextColor(
                 if (isError) 0xFFFF6B6B.toInt() else 0xFFCCCCCC.toInt()
             )
+            if (::headerStatusView.isInitialized) {
+                headerStatusView.setTextColor(
+                    if (isError) 0xFFFF8A8A.toInt() else 0xFFB8B6C8.toInt()
+                )
+            }
+        }
+    }
+
+    private fun updateTimeoutProgress() {
+        if (!::timeoutProgress.isInitialized || challengeStartedAt <= 0L) return
+        val elapsed = (System.currentTimeMillis() - challengeStartedAt).coerceAtLeast(0L)
+        val remaining = (timeoutMs - elapsed).coerceAtLeast(0L)
+        timeoutProgress.progress = ((remaining * 1000L) / timeoutMs.coerceAtLeast(1L))
+            .toInt()
+            .coerceIn(0, 1000)
+        if (::headerStatusView.isInitialized && !isDownloadLocked && !isSolved) {
+            headerStatusView.text = "Waiting for cookies… (${remaining / 1000L}s)"
         }
     }
 

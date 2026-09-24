@@ -1,0 +1,51 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="512dp"
+    android:height="512dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+
+    <!-- Outer gold shield shape (border) -->
+    <path android:pathData="M256,38
+            C296,84 336,104 402,116
+            C402,224 380,352 256,478
+            C132,352 110,224 110,116
+            C176,104 216,84 256,38 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="110"
+                android:startY="38"
+                android:endX="402"
+                android:endY="478"
+                android:angle="45">
+                <item android:offset="0.0" android:color="#FFF6DE7A" />
+                <item android:offset="0.25" android:color="#FFE7B83A" />
+                <item android:offset="0.5" android:color="#FFFFF3B0" />
+                <item android:offset="0.75" android:color="#FFC98B1E" />
+                <item android:offset="1.0" android:color="#FFF6DE7A" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Inner brown shield shape (fill), inset from the gold border -->
+    <path android:pathData="M256,64
+            C290,102 322,118 378,128
+            C378,220 360,330 256,442
+            C152,330 134,220 134,128
+            C190,118 222,102 256,64 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="256"
+                android:centerY="230"
+                android:gradientRadius="230"
+                android:type="radial">
+                <item android:offset="0.0" android:color="#FFB5701A" />
+                <item android:offset="0.6" android:color="#FF8A4E10" />
+                <item android:offset="1.0" android:color="#FF5C320A" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+</vector>
