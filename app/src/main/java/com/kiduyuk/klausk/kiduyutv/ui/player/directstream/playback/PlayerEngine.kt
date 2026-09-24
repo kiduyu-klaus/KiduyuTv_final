@@ -22,9 +22,7 @@ import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.dash.DashMediaSource
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MediaSource
-import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
-import androidx.media3.exoplayer.source.SingleSampleMediaSource
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamItem
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.SubtitleItem
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.HttpCookieStore
@@ -204,22 +202,13 @@ class PlayerEngine(context: Context) {
                     subtitle.url.startsWith("file://", ignoreCase = true))
         }
 
-        // Media3 sideloaded SRT/VTT tracks use SubtitleConfiguration. The
-        // header-free path below uses DefaultMediaSourceFactory, while
-        // header-bearing tracks use a subtitle-specific single-sample source
-        // so an invalid remote subtitle cannot be parsed as progressive video.
+        // Media3 sideloaded SRT/VTT tracks use SubtitleConfiguration and
+        // DefaultMediaSourceFactory. This keeps VTT on the supported Media3
+        // subtitle decoder path instead of the legacy text-sample path.
         //
-        // Header-free subtitles cover SubDL's downloaded cache files and can
-        // use the supported factory path. DASH streams also use this path even
-        // when their subtitle entries contain headers. The stream data source
-        // already carries the MovieBox Origin, Referer, User-Agent, and Cookie,
-        // while DefaultMediaSourceFactory uses the explicit MPD MIME type to
-        // keep the video on DashMediaSource instead of routing it through a
-        // progressive extractor when subtitles are attached.
-        if (
-            validSubtitles.isNotEmpty() &&
-            (validSubtitles.all { it.headers.isEmpty() } || isDash(stream))
-        ) {
+        // The stream data source carries the provider's Origin, Referer,
+        // User-Agent, and Cookie for subtitle requests as well.
+        if (validSubtitles.isNotEmpty()) {
             val subtitleConfigurations = validSubtitles.mapIndexed { index, subtitle ->
                 MediaItem.SubtitleConfiguration.Builder(Uri.parse(subtitle.url))
                     .setMimeType(subtitle.mimeType)
@@ -250,40 +239,7 @@ class PlayerEngine(context: Context) {
             else -> ProgressiveMediaSource.Factory(dataSourceFactory)
                 .createMediaSource(mediaItem)
         }
-        if (validSubtitles.isEmpty()) return videoSource
-
-        val subtitleSources = validSubtitles.mapIndexed { index, subtitle ->
-            val subtitleUri = Uri.parse(subtitle.url)
-            val subtitleDataSource = if (
-                subtitleUri.scheme.equals("http", ignoreCase = true) ||
-                subtitleUri.scheme.equals("https", ignoreCase = true)
-            ) {
-                val httpFactory = DefaultHttpDataSource.Factory()
-                    .setUserAgent(REAL_BROWSER_USER_AGENT)
-                    .setAllowCrossProtocolRedirects(true)
-                    .setDefaultRequestProperties(subtitle.headers)
-                DefaultDataSource.Factory(appContext, httpFactory)
-            } else {
-                DefaultDataSource.Factory(appContext)
-            }
-            val subtitleConfiguration = MediaItem.SubtitleConfiguration.Builder(subtitleUri)
-                .setMimeType(subtitle.mimeType)
-                .apply {
-                    subtitle.language?.let { setLanguage(it) }
-                    subtitle.label?.let { setLabel(it) }
-                    if (index == 0) setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
-                }
-                .build()
-            // Subtitle files are samples, not progressive video containers.
-            // Sending SRT/VTT through ProgressiveMediaSource makes Media3 run
-            // video extractors against the text and can raise
-            // UnrecognizedInputFormatException. Treat an unavailable subtitle
-            // as optional so a bad proxy/expired signed URL cannot stop video.
-            SingleSampleMediaSource.Factory(subtitleDataSource)
-                .setTreatLoadErrorsAsEndOfStream(true)
-                .createMediaSource(subtitleConfiguration, C.TIME_UNSET)
-        }
-        return MergingMediaSource(videoSource, *subtitleSources.toTypedArray())
+        return videoSource
     }
 
     private fun MediaItem.Builder.setDetectedMimeType(stream: StreamItem) {
