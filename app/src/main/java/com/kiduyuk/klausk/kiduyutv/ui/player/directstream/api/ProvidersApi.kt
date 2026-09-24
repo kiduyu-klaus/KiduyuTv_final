@@ -3,6 +3,7 @@ package com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api
 import android.net.Uri
 import android.util.Log
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
+import com.kiduyuk.klausk.kiduyutv.data.api.ApiClient
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamItem
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamResponse
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.SubtitleItem
@@ -50,6 +51,10 @@ object ProvidersApi {
     private const val CONNECT_TIMEOUT_MS = 30_000
     private const val PROVIDERS_READ_TIMEOUT_MS = 30_000
     private const val BACKEND_HEALTH_TIMEOUT_SECONDS = 10L
+    private const val ANIMATION_GENRE_ID = 16
+    private const val MOVIES_CATEGORY = "movies"
+    private const val TV_CATEGORY = "tv"
+    private const val ANIME_CATEGORY = "anime"
 
     // Aggregate stream requests wait for several enabled providers on the
     // backend. Some valid scrapers need well over 30 seconds, so keep the
@@ -58,6 +63,28 @@ object ProvidersApi {
 
     private const val baseUrl = "https://sflatransport.com/kiduyuTv_providers"
     private const val streamApiToken = BuildConfig.STREAM_API_TOKEN
+
+    /**
+     * Android copy of kiduyu-providers/map.json. These categories are used
+     * only to select among providers the backend says are currently enabled.
+     */
+    private val providerPreferences: Map<String, Set<String>> = buildMap {
+        val movieAndTv = setOf(
+            "4khdhub", "castletv", "cinejoy", "cinemacity", "cinemaos",
+            "cinesrc", "cinesrc_provider", "dahmermovies", "hdghartv",
+            "hdhub4u", "hdmovie2", "hexa", "kisskh", "lordflix", "meowtv",
+            "movieblast", "netmirror", "notorrent", "peachify", "playimdb",
+            "showbox", "streamflix", "uhdmovies", "vaplayer", "vegamovies",
+            "vidbox", "vidcore", "videasy", "vidfast", "vidlink", "vidlove",
+            "vidlux", "vidrock", "vidup", "vixsrc", "webstreamr", "zxcstreams"
+        )
+        movieAndTv.forEach { put(it, setOf(MOVIES_CATEGORY, TV_CATEGORY)) }
+        setOf(
+            "allwish", "anikai", "anikoto", "animekai", "animepahe",
+            "animesalt", "animezey", "aniwaves", "flixcloud"
+        ).forEach { put(it, setOf(ANIME_CATEGORY)) }
+        put("moviebox", setOf(MOVIES_CATEGORY, TV_CATEGORY, ANIME_CATEGORY))
+    }
 
     private val backendHealthClient by lazy {
         OkHttpClient.Builder()
@@ -161,6 +188,59 @@ object ProvidersApi {
         } finally {
             connection.disconnect()
         }
+    }
+
+    /**
+     * Returns enabled providers compatible with the requested TMDB media.
+     *
+     * Movies use the movies category and series use the tv category. If TMDB
+     * reports the Animation genre (ID 16), anime providers are added to the
+     * applicable base category. A failed TMDB lookup keeps the base category
+     * so an incidental metadata failure never blocks playback.
+     */
+    suspend fun enabledProviderNamesForMedia(type: String, tmdbId: Int): List<String> {
+        require(type == "movie" || type == "series") { "invalid type: $type" }
+        require(tmdbId > 0) { "invalid tmdbId: $tmdbId" }
+
+        val enabled = enabledProviderNames()
+        val animation = hasAnimationGenre(type, tmdbId)
+        val categories = buildSet {
+            add(if (type == "movie") MOVIES_CATEGORY else TV_CATEGORY)
+            if (animation) add(ANIME_CATEGORY)
+        }
+        val selected = enabled.filter { provider ->
+            providerPreferences[provider.lowercase(Locale.ROOT)]
+                ?.any(categories::contains) == true
+        }
+        val skipped = enabled.filterNot(selected::contains)
+        Log.i(
+            TAG,
+            "Provider selection type=$type tmdbId=$tmdbId animation=$animation " +
+                "categories=${categories.joinToString()} selected=${selected.joinToString()}"
+        )
+        if (skipped.isNotEmpty()) {
+            Log.i(TAG, "Skipped incompatible or unmapped enabled providers: ${skipped.joinToString()}")
+        }
+        return selected
+    }
+
+    private suspend fun hasAnimationGenre(type: String, tmdbId: Int): Boolean {
+        return runCatching {
+            val genres = if (type == "movie") {
+                ApiClient.tmdbApiService.getMovieDetail(tmdbId).genres
+            } else {
+                ApiClient.tmdbApiService.getTvShowDetail(tmdbId).genres
+            }
+            genres.orEmpty().any { it.id == ANIMATION_GENRE_ID }
+        }.onSuccess { isAnimation ->
+            Log.i(TAG, "TMDB genres type=$type tmdbId=$tmdbId animation=$isAnimation")
+        }.onFailure { error ->
+            Log.w(
+                TAG,
+                "Could not read TMDB genres for $type/$tmdbId; using only the base provider category",
+                error
+            )
+        }.getOrDefault(false)
     }
 
     fun streams(
@@ -272,16 +352,28 @@ object ProvidersApi {
                 // Media3 onto its HLS path instead of treating it as a GIF
                 // or progressive stream.
                 val isGifPlaylist = url.substringBefore('?').endsWith(".gif", ignoreCase = true)
-                val normalizedType = type.ifBlank {
-                    if (isVixsrcHls || isGifPlaylist) "hls" else ""
-                }
-                val mimeType = s.optString(
+                // A number of CDNs return a pathless/signed HLS URL with
+                // ".m3u8" only in its query string (for example
+                // "?t.m3u8") and falsely advertise it as image/jpeg. The
+                // URL is a stronger signal here: force HlsMediaSource and
+                // its MIME type before Media3 sees the bad HTTP header.
+                val isHlsUrlHint = url.contains(".m3u8", ignoreCase = true) ||
+                    url.contains("/m3u8-proxy", ignoreCase = true) ||
+                    url.contains("/m3u8_proxy", ignoreCase = true)
+                val rawMimeType = s.optString(
                     "mimeType",
                     s.optString("contentType", "")
-                ).ifBlank {
-                    if (isVixsrcHls || isGifPlaylist) HLS_MIME_TYPE else ""
-                }.let { parsedMimeType ->
-                    if (isGifPlaylist) HLS_MIME_TYPE else parsedMimeType
+                )
+                val normalizedType = when {
+                    isVixsrcHls || isGifPlaylist || isHlsUrlHint -> "hls"
+                    else -> type
+                }
+                val mimeType = when {
+                    isVixsrcHls || isGifPlaylist || isHlsUrlHint -> HLS_MIME_TYPE
+                    else -> rawMimeType
+                }
+                if (isHlsUrlHint && rawMimeType.equals("image/jpeg", ignoreCase = true)) {
+                    Log.i(TAG, "Overriding image/jpeg MIME hint with HLS for provider=${provider.ifBlank { "?" }}")
                 }
                 val headers = s.optJSONObject("headers")?.let { h ->
                     val map = LinkedHashMap<String, String>(h.length())

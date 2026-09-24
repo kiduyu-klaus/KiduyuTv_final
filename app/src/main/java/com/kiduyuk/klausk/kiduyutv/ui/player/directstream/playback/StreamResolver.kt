@@ -51,7 +51,7 @@ class StreamResolver {
         // backend should be reported to the player immediately.
         ProvidersApi.requireBackendAvailable()
 
-        val enabledProviderNames = ProvidersApi.enabledProviderNames()
+        val enabledProviderNames = ProvidersApi.enabledProviderNamesForMedia(type, tmdbId)
         val selectedProvider = provider.key.takeIf { selected ->
             enabledProviderNames.any { it.equals(selected, ignoreCase = true) }
         }
@@ -62,7 +62,7 @@ class StreamResolver {
         if (provider.key.isNotBlank() && selectedProvider == null) {
             Log.w(
                 tag,
-                "Saved provider ${provider.key} is not enabled by the backend; using all enabled providers"
+                "Saved provider ${provider.key} is not enabled or compatible with this media; using compatible enabled providers"
             )
         }
 
