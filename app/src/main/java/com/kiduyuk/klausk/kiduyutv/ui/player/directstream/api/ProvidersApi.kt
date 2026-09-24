@@ -191,10 +191,11 @@ object ProvidersApi {
     /**
      * Returns enabled providers compatible with the requested TMDB media.
      *
-     * Movies use the movies category and series use the tv category. If TMDB
-     * reports the Animation genre (ID 16), anime providers are added to the
-     * applicable base category. A failed TMDB lookup keeps the base category
-     * so an incidental metadata failure never blocks playback.
+     * Non-animation movies use the movies category and non-animation series use the
+     * tv category. TMDB Animation genre (ID 16) routes a movie or series exclusively
+     * to anime providers, so anime and non-anime provider groups are never mixed.
+     * A failed TMDB lookup keeps the base category so an incidental metadata failure
+     * never blocks playback.
      */
     suspend fun enabledProviderNamesForMedia(type: String, tmdbId: Int): List<String> {
         require(type == "movie" || type == "series") { "invalid type: $type" }
@@ -202,19 +203,20 @@ object ProvidersApi {
 
         val enabled = enabledProviderNames()
         val animation = hasAnimationGenre(type, tmdbId)
-        val categories = buildSet {
-            add(if (type == "movie") MOVIES_CATEGORY else TV_CATEGORY)
-            if (animation) add(ANIME_CATEGORY)
+        val category = when {
+            animation -> ANIME_CATEGORY
+            type == "movie" -> MOVIES_CATEGORY
+            else -> TV_CATEGORY
         }
         val selected = enabled.filter { provider ->
             providerPreferences[provider.lowercase(Locale.ROOT)]
-                ?.any(categories::contains) == true
+                ?.contains(category) == true
         }
         val skipped = enabled.filterNot(selected::contains)
         Log.i(
             TAG,
             "Provider selection type=$type tmdbId=$tmdbId animation=$animation " +
-                "categories=${categories.joinToString()} selected=${selected.joinToString()}"
+                "category=$category selected=${selected.joinToString()}"
         )
         if (skipped.isNotEmpty()) {
             Log.i(TAG, "Skipped incompatible or unmapped enabled providers: ${skipped.joinToString()}")
