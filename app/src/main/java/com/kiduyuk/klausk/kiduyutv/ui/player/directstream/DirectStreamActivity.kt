@@ -1584,27 +1584,14 @@ class DirectStreamActivity : AppCompatActivity() {
                     StreamValidator.probeStatus(active)
                 }
                 if (isFinishing || isDestroyed) return@launch
-                if (statusCode == 429 && cloudflareDialog?.isShowing != true) {
-                    Log.w(
-                        TAG,
-                        "Playback returned HTTP 429; opening CloudflareBypassActivity " +
-                            "to refresh the locked download link"
-                    )
-                    playbackErrorDialog?.dismiss()
-                    pendingCloudflareStream = active
-                    pendingCloudflareResumeMs = engine.player.currentPosition.coerceAtLeast(0L)
-                    engine.player.stop()
-                    launchCloudflareBypass(active, preserveCookies = true)
-                    return@launch
-                }
-                if (statusCode == 426) {
+                if (statusCode == 429 || statusCode == 426) {
                     val (_, isLocked) = withContext(Dispatchers.IO) {
                         StreamValidator.responseBodyContains(active, "<h1>Download Locked</h1>")
                     }
                     if (isLocked && cloudflareDialog?.isShowing != true) {
                         Log.w(
                             TAG,
-                            "Playback returned HTTP 426 with a locked-download page; " +
+                            "Playback returned HTTP $statusCode with a locked-download page; " +
                                 "opening CloudflareBypassActivity"
                         )
                         playbackErrorDialog?.dismiss()
@@ -2308,6 +2295,10 @@ class DirectStreamActivity : AppCompatActivity() {
             putExtra(
                 CloudflareBypassActivity.EXTRA_WAIT_FOR_DOWNLOAD,
                 waitForDownload
+            )
+            putExtra(
+                CloudflareBypassActivity.EXTRA_COMPLETE_ON_UNLOCK,
+                isCfokDownloadStream(stream)
             )
             putExtra(
                 CloudflareBypassActivity.EXTRA_REQUEST_HEADERS,

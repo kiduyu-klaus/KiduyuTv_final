@@ -121,6 +121,9 @@ class CloudflareBypassActivity : AppCompatActivity() {
         /** Keep the WebView open after verification until a download URL is observed. */
         const val EXTRA_WAIT_FOR_DOWNLOAD = "wait_for_download"
 
+        /** Return the original URL immediately when a download-lock CAPTCHA is solved. */
+        const val EXTRA_COMPLETE_ON_UNLOCK = "complete_on_unlock"
+
         /** Original provider headers used when opening the gated stream URL. */
         const val EXTRA_REQUEST_HEADERS = "request_headers"
 
@@ -260,6 +263,7 @@ class CloudflareBypassActivity : AppCompatActivity() {
     private var isReturningDownload: Boolean = false
     private var isFinishingForResult: Boolean = false
     private var waitForDownload: Boolean = false
+    private var completeOnUnlock: Boolean = false
     private var initialRequestHeaders: Map<String, String> = emptyMap()
     private var lastRequestHeaders: Map<String, String> = emptyMap()
 
@@ -277,23 +281,38 @@ class CloudflareBypassActivity : AppCompatActivity() {
         }
 
         @android.webkit.JavascriptInterface
-        fun onDownloadUnlocked() {
+        fun onDownloadUnlocked(resolvedUrl: String?) {
             mainHandler.post {
                 if (isFinishing || isDestroyed) return@post
                 isDownloadLocked = false
-                setStatus("✓ Unlocked! Waiting for media link...", isError = false)
+                setStatus(
+                    if (completeOnUnlock) {
+                        "✓ Unlocked! Returning to player…"
+                    } else {
+                        "✓ Unlocked! Waiting for media link..."
+                    },
+                    isError = false
+                )
                 Log.i(TAG, "[JS] Download Unlocked detected")
-                if (waitForDownload && !isFinishingForResult && !isReturningDownload) {
-                    // Some download-lock pages unlock the existing media URL
-                    // in place instead of redirecting to a new URL. Return
-                    // that same URL immediately with the refreshed WebView
-                    // headers/cookies so the caller can replace the stream
-                    // request context and resume playback.
-                    val unlockedUrl = targetUrl.ifBlank { lastMainFrameUrl }
+                if (waitForDownload && completeOnUnlock &&
+                    !isFinishingForResult && !isReturningDownload
+                ) {
+                    // DahmerMovies first opens a p.111477.xyz bulk URL, then
+                    // redirects to the resolved CFOK URL that displays this
+                    // lock page. The lock page exposes that resolved URL in
+                    // its hidden retryUrl field. Return it rather than the
+                    // original bulk URL so native playback receives the
+                    // unlocked worker request and its refreshed headers.
+                    val unlockedUrl = resolvedUrl
+                        ?.trim()
+                        ?.takeIf { it.startsWith("http://", ignoreCase = true) || it.startsWith("https://", ignoreCase = true) }
+                        ?: lastMainFrameUrl
+                            .takeIf { it.startsWith("http://", ignoreCase = true) || it.startsWith("https://", ignoreCase = true) }
+                        ?: targetUrl
                     Log.i(
                         TAG,
-                        "[JS] Download lock solved without URL change; returning refreshed " +
-                            "headers for ${Uri.parse(unlockedUrl).host.orEmpty()}"
+                        "[JS] Download lock solved; returning resolved URL=" +
+                            "$unlockedUrl with refreshed headers"
                     )
                     completeWithDownload(
                         unlockedUrl,
@@ -396,6 +415,7 @@ class CloudflareBypassActivity : AppCompatActivity() {
         timeoutMs = intent.getLongExtra(EXTRA_TIMEOUT_MS, DEFAULT_TIMEOUT_MS)
             .coerceAtLeast(MIN_SOLVE_TIME_MS)
         waitForDownload = intent.getBooleanExtra(EXTRA_WAIT_FOR_DOWNLOAD, false)
+        completeOnUnlock = intent.getBooleanExtra(EXTRA_COMPLETE_ON_UNLOCK, false)
         initialRequestHeaders = parseRequestHeaders(
             intent.getStringExtra(EXTRA_REQUEST_HEADERS).orEmpty()
         )
@@ -653,16 +673,24 @@ class CloudflareBypassActivity : AppCompatActivity() {
                             
                             if (isLocked) {
                                 KiduyuBypass.onDownloadLocked();
-                                
-                                var observer = new MutationObserver(function(mutations) {
-                                    var successDiv = document.getElementById('success');
-                                    if (successDiv && window.getComputedStyle(successDiv).display === 'block' && 
-                                        successDiv.innerText.indexOf('Unlocked!') !== -1) {
-                                        KiduyuBypass.onDownloadUnlocked();
-                                        observer.disconnect();
-                                    }
+                            }
+
+                            function reportUnlocked() {
+                                var successDiv = document.getElementById('success');
+                                var successText = successDiv ? (successDiv.innerText || successDiv.textContent || '') : '';
+                                if (successDiv && /unlocked|retrying download/i.test(successText)) {
+                                    var retryInput = document.getElementById('retryUrl');
+                                    var resolvedUrl = retryInput ? (retryInput.value || '') : '';
+                                    KiduyuBypass.onDownloadUnlocked(resolvedUrl);
+                                    return true;
+                                }
+                                return false;
+                            }
+
+                            if (!reportUnlocked() && document.body) {
+                                var observer = new MutationObserver(function() {
+                                    if (reportUnlocked()) observer.disconnect();
                                 });
-                                
                                 observer.observe(document.body, { attributes: true, childList: true, subtree: true });
                             }
                         })();
