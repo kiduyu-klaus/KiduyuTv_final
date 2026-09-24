@@ -13,6 +13,7 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
+import android.webkit.CookieManager
 
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.ScrollView
@@ -56,6 +57,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.player.cloudflareBypass.CloudflareBypassAc
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamItem
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.SubtitleItem
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.OpenSubtitlesClient
+import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.HttpCookieStore
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.ProvidersApi
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.SubdlSubtitleClient
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.ProvidersBackendUnavailableException
@@ -178,6 +180,7 @@ class DirectStreamActivity : AppCompatActivity() {
      * after a successful Cloudflare bypass resumes from the same point.
      */
     private var pendingCloudflareResumeMs: Long = 0L
+    private var isClearingCookiesForCloudflareBypass = false
     /** Googleusercontent URLs already resolved by CloudflareBypassActivity. */
     private val resolvedGoogleusercontentUrls = mutableSetOf<String>()
     /** DahmerMovies URLs already resolved to a final download URL this session. */
@@ -2264,11 +2267,6 @@ class DirectStreamActivity : AppCompatActivity() {
             return
         }
 
-        // Always begin a fresh challenge. A stale or invalid cf_clearance
-        // cookie can cause CloudflareBypassActivity to skip the challenge or
-        // repeatedly return a blocked download URL.
-        CloudflareBypassActivity.clearCookies(applicationContext, bypassHost)
-
         val intent = Intent(this, CloudflareBypassActivity::class.java).apply {
             putExtra(CloudflareBypassActivity.EXTRA_HOST, bypassHost)
             putExtra(CloudflareBypassActivity.EXTRA_URL, fullVerificationUrl)
@@ -2296,17 +2294,35 @@ class DirectStreamActivity : AppCompatActivity() {
             "Launching CloudflareBypassActivity for ${stream.provider} " +
                 "${stream.quality} verificationHost=$bypassHost"
         )
-        runCatching {
-            cloudflareBypassLauncher.launch(intent)
-        }.onFailure { error ->
-            Log.e(TAG, "Failed to launch CloudflareBypassActivity", error)
-            Toast.makeText(
-                this,
-                R.string.cloudflare_bypass_open_failed,
-                Toast.LENGTH_LONG
-            ).show()
-            pendingCloudflareStream = null
-            pendingCloudflareResumeMs = 0L
+        if (isClearingCookiesForCloudflareBypass) {
+            Log.w(TAG, "Cloudflare bypass launch already waiting for cookie deletion")
+            return
+        }
+        isClearingCookiesForCloudflareBypass = true
+
+        // A new bypass must never inherit a stale Cloudflare session. Clear
+        // each cookie store before launching its WebView, and wait for the
+        // asynchronous WebView deletion callback so no persisted cookies can
+        // be sent with the first challenge request.
+        CloudflareBypassActivity.clearAllCookies(applicationContext)
+        HttpCookieStore.clearAll()
+        val cookieManager = CookieManager.getInstance()
+        cookieManager.removeAllCookies {
+            cookieManager.flush()
+            isClearingCookiesForCloudflareBypass = false
+            Log.i(TAG, "Cleared saved WebView, HTTP, and Cloudflare cookies before bypass launch")
+            runCatching {
+                cloudflareBypassLauncher.launch(intent)
+            }.onFailure { error ->
+                Log.e(TAG, "Failed to launch CloudflareBypassActivity", error)
+                Toast.makeText(
+                    this,
+                    R.string.cloudflare_bypass_open_failed,
+                    Toast.LENGTH_LONG
+                ).show()
+                pendingCloudflareStream = null
+                pendingCloudflareResumeMs = 0L
+            }
         }
     }
 

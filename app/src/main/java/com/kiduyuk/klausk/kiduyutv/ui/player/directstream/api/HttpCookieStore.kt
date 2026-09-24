@@ -50,4 +50,9 @@ object HttpCookieStore {
             ?.joinToString("; ")
             ?.takeIf { it.isNotBlank() }
     }
+
+    /** Clears every cookie captured by native HTTP requests in this process. */
+    fun clearAll() {
+        manager.cookieStore.removeAll()
+    }
 }
