@@ -652,7 +652,16 @@ class CloudflareBypassActivity : AppCompatActivity() {
                     )
 
                     if (waitForDownload && isResolvedDownloadUrl(url)) {
-                        completeWithDownload(url.orEmpty(), view?.settings?.userAgentString, null)
+                        // The unlock callback and page-finished callback can
+                        // arrive in either order. This URL has already passed
+                        // isResolvedDownloadUrl(), so do not let the stale
+                        // lock flag suppress the result.
+                        completeWithDownload(
+                            url.orEmpty(),
+                            view?.settings?.userAgentString,
+                            null,
+                            allowWhileLocked = true
+                        )
                         return
                     }
                     if (isSolved) return
@@ -835,9 +844,14 @@ class CloudflareBypassActivity : AppCompatActivity() {
         }
     }
 
-    private fun completeWithDownload(url: String, userAgent: String?, mimeType: String?) {
-        if (isFinishingForResult || isReturningDownload || isDownloadLocked) {
-            if (isDownloadLocked) {
+    private fun completeWithDownload(
+        url: String,
+        userAgent: String?,
+        mimeType: String?,
+        allowWhileLocked: Boolean = false
+    ) {
+        if (isFinishingForResult || isReturningDownload || (isDownloadLocked && !allowWhileLocked)) {
+            if (isDownloadLocked && !allowWhileLocked) {
                 Log.d(TAG, "Download captured but page is currently LOCKED; ignoring URL=$url")
             }
             return

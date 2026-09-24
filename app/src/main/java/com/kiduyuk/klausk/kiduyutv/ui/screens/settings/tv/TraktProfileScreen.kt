@@ -334,8 +334,20 @@ private fun TraktStatsTabContent() {
                     error = "Trakt profile did not include a username"
                     Log.w("TraktProfileScreen", "Stats profile request succeeded without a username")
                 } else {
-                    Log.i("TraktProfileScreen", "Stats: resolved Trakt username=$username; requesting concrete stats endpoint")
-                    val response = TraktApiClient.apiService.getUserStatsForUser(username, authorization)
+                    Log.i("TraktProfileScreen", "Stats: resolved Trakt username=$username; requesting authenticated stats endpoint")
+                    val meStatsResponse = TraktApiClient.apiService.getUserStats(authorization)
+                    val response = if (
+                        meStatsResponse.isSuccessful && meStatsResponse.body() != null
+                    ) {
+                        meStatsResponse
+                    } else {
+                        Log.w(
+                            "TraktProfileScreen",
+                            "Authenticated stats endpoint returned no usable body " +
+                                "(HTTP ${meStatsResponse.code()}); falling back to username endpoint"
+                        )
+                        TraktApiClient.apiService.getUserStatsForUser(username, authorization)
+                    }
                     if (response.isSuccessful) {
                         stats = response.body()
                         if (stats == null) {
