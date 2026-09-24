@@ -24,6 +24,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.exoplayer.source.SingleSampleMediaSource
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamItem
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.SubtitleItem
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.HttpCookieStore
@@ -203,11 +204,10 @@ class PlayerEngine(context: Context) {
                     subtitle.url.startsWith("file://", ignoreCase = true))
         }
 
-        // Media3 1.4+ expects sideloaded SRT/VTT tracks to be supplied through
-        // MediaItem.SubtitleConfiguration and DefaultMediaSourceFactory. The
-        // old SingleSampleMediaSource + MergingMediaSource path can produce an
-        // invalid merged timeline and turn a valid video into a fatal playback
-        // error when a local SubDL subtitle is added.
+        // Media3 sideloaded SRT/VTT tracks use SubtitleConfiguration. The
+        // header-free path below uses DefaultMediaSourceFactory, while
+        // header-bearing tracks use a subtitle-specific single-sample source
+        // so an invalid remote subtitle cannot be parsed as progressive video.
         //
         // Header-free subtitles cover SubDL's downloaded cache files and can
         // use the supported factory path. DASH streams also use this path even
@@ -252,7 +252,7 @@ class PlayerEngine(context: Context) {
         }
         if (validSubtitles.isEmpty()) return videoSource
 
-        val subtitleSources = validSubtitles.map { subtitle ->
+        val subtitleSources = validSubtitles.mapIndexed { index, subtitle ->
             val subtitleUri = Uri.parse(subtitle.url)
             val subtitleDataSource = if (
                 subtitleUri.scheme.equals("http", ignoreCase = true) ||
@@ -266,12 +266,22 @@ class PlayerEngine(context: Context) {
             } else {
                 DefaultDataSource.Factory(appContext)
             }
-            val subtitleMediaItem = MediaItem.Builder()
-                .setUri(subtitleUri)
+            val subtitleConfiguration = MediaItem.SubtitleConfiguration.Builder(subtitleUri)
                 .setMimeType(subtitle.mimeType)
+                .apply {
+                    subtitle.language?.let { setLanguage(it) }
+                    subtitle.label?.let { setLabel(it) }
+                    if (index == 0) setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
+                }
                 .build()
-            ProgressiveMediaSource.Factory(subtitleDataSource)
-                .createMediaSource(subtitleMediaItem)
+            // Subtitle files are samples, not progressive video containers.
+            // Sending SRT/VTT through ProgressiveMediaSource makes Media3 run
+            // video extractors against the text and can raise
+            // UnrecognizedInputFormatException. Treat an unavailable subtitle
+            // as optional so a bad proxy/expired signed URL cannot stop video.
+            SingleSampleMediaSource.Factory(subtitleDataSource)
+                .setTreatLoadErrorsAsEndOfStream(true)
+                .createMediaSource(subtitleConfiguration, C.TIME_UNSET)
         }
         return MergingMediaSource(videoSource, *subtitleSources.toTypedArray())
     }
