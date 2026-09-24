@@ -451,7 +451,7 @@ class StreamSelectionDialog(
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier
-                                .background(ComposeColor(0xFF2E7D32), RoundedCornerShape(6.dp))
+                                .background(ComposeColor(0xFF1565C0), RoundedCornerShape(6.dp))
                                 .padding(horizontal = 7.dp, vertical = 4.dp)
                         )
                     }
