@@ -457,6 +457,8 @@ class DirectStreamActivity : AppCompatActivity() {
                                 TAG,
                                 "Episode playback ended; loading the next episode automatically"
                             )
+                            showLoadingArtwork()
+                            showStatus("Loading next episode…", retry = false)
                             loadAdjacentEpisode(1)
                         } else {
                             persistWatchProgress()
@@ -724,8 +726,59 @@ class DirectStreamActivity : AppCompatActivity() {
         val season = currentSeason ?: return
         val episode = currentEpisode ?: return
         val previousEpisode = episode + delta
-        if (previousEpisode < 1) return
-        loadEpisodeInPlace(season, previousEpisode, delta)
+        if (previousEpisode >= 1) {
+            loadEpisodeInPlace(season, previousEpisode, delta)
+        } else {
+            loadPreviousEpisodeOrSeason()
+        }
+    }
+
+    /**
+     * Loads the last available episode from the nearest earlier season when
+     * the current episode is the first episode of its season.
+     */
+    private fun loadPreviousEpisodeOrSeason() {
+        val season = currentSeason ?: return
+        autoAdvanceJob?.cancel()
+        autoAdvanceJob = lifecycleScope.launch {
+            val tvShowDetail = withContext(Dispatchers.IO) {
+                repository.getTvShowDetail(currentTmdbId).getOrNull()
+            }
+            val configuredSeasonNumbers = tvShowDetail
+                ?.seasons
+                ?.asSequence()
+                ?.map { it.seasonNumber }
+                ?.filter { it in 1 until season }
+                ?.sortedDescending()
+                ?.toList()
+                .orEmpty()
+            val seasonNumbers = if (configuredSeasonNumbers.isNotEmpty()) {
+                configuredSeasonNumbers
+            } else {
+                (season - 1 downTo 1).toList()
+            }
+
+            for (candidateSeason in seasonNumbers) {
+                val detail = withContext(Dispatchers.IO) {
+                    repository.getSeasonDetail(currentTmdbId, candidateSeason).getOrNull()
+                }
+                val lastEpisode = detail
+                    ?.episodes
+                    ?.filter { it.episodeNumber > 0 }
+                    ?.maxByOrNull { it.episodeNumber }
+                if (lastEpisode != null) {
+                    cachedSeasonDetail = detail
+                    cachedSeasonFor = candidateSeason
+                    loadEpisodeInPlace(candidateSeason, lastEpisode.episodeNumber, -1)
+                    return@launch
+                }
+            }
+
+            Log.i(
+                PROVIDER_TAG,
+                "No previous episode or season found for S${season}E${currentEpisode ?: 0}"
+            )
+        }
     }
 
     /**
@@ -736,79 +789,96 @@ class DirectStreamActivity : AppCompatActivity() {
     private fun loadNextEpisodeOrSeason() {
         val season = currentSeason ?: return
         val episode = currentEpisode ?: return
-        autoAdvanceJob?.cancel()
+        // Media3 can report STATE_ENDED again while the replacement source is
+        // being resolved. Do not cancel the first lookup and start over.
+        if (autoAdvanceJob?.isActive == true) {
+            Log.i(
+                PROVIDER_TAG,
+                "Ignoring duplicate next-episode request for S${season}E${episode}"
+            )
+            return
+        }
         autoAdvanceJob = lifecycleScope.launch {
-            val currentSeasonDetail = if (cachedSeasonFor == season) {
-                cachedSeasonDetail
-            } else {
-                withContext(Dispatchers.IO) {
-                    repository.getSeasonDetail(currentTmdbId, season).getOrNull()
-                }
-            }
-
-            val nextEpisode = currentSeasonDetail
-                ?.episodes
-                ?.filter { it.episodeNumber > episode }
-                ?.minByOrNull { it.episodeNumber }
-
-            if (nextEpisode != null) {
-                cachedSeasonDetail = currentSeasonDetail
-                cachedSeasonFor = season
-                loadEpisodeInPlace(season, nextEpisode.episodeNumber, 1)
-                return@launch
-            }
-
-            val tvShowDetail = withContext(Dispatchers.IO) {
-                repository.getTvShowDetail(currentTmdbId).getOrNull()
-            }
-            val configuredSeasonNumbers = tvShowDetail
-                ?.seasons
-                ?.asSequence()
-                ?.map { it.seasonNumber }
-                ?.filter { it > season }
-                ?.sorted()
-                ?.toList()
-                .orEmpty()
-            val seasonNumbers = if (configuredSeasonNumbers.isNotEmpty()) {
-                configuredSeasonNumbers
-            } else {
-                val totalSeasons = tvShowDetail?.numberOfSeasons ?: 0
-                if (totalSeasons > season) {
-                    (season + 1..totalSeasons).toList()
+            try {
+                val currentSeasonDetail = if (cachedSeasonFor == season) {
+                    cachedSeasonDetail
                 } else {
-                    emptyList()
+                    withContext(Dispatchers.IO) {
+                        repository.getSeasonDetail(currentTmdbId, season).getOrNull()
+                    }
                 }
-            }
 
-            var nextSeasonEpisode: Episode? = null
-            var nextSeasonNumber: Int? = null
-            for (candidateSeason in seasonNumbers) {
-                val detail = withContext(Dispatchers.IO) {
-                    repository.getSeasonDetail(currentTmdbId, candidateSeason).getOrNull()
-                }
-                val firstEpisode = detail
+                val nextEpisode = currentSeasonDetail
                     ?.episodes
-                    ?.filter { it.episodeNumber > 0 }
+                    ?.filter { it.episodeNumber > episode }
                     ?.minByOrNull { it.episodeNumber }
-                if (firstEpisode != null) {
-                    nextSeasonEpisode = firstEpisode
-                    nextSeasonNumber = candidateSeason
-                    cachedSeasonDetail = detail
-                    cachedSeasonFor = candidateSeason
-                    break
-                }
-            }
 
-            if (nextSeasonEpisode != null && nextSeasonNumber != null) {
-                loadEpisodeInPlace(nextSeasonNumber, nextSeasonEpisode.episodeNumber, 1)
-            } else {
-                persistWatchProgress()
-                Log.i(PROVIDER_TAG, "No next episode or season found for S${season}E$episode")
+                if (nextEpisode != null) {
+                    cachedSeasonDetail = currentSeasonDetail
+                    cachedSeasonFor = season
+                    loadEpisodeInPlace(season, nextEpisode.episodeNumber, 1)
+                    return@launch
+                }
+
+                val tvShowDetail = withContext(Dispatchers.IO) {
+                    repository.getTvShowDetail(currentTmdbId).getOrNull()
+                }
+                val configuredSeasonNumbers = tvShowDetail
+                    ?.seasons
+                    ?.asSequence()
+                    ?.map { it.seasonNumber }
+                    ?.filter { it > season }
+                    ?.sorted()
+                    ?.toList()
+                    .orEmpty()
+                val seasonNumbers = if (configuredSeasonNumbers.isNotEmpty()) {
+                    configuredSeasonNumbers
+                } else {
+                    val totalSeasons = tvShowDetail?.numberOfSeasons ?: 0
+                    if (totalSeasons > season) {
+                        (season + 1..totalSeasons).toList()
+                    } else {
+                        emptyList()
+                    }
+                }
+
+                var nextSeasonEpisode: Episode? = null
+                var nextSeasonNumber: Int? = null
+                for (candidateSeason in seasonNumbers) {
+                    val detail = withContext(Dispatchers.IO) {
+                        repository.getSeasonDetail(currentTmdbId, candidateSeason).getOrNull()
+                    }
+                    val firstEpisode = detail
+                        ?.episodes
+                        ?.filter { it.episodeNumber > 0 }
+                        ?.minByOrNull { it.episodeNumber }
+                    if (firstEpisode != null) {
+                        nextSeasonEpisode = firstEpisode
+                        nextSeasonNumber = candidateSeason
+                        cachedSeasonDetail = detail
+                        cachedSeasonFor = candidateSeason
+                        break
+                    }
+                }
+
+                if (nextSeasonEpisode != null && nextSeasonNumber != null) {
+                    loadEpisodeInPlace(nextSeasonNumber, nextSeasonEpisode.episodeNumber, 1)
+                } else {
+                    persistWatchProgress()
+                    Log.i(PROVIDER_TAG, "No next episode or season found for S${season}E${episode}")
+                    binding.playerStatus.visibility = View.GONE
+                    hideLoadingArtwork()
+                }
+            } finally {
+                autoAdvanceJob = null
             }
         }
     }
 
     private fun loadEpisodeInPlace(season: Int, episode: Int, delta: Int) {
+        // Save the episode being left before changing the identity fields used
+        // by persistence. The old reset helper erased its resume position.
+        persistWatchProgress()
         currentSeason = season
         currentEpisode = episode
         pendingStartPositionMs = 0L
@@ -830,7 +900,6 @@ class DirectStreamActivity : AppCompatActivity() {
             PROVIDER_TAG,
             "Loading adjacent episode season=$season episode=$episode delta=$delta"
         )
-        resetWatchProgressForCurrentEpisode()
         // Kick off the TMDB episode-runtime lookup for the new episode.
         fetchEpisodeDurationFromTmdb()
         loadCurrentMedia()
@@ -841,7 +910,11 @@ class DirectStreamActivity : AppCompatActivity() {
         val isSeries = currentMediaType == TYPE_SERIES && currentEpisode != null
         binding.btnNextEpisode.visibility = if (isSeries) View.VISIBLE else View.GONE
         binding.btnPreviousEpisode.visibility =
-            if (isSeries && (currentEpisode ?: 1) > 1) View.VISIBLE else View.GONE
+            if (isSeries && ((currentEpisode ?: 1) > 1 || (currentSeason ?: 1) > 1)) {
+                View.VISIBLE
+            } else {
+                View.GONE
+            }
         binding.btnEpisodes.visibility = if (isSeries) View.VISIBLE else View.GONE
         updateBottomFocusChain()
     }
@@ -2668,7 +2741,7 @@ class DirectStreamActivity : AppCompatActivity() {
         // Persist the user's progress for the episode they're leaving so the
         // new instance of the activity can resume at the right place if the
         // user comes back.
-        resetWatchProgressForCurrentEpisode()
+        persistWatchProgress()
 
         val newIntent = DirectStreamActivity.createIntent(
             context = this,
@@ -2683,15 +2756,11 @@ class DirectStreamActivity : AppCompatActivity() {
             voteAverage = currentVoteAverage,
             releaseDate = currentReleaseDate
         )
-        // Preserve the provider choice and any sniffed-stream extras so the
-        // new activity picks the same source as the old one.
+        // Preserve the provider choice. Do not copy sniffed-stream extras:
+        // those URLs belong to the old episode and would cause the new player
+        // instance to replay the old captured stream instead of fetching the
+        // selected episode.
         intent.getStringExtra(EXTRA_PROVIDER)?.let { newIntent.putExtra(EXTRA_PROVIDER, it) }
-        intent.getStringExtra(EXTRA_SNIFFED_URL)?.let { newIntent.putExtra(EXTRA_SNIFFED_URL, it) }
-        intent.getStringExtra(EXTRA_SNIFFED_TYPE)?.let { newIntent.putExtra(EXTRA_SNIFFED_TYPE, it) }
-        intent.getStringExtra(EXTRA_SNIFFED_MIME_TYPE)?.let { newIntent.putExtra(EXTRA_SNIFFED_MIME_TYPE, it) }
-        intent.getStringExtra(EXTRA_SNIFFED_HEADERS)?.let { newIntent.putExtra(EXTRA_SNIFFED_HEADERS, it) }
-        intent.getStringExtra(EXTRA_SNIFFED_COOKIE)?.let { newIntent.putExtra(EXTRA_SNIFFED_COOKIE, it) }
-        intent.getStringExtra(EXTRA_SNIFFED_SUBTITLES)?.let { newIntent.putExtra(EXTRA_SNIFFED_SUBTITLES, it) }
 
         // Cancel any in-flight panel fetch and dismiss the panel cleanly
         // *before* finishing so the user does not see the panel "snap shut"
