@@ -182,8 +182,6 @@ class DirectStreamActivity : AppCompatActivity() {
      */
     private var pendingCloudflareResumeMs: Long = 0L
     private var isClearingCookiesForCloudflareBypass = false
-    /** Googleusercontent URLs already resolved by CloudflareBypassActivity. */
-    private val resolvedGoogleusercontentUrls = mutableSetOf<String>()
     /** DahmerMovies URLs already resolved to a final download URL this session. */
     private val resolvedDahmerMoviesUrls = mutableSetOf<String>()
     private var lastLoadSignature: String? = null
@@ -279,10 +277,6 @@ class DirectStreamActivity : AppCompatActivity() {
             url = finalUrl,
             headers = retryHeaders
         )
-        if (isGoogleusercontentHost(finalUrl)) {
-            resolvedGoogleusercontentUrls += finalUrl
-            Log.i(TAG, "Marked Googleusercontent URL as resolved for this session")
-        }
         if (stream.provider.equals("DahmerMovies", ignoreCase = true)) {
             resolvedDahmerMoviesUrls += finalUrl
             Log.i(TAG, "Marked DahmerMovies URL as resolved for this session")
@@ -1675,7 +1669,11 @@ class DirectStreamActivity : AppCompatActivity() {
                     val (_, isLocked) = withContext(Dispatchers.IO) {
                         StreamValidator.responseBodyContains(active, "<h1>Download Locked</h1>")
                     }
-                    if (isLocked && cloudflareDialog?.isShowing != true) {
+                    if (
+                        isLocked &&
+                        !isGoogleusercontentHost(active.url) &&
+                        cloudflareDialog?.isShowing != true
+                    ) {
                         Log.w(
                             TAG,
                             "Playback returned HTTP $statusCode with a locked-download page; " +
@@ -1691,6 +1689,7 @@ class DirectStreamActivity : AppCompatActivity() {
                 }
                 if (
                     statusCode == 403 &&
+                    !isGoogleusercontentHost(active.url) &&
                     cloudflareDialog?.isShowing != true &&
                     CloudflareBypassActivity.loadCookies(
                         applicationContext,
@@ -1907,7 +1906,7 @@ class DirectStreamActivity : AppCompatActivity() {
                     !handlingPlaybackError &&
                     !engine.player.isPlaying &&
                     cloudflareDialog?.isShowing != true &&
-                    !shouldPlayGoogleusercontentDirectly(active) &&
+                    !isGoogleusercontentHost(active.url) &&
                     active.httpStatusCode == 403 &&
                     CloudflareBypassActivity.loadCookies(
                         applicationContext,
@@ -1999,17 +1998,6 @@ class DirectStreamActivity : AppCompatActivity() {
         // page first so Cloudflare can complete its browser challenge. The
         // resulting cookie is persisted by CloudflareBypassActivity and is
         // attached by PlayerEngine when this stream is retried.
-        if (isGoogleusercontentStream(chosen) && !shouldPlayGoogleusercontentDirectly(chosen)) {
-            Log.i(
-                TAG,
-                "Googleusercontent stream detected; resolving download URL through " +
-                    "CloudflareBypassActivity"
-            )
-            pendingCloudflareStream = chosen
-            pendingCloudflareResumeMs = resumeMs
-            launchCloudflareBypass(chosen)
-            return
-        }
         if (needsDahmerMoviesClearance(chosen)) {
             Log.i(
                 TAG,
@@ -2095,27 +2083,10 @@ class DirectStreamActivity : AppCompatActivity() {
         }
     }
 
-    private fun isGoogleusercontentStream(stream: StreamItem): Boolean =
-        isGoogleusercontentHost(stream.url) && stream.url !in resolvedGoogleusercontentUrls
-
     private fun isGoogleusercontentHost(url: String): Boolean =
         runCatching { Uri.parse(url).host.orEmpty() }
             .getOrDefault("")
             .equals(GOOGLE_DOWNLOADS_HOST, ignoreCase = true)
-
-    /**
-     * MoviesDrive1 returns already-resolved Googleusercontent MKV files. They
-     * are playable directly with the supplied request headers and must not be
-     * sent through the interactive Cloudflare WebView flow. The provider field
-     * in the response may be reported as "moviesdrive", so also check the
-     * explicitly selected provider key.
-     */
-    private fun shouldPlayGoogleusercontentDirectly(stream: StreamItem): Boolean =
-        isGoogleusercontentHost(stream.url) &&
-            (
-                currentProvider.key.equals("moviesdrive1", ignoreCase = true) ||
-                    stream.provider.equals("moviesdrive1", ignoreCase = true)
-                )
 
     /**
      * Detects streams hosted on the oogachaka CDN
@@ -2182,7 +2153,10 @@ class DirectStreamActivity : AppCompatActivity() {
      */
     private fun needsCloudflareBypass(stream: StreamItem): Boolean {
         if (stream.url.isBlank()) return false
-        if (shouldPlayGoogleusercontentDirectly(stream)) return false
+        // Googleusercontent URLs are already resolved media files. Never
+        // route them into the interactive WebView fallback, even on a
+        // transient probe failure.
+        if (isGoogleusercontentHost(stream.url)) return false
         if (stream.url.startsWith(DAHMER_BULK_PREFIX, ignoreCase = true)) {
             return true
         }
@@ -2226,19 +2200,6 @@ class DirectStreamActivity : AppCompatActivity() {
         // DahmerMovies must resolve the browser redirect whenever an
         // unresolved stream is selected, even if another stream is currently
         // playing and even when a clearance cookie is already saved.
-        if (isGoogleusercontentStream(stream) && !shouldPlayGoogleusercontentDirectly(stream)) {
-            Log.i(
-                TAG,
-                "Googleusercontent stream selected; resolving download URL through " +
-                    "CloudflareBypassActivity"
-            )
-            pendingCloudflareStream = stream
-            pendingCloudflareResumeMs = playableStartPositionMs
-            showStatus(getString(R.string.cloudflare_blocked_checking), retry = false)
-            showLoadingArtwork()
-            launchCloudflareBypass(stream)
-            return
-        }
         if (!skipDahmerMoviesBypass && needsDahmerMoviesClearance(stream)) {
             Log.w(
                 TAG,
@@ -2309,7 +2270,7 @@ class DirectStreamActivity : AppCompatActivity() {
                 "Cloudflare probe for ${stream.provider} ${stream.quality} " +
                     "url=${stream.url} -> HTTP $code"
             )
-            if (code == 403) {
+            if (code == 403 && !isGoogleusercontentHost(stream.url)) {
                 showCloudflareBypassDialog(stream, resumeMs)
             } else {
                 // 2xx, 4xx-other, 5xx, or null (network error): play
@@ -2389,7 +2350,6 @@ class DirectStreamActivity : AppCompatActivity() {
         }
 
         val waitForDownload = isDahmerMoviesStream(stream) ||
-            isGoogleusercontentStream(stream) ||
             isCfokDownloadStream(stream)
         val intent = Intent(this, CloudflareBypassActivity::class.java).apply {
             putExtra(CloudflareBypassActivity.EXTRA_HOST, bypassHost)
