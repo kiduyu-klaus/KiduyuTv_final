@@ -450,6 +450,17 @@ object ProvidersApi {
                     h.keys().forEach { k -> map[k] = h.optString(k) }
                     map
                 } ?: linkedMapOf()
+                if (isGoogleusercontentHost(url)) {
+                    // These are controlled by OkHttp/Media3. Forwarding
+                    // provider-supplied values can break signed direct-file
+                    // requests, range seeking, or connection reuse.
+                    headers.keys.removeAll { headerName ->
+                        headerName.equals("Connection", ignoreCase = true) ||
+                            headerName.equals("Host", ignoreCase = true) ||
+                            headerName.equals("Content-Length", ignoreCase = true) ||
+                            headerName.equals("Range", ignoreCase = true)
+                    }
+                }
                 val hasMovieBoxCookieHeader =
                     provider.equals("moviebox", ignoreCase = true) &&
                         headers.any { (name, value) ->
@@ -539,6 +550,11 @@ object ProvidersApi {
             !uri.getQueryParameter("t").isNullOrBlank()
     }
 
+    private fun isGoogleusercontentHost(url: String): Boolean =
+        runCatching { Uri.parse(url).host.orEmpty() }
+            .getOrDefault("")
+            .equals(GOOGLE_DOWNLOADS_HOST, ignoreCase = true)
+
     /**
      * Normalizes the subtitle shapes emitted by the provider plugins. MovieBox
      * currently returns `{ url, name, language, headers }`, while other
@@ -608,6 +624,7 @@ object ProvidersApi {
     }
 
     private const val HLS_MIME_TYPE = "application/vnd.apple.mpegurl"
+    private const val GOOGLE_DOWNLOADS_HOST = "video-downloads.googleusercontent.com"
 
     private val PROVIDERS_WITHOUT_SOURCE_HEADERS = setOf(
         // "cinesrc_provider",
