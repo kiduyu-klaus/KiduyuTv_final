@@ -209,7 +209,7 @@ private fun clearWatchedCache(context: Context) {
  * or removal from the list.
  *
  * The "Watched" tab (only visible when authenticated with Trakt) supports paginated loading
- * of [WATCHED_PAGE_SIZE] items per page with infinite-scroll auto-loading.
+ * of [WATCHED_PAGE_SIZE] items per page and continuously appends every available page.
  *
  * @param onMovieClick Lambda to navigate to the detail screen of a movie.
  * @param onTvShowClick Lambda to navigate to the detail screen of a TV show.
@@ -400,6 +400,7 @@ fun MyListScreen(
                 "total=${watchedHistoryTotal ?: "unknown"}"
         )
 
+        var shouldContinueLoading = false
         coroutineScope.launch {
             try {
                 Log.i(TAG, "Collecting Trakt watched history flow on thread=${Thread.currentThread().name}")
@@ -492,6 +493,7 @@ fun MyListScreen(
                             hasMoreWatched = historyPage.pageCount?.let {
                                 nextPage < it
                             } ?: (history.size == WATCHED_PAGE_SIZE)
+                            shouldContinueLoading = hasMoreWatched
                             // Persist the merged list (best-effort)
                             saveWatchedCache(
                                 context,
@@ -521,6 +523,14 @@ fun MyListScreen(
                         "watchedItems.size=${watchedItems.size}"
                 )
                 isInitialLoading = false
+                if (shouldContinueLoading) {
+                    // Keep fetching in the background until Trakt's page-count
+                    // header says the complete history has been received. This
+                    // also handles pages that collapse to no new cards because
+                    // multiple episode records belong to the same show.
+                    Log.i(TAG, "Continuing watched history pagination after page=$nextPage")
+                    coroutineScope.launch { loadNextWatchedPage() }
+                }
             }
         }
     }
@@ -1046,14 +1056,11 @@ private fun WatchedFooter(
                     }
                 }
             }
-            hasMore -> {
-                // A history page can collapse to only a few cards after repeated
-                // watches are deduplicated. In that case the grid cannot scroll,
-                // so provide an explicit way to request the next page.
-                Button(onClick = onLoadMore) {
-                    Text("Load more watched items")
-                }
-            }
+            hasMore -> Text(
+                text = "Continuing to load watched history…",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
+            )
             !hasMore && totalItems > 0 -> {
                 Text(
                     text = "You've reached the end ($totalItems items)",
