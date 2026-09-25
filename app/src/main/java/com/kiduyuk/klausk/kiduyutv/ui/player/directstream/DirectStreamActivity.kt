@@ -164,6 +164,7 @@ class DirectStreamActivity : AppCompatActivity() {
     private var pendingStartPositionMs = 0L
     private var pendingReadySeekPositionMs = 0L
     private var handlingPlaybackError = false
+    private var isPlaybackBuffering = false
     private var watchHistoryReady = false
     private val controlsClock = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
     private val controlsTime = SimpleDateFormat("h:mm a", Locale.getDefault())
@@ -430,16 +431,25 @@ class DirectStreamActivity : AppCompatActivity() {
             onPlaybackStateChanged = { state ->
                 when (state) {
                     Player.STATE_BUFFERING -> {
+                        isPlaybackBuffering = true
                         showLoadingArtwork()
-                        showStatus(getString(R.string.buffering), retry = false)
+                        showBufferingOverlay()
+                        binding.playerStatus.visibility = View.GONE
+                        binding.btnPlayPause.visibility = View.GONE
                     }
                     Player.STATE_READY -> {
+                        isPlaybackBuffering = false
+                        hideBufferingOverlay()
+                        binding.btnPlayPause.visibility = View.VISIBLE
                         binding.playerStatus.visibility = View.GONE
                         loadSkipSegments()
                         applyPendingReadySeek()
                         startWatchProgressUpdates()
                     }
                     Player.STATE_ENDED -> {
+                        isPlaybackBuffering = false
+                        hideBufferingOverlay()
+                        binding.btnPlayPause.visibility = View.VISIBLE
                         stopWatchProgressUpdates()
                         binding.playerStatus.visibility = View.GONE
                         if (currentMediaType == TYPE_SERIES && currentEpisode != null) {
@@ -459,6 +469,10 @@ class DirectStreamActivity : AppCompatActivity() {
             }
             onIsPlayingChanged = { isPlaying ->
                 if (isPlaying) {
+                    isPlaybackBuffering = false
+                    hideBufferingOverlay()
+                    binding.btnPlayPause.visibility = View.VISIBLE
+                    binding.playerStatus.visibility = View.GONE
                     hideLoadingArtwork()
                     markActiveStreamPlayable()
                 }
@@ -618,7 +632,6 @@ class DirectStreamActivity : AppCompatActivity() {
         )
         availableStreams = listOf(stream)
         activeStream = stream
-        showStatus(getString(R.string.buffering), retry = false)
         providerSubtitles = parseSniffedSubtitles().filterNot { subtitle ->
             val subtitleUrl = subtitle.url.trim()
             subtitleUrl.equals(normalizedUrl, ignoreCase = true) ||
@@ -1433,7 +1446,6 @@ class DirectStreamActivity : AppCompatActivity() {
                 "language=${subtitle.language.orEmpty()} mimeType=${subtitle.mimeType}"
         )
         pendingReadySeekPositionMs = playableStartPosition(updatedStream, positionMs)
-        showStatus(getString(R.string.buffering), retry = false)
         engine.play(updatedStream, 0L, activeSubtitles)
     }
 
@@ -1490,7 +1502,6 @@ class DirectStreamActivity : AppCompatActivity() {
             }
             streamDialog?.updateStreams(availableStreams, activeUrl = refreshed.url)
             activeStream = refreshed
-            showStatus(getString(R.string.buffering), retry = false)
             startStreamPlayback(refreshed, positionMs)
         }
     }
@@ -1532,6 +1543,9 @@ class DirectStreamActivity : AppCompatActivity() {
         )
         stopWatchProgressUpdates()
         engine.pause()
+        isPlaybackBuffering = false
+        hideBufferingOverlay()
+        binding.btnPlayPause.visibility = View.VISIBLE
         // Keep the movie or episode backdrop visible over the failed player
         // surface so playback errors do not leave a black screen.
         showLoadingArtwork()
@@ -2170,7 +2184,6 @@ class DirectStreamActivity : AppCompatActivity() {
         providerSubtitles = stream.subtitles
         stopWatchProgressUpdates()
         showLoadingArtwork()
-        showStatus(getString(R.string.buffering), retry = false)
         // A replacement MediaSource has its own buffer. Clear the old
         // source's buffered marker so the seek bar reflects the new source
         // as Media3 fills it.
@@ -2514,6 +2527,14 @@ class DirectStreamActivity : AppCompatActivity() {
             .start()
     }
 
+    private fun showBufferingOverlay() {
+        binding.bufferingOverlay.visibility = View.VISIBLE
+    }
+
+    private fun hideBufferingOverlay() {
+        binding.bufferingOverlay.visibility = View.GONE
+    }
+
     // ── Episodes side panel helpers ────────────────────────────────────────
 
     private fun toggleEpisodesPanel() {
@@ -2723,7 +2744,9 @@ class DirectStreamActivity : AppCompatActivity() {
         }
         uiHandler.removeCallbacks(hideControlsRunnable)
         binding.overlayControls.visibility = View.VISIBLE
-        binding.btnPlayPause.post { binding.btnPlayPause.requestFocus() }
+        if (!isPlaybackBuffering && binding.btnPlayPause.visibility == View.VISIBLE) {
+            binding.btnPlayPause.post { binding.btnPlayPause.requestFocus() }
+        }
         uiHandler.postDelayed(hideControlsRunnable, 4_000)
     }
 
