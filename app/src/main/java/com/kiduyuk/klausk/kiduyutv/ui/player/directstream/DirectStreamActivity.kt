@@ -1907,6 +1907,7 @@ class DirectStreamActivity : AppCompatActivity() {
                     !handlingPlaybackError &&
                     !engine.player.isPlaying &&
                     cloudflareDialog?.isShowing != true &&
+                    !shouldPlayGoogleusercontentDirectly(active) &&
                     active.httpStatusCode == 403 &&
                     CloudflareBypassActivity.loadCookies(
                         applicationContext,
@@ -1998,7 +1999,7 @@ class DirectStreamActivity : AppCompatActivity() {
         // page first so Cloudflare can complete its browser challenge. The
         // resulting cookie is persisted by CloudflareBypassActivity and is
         // attached by PlayerEngine when this stream is retried.
-        if (isGoogleusercontentStream(chosen)) {
+        if (isGoogleusercontentStream(chosen) && !shouldPlayGoogleusercontentDirectly(chosen)) {
             Log.i(
                 TAG,
                 "Googleusercontent stream detected; resolving download URL through " +
@@ -2103,6 +2104,20 @@ class DirectStreamActivity : AppCompatActivity() {
             .equals(GOOGLE_DOWNLOADS_HOST, ignoreCase = true)
 
     /**
+     * MoviesDrive1 returns already-resolved Googleusercontent MKV files. They
+     * are playable directly with the supplied request headers and must not be
+     * sent through the interactive Cloudflare WebView flow. The provider field
+     * in the response may be reported as "moviesdrive", so also check the
+     * explicitly selected provider key.
+     */
+    private fun shouldPlayGoogleusercontentDirectly(stream: StreamItem): Boolean =
+        isGoogleusercontentHost(stream.url) &&
+            (
+                currentProvider.key.equals("moviesdrive1", ignoreCase = true) ||
+                    stream.provider.equals("moviesdrive1", ignoreCase = true)
+                )
+
+    /**
      * Detects streams hosted on the oogachaka CDN
      * (https://serve.oogachakacdn.store) that do not have a saved
      * `cf_clearance` cookie yet. The oogachaka CDN reliably responds with
@@ -2167,6 +2182,7 @@ class DirectStreamActivity : AppCompatActivity() {
      */
     private fun needsCloudflareBypass(stream: StreamItem): Boolean {
         if (stream.url.isBlank()) return false
+        if (shouldPlayGoogleusercontentDirectly(stream)) return false
         if (stream.url.startsWith(DAHMER_BULK_PREFIX, ignoreCase = true)) {
             return true
         }
@@ -2210,7 +2226,7 @@ class DirectStreamActivity : AppCompatActivity() {
         // DahmerMovies must resolve the browser redirect whenever an
         // unresolved stream is selected, even if another stream is currently
         // playing and even when a clearance cookie is already saved.
-        if (isGoogleusercontentStream(stream)) {
+        if (isGoogleusercontentStream(stream) && !shouldPlayGoogleusercontentDirectly(stream)) {
             Log.i(
                 TAG,
                 "Googleusercontent stream selected; resolving download URL through " +
