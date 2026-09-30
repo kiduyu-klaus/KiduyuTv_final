@@ -41,6 +41,9 @@ import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 
 class MainActivity : ComponentActivity() {
 
+    private var startDestination = Screen.Home.route
+    private var finishWhenRootIsPopped = false
+
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -54,6 +57,11 @@ class MainActivity : ComponentActivity() {
     @OptIn(UnstableApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        startDestination = intent.getStringExtra(EXTRA_START_DESTINATION)
+            ?.takeIf { it == Screen.Settings.route }
+            ?: Screen.Home.route
+        finishWhenRootIsPopped = intent.getBooleanExtra(EXTRA_FINISH_ON_ROOT_BACK, false)
 
         // Set this Activity as the current Activity for dialog display
         AndroidApp.setCurrentActivity(this)
@@ -74,7 +82,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             KiduyuTvTheme {
                 val navController = rememberNavController()
-                var currentRoute by remember { mutableStateOf(Screen.Home.route) }
+                var currentRoute by remember { mutableStateOf(startDestination) }
 
                 // Track navigation changes
                 LaunchedEffect(navController) {
@@ -95,6 +103,11 @@ class MainActivity : ComponentActivity() {
                             // If we can pop back stack, do it. Otherwise, show exit dialog.
                             if (navController.previousBackStackEntry != null) {
                                 navController.popBackStack()
+                            } else if (finishWhenRootIsPopped) {
+                                // DirectStreamActivity opens Settings in a separate task entry so
+                                // leaving Settings returns to the still-open player instead of
+                                // presenting an exit prompt from this transient MainActivity.
+                                finish()
                             } else {
                                 showExitConfirmationDialog()
                             }
@@ -116,9 +129,21 @@ class MainActivity : ComponentActivity() {
                     val isTv = uiModeManager.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION
 
                     if (isTv) {
-                        NavGraph(navController = navController)
+                        NavGraph(
+                            navController = navController,
+                            startDestination = startDestination,
+                            onRootBack = {
+                                if (finishWhenRootIsPopped) finish() else showExitConfirmationDialog()
+                            }
+                        )
                     } else {
-                        MobileNavGraph(navController = navController)
+                        MobileNavGraph(
+                            navController = navController,
+                            startDestination = startDestination,
+                            onRootBack = {
+                                if (finishWhenRootIsPopped) finish() else showExitConfirmationDialog()
+                            }
+                        )
                     }
 
                     if (currentRoute == Screen.Home.route) {
@@ -154,6 +179,20 @@ class MainActivity : ComponentActivity() {
             intent.removeExtra("NOTIFICATION_MEDIA_ID")
             intent.removeExtra("NOTIFICATION_MEDIA_TYPE")
         }
+    }
+
+    companion object {
+        private const val EXTRA_START_DESTINATION =
+            "com.kiduyuk.klausk.kiduyutv.extra.START_DESTINATION"
+        private const val EXTRA_FINISH_ON_ROOT_BACK =
+            "com.kiduyuk.klausk.kiduyutv.extra.FINISH_ON_ROOT_BACK"
+
+        /** Opens the appropriate Compose settings screen for the current device type. */
+        fun createSettingsIntent(context: Context): android.content.Intent =
+            android.content.Intent(context, MainActivity::class.java).apply {
+                putExtra(EXTRA_START_DESTINATION, Screen.Settings.route)
+                putExtra(EXTRA_FINISH_ON_ROOT_BACK, true)
+            }
     }
 
     private fun showExitConfirmationDialog() {

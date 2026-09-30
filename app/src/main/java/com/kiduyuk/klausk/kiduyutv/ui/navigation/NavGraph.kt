@@ -62,11 +62,15 @@ import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 @androidx.media3.common.util.UnstableApi
 @OptIn(UnstableApi::class)
 @Composable
-fun NavGraph(navController: NavHostController) {
+fun NavGraph(
+    navController: NavHostController,
+    startDestination: String = Screen.Home.route,
+    onRootBack: () -> Unit = {}
+) {
     Box(modifier = Modifier.fillMaxSize()) {
         NavHost(
             navController = navController,
-            startDestination = Screen.Home.route,
+            startDestination = startDestination,
             modifier = Modifier.fillMaxSize()
         ) {
         // Home Screen: The main landing page with hero and mixed content.
@@ -453,7 +457,9 @@ fun NavGraph(navController: NavHostController) {
         // Settings Screen: Screen for app settings, information, and version details.
         composable(Screen.Settings.route) {
             SettingsScreen(
-                onBackClick = { navController.popBackStack() },
+                onBackClick = {
+                    if (!navController.popBackStack()) onRootBack()
+                },
                 onNavigateToTraktProfile = { navController.navigate(Screen.TraktProfile.route) }
             )
         }

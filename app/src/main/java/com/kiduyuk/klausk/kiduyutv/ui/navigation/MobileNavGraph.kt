@@ -47,8 +47,12 @@ import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 @androidx.media3.common.util.UnstableApi
 @OptIn(UnstableApi::class)
 @Composable
-fun MobileNavGraph(navController: NavHostController) {
-    NavHost(navController = navController, startDestination = Screen.Home.route) {
+fun MobileNavGraph(
+    navController: NavHostController,
+    startDestination: String = Screen.Home.route,
+    onRootBack: () -> Unit = {}
+) {
+    NavHost(navController = navController, startDestination = startDestination) {
         composable(Screen.Home.route) {
             MobileHomeScreen(
                 navController = navController,
@@ -116,7 +120,9 @@ fun MobileNavGraph(navController: NavHostController) {
 
         composable(Screen.Settings.route) {
             MobileSettingsScreen(
-                onBackClick = { navController.popBackStack() },
+                onBackClick = {
+                    if (!navController.popBackStack()) onRootBack()
+                },
                 onMyListClick = { navController.navigate(Screen.MyList.route) },
                 onNavigateToTraktProfile = { navController.navigate(Screen.TraktProfile.route) }
             )

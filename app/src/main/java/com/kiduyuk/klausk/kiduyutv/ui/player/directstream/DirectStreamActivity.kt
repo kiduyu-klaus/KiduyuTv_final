@@ -52,6 +52,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import com.kiduyuk.klausk.kiduyutv.R
+import com.kiduyuk.klausk.kiduyutv.activity.mainactivity.MainActivity
 import com.kiduyuk.klausk.kiduyutv.databinding.ActivityDirectStreamBinding
 import com.kiduyuk.klausk.kiduyutv.ui.player.cloudflareBypass.CloudflareBypassActivity
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamItem
@@ -493,6 +494,7 @@ class DirectStreamActivity : AppCompatActivity() {
         // app:show_subtitle_button="false" because we don't render
         // subtitle tracks via the Media3 overlay.
         binding.btnPlayerBack.setOnClickListener { showExitConfirmationDialog() }
+        binding.btnPlayerSettings.setOnClickListener { openSettings() }
         binding.btnSkipSegment.setOnClickListener { onSkipClicked() }
         binding.btnPlayerTracks.setOnClickListener { showTrackDialog() }
         binding.btnPlayerStreams.setOnClickListener { showStreamDialog() }
@@ -1284,6 +1286,7 @@ class DirectStreamActivity : AppCompatActivity() {
     private fun installPlayerControlTooltips() {
         listOf(
             binding.btnPlayerBack,
+            binding.btnPlayerSettings,
             binding.btnRewind,
             binding.btnPlayPause,
             binding.btnForward,
@@ -1339,12 +1342,22 @@ class DirectStreamActivity : AppCompatActivity() {
                 activePlayerTooltip?.dismiss()
                 activePlayerTooltip = balloon
             }
-            if (anchor === binding.btnPlayerBack || anchor === binding.btnSkipSegment) {
+            if (
+                anchor === binding.btnPlayerBack ||
+                anchor === binding.btnPlayerSettings ||
+                anchor === binding.btnSkipSegment
+            ) {
                 balloon.showAlignBottom(anchor)
             } else {
                 balloon.showAlignTop(anchor)
             }
         }
+    }
+
+    private fun openSettings() {
+        // MainActivity selects the TV or phone navigation graph from the
+        // device configuration, so this always opens the matching Settings UI.
+        startActivity(MainActivity.createSettingsIntent(this))
     }
 
     private fun showStreamDialog() {

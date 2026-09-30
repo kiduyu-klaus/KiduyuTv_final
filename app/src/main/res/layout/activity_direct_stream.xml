@@ -134,6 +134,14 @@
                     android:textColor="@color/text_secondary"
                     android:textSize="12sp" />
             </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnPlayerSettings"
+                style="@style/DirectStreamIconButtonFlat"
+                android:layout_marginStart="12dp"
+                android:contentDescription="@string/player_settings_cd"
+                android:nextFocusDown="@id/btnPlayPause"
+                app:icon="@drawable/ic_settings" />
         </LinearLayout>
 
         <com.google.android.material.button.MaterialButton

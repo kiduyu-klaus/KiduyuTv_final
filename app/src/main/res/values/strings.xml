@@ -112,6 +112,7 @@
     <string name="player_next_episode_cd">Play next episode</string>
     <string name="player_episodes">Episodes</string>
     <string name="player_episodes_cd">Show episode list</string>
+    <string name="player_settings_cd">Open settings</string>
     <string name="skip_intro">Skip Intro</string>
     <string name="skip_recap">Skip Recap</string>
     <string name="skip_outro">Skip Credits</string>
