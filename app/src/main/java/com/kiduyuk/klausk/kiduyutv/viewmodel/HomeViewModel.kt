@@ -9,6 +9,8 @@ import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
 import com.kiduyuk.klausk.kiduyutv.util.NotificationHelper
 import com.kiduyuk.klausk.kiduyutv.util.WatchHistoryEnricher
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -92,12 +94,29 @@ class HomeViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    init {
-        // loadHomeContent will be called from the UI with context
-    }
+    // The Home destination can leave and re-enter composition when the user
+    // opens a detail screen and returns. Keep its loaded state in the
+    // ViewModel, not the composable, so LaunchedEffect(Unit) does not restart
+    // all home, GitHub-list, and watch-history requests on every return.
+    private var hasLoadedHomeContent = false
+    private var homeLoadJob: Job? = null
 
-    fun loadHomeContent(context: Context) {
-        viewModelScope.launch {
+    /**
+     * Loads Home content once per ViewModel instance. Pass [forceRefresh] from
+     * an explicit user refresh action when a new network load is desired.
+     */
+    fun loadHomeContent(context: Context, forceRefresh: Boolean = false) {
+        if (homeLoadJob?.isActive == true) {
+            android.util.Log.d("HomeViewModel", "Home load already in progress; ignoring duplicate request")
+            return
+        }
+        if (hasLoadedHomeContent && !forceRefresh) {
+            android.util.Log.d("HomeViewModel", "Home content already loaded; retaining current state")
+            return
+        }
+
+        val appContext = context.applicationContext
+        homeLoadJob = viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
             try {
@@ -118,7 +137,7 @@ class HomeViewModel : ViewModel() {
                 val timeTravelTv = timeTravelTvDeferred.await().getOrNull() ?: emptyList()
 
                 // Get watch history
-                val watchHistory = repository.getWatchHistory(context)
+                val watchHistory = repository.getWatchHistory(appContext)
                 //android.util.Log.i("HomeViewModel", "[WatchHistory] Fetched ${watchHistory.size} items from database")
                 
                 // Filter TV shows from watch history
@@ -150,9 +169,13 @@ class HomeViewModel : ViewModel() {
                     timeTravelTvShows = timeTravelTv,
                     selectedItem = sortedNowPlaying.firstOrNull() ?: sortedTrendingTv.firstOrNull() ?: sortedTrendingMovies.firstOrNull()
                 )
+                // Primary content is now available. Subsequent composition of
+                // Home must retain this state rather than launching another
+                // complete load while secondary rows finish in the background.
+                hasLoadedHomeContent = true
 
                 // Trigger a random recommendation notification if we have content
-                triggerRandomRecommendation(context, sortedTrendingMovies, sortedTrendingTv)
+                triggerRandomRecommendation(appContext, sortedTrendingMovies, sortedTrendingTv)
 
                 // Refresh watch history images and enrich items with TMDB details in background
                 // This ensures "Continue Watching" row displays complete and accurate information
@@ -167,14 +190,14 @@ class HomeViewModel : ViewModel() {
                 viewModelScope.launch {
                     try {
                         // First, refresh all images from TMDB to ensure fresh images
-                        WatchHistoryEnricher.refreshAllWatchHistoryImages(context)
+                        WatchHistoryEnricher.refreshAllWatchHistoryImages(appContext)
 
                         // Then, enrich items with missing TMDB details (including voteAverage and overview)
-                        WatchHistoryEnricher.enrichAllMissingItems(context)
+                        WatchHistoryEnricher.enrichAllMissingItems(appContext)
 
                         // Refresh the watch history after enrichment to get updated items
                         val enrichedWatchHistory = WatchHistoryEnricher
-                            .getEnrichedWatchHistory(context)
+                            .getEnrichedWatchHistory(appContext)
                             .sortedByDescending { it.lastWatched }
                         _uiState.value = _uiState.value.copy(continueWatching = enrichedWatchHistory)
                     } catch (e: Exception) {
@@ -189,17 +212,17 @@ class HomeViewModel : ViewModel() {
                 viewModelScope.launch {
                     try {
                         // Get items that specifically need voteAverage or overview enrichment
-                        val itemsWithMissingDetails = WatchHistoryEnricher.getItemsWithMissingDetails(context)
+                        val itemsWithMissingDetails = WatchHistoryEnricher.getItemsWithMissingDetails(appContext)
                         for (item in itemsWithMissingDetails) {
                             // Only enrich items that are in the continue watching list
                             if (sortedWatchHistory.any { it.id == item.id && it.isTv == (item.mediaType == "tv") }) {
-                                WatchHistoryEnricher.enrichSingleItem(context, item.id, item.mediaType)
+                                WatchHistoryEnricher.enrichSingleItem(appContext, item.id, item.mediaType)
                                 //android.util.Log.i("HomeViewModel", "Enriched continue watching item: ${item.id} (${item.mediaType})")
                             }
                         }
                         // Refresh the watch history after individual enrichment
                         val enrichedWatchHistory = WatchHistoryEnricher
-                            .getEnrichedWatchHistory(context)
+                            .getEnrichedWatchHistory(appContext)
                             .sortedByDescending { it.lastWatched }
                         _uiState.value = _uiState.value.copy(continueWatching = enrichedWatchHistory)
                     } catch (e: Exception) {
@@ -212,65 +235,65 @@ class HomeViewModel : ViewModel() {
                 // Use parallel async calls to load all content simultaneously for faster display
                 viewModelScope.launch {
                     val oscarWinnersDeferred = async {
-                        repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/oscar_winners_2026.json").getOrNull() ?: emptyList()
+                        repository.getGitHubMovieList(appContext, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/oscar_winners_2026.json").getOrNull() ?: emptyList()
                     }
                     val marvelCinematicUniverseDeferred = async {
-                        repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/marvel_cinematic_universe.json").getOrNull() ?: emptyList()
+                        repository.getGitHubMovieList(appContext, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/marvel_cinematic_universe.json").getOrNull() ?: emptyList()
                     }
                     val harryPotterCollectionDeferred = async {
-                        repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/harry_potter_collection.json").getOrNull() ?: emptyList()
+                        repository.getGitHubMovieList(appContext, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/harry_potter_collection.json").getOrNull() ?: emptyList()
                     }
                     val animeToWatchDeferred = async {
-                        repository.getGitHubTvShowList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/anime_to_watch_before_you_die.json").getOrNull() ?: emptyList()
+                        repository.getGitHubTvShowList(appContext, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/anime_to_watch_before_you_die.json").getOrNull() ?: emptyList()
                     }
                     val popularHorrorDeferred = async {
-                        repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/popular_horror.json").getOrNull() ?: emptyList()
+                        repository.getGitHubMovieList(appContext, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/popular_horror.json").getOrNull() ?: emptyList()
                     }
                     val shutUpAndWatchDeferred = async {
-                        repository.getGitHubTvShowList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/shut_up_and_watch.json").getOrNull() ?: emptyList()
+                        repository.getGitHubTvShowList(appContext, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/shut_up_and_watch.json").getOrNull() ?: emptyList()
                     }
                     val jamesBondCollectionDeferred = async {
-                        repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/james_bond_collection.json").getOrNull() ?: emptyList()
+                        repository.getGitHubMovieList(appContext, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/james_bond_collection.json").getOrNull() ?: emptyList()
                     }
                     val piratesOfTheCaribbeanDeferred = async {
-                        repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/pirates_of_the_caribbean.json").getOrNull() ?: emptyList()
+                        repository.getGitHubMovieList(appContext, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/pirates_of_the_caribbean.json").getOrNull() ?: emptyList()
                     }
                     // Networks and companies loaded in parallel with other content
                     val companiesNetworksDeferred = async {
-                        repository.getGitHubCompaniesNetworks(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/companies_networks.json").getOrNull()
+                        repository.getGitHubCompaniesNetworks(appContext, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/companies_networks.json").getOrNull()
                     }
                     val hallmarkMoviesDeferred = async {
-                        repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/hallmark_movies.json").getOrNull() ?: emptyList()
+                        repository.getGitHubMovieList(appContext, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/hallmark_movies.json").getOrNull() ?: emptyList()
                     }
                     val trueStoryMoviesDeferred = async {
-                        repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/true_story_movies.json").getOrNull() ?: emptyList()
+                        repository.getGitHubMovieList(appContext, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/true_story_movies.json").getOrNull() ?: emptyList()
                     }
                     val bestSitcomsDeferred = async {
-                        repository.getGitHubTvShowList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/best_sitcoms.json").getOrNull() ?: emptyList()
+                        repository.getGitHubTvShowList(appContext, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/best_sitcoms.json").getOrNull() ?: emptyList()
                     }
                     val bestClassicsDeferred = async {
-                        repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/best_classics.json").getOrNull() ?: emptyList()
+                        repository.getGitHubMovieList(appContext, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/best_classics.json").getOrNull() ?: emptyList()
                     }
                     val spyMoviesDeferred = async {
-                        repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/cia_mossad_spies.json").getOrNull() ?: emptyList()
+                        repository.getGitHubMovieList(appContext, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/cia_mossad_spies.json").getOrNull() ?: emptyList()
                     }
                     val stathamMoviesDeferred = async {
-                        repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/jason_statham_movies.json").getOrNull() ?: emptyList()
+                        repository.getGitHubMovieList(appContext, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/jason_statham_movies.json").getOrNull() ?: emptyList()
                     }
                     val timeTravelMoviesDeferred = async {
-                        repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/time_travel_movies.json").getOrNull() ?: emptyList()
+                        repository.getGitHubMovieList(appContext, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/time_travel_movies.json").getOrNull() ?: emptyList()
                     }
                     val christianMoviesDeferred = async {
-                        repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/christian_movies.json").getOrNull() ?: emptyList()
+                        repository.getGitHubMovieList(appContext, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/christian_movies.json").getOrNull() ?: emptyList()
                     }
                     val bibleMoviesDeferred = async {
-                        repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/movies_from_the_bible.json").getOrNull() ?: emptyList()
+                        repository.getGitHubMovieList(appContext, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/movies_from_the_bible.json").getOrNull() ?: emptyList()
                     }
                     val christianTvShowsDeferred = async {
-                        repository.getGitHubTvShowList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/christian_tv_shows.json").getOrNull() ?: emptyList()
+                        repository.getGitHubTvShowList(appContext, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/christian_tv_shows.json").getOrNull() ?: emptyList()
                     }
                     val doctorWhoSpecialsDeferred = async {
-                        repository.getGitHubMovieList(context, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/doctor_who_specials.json").getOrNull() ?: emptyList()
+                        repository.getGitHubMovieList(appContext, "https://raw.githubusercontent.com/kiduyu-klaus/KiduyuTv_final/refs/heads/main/lists/doctor_who_specials.json").getOrNull() ?: emptyList()
                     }
 
 
@@ -348,6 +371,8 @@ class HomeViewModel : ViewModel() {
                         popularCompanies = companies
                     )
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
