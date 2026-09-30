@@ -31,6 +31,7 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
+import com.kiduyuk.klausk.kiduyutv.ui.components.SectionNativeAd
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileBottomNavigation
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileMovieCard
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileSearchTopBar
@@ -146,6 +147,9 @@ fun MobileMoviesScreen(
                         }
                     }
 
+                    // Three catalog sections precede this in-feed placement.
+                    item { SectionNativeAd() }
+
                     // Now Playing in Theaters
                     if (uiState.nowPlayingMovies.isNotEmpty()) {
                         item {
@@ -226,6 +230,8 @@ fun MobileMoviesScreen(
                         }
                     }
 
+                    item { SectionNativeAd() }
+
                     // CIA & Mossad Spy Movies
                     if (uiState.spyMovies.isNotEmpty()) {
                         item {
@@ -285,6 +291,8 @@ fun MobileMoviesScreen(
                             }
                         }
                     }
+
+                    item { SectionNativeAd() }
 
                     // Christian Movies
                     if (uiState.christianMovies.isNotEmpty()) {

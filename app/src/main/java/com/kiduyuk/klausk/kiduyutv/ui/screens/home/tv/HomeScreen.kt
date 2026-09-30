@@ -36,6 +36,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.components.ContentRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.HeroSection
 import com.kiduyuk.klausk.kiduyutv.ui.components.MovieCard
 import com.kiduyuk.klausk.kiduyutv.ui.components.NetworkRow
+import com.kiduyuk.klausk.kiduyutv.ui.components.SectionNativeAd
 import com.kiduyuk.klausk.kiduyutv.ui.components.TopBar
 import com.kiduyuk.klausk.kiduyutv.ui.components.TvShowCard
 import com.kiduyuk.klausk.kiduyutv.ui.components.shimmer.TvHomeSkeleton
@@ -421,6 +422,9 @@ private fun HomeContent(
                             onClick = onClick
                         )
                     }
+                    // Several catalog rows precede this native in-feed placement.
+                    SectionNativeAd()
+
                     // Content Row for Movies Trending This Week.
                     if (uiState.trendingMoviesThisWeek.isNotEmpty()) {
                         ContentRow(
@@ -494,6 +498,8 @@ private fun HomeContent(
                         )
                     }
 
+                    SectionNativeAd()
+
                     if (uiState.oscarWinners2026.isNotEmpty()) {
                         ContentRow(
                             title = "2026 Oscar winners",
@@ -565,6 +571,8 @@ private fun HomeContent(
                             TvShowCard(tvShow = tvShow, isSelected = isFocused, onClick = onClick)
                         }
                     }
+
+                    SectionNativeAd()
 
                     if (uiState.popularHorror.isNotEmpty()) {
                         ContentRow(

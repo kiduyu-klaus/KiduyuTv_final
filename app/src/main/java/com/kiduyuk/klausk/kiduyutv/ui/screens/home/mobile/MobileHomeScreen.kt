@@ -53,6 +53,7 @@ import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
 import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
+import com.kiduyuk.klausk.kiduyutv.ui.components.SectionNativeAd
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileBottomNavigation
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileMovieCard
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileNetworkCard
@@ -386,6 +387,9 @@ fun MobileHomeScreen(
                             }
                         }
                     }
+                    // Three catalog rows precede this in-feed placement.
+                    item { SectionNativeAd() }
+
                     // Popular Networks
                     if (uiState.popularNetworks.isNotEmpty()) {
                         item {
@@ -423,6 +427,8 @@ fun MobileHomeScreen(
                     }
 
                     // Oscar Winners
+                    item { SectionNativeAd() }
+
                     if (uiState.oscarWinners2026.isNotEmpty()) {
                         item {
                             MobileCategoryRow("2026 Oscar Winners", uiState.oscarWinners2026) { movie ->
@@ -454,6 +460,8 @@ fun MobileHomeScreen(
                             }
                         }
                     }
+
+                    item { SectionNativeAd() }
 
                     if (uiState.popularHorror.isNotEmpty()) {
                         item {

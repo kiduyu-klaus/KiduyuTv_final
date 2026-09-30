@@ -37,6 +37,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.components.ContentRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.HeroSection
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.MovieCard
+import com.kiduyuk.klausk.kiduyutv.ui.components.SectionNativeAd
 import com.kiduyuk.klausk.kiduyutv.ui.components.TopBar
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
@@ -205,6 +206,9 @@ fun MoviesScreen(
                         }
                     }
 
+                    // Skip two catalog rows before showing an in-feed ad.
+                    SectionNativeAd()
+
                     // Content Row for Top Rated Movies
                     if (uiState.latestMovies.isNotEmpty()) {
                         ContentRow(
@@ -269,6 +273,8 @@ fun MoviesScreen(
                         }
                     }
 
+                    SectionNativeAd()
+
                     // Content Row for Best movie classics
                     if (uiState.bestClassics.isNotEmpty()) {
                         ContentRow(
@@ -332,6 +338,8 @@ fun MoviesScreen(
                             )
                         }
                     }
+
+                    SectionNativeAd()
 
                     // Content Row for Christian Movies
                     if (uiState.christianMovies.isNotEmpty()) {

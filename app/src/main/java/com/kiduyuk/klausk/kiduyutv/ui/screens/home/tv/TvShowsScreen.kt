@@ -34,6 +34,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
 import com.kiduyuk.klausk.kiduyutv.data.model.WatchHistoryItem
 import com.kiduyuk.klausk.kiduyutv.ui.components.ContentRow
+import com.kiduyuk.klausk.kiduyutv.ui.components.SectionNativeAd
 import com.kiduyuk.klausk.kiduyutv.ui.components.HeroSection
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.TopBar
@@ -185,6 +186,9 @@ fun TvShowsScreen(
                             onClick = onClick
                         )
                     }
+
+                    // Three catalog rows precede this native in-feed placement.
+                    SectionNativeAd()
 
                     // Content Row for Best Sitcoms Ever
                     if (uiState.bestSitcoms.isNotEmpty()) {

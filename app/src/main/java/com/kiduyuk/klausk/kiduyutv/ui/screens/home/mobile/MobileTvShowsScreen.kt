@@ -26,6 +26,7 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import com.kiduyuk.klausk.kiduyutv.data.model.TvShow
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
+import com.kiduyuk.klausk.kiduyutv.ui.components.SectionNativeAd
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileBottomNavigation
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileSearchTopBar
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileTvShowCard
@@ -153,6 +154,9 @@ fun MobileTvShowsScreen(
                             }
                         }
                     }
+
+                    // Three catalog sections precede this in-feed placement.
+                    item { SectionNativeAd() }
 
                     // Best Sitcoms
                     if (uiState.bestSitcoms.isNotEmpty()) {
