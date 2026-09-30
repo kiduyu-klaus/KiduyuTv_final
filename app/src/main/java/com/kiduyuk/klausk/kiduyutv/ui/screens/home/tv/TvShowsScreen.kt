@@ -144,6 +144,10 @@ fun TvShowsScreen(
                         )
                     }
 
+                    // Keep the in-feed placement between the first two TV
+                    // catalog sections so it is visible without interrupting
+                    // either horizontal row.
+                    SectionNativeAd()
 
                     // Content Row for Continue Watching TV Shows, only shown if not empty.
                     val tvHistory = uiState.continueWatching.filter { it.isTv }
@@ -186,9 +190,6 @@ fun TvShowsScreen(
                             onClick = onClick
                         )
                     }
-
-                    // Three catalog rows precede this native in-feed placement.
-                    SectionNativeAd()
 
                     // Content Row for Best Sitcoms Ever
                     if (uiState.bestSitcoms.isNotEmpty()) {
