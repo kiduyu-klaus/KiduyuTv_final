@@ -1,6 +1,7 @@
 package com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback
 
 import android.content.Context
+import kotlinx.coroutines.*
 import android.net.Uri
 import android.util.Log
 import androidx.annotation.OptIn
@@ -42,6 +43,8 @@ import com.kiduyuk.klausk.kiduyutv.ui.player.cloudflareBypass.CloudflareBypassAc
  */
 @OptIn(UnstableApi::class)
 class PlayerEngine(context: Context) {
+    private val preparationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var preparationJob: Job? = null
 
     private val appContext: Context = context.applicationContext
 
@@ -589,6 +592,27 @@ class PlayerEngine(context: Context) {
         startPositionMs: Long = 0L,
         subtitles: List<SubtitleItem> = emptyList()
     ) {
+        preparationJob?.cancel()
+        if (!MegaPlaybackToken.needsRefresh(stream)) {
+            playPrepared(stream, startPositionMs, subtitles)
+            return
+        }
+        player.stop()
+        val headers = playbackHeaders(stream)
+        preparationJob = preparationScope.launch {
+            try {
+                val refreshed = withContext(Dispatchers.IO) { MegaPlaybackToken.refresh(stream, headers) }
+                ensureActive()
+                playPrepared(refreshed, startPositionMs, subtitles)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                onError?.invoke("Could not prepare Mega playback. Retry to request a fresh device token.")
+            }
+        }
+    }
+
+    private fun playPrepared(stream: StreamItem, startPositionMs: Long, subtitles: List<SubtitleItem>) {
         val normalizedUrl = normalizePlaybackUrl(stream)
         val playbackStream = if (normalizedUrl == stream.url) stream else stream.copy(url = normalizedUrl)
         currentUrl = normalizedUrl
@@ -608,7 +632,7 @@ class PlayerEngine(context: Context) {
             TAG,
             "Engine.play provider=${playbackStream.provider.ifBlank { "?" }} " +
                 "quality=${playbackStream.quality} scheme=$scheme isHls=$isHlsStream " +
-                "source=$sourceType host=$host url=$normalizedUrl headerCount=${requestHeaders.size}"
+                "source=$sourceType host=$host url=${sanitize(normalizedUrl)} headerCount=${requestHeaders.size}"
         )
         // Log the actual header values (truncated) so a 403 from the CDN
         // is diagnosable from logcat without needing to attach a debugger.
@@ -670,6 +694,7 @@ class PlayerEngine(context: Context) {
     fun currentTracks(): Tracks = player.currentTracks
 
     fun release() {
+        preparationScope.cancel()
         runCatching { player.release() }
     }
 

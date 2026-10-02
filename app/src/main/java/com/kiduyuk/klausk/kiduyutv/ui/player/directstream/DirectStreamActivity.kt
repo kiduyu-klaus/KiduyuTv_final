@@ -2039,7 +2039,9 @@ class DirectStreamActivity : AppCompatActivity() {
         // Pre-flight 403 detection. If the manifest URL is gated by
         // Cloudflare, give the user the option to open the bypass screen
         // *before* ExoPlayer emits a generic "Playback failed" toast.
-        if (StreamValidator.isDashCandidate(chosen)) {
+        if (com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.MegaPlaybackToken.needsRefresh(chosen)) {
+            startStreamPlayback(chosen, resumeMs)
+        } else if (StreamValidator.isDashCandidate(chosen)) {
             preflightDashAndPlay(chosen, resumeMs)
         } else if (needsCloudflareBypass(chosen)) {
             offerCloudflareBypass(chosen, resumeMs)
@@ -2165,6 +2167,8 @@ class DirectStreamActivity : AppCompatActivity() {
      * automatically and the user does not need to be re-prompted.
      */
     private fun needsCloudflareBypass(stream: StreamItem): Boolean {
+        // A server-issued Mega token can fail IP validation; refresh it on-device.
+        if (com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.MegaPlaybackToken.needsRefresh(stream)) return false
         if (stream.url.isBlank()) return false
         // Googleusercontent URLs are already resolved media files. Never
         // route them into the interactive WebView fallback, even on a
