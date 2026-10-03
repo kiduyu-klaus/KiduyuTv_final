@@ -5,6 +5,8 @@ import android.animation.AnimatorListenerAdapter
 import android.animation.ObjectAnimator
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -40,6 +42,7 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.button.MaterialButton
 import com.skydoves.balloon.ArrowPositionRules
 import com.skydoves.balloon.Balloon
 import com.skydoves.balloon.BalloonAnimation
@@ -1305,7 +1308,14 @@ class DirectStreamActivity : AppCompatActivity() {
             binding.btnEpisodes,
             binding.btnCloseEpisodesPanel
         ).forEach { button ->
+            val materialButton = button as? MaterialButton
+            val defaultTint = materialButton?.backgroundTintList
             button.setOnFocusChangeListener { view, hasFocus ->
+                materialButton?.backgroundTintList = if (hasFocus) {
+                    ColorStateList.valueOf(Color.parseColor("#38BDF8"))
+                } else {
+                    defaultTint
+                }
                 if (hasFocus) {
                     showPlayerTooltip(view)
                 } else {
