@@ -380,7 +380,7 @@ fun MobileNavGraph(
                 onPlayClick = { route -> navController.navigate(route) },
                 onCastClick = { cast ->
                     navController.navigate(
-                        Screen.CastDetail.createRoute(
+                        Screen.MobileCastDetail.createRoute(
                             castId = cast.id,
                             castName = cast.name,
                             character = cast.character,
@@ -391,7 +391,7 @@ fun MobileNavGraph(
                 },
                 onCrewClick = { crew ->
                     navController.navigate(
-                        Screen.CastDetail.createRoute(
+                        Screen.MobileCastDetail.createRoute(
                             castId = crew.id,
                             castName = crew.name,
                             character = crew.job,
