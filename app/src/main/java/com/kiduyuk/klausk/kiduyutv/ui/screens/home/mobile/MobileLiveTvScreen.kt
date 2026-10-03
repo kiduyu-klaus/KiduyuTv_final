@@ -202,13 +202,17 @@ fun MobileLiveTvScreen(
                 when (selectedTab) {
                     0 -> {
                         Column(modifier = Modifier.fillMaxSize()) {
+                            val isCountryDirectory = uiState.selectedCategory == null &&
+                                uiState.playlistChoices.isEmpty()
                             OutlinedTextField(
                                 value = uiState.searchQuery,
                                 onValueChange = { viewModel.updateSearchQuery(it) },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(12.dp),
-                                placeholder = { Text("Search channels...") },
+                                placeholder = {
+                                    Text(if (isCountryDirectory) "Search countries..." else "Search channels...")
+                                },
                                 leadingIcon = {
                                     Icon(Icons.Default.Search, contentDescription = "Search")
                                 },
@@ -233,7 +237,38 @@ fun MobileLiveTvScreen(
                             )
 
                             if (uiState.searchQuery.isNotBlank()) {
-                                if (uiState.searchResults.isEmpty()) {
+                                if (isCountryDirectory) {
+                                    val matchingCountries = uiState.categories.filter { country ->
+                                        country.name.contains(uiState.searchQuery, ignoreCase = true) ||
+                                            country.countryCode?.contains(uiState.searchQuery, ignoreCase = true) == true
+                                    }
+                                    if (matchingCountries.isEmpty()) {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .padding(24.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center
+                                        ) {
+                                            Text(
+                                                text = "No countries match \"${uiState.searchQuery}\"",
+                                                color = TextSecondary
+                                            )
+                                        }
+                                    } else {
+                                        LazyColumn(
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentPadding = PaddingValues(12.dp)
+                                        ) {
+                                            items(matchingCountries) { country ->
+                                                CountryCategoryRow(country) {
+                                                    country.countryCode?.let(viewModel::selectCountry)
+                                                }
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                            }
+                                        }
+                                    }
+                                } else if (uiState.searchResults.isEmpty()) {
                                     Column(
                                         modifier = Modifier
                                             .fillMaxSize()

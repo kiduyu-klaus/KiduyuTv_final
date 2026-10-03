@@ -1231,7 +1231,20 @@ private fun CountryCategoriesContent(
 ) {
     // Focus requester for D-pad navigation
     val firstFocusRequester = remember { FocusRequester() }
+    val countrySearchFocusRequester = remember { FocusRequester() }
     val gridState = rememberLazyGridState()
+    var isCountrySearchVisible by remember { mutableStateOf(false) }
+    var countrySearchQuery by remember { mutableStateOf("") }
+    val filteredCountries = remember(countries, countrySearchQuery) {
+        if (countrySearchQuery.isBlank()) {
+            countries
+        } else {
+            countries.filter { country ->
+                country.displayName.contains(countrySearchQuery, ignoreCase = true) ||
+                    country.countryCode.contains(countrySearchQuery, ignoreCase = true)
+            }
+        }
+    }
 
     // Request focus on first item when categories load
     LaunchedEffect(countries) {
@@ -1266,9 +1279,30 @@ private fun CountryCategoriesContent(
                     fontSize = 14.sp
                 )
             }
+            SearchButton(
+                label = "Search Countries",
+                onClick = {
+                    isCountrySearchVisible = !isCountrySearchVisible
+                    if (!isCountrySearchVisible) countrySearchQuery = ""
+                }
+            )
         }
 
-        if (countries.isEmpty()) {
+        if (isCountrySearchVisible) {
+            SearchInputField(
+                query = countrySearchQuery,
+                onQueryChange = { countrySearchQuery = it },
+                onClear = { countrySearchQuery = "" },
+                onImeAction = { },
+                focusRequester = countrySearchFocusRequester
+            )
+            LaunchedEffect(isCountrySearchVisible) {
+                countrySearchFocusRequester.requestFocus()
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        if (filteredCountries.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1276,7 +1310,11 @@ private fun CountryCategoriesContent(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "No country playlists available",
+                    text = if (countrySearchQuery.isBlank()) {
+                        "No country playlists available"
+                    } else {
+                        "No countries match \"$countrySearchQuery\""
+                    },
                     color = TextSecondary,
                     fontSize = 16.sp
                 )
@@ -1291,7 +1329,7 @@ private fun CountryCategoriesContent(
                     .fillMaxWidth()
                     .padding(bottom = 16.dp)
             ) {
-                itemsIndexed(countries, key = { _, country -> country.countryCode }) { index, country ->
+                itemsIndexed(filteredCountries, key = { _, country -> country.countryCode }) { index, country ->
                     val modifier = if (index == 0) {
                         Modifier.focusRequester(firstFocusRequester)
                     } else {
@@ -1312,7 +1350,10 @@ private fun CountryCategoriesContent(
  * Search button component for TV navigation.
  */
 @Composable
-private fun SearchButton(onClick: () -> Unit) {
+private fun SearchButton(
+    label: String = "Search Channels",
+    onClick: () -> Unit
+) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
@@ -1343,7 +1384,7 @@ private fun SearchButton(onClick: () -> Unit) {
                 tint = Color.White
             )
             Text(
-                text = "Search Channels",
+                text = label,
                 color = Color.White,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium
