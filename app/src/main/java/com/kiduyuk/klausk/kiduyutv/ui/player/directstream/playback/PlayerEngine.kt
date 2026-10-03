@@ -407,6 +407,7 @@ class PlayerEngine(context: Context) {
     private var currentSourceIsPlaylist = false
     private var highestVideoTrackApplied = false
     private var autoAudioTrackApplied = false
+    private var audioRecoveryAttempted = false
 
     /** Invoked on fatal playback errors. The argument is a stable error code name. */
     var onError: ((String) -> Unit)? = null
@@ -447,6 +448,9 @@ class PlayerEngine(context: Context) {
                     }
                 }
                 Log.w(TAG, completeErrorMessage, error)
+                if (isAudioDecodingError(error) && tryRecoverWithAlternateAudioTrack()) {
+                    return
+                }
                 onError?.invoke(completeErrorMessage)
             }
 
@@ -489,7 +493,7 @@ class PlayerEngine(context: Context) {
      * Mirrors [selectHighestResolutionVideoTrack] in scope and lifetime.
      */
     private fun applyAutoAudioTrack(tracks: Tracks) {
-        if (!currentSourceIsPlaylist || autoAudioTrackApplied) return
+        if (autoAudioTrackApplied) return
         // No-op when the manifest exposes zero audio tracks; some streams
         // (e.g. video-only promo clips) legitimately have no audio group.
         val hasAudio = tracks.groups.any { it.type == C.TRACK_TYPE_AUDIO && it.length > 0 }
@@ -498,6 +502,12 @@ class PlayerEngine(context: Context) {
             return
         }
         autoAudioTrackApplied = true
+        val candidates = audioTrackCandidates(tracks)
+        val preferred = candidates.minWithOrNull(
+            compareBy<AudioCandidate> { audioLanguageRank(it.language) }
+                .thenBy { it.channelCount.takeIf { count -> count > 0 } ?: Int.MAX_VALUE }
+                .thenBy { it.trackIndex }
+        )
         val current = player.trackSelectionParameters
         val builder = current.buildUpon()
             .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
@@ -511,11 +521,17 @@ class PlayerEngine(context: Context) {
                 MimeTypes.AUDIO_MPEG_L2,
                 MimeTypes.AUDIO_RAW
             )
+        if (candidates.size > 1 && preferred != null) {
+            builder.setOverrideForType(
+                TrackSelectionOverride(preferred.trackGroup, preferred.trackIndex)
+            )
+        }
         player.trackSelectionParameters = builder.build()
         val chosen = describeCurrentAudioTrack(tracks)
         Log.i(
             TAG,
-            "Applied Playlist audio track=auto (preferred AAC > AC3 > E-AC3 > DTS). " +
+            "Applied audio track=${preferred?.language ?: "auto"} " +
+                "(preferred English, then AAC > AC3 > E-AC3 > DTS). " +
                 "Active audio track after selection: ${chosen ?: "<none>"}"
         )
     }
@@ -534,6 +550,82 @@ class PlayerEngine(context: Context) {
         val mime = format.sampleMimeType ?: format.codecs ?: "?"
         return "$language $channels $mime"
     }
+
+    private fun audioTrackCandidates(tracks: Tracks): List<AudioCandidate> = buildList {
+        tracks.groups.forEach { group ->
+            if (group.type != C.TRACK_TYPE_AUDIO) return@forEach
+            for (trackIndex in 0 until group.length) {
+                if (!group.isTrackSupported(trackIndex)) continue
+                val format = group.getTrackFormat(trackIndex)
+                add(
+                    AudioCandidate(
+                        trackGroup = group.mediaTrackGroup,
+                        trackIndex = trackIndex,
+                        language = format.language,
+                        channelCount = format.channelCount
+                    )
+                )
+            }
+        }
+    }
+
+    private fun audioLanguageRank(language: String?): Int = when (language?.lowercase()) {
+        "en", "eng", "en-us", "en-gb" -> 0
+        null, "", "und", "mul" -> 1
+        else -> 2
+    }
+
+    private fun isAudioDecodingError(error: PlaybackException): Boolean {
+        if (error.errorCode != PlaybackException.ERROR_CODE_DECODING_FAILED) return false
+        val details = "${error.message} ${error.cause?.message} ${error.cause?.javaClass?.simpleName}"
+        return details.contains("audio", ignoreCase = true) ||
+            details.contains("FfmpegAudioRenderer", ignoreCase = true) ||
+            details.contains("mp4a", ignoreCase = true)
+    }
+
+    private fun tryRecoverWithAlternateAudioTrack(): Boolean {
+        if (audioRecoveryAttempted) return false
+        val candidates = audioTrackCandidates(player.currentTracks)
+        if (candidates.size < 2) return false
+        val current = candidates.firstOrNull { candidate ->
+            player.currentTracks.groups.any { group ->
+                group.type == C.TRACK_TYPE_AUDIO &&
+                    group.mediaTrackGroup == candidate.trackGroup &&
+                    group.isTrackSelected(candidate.trackIndex)
+            }
+        }
+        val alternate = candidates
+            .filter { it != current }
+            .minWithOrNull(
+                compareBy<AudioCandidate> { audioLanguageRank(it.language) }
+                    .thenBy { it.channelCount.takeIf { count -> count > 0 } ?: Int.MAX_VALUE }
+            ) ?: return false
+
+        audioRecoveryAttempted = true
+        val resumePosition = player.currentPosition.coerceAtLeast(0L)
+        player.trackSelectionParameters = player.trackSelectionParameters
+            .buildUpon()
+            .clearOverridesOfType(C.TRACK_TYPE_AUDIO)
+            .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
+            .setOverrideForType(TrackSelectionOverride(alternate.trackGroup, alternate.trackIndex))
+            .build()
+        player.seekTo(resumePosition)
+        player.prepare()
+        player.playWhenReady = true
+        Log.w(
+            TAG,
+            "Audio decoding failed; retrying with alternate audio track " +
+                "language=${alternate.language ?: "und"} channels=${alternate.channelCount}"
+        )
+        return true
+    }
+
+    private data class AudioCandidate(
+        val trackGroup: androidx.media3.common.TrackGroup,
+        val trackIndex: Int,
+        val language: String?,
+        val channelCount: Int
+    )
 
     /**
      * Pins a newly loaded HLS/DASH playlist to its highest-resolution
@@ -621,6 +713,7 @@ class PlayerEngine(context: Context) {
         currentSourceIsPlaylist = isHlsStream || isDash(playbackStream)
         highestVideoTrackApplied = false
         autoAudioTrackApplied = false
+        audioRecoveryAttempted = false
         val sourceType = when {
             isHlsStream -> "HlsMediaSource"
             isDash(playbackStream) -> "DashMediaSource"
