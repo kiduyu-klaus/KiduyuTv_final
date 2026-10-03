@@ -13,7 +13,6 @@ import coil.util.DebugLogger
 import coil.decode.SvgDecoder
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.database.FirebaseDatabase
-import com.kiduyuk.klausk.kiduyutv.data.api.ApiClient
 import com.kiduyuk.klausk.kiduyutv.data.local.database.DatabaseManager
 import com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
@@ -27,6 +26,8 @@ import com.kiduyuk.klausk.kiduyutv.util.LogcatManager
 import com.kiduyuk.klausk.kiduyutv.util.NotificationHelper
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager
+import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
 /**
  * A Custom Application class for KiduyuTv.
  * This class handles app-wide initializations and provides a centralized
@@ -183,9 +184,13 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
                     .maxSizeBytes(30 * 1024 * 1024) // Reduced from 100MB to 30MB
                     .build()
             }
-            // Network cache with OkHttp integration
+            // Remote images (including GitHub SVG country flags) must not use the API
+            // client, which injects TMDB authorization and JSON headers into every request.
             .okHttpClient {
-                ApiClient.createOkHttpClient(this@KiduyuTvApp)
+                OkHttpClient.Builder()
+                    .connectTimeout(30, TimeUnit.SECONDS)
+                    .readTimeout(30, TimeUnit.SECONDS)
+                    .build()
             }
             .crossfade(true)
             .respectCacheHeaders(true)
