@@ -14,6 +14,9 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
@@ -62,6 +65,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.player.webview.AdBlockerWebViewClient
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.MouseCursorView
 import com.kiduyuk.klausk.kiduyutv.util.AdvancedAdBlocker
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -93,6 +97,7 @@ class SchedulePlayerActivity : ComponentActivity() {
     private var adBlockerReady = false
     private var pendingStreamLoad = false
     private var volumeControllerEnabled = false
+    private var pageLoadingDialog: androidx.appcompat.app.AlertDialog? = null
 
     // FIX: playerOptions and selectedPlayerIndex backed by mutableStateOf so
     // the Compose top bar recomposes automatically when these change.
@@ -212,6 +217,7 @@ class SchedulePlayerActivity : ComponentActivity() {
         })
 
         setupLayout()
+        showPageLoadingDialog()
         initializeAdBlocker()
 
         if (hasDirectIframeUrls) {
@@ -258,6 +264,45 @@ class SchedulePlayerActivity : ComponentActivity() {
                 }
             )
         }
+    }
+
+    private fun showPageLoadingDialog() {
+        if (isFinishing || isDestroyed) return
+
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(24, 8, 24, 8)
+
+            addView(ProgressBar(context), LinearLayout.LayoutParams(48, 48))
+            addView(TextView(context).apply {
+                text = "Please wait while the channel page loads…"
+                textSize = 16f
+                setTextColor(android.graphics.Color.WHITE)
+                setPadding(20, 0, 0, 0)
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ))
+        }
+
+        pageLoadingDialog = MaterialAlertDialogBuilder(this)
+            .setTitle("Loading player")
+            .setView(content)
+            .setCancelable(true)
+            .create()
+            .also { dialog ->
+                dialog.setOnCancelListener {
+                    if (::webView.isInitialized) webView.stopLoading()
+                    finish()
+                }
+                dialog.show()
+            }
+    }
+
+    private fun dismissPageLoadingDialog() {
+        pageLoadingDialog?.dismiss()
+        pageLoadingDialog = null
     }
 
     private fun loadCurrentStream() {
@@ -870,6 +915,7 @@ class SchedulePlayerActivity : ComponentActivity() {
 
                 override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
                     super.onPageFinished(view, url)
+                    dismissPageLoadingDialog()
                     android.util.Log.i(TAG, "[WebView] Schedule stream page finished: $url")
                     installAdvancedAdGuards(view)
 
@@ -1171,6 +1217,7 @@ class SchedulePlayerActivity : ComponentActivity() {
     override fun onDestroy() {
         cursorHideHandler.removeCallbacks(cursorHideRunnable)
         topBarHideHandler.removeCallbacks(topBarHideRunnable)
+        dismissPageLoadingDialog()
 
         if (::webView.isInitialized) {
             try {
