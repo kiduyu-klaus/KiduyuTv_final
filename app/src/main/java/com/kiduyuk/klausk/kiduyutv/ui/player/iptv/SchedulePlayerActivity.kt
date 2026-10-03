@@ -21,44 +21,32 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.text.font.FontWeight
@@ -75,7 +63,6 @@ import com.kiduyuk.klausk.kiduyutv.ui.player.webview.MouseCursorView
 import com.kiduyuk.klausk.kiduyutv.util.AdvancedAdBlocker
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -83,7 +70,7 @@ import kotlinx.coroutines.withContext
  * Schedule Player Activity for playing scheduled channels from dlive.sx.
  * Extends the existing PlayerActivity functionality with schedule-specific features
  * Takes an iframe HTML as intent extra and plays the scheduled channel in WebView
- * Includes a focusable row of player source options at the top for easy stream switching
+ * Uses an unobtrusive Material server control for source switching.
  * Uses ChannelWatchPage and playerOptions for handling multiple streams
  */
 class SchedulePlayerActivity : ComponentActivity() {
@@ -105,6 +92,7 @@ class SchedulePlayerActivity : ComponentActivity() {
     private val failedPlayerUrls = mutableSetOf<String>()
     private var adBlockerReady = false
     private var pendingStreamLoad = false
+    private var volumeControllerEnabled = false
 
     // FIX: playerOptions and selectedPlayerIndex backed by mutableStateOf so
     // the Compose top bar recomposes automatically when these change.
@@ -119,6 +107,7 @@ class SchedulePlayerActivity : ComponentActivity() {
 
     // UI State — backed by Compose state so the UI reacts to changes
     private val isTopBarVisible = mutableStateOf(true)
+    private val isServerMenuExpanded = mutableStateOf(false)
 
     companion object {
         private const val TAG = "SchedulePlayer"
@@ -488,10 +477,16 @@ class SchedulePlayerActivity : ComponentActivity() {
      * This method is kept as a fallback for same-origin frames or the top-level page.
      */
     private fun injectVideoVolumeController() {
-        if (!::webView.isInitialized) return
+        if (!::webView.isInitialized || volumeControllerEnabled) return
         val jsCode = """
             (function() {
+                if (window.__kiduyuVolumeControllerEnabled) return;
                 console.log('[VideoController] Initializing top-frame volume controller');
+
+                function markVolumeEnabled() {
+                    window.__kiduyuVolumeControllerEnabled = true;
+                    try { Android.onVolumeEnabled(); } catch(e) {}
+                }
 
                 function forcePlayAndUnmute(video) {
                     try {
@@ -505,6 +500,7 @@ class SchedulePlayerActivity : ComponentActivity() {
                             try {
                                 video.muted = false;
                                 video.volume = 1;
+                                    markVolumeEnabled();
                                 console.log('[VideoController] Unmuted');
                             } catch(e) {
                                 console.warn('[VideoController] Unmute failed:', e.message);
@@ -644,14 +640,22 @@ class SchedulePlayerActivity : ComponentActivity() {
                             if (p && p.then) {
                                 p.then(function() {
                                     setTimeout(function() {
-                                        try { v.muted = false; v.volume = 1; } catch(e) {}
+                                        try {
+                                            v.muted = false;
+                                            v.volume = 1;
+                                            if (window.Android && Android.onVolumeEnabled) Android.onVolumeEnabled();
+                                        } catch(e) {}
                                     }, 800);
                                 }).catch(function(e) {
                                     console.warn('[AutoplayInject] play() blocked:', e.message);
                                 });
                             } else {
                                 setTimeout(function() {
-                                    try { v.muted = false; v.volume = 1; } catch(e) {}
+                                    try {
+                                        v.muted = false;
+                                        v.volume = 1;
+                                        if (window.Android && Android.onVolumeEnabled) Android.onVolumeEnabled();
+                                    } catch(e) {}
                                 }, 800);
                             }
                         } catch(e) {}
@@ -909,6 +913,14 @@ class SchedulePlayerActivity : ComponentActivity() {
                     Toast.makeText(this@SchedulePlayerActivity, message, Toast.LENGTH_LONG).show()
                 }
             }
+
+            @JavascriptInterface
+            fun onVolumeEnabled() {
+                runOnUiThread {
+                    volumeControllerEnabled = true
+                    android.util.Log.d(TAG, "[VideoController] Volume enabled; skipping future injections")
+                }
+            }
         }, "Android")
 
         cursorView = MouseCursorView(this).apply {
@@ -926,25 +938,26 @@ class SchedulePlayerActivity : ComponentActivity() {
                 topMargin = 0
             }
             setContent {
-                // FIX: playerOptions and selectedPlayerIndex are now mutableStateOf,
-                // so reading them here automatically subscribes to their changes
-                // and triggers recomposition when switchToPlayer() updates them.
-                val topBarVisible by isTopBarVisible
+                val controlsVisible by isTopBarVisible
+                val serverMenuExpanded by isServerMenuExpanded
                 MaterialTheme {
                     AnimatedVisibility(
-                        visible = topBarVisible,
-                        enter = fadeIn() + slideInVertically { -it },
-                        exit = fadeOut() + slideOutVertically { -it }
+                        visible = controlsVisible,
+                        enter = fadeIn(),
+                        exit = fadeOut()
                     ) {
-                        PlayerSourceTopBar(
+                        SchedulePlayerOverlay(
                             channelName = channelName,
                             eventTitle = eventTitle,
                             playerOptions = playerOptions,
                             selectedIndex = selectedPlayerIndex,
+                            menuExpanded = serverMenuExpanded,
+                            onMenuExpandedChange = { isServerMenuExpanded.value = it },
                             onSourceSelected = { index ->
                                 if (index != selectedPlayerIndex && index in playerOptions.indices) {
                                     switchToPlayer(index)
                                 }
+                                isServerMenuExpanded.value = false
                             },
                             onBackPressed = { showExitConfirmationDialog() }
                         )
@@ -1094,6 +1107,7 @@ class SchedulePlayerActivity : ComponentActivity() {
 
     private fun hideTopBar() {
         isTopBarVisible.value = false
+        isServerMenuExpanded.value = false
     }
 
     private fun scheduleTopBarHide() {
@@ -1286,205 +1300,162 @@ class SchedulePlayerActivity : ComponentActivity() {
 }
 
 // ============================================================================
-// COMPOSE — Player Source Selection Top Bar
+// COMPOSE — Minimal player overlay and server picker
 // ============================================================================
 
 @Composable
-fun PlayerSourceTopBar(
+private fun SchedulePlayerOverlay(
     channelName: String,
     eventTitle: String,
     playerOptions: List<PlayerOption>,
     selectedIndex: Int,
+    menuExpanded: Boolean,
+    onMenuExpandedChange: (Boolean) -> Unit,
     onSourceSelected: (Int) -> Unit,
     onBackPressed: () -> Unit
 ) {
-    val listState = rememberLazyListState()
-
-    // Auto-scroll to selected server when it changes
-    LaunchedEffect(selectedIndex) {
-        if (selectedIndex in playerOptions.indices) {
-            listState.animateScrollToItem(selectedIndex)
-        }
-    }
-
-    Column(
+    Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .background(color = Color(0xCC000000))
-            .padding(vertical = 8.dp)
+            .fillMaxSize()
+            .padding(20.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                BackButton(onBackPressed = onBackPressed)
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(
-                        text = channelName,
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
+        Column(modifier = Modifier.align(Alignment.TopStart)) {
+            Surface(
+                color = Color(0xE6191919),
+                contentColor = Color.White,
+                shape = RoundedCornerShape(16.dp),
+                shadowElevation = 8.dp
+            ) {
+                IconButton(
+                    onClick = { onMenuExpandedChange(!menuExpanded) },
+                    modifier = Modifier.size(52.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Storage,
+                        contentDescription = "Choose server",
+                        modifier = Modifier.size(28.dp)
                     )
+                }
+            }
+
+            DropdownMenu(
+                expanded = menuExpanded,
+                onDismissRequest = { onMenuExpandedChange(false) },
+                modifier = Modifier
+                    .padding(top = 10.dp)
+                    .widthIn(min = 280.dp, max = 340.dp),
+                containerColor = Color(0xF01B1B1B),
+                tonalElevation = 8.dp
+            ) {
+                ServerMenuHeader(
+                    count = playerOptions.size,
+                    selected = playerOptions.getOrNull(selectedIndex)?.playerNumber
+                )
+                playerOptions.forEachIndexed { index, option ->
+                    ServerMenuItem(
+                        option = option,
+                        selected = index == selectedIndex,
+                        onClick = { onSourceSelected(index) }
+                    )
+                }
+            }
+        }
+
+        Surface(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .widthIn(max = 560.dp),
+            color = Color(0xB3000000),
+            contentColor = Color.White,
+            shape = RoundedCornerShape(20.dp)
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
+                Text(
+                    text = channelName,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                if (eventTitle.isNotBlank() && eventTitle != channelName) {
                     Text(
                         text = eventTitle,
-                        color = Color(0xFFB0B0B0),
-                        fontSize = 14.sp
+                        color = Color(0xFFCACACA),
+                        fontSize = 12.sp,
+                        maxLines = 1
                     )
                 }
-            }
-
-            if (playerOptions.isNotEmpty()) {
-                Text(
-                    text = "${playerOptions.size} Servers",
-                    color = Color(0xFF888888),
-                    fontSize = 14.sp,
-                    modifier = Modifier.padding(end = 8.dp)
-                )
             }
         }
 
-        if (playerOptions.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
+        Surface(
+            modifier = Modifier.align(Alignment.TopEnd),
+            color = Color(0xB3000000),
+            contentColor = Color.White,
+            shape = CircleShape
+        ) {
+            IconButton(
+                onClick = onBackPressed,
+                modifier = Modifier.size(48.dp)
             ) {
-                Text(
-                    text = "Servers:",
-                    color = Color(0xFF666666),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Stop playback"
                 )
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            LazyRow(
-                state = listState,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(horizontal = 0.dp)
-            ) {
-                itemsIndexed(playerOptions) { index, playerOption ->
-                    val isSelected = index == selectedIndex
-                    val focusRequester = remember { FocusRequester() }
-
-                    // Request focus on the button when it becomes selected
-                    LaunchedEffect(isSelected, playerOptions.size) {
-                        if (isSelected) {
-                            // The surrounding Android root requests focus shortly after layout.
-                            // Wait for that pass, then place focus on the active server chip.
-                            delay(150)
-                            try {
-                                focusRequester.requestFocus()
-                            } catch (e: Exception) {
-                                // Component might not be ready for focus yet
-                            }
-                        }
-                    }
-
-                    PlayerOptionButton(
-                        playerNumber = playerOption.playerNumber,
-                        isSelected = isSelected,
-                        onClick = { onSourceSelected(index) },
-                        modifier = Modifier.focusRequester(focusRequester)
-                    )
-                }
             }
         }
     }
 }
 
 @Composable
-private fun BackButton(
-    onBackPressed: () -> Unit
-) {
-    var isFocused by remember { mutableStateOf(false) }
-
-    Surface(
-        modifier = Modifier
-            .onFocusChanged { focusState -> isFocused = focusState.isFocused }
-            .focusable()
-            .clickable { onBackPressed() },
-        shape = RoundedCornerShape(8.dp),
-        color = if (isFocused) Color(0xFF424242) else Color.Transparent,
-        border = if (isFocused) BorderStroke(1.dp, Color(0xFF448AFF)) else null
-    ) {
-        Icon(
-            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-            contentDescription = "Back",
-            tint = if (isFocused) Color(0xFF448AFF) else Color.White,
-            modifier = Modifier
-                .padding(8.dp)
-                .size(24.dp)
+private fun ServerMenuHeader(count: Int, selected: Int?) {
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Text(
+            text = "Playback servers",
+            color = Color.White,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = if (selected != null) {
+                "$count available · Server $selected selected"
+            } else {
+                "$count available"
+            },
+            color = Color(0xFFBDBDBD),
+            fontSize = 13.sp
         )
     }
 }
 
 @Composable
-private fun PlayerOptionButton(
-    playerNumber: Int,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+private fun ServerMenuItem(
+    option: PlayerOption,
+    selected: Boolean,
+    onClick: () -> Unit
 ) {
-    var isFocused by remember { mutableStateOf(false) }
-
-    val backgroundColor = when {
-        isFocused  -> Color(0xFF37474F)
-        isSelected -> Color(0xFF2196F3)
-        else       -> Color(0xFF1A1A1A)
-    }
-
-    val textColor = when {
-        isSelected -> Color.White
-        isFocused  -> Color(0xFF448AFF)
-        else       -> Color(0xFFE0E0E0)
-    }
-
-    val borderColor = when {
-        isFocused  -> Color.White
-        isSelected -> Color(0xFFFF1744)
-        else       -> Color(0xFF404040)
-    }
-
-    Surface(
-        modifier = modifier
-            .onFocusChanged { focusState -> isFocused = focusState.isFocused }
-            .focusable()
-            .clickable { onClick() },
-        shape = RoundedCornerShape(8.dp),
-        color = backgroundColor,
-        border = BorderStroke(2.dp, borderColor)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = "Server $playerNumber",
-                color = textColor,
-                fontSize = 14.sp,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-            )
-
-            if (isSelected) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = "Selected",
-                    tint = Color.White,
-                    modifier = Modifier.size(16.dp)
+    DropdownMenuItem(
+        text = {
+            Column {
+                Text(
+                    text = "Server ${option.playerNumber}",
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                    color = if (selected) Color(0xFF80CBC4) else Color.White
+                )
+                Text(
+                    text = if (selected) "Playing now" else "Schedule stream",
+                    color = Color(0xFFAAAAAA),
+                    fontSize = 12.sp
                 )
             }
-        }
-    }
+        },
+        trailingIcon = {
+            if (selected) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = "Currently selected",
+                    tint = Color(0xFF80CBC4)
+                )
+            }
+        },
+        onClick = onClick
+    )
 }
