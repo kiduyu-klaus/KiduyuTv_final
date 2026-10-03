@@ -24,21 +24,34 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -92,6 +105,7 @@ class SplashActivity : ComponentActivity() {
     private var syncCompleted by mutableStateOf(false)
     private var versionCheckHandled by mutableStateOf(false)
     private var adsConsentHandled by mutableStateOf(false)
+    private var pendingUpdateDialog by mutableStateOf<FirebaseAppUpdate?>(null)
 
     // Remote version shown in the status chip
     private var currentRemoteVersion by mutableStateOf<String?>(null)
@@ -254,19 +268,34 @@ class SplashActivity : ComponentActivity() {
         // after setContent has no behavioural effect.
         setContent {
             KiduyuTvTheme {
-                SplashScreen(
-                    updateAvailable = updateAvailable,
-                    permissionHandled = permissionHandled,
-                    remoteVersion = currentRemoteVersion,
-                    syncCompleted = syncCompleted,
-                    adsConsentHandled = adsConsentHandled,
-                    syncProgress = syncProgress,
-                    syncMessage = syncMessage,
-                    onTimeout = {
-                        // Navigate to MainActivity regardless of sync status
-                        navigateToMain()
+                Box {
+                    SplashScreen(
+                        updateAvailable = updateAvailable,
+                        permissionHandled = permissionHandled,
+                        remoteVersion = currentRemoteVersion,
+                        syncCompleted = syncCompleted,
+                        adsConsentHandled = adsConsentHandled,
+                        syncProgress = syncProgress,
+                        syncMessage = syncMessage,
+                        onTimeout = {
+                            // Navigate to MainActivity regardless of sync status
+                            navigateToMain()
+                        }
+                    )
+                    pendingUpdateDialog?.let { update ->
+                        UpdateAvailableDialog(
+                            update = update,
+                            onDownload = {
+                                pendingUpdateDialog = null
+                                downloadUpdate(update)
+                            },
+                            onExit = {
+                                pendingUpdateDialog = null
+                                finish()
+                            }
+                        )
                     }
-                )
+                }
             }
         }
 
@@ -679,41 +708,25 @@ class SplashActivity : ComponentActivity() {
     // ── Dialogs ───────────────────────────────────────────────────────────────
 
     private fun showUpdateDialog(update: FirebaseAppUpdate) {
-        val dialogTitle = update.updateTitle.ifBlank {
-            update.version.takeIf { it.isNotBlank() }
-                ?.let { "v$it Update Available" }
-                ?: "Update Available"
-        }
-        val dialogMessage = update.message.ifBlank {
-            "An update is available for your ${getDeviceTypeString()}."
-        }
-        val apkInfo = createFirebaseApkInfo(update)
+        pendingUpdateDialog = update
+    }
 
-        QuitDialog(
-            context = this,
-            title = dialogTitle,
-            message = dialogMessage,
-            positiveButtonText = "Download",
-            negativeButtonText = "Exit",
-            lottieAnimRes = R.raw.exit,
-            onNo = { finish() },
-            onYes = {
-                val localFile = UpdateUtil.getLocalApkFile(this)
-                when {
-                    UpdateUtil.isLocalApkValid(this, apkInfo) -> {
-                        Log.i(TAG, "Valid cached Firebase APK found, skipping download")
-                        showInstallPrompt(localFile, apkInfo)
-                    }
-                    else -> {
-                        if (localFile.exists()) {
-                            localFile.delete()
-                            Log.i(TAG, "Deleted stale cached APK")
-                        }
-                        downloadAndInstallApk(apkInfo)
-                    }
-                }
+    private fun downloadUpdate(update: FirebaseAppUpdate) {
+        val apkInfo = createFirebaseApkInfo(update)
+        val localFile = UpdateUtil.getLocalApkFile(this)
+        when {
+            UpdateUtil.isLocalApkValid(this, apkInfo) -> {
+                Log.i(TAG, "Valid cached Firebase APK found, skipping download")
+                showInstallPrompt(localFile, apkInfo)
             }
-        ).showTracked()
+            else -> {
+                if (localFile.exists()) {
+                    localFile.delete()
+                    Log.i(TAG, "Deleted stale cached APK")
+                }
+                downloadAndInstallApk(apkInfo)
+            }
+        }
     }
 
     private fun createFirebaseApkInfo(update: FirebaseAppUpdate): ApkInfo {
@@ -891,6 +904,100 @@ class SplashActivity : ComponentActivity() {
     }
 
     // ── Composable ────────────────────────────────────────────────────────────
+
+    /**
+     * Material update prompt with a deliberately bounded changelog region.
+     *
+     * The list is naturally swipe-scrollable on phones. On a TV the body receives
+     * initial focus and maps D-pad Up/Down to list scrolling, so a long remote
+     * changelog never makes Download or Exit unreachable.
+     */
+    @Composable
+    private fun UpdateAvailableDialog(
+        update: FirebaseAppUpdate,
+        onDownload: () -> Unit,
+        onExit: () -> Unit
+    ) {
+        val dialogTitle = update.updateTitle.ifBlank {
+            update.version.takeIf { it.isNotBlank() }
+                ?.let { "v$it Update Available" }
+                ?: "Update Available"
+        }
+        val dialogMessage = update.message.ifBlank {
+            "An update is available for your ${getDeviceTypeString()}."
+        }
+        val changelogState = rememberLazyListState()
+        val changelogFocusRequester = remember { FocusRequester() }
+        val downloadFocusRequester = remember { FocusRequester() }
+        val scope = rememberCoroutineScope()
+
+        LaunchedEffect(update.version, update.message) {
+            changelogFocusRequester.requestFocus()
+        }
+
+        AlertDialog(
+            // An update dialog is intentionally explicit: users choose Download or
+            // Exit instead of accidentally dismissing the mandatory update prompt.
+            onDismissRequest = {},
+            title = {
+                Text(
+                    text = dialogTitle,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                LazyColumn(
+                    state = changelogState,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 280.dp)
+                        .focusRequester(changelogFocusRequester)
+                        .focusable()
+                        .onPreviewKeyEvent { event ->
+                            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                            when (event.key) {
+                                Key.DirectionDown -> {
+                                    if (changelogState.canScrollForward) {
+                                        scope.launch { changelogState.animateScrollBy(220f) }
+                                    } else {
+                                        // Once the changelog reaches its end, make
+                                        // the primary action reachable by remote.
+                                        downloadFocusRequester.requestFocus()
+                                    }
+                                    true
+                                }
+                                Key.DirectionUp -> {
+                                    scope.launch { changelogState.animateScrollBy(-220f) }
+                                    true
+                                }
+                                else -> false
+                            }
+                        }
+                ) {
+                    item {
+                        Text(
+                            text = dialogMessage,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = onDownload,
+                    modifier = Modifier.focusRequester(downloadFocusRequester)
+                ) {
+                    Text("Download")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onExit) {
+                    Text("Exit")
+                }
+            }
+        )
+    }
 
     @Composable
     fun SplashScreen(
