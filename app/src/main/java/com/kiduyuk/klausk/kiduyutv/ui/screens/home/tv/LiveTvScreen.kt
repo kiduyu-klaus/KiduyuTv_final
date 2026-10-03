@@ -175,6 +175,19 @@ fun LiveTvScreen(
     // Track selected tab
     var selectedTabIndex by remember { mutableIntStateOf(initialTab) }
 
+    // Ensure the schedule is requested when the user first opens its tab.
+    // This also covers cases where the screen was restored without the initial
+    // startup request completing.
+    LaunchedEffect(selectedTabIndex) {
+        if (selectedTabIndex == 1 &&
+            scheduleUiState.scheduleDays.isEmpty() &&
+            scheduleUiState.error == null &&
+            !scheduleUiState.isLoading
+        ) {
+            scheduleViewModel.loadSchedule()
+        }
+    }
+
     val tabs = listOf(
         TabItem("Live TV", Icons.Default.Tv),
         TabItem("Schedule", Icons.Default.CalendarToday),
@@ -213,33 +226,21 @@ fun LiveTvScreen(
                     )
                 }
                 1 -> { // Schedule Tab
-                    // If the Live playlist is still loading, show the loading state
-                    if (uiState.isLoading) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            LottieLoadingView(size = 300.dp)
+                    ScheduleTabContent(
+                        uiState = scheduleUiState,
+                        viewModel = scheduleViewModel,
+                        onChannelClick = { channel, event ->
+                            // Use channel ID to launch SchedulePlayerActivity
+                            // The player will fetch ChannelWatchPage and playerOptions
+                            val intent = SchedulePlayerActivity.createIntent(
+                                context = context,
+                                channelId = channel.id,
+                                channelName = channel.name,
+                                eventTitle = event.title
+                            )
+                            context.startActivity(intent)
                         }
-                    } else {
-                        ScheduleTabContent(
-                            uiState = scheduleUiState,
-                            viewModel = scheduleViewModel,
-                            onChannelClick = { channel, event ->
-                                // Use channel ID to launch SchedulePlayerActivity
-                                // The player will fetch ChannelWatchPage and playerOptions
-                                val intent = SchedulePlayerActivity.createIntent(
-                                    context = context,
-                                    channelId = channel.id,
-                                    channelName = channel.name,
-                                    eventTitle = event.title
-                                )
-                                context.startActivity(intent)
-                            }
-                        )
-                    }
+                    )
                 }
                 2 -> { // My Channels (favorited)
                     // Trigger two-way sync when user views My Channels tab
@@ -818,9 +819,13 @@ private fun ScheduleTabContent(
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         when {
-            uiState.isLoading -> {
+            uiState.isLoading ||
+                (uiState.scheduleDays.isEmpty() && uiState.error == null) -> {
                 LottieLoadingView(
-                    modifier = Modifier.align(Alignment.Center)
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .align(Alignment.Center),
+                    size = 300.dp
                 )
             }
             uiState.scheduleDays.isEmpty() -> {
