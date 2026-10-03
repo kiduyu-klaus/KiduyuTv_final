@@ -595,7 +595,9 @@ private fun DaddyLiveTabContent(
     onChannelLongClick: (IptvChannel) -> Unit
 ) {
     val firstChannelFocusRequester = remember { FocusRequester() }
+    val daddyLiveSearchFocusRequester = remember { FocusRequester() }
     val gridState = rememberLazyGridState()
+    var isDaddyLiveSearchVisible by remember { mutableStateOf(false) }
 
     when {
         isLoading -> {
@@ -655,18 +657,42 @@ private fun DaddyLiveTabContent(
                     .fillMaxSize()
                     .padding(horizontal = 16.dp)
             ) {
-                Text(
-                    text = "DaddyLive",
-                    color = TextPrimary,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                DaddyLiveSearchField(
-                    query = searchQuery,
-                    onQueryChange = onSearchQueryChange,
-                    onClear = onClearSearch
-                )
-                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "DaddyLive",
+                        color = TextPrimary,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    // Keep the editable field out of the initial D-pad focus chain.
+                    // On TV, merely focusing an editable field invokes the keyboard;
+                    // the explicit button matches the country Live TV search flow.
+                    SearchButton(
+                        label = if (isDaddyLiveSearchVisible) "Close Search" else "Search Channels",
+                        onClick = {
+                            isDaddyLiveSearchVisible = !isDaddyLiveSearchVisible
+                            if (!isDaddyLiveSearchVisible) onClearSearch()
+                        }
+                    )
+                }
+                if (isDaddyLiveSearchVisible) {
+                    DaddyLiveSearchField(
+                        query = searchQuery,
+                        onQueryChange = onSearchQueryChange,
+                        onClear = onClearSearch,
+                        focusRequester = daddyLiveSearchFocusRequester
+                    )
+                    // This is intentionally the only automatic request for input
+                    // focus: it occurs after the user activates Search Channels.
+                    LaunchedEffect(isDaddyLiveSearchVisible) {
+                        daddyLiveSearchFocusRequester.requestFocus()
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
                 Text(
                     text = if (searchQuery.isBlank()) {
                         "${channels.size} scraped channels"
@@ -710,11 +736,11 @@ private fun DaddyLiveTabContent(
 private fun DaddyLiveSearchField(
     query: String,
     onQueryChange: (String) -> Unit,
-    onClear: () -> Unit
+    onClear: () -> Unit,
+    focusRequester: FocusRequester
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
-    val focusRequester = remember { FocusRequester() }
 
     Box(
         modifier = Modifier
@@ -748,11 +774,18 @@ private fun DaddyLiveSearchField(
                 cursorBrush = SolidColor(PrimaryRed),
                 singleLine = true,
                 interactionSource = interactionSource,
+                // Fire TV renders the keyboard submit key as "Next".  Request it
+                // explicitly, while still handling Search for regular Android IMEs
+                // that expose a search action for this field.
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                 keyboardActions = KeyboardActions(
-                    // Handle both keyboard variants without clearing focus.
-                    onNext = { },
-                    onSearch = { }
+                    // Channel results filter as the user types, so submitting must
+                    // not move focus to the grid (which would close the TV keyboard).
+                    // Some IMEs send Search despite the requested Next action.
+                    onNext = { focusRequester.requestFocus() },
+                    onSearch = { focusRequester.requestFocus() },
+                    onGo = { focusRequester.requestFocus() },
+                    onDone = { focusRequester.requestFocus() }
                 ),
                 modifier = Modifier
                     .weight(1f)
