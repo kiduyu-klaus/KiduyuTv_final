@@ -1448,6 +1448,15 @@ private fun PlaybackContent(
                     fontSize = 13.sp
                 )
                 if (liveTvUiState.isCountryPlaylistRefreshing) {
+                    val refreshPercent = ((liveTvUiState.countryPlaylistRefreshProgress ?: 0f) * 100f)
+                        .toInt()
+                        .coerceIn(0, 100)
+                    Text(
+                        text = "$refreshPercent%",
+                        color = TextSecondary,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
                     LinearProgressIndicator(
                         progress = { liveTvUiState.countryPlaylistRefreshProgress ?: 0f },
                         modifier = Modifier

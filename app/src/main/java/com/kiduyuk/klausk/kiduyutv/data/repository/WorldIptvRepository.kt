@@ -93,7 +93,7 @@ class WorldIptvRepository(
      * here, so refresh validates the actual M3U files rather than only the
      * GitHub directory listing.
      *
-     * A small concurrency limit prevents a refresh from opening hundreds of
+     * A bounded concurrency limit prevents a refresh from opening hundreds of
      * simultaneous connections. Progress is reported after each playlist
      * completes, including failed requests, so the UI cannot remain stuck.
      */
@@ -249,7 +249,7 @@ class WorldIptvRepository(
             "https://cdn.jsdelivr.net/gh/hampusborgos/country-flags@main/svg/"
         private const val COUNTRY_INDEX_CACHE_FILE = "world_iptv_country_index.json"
         private const val COUNTRY_INDEX_CACHE_AGE_MS = 12 * 60 * 60 * 1000L
-        private const val MAX_CONCURRENT_PLAYLIST_REQUESTS = 4
+        private const val MAX_CONCURRENT_PLAYLIST_REQUESTS = 10
         private const val MAX_CONCURRENT_METADATA_REQUESTS = 4
         private const val METADATA_READ_LIMIT_BYTES = 8 * 1024
         private val COUNTRY_PLAYLIST_FILE = Regex("^([a-z]{2})(?:-([a-z0-9]+))?\\.m3u$")

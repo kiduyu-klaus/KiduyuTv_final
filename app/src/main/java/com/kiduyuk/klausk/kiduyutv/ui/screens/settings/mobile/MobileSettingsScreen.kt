@@ -729,10 +729,14 @@ fun MobileSettingsScreen(
                 SettingsItem(
                     icon = Icons.Default.Update,
                     title = "Refresh IPTV country playlists",
-                    subtitle = if (liveTvUiState.isCountryPlaylistRefreshing)
-                        "Updating playlists used by Live TV..."
-                    else
-                        "Download the latest country playlists used by Live TV",
+                    subtitle = if (liveTvUiState.isCountryPlaylistRefreshing) {
+                        val refreshPercent = ((liveTvUiState.countryPlaylistRefreshProgress ?: 0f) * 100f)
+                            .toInt()
+                            .coerceIn(0, 100)
+                        "Updating playlists used by Live TV... $refreshPercent%"
+                    } else {
+                        "Download the latest country playlists used by Live TV"
+                    },
                     onClick = { liveTvViewModel.loadPlaylist(forceRefresh = true) },
                     isLoading = liveTvUiState.isCountryPlaylistRefreshing,
                     progress = liveTvUiState.countryPlaylistRefreshProgress

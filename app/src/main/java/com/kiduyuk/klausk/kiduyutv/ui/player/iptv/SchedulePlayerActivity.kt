@@ -507,17 +507,26 @@ class SchedulePlayerActivity : ComponentActivity() {
                         }
 
                         if (video.paused) {
-                            // Muting is needed only for the initial autoplay gesture.
-                            video.muted = true;
+                            // Try unmuted autoplay first. If the browser blocks it,
+                            // retry muted once and unmute after playback starts.
+                            video.addEventListener('playing', function() {
+                                setTimeout(enableVolume, 300);
+                            }, { once: true });
                             var playResult = video.play();
-                            if (playResult && playResult.then) {
-                                playResult.then(function() { setTimeout(enableVolume, 800); })
-                                    .catch(function(e) {
-                                        console.warn('[VideoController] play() blocked:', e.message);
-                                    });
-                            } else {
-                                setTimeout(enableVolume, 800);
+                            if (playResult && playResult.catch) {
+                                playResult.catch(function(e) {
+                                    console.warn('[VideoController] Unmuted play blocked; retrying muted:', e.message);
+                                    video.muted = true;
+                                    var mutedPlay = video.play();
+                                    if (mutedPlay && mutedPlay.then) {
+                                        mutedPlay.then(function() { setTimeout(enableVolume, 800); })
+                                            .catch(function(error) {
+                                                console.warn('[VideoController] Muted play blocked:', error.message);
+                                            });
+                                    }
+                                });
                             }
+                            setTimeout(enableVolume, 1200);
                         } else {
                             // Do not mute an already-playing stream on every scan.
                             enableVolume();
@@ -665,16 +674,26 @@ class SchedulePlayerActivity : ComponentActivity() {
                                 return;
                             }
 
-                            v.muted = true;
+                            // Try unmuted autoplay first. If blocked, retry muted
+                            // once and restore audio after the stream starts.
+                            v.addEventListener('playing', function() {
+                                setTimeout(enableVolume, 300);
+                            }, { once: true });
                             var p = v.play();
-                            if (p && p.then) {
-                                p.then(function() { setTimeout(enableVolume, 800); })
-                                    .catch(function(e) {
-                                    console.warn('[AutoplayInject] play() blocked:', e.message);
-                                    });
-                            } else {
-                                setTimeout(enableVolume, 800);
+                            if (p && p.catch) {
+                                p.catch(function(e) {
+                                    console.warn('[AutoplayInject] Unmuted play blocked; retrying muted:', e.message);
+                                    v.muted = true;
+                                    var mutedPlay = v.play();
+                                    if (mutedPlay && mutedPlay.then) {
+                                        mutedPlay.then(function() { setTimeout(enableVolume, 800); })
+                                            .catch(function(error) {
+                                                console.warn('[AutoplayInject] Muted play blocked:', error.message);
+                                            });
+                                    }
+                                });
                             }
+                            setTimeout(enableVolume, 1200);
                         } catch(e) {}
                     }
                     function scan(root) {
