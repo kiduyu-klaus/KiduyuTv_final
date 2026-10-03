@@ -170,7 +170,8 @@ class IptvRepository(
     /**
      * Legacy parser for cached content (when we have the full string).
      */
-    private fun parseM3uPlaylist(content: String): IptvPlaylist {
+    /** Parses a downloaded country playlist without altering the app-wide cache. */
+    fun parseM3uPlaylist(content: String): IptvPlaylist {
         val channels = mutableListOf<IptvChannel>()
         var currentChannel: IptvChannel? = null
         
@@ -218,9 +219,14 @@ class IptvRepository(
             val logoMatch = Regex("""tvg-logo=["']?([^"'>\s]+)["']?""").find(attributesPart)
             val logo = logoMatch?.groupValues?.get(1)?.trim()
             
-            // Parse group-title - handles optional quotes, single quotes, or no quotes
-            val groupMatch = Regex("""group-title=["']?([^"'>\s]+)["']?""").find(attributesPart)
-            val group = groupMatch?.groupValues?.get(1)?.trim()
+            // Keep multi-word quoted groups intact (for example, "New York").
+            val groupMatch = Regex(
+                """group-title=(?:"([^"]*)"|'([^']*)'|([^\s,]+))"""
+            ).find(attributesPart)
+            val group = groupMatch?.groupValues
+                ?.drop(1)
+                ?.firstOrNull { it.isNotBlank() }
+                ?.trim()
             
             // Parse tvg-id - handles optional quotes, single quotes, or no quotes
             val tvgIdMatch = Regex("""tvg-id=["']?([^"'>\s]+)["']?""").find(attributesPart)

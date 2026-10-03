@@ -46,6 +46,8 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.model.IptvChannel
+import com.kiduyuk.klausk.kiduyutv.data.model.CountryPlaylist
+import com.kiduyuk.klausk.kiduyutv.viewmodel.CategoryItem
 import com.kiduyuk.klausk.kiduyutv.data.model.ScrapedChannel
 import com.kiduyuk.klausk.kiduyutv.data.repository.ChannelScraper
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
@@ -261,11 +263,17 @@ fun MobileLiveTvScreen(
                                     }
                                 }
                             } else {
-                                if (uiState.selectedCategory == null) {
+                                if (uiState.playlistChoices.isNotEmpty()) {
+                                    CountryPlaylistList(
+                                        playlists = uiState.playlistChoices,
+                                        onPlaylistClick = viewModel::selectCountryPlaylist,
+                                        onBackClick = viewModel::clearCategorySelection
+                                    )
+                                } else if (uiState.selectedCategory == null) {
                                     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp)) {
                                         items(uiState.categories) { category ->
-                                            CategoryRow(category.name, category.channelCount) {
-                                                viewModel.selectCategory(category.name)
+                                            CountryCategoryRow(category) {
+                                                category.countryCode?.let(viewModel::selectCountry)
                                             }
                                             Spacer(modifier = Modifier.height(8.dp))
                                         }
@@ -434,13 +442,47 @@ private fun ScrapedChannel.toMobileIptvChannel() = IptvChannel(
 )
 
 @Composable
-private fun CategoryRow(name: String, count: Int, onClick: () -> Unit) {
+private fun CountryCategoryRow(category: CategoryItem, onClick: () -> Unit) {
     Row(modifier = Modifier
         .fillMaxWidth()
         .clickable { onClick() }
         .padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(text = name, modifier = Modifier.weight(1f))
-        Text(text = "${count} channels")
+        AsyncImage(
+            model = category.flagUrl,
+            contentDescription = "${category.name} flag",
+            modifier = Modifier.size(32.dp)
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(text = category.name, modifier = Modifier.weight(1f))
+        Text(text = if (category.channelCount == 1) "1 playlist" else "${category.channelCount} playlists")
+    }
+}
+
+@Composable
+private fun CountryPlaylistList(
+    playlists: List<CountryPlaylist>,
+    onPlaylistClick: (CountryPlaylist) -> Unit,
+    onBackClick: () -> Unit
+) {
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp)) {
+        item {
+            Button(onClick = onBackClick) { Text("← Countries") }
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(text = "Choose a playlist")
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+        items(playlists, key = { it.url }) { playlist ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onPlaylistClick(playlist) }
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = playlist.displayName, modifier = Modifier.weight(1f))
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
     }
 }
 

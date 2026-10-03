@@ -47,6 +47,22 @@ data class IptvPlaylist(
     val allChannels: List<IptvChannel>
 )
 
+/** A country entry discovered from the world_ip_tv `country/` directory. */
+data class CountryPlaylistCategory(
+    val countryCode: String,
+    val displayName: String,
+    val flagUrl: String,
+    val playlists: List<CountryPlaylist>
+)
+
+/** One country or regional M3U file, for example `us.m3u` or `us-ny.m3u`. */
+data class CountryPlaylist(
+    val countryCode: String,
+    val regionCode: String?,
+    val displayName: String,
+    val url: String
+)
+
 // ================================================================
 // EPG (Electronic Program Guide) Models
 // Source: XMLTV format from lg_epg_us.xml

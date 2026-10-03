@@ -6,9 +6,12 @@ import android.util.Base64
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kiduyuk.klausk.kiduyutv.data.model.EpgProgram
+import com.kiduyuk.klausk.kiduyutv.data.model.CountryPlaylist
+import com.kiduyuk.klausk.kiduyutv.data.model.CountryPlaylistCategory
 import com.kiduyuk.klausk.kiduyutv.data.model.IptvChannel
 import com.kiduyuk.klausk.kiduyutv.data.model.IptvPlaylist
 import com.kiduyuk.klausk.kiduyutv.data.repository.IptvRepository
+import com.kiduyuk.klausk.kiduyutv.data.repository.WorldIptvRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,6 +42,9 @@ data class LiveTvUiState(
     val isLoading: Boolean = true,
     val isEpgLoading: Boolean = false,
     val categories: List<CategoryItem> = emptyList(),
+    val countryCategories: List<CountryPlaylistCategory> = emptyList(),
+    val selectedCountry: CountryPlaylistCategory? = null,
+    val playlistChoices: List<CountryPlaylist> = emptyList(),
     val selectedCategory: String? = null,
     val channels: List<IptvChannel> = emptyList(),
     val selectedChannel: IptvChannel? = null,
@@ -58,7 +64,9 @@ data class LiveTvUiState(
  */
 data class CategoryItem(
     val name: String,
-    val channelCount: Int
+    val channelCount: Int,
+    val countryCode: String? = null,
+    val flagUrl: String? = null
 )
 
 /**
@@ -68,6 +76,7 @@ data class CategoryItem(
 class LiveTvViewModel : ViewModel() {
     
     private val repository = IptvRepository.getInstance()
+    private val worldIptvRepository = WorldIptvRepository()
     
     private val _uiState = MutableStateFlow(LiveTvUiState())
     val uiState: StateFlow<LiveTvUiState> = _uiState.asStateFlow()
@@ -380,19 +389,23 @@ class LiveTvViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             
-            repository.fetchPlaylist(context, forceRefresh).fold(
-                onSuccess = { playlist ->
-                    cachedPlaylist = playlist
-                    val categoryItems = playlist.categories.keys.map { name ->
-                        CategoryItem(
-                            name = name,
-                            channelCount = playlist.categories[name]?.size ?: 0
-                        )
-                    }.sortedBy { it.name }
-                    
+            worldIptvRepository.fetchCountryCategories(context, forceRefresh).fold(
+                onSuccess = { countries ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        categories = categoryItems,
+                        categories = countries.map { country ->
+                            CategoryItem(
+                                name = country.displayName,
+                                channelCount = country.playlists.size,
+                                countryCode = country.countryCode,
+                                flagUrl = country.flagUrl
+                            )
+                        },
+                        countryCategories = countries,
+                        selectedCountry = null,
+                        playlistChoices = emptyList(),
+                        selectedCategory = null,
+                        channels = emptyList(),
                         error = null
                     )
                 },
@@ -468,12 +481,70 @@ class LiveTvViewModel : ViewModel() {
             )
         }
     }
+
+    /** Opens the playlist picker for a country, or loads its only playlist. */
+    fun selectCountry(countryCode: String) {
+        val country = _uiState.value.countryCategories
+            .firstOrNull { it.countryCode.equals(countryCode, ignoreCase = true) }
+            ?: return
+        if (country.playlists.size == 1) {
+            selectCountryPlaylist(country, country.playlists.first())
+        } else {
+            _uiState.update {
+                it.copy(
+                    selectedCountry = country,
+                    playlistChoices = country.playlists,
+                    selectedCategory = null,
+                    channels = emptyList(),
+                    searchQuery = "",
+                    searchResults = emptyList()
+                )
+            }
+        }
+    }
+
+    /** Fetches and parses only the regional/country playlist selected by the viewer. */
+    fun selectCountryPlaylist(playlist: CountryPlaylist) {
+        val country = _uiState.value.countryCategories
+            .firstOrNull { it.countryCode.equals(playlist.countryCode, ignoreCase = true) }
+            ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            worldIptvRepository.fetchPlaylist(playlist).fold(
+                onSuccess = { parsed ->
+                    cachedPlaylist = parsed
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            selectedCountry = country,
+                            playlistChoices = emptyList(),
+                            selectedCategory = playlist.displayName,
+                            channels = parsed.allChannels,
+                            selectedChannel = null,
+                            currentProgram = null,
+                            nextProgram = null
+                        )
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            error = error.message ?: "Failed to load country playlist"
+                        )
+                    }
+                }
+            )
+        }
+    }
     
     /**
      * Clears the category selection and returns to categories view.
      */
     fun clearCategorySelection() {
         _uiState.value = _uiState.value.copy(
+            selectedCountry = null,
+            playlistChoices = emptyList(),
             selectedCategory = null,
             channels = emptyList(),
             selectedChannel = null,

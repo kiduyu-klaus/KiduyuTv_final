@@ -100,6 +100,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.kiduyuk.klausk.kiduyutv.data.model.IptvChannel
+import com.kiduyuk.klausk.kiduyutv.data.model.CountryPlaylist
+import com.kiduyuk.klausk.kiduyutv.data.model.CountryPlaylistCategory
 import com.kiduyuk.klausk.kiduyutv.data.model.ScrapedChannel
 import com.kiduyuk.klausk.kiduyutv.data.model.ScheduleCategory
 import com.kiduyuk.klausk.kiduyutv.data.model.ScheduleChannel
@@ -117,7 +119,6 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.TextSecondary
 import com.kiduyuk.klausk.kiduyutv.data.repository.ChannelScraper
 import com.kiduyuk.klausk.kiduyutv.util.ScrapedChannelsCache
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
-import com.kiduyuk.klausk.kiduyutv.viewmodel.CategoryItem
 import com.kiduyuk.klausk.kiduyutv.viewmodel.LiveTvViewModel
 import com.kiduyuk.klausk.kiduyutv.viewmodel.ScheduleUiState
 import com.kiduyuk.klausk.kiduyutv.viewmodel.ScheduleViewModel
@@ -153,34 +154,14 @@ fun LiveTvScreen(
     val favoriteChannels by viewModel.favoriteChannels.collectAsState()
     val scheduleUiState by scheduleViewModel.uiState.collectAsState()
     val context = LocalContext.current
-    val daddyLiveScope = rememberCoroutineScope()
-    val daddyLiveEnabled = remember(context) {
-        SettingsManager(context).isDaddyLiveEnabled()
-    }
-    var scrapedChannels by remember { mutableStateOf<List<IptvChannel>>(emptyList()) }
-    var scrapedChannelsLoading by remember { mutableStateOf(daddyLiveEnabled) }
-    var scrapedChannelsError by remember { mutableStateOf<String?>(null) }
     var favoriteChannelToConfirm by remember { mutableStateOf<IptvChannel?>(null) }
 
     // Initialize ViewModels with context
-    LaunchedEffect(daddyLiveEnabled) {
+    LaunchedEffect(Unit) {
         viewModel.initialize(context)
-        if (daddyLiveEnabled) {
-            scrapedChannelsLoading = true
-            val cached = ScrapedChannelsCache.loadChannels(context)
-            scrapedChannels = cached.map { it.toIptvChannel() }
-            scrapedChannelsError = if (scrapedChannels.isEmpty()) {
-                "No scraped channels are cached. Scrape channels from Settings first."
-            } else {
-                null
-            }
-            scrapedChannelsLoading = false
-        } else {
-            viewModel.loadPlaylist()
-            // Pre-load EPG data for program info
-            viewModel.loadEpg()
-        }
-
+        viewModel.loadPlaylist()
+        // Pre-load EPG data for program info
+        viewModel.loadEpg()
         scheduleViewModel.initialize(context)
         scheduleViewModel.loadSchedule()
     }
@@ -227,55 +208,11 @@ fun LiveTvScreen(
 
             when (selectedTabIndex) {
                 0 -> { // Live TV Tab
-                    if (daddyLiveEnabled) {
-                        DaddyLiveTabContent(
-                            channels = scrapedChannels,
-                            isLoading = scrapedChannelsLoading,
-                            error = scrapedChannelsError,
-                            onScrape = {
-                                daddyLiveScope.launch {
-                                    scrapedChannelsLoading = true
-                                    scrapedChannelsError = null
-                                    val result =
-                                        ChannelScraper.fetchChannels(fetchStreamUrls = true)
-                                    val scraped = result.getOrNull()
-                                    if (scraped != null) {
-                                        ScrapedChannelsCache.saveChannels(context, scraped)
-                                        scrapedChannels = scraped.map { it.toIptvChannel() }
-                                        scrapedChannelsError = if (scrapedChannels.isEmpty()) {
-                                            "No channels were found. Check the DaddyLive address and try again."
-                                        } else {
-                                            null
-                                        }
-                                    } else {
-                                        scrapedChannelsError = result.exceptionOrNull()?.message
-                                            ?: "Unable to scrape DaddyLive channels."
-                                    }
-                                    scrapedChannelsLoading = false
-                                }
-                            },
-                            onChannelClick = { channel ->
-                                context.startActivity(
-                                    SchedulePlayerActivity.createIntent(
-                                        context = context,
-                                        channelId = channel.id,
-                                        channelName = channel.name,
-                                        eventTitle = channel.name,
-                                        iframeUrls = channel.url
-                                            .takeIf { it.isNotBlank() }
-                                            ?.let { listOf(it) }
-                                            .orEmpty()
-                                    )
-                                )
-                            }
-                        )
-                    } else {
-                        LiveTvTabContent(
-                            uiState = uiState,
-                            viewModel = viewModel,
-                            onChannelLongPress = { channel -> favoriteChannelToConfirm = channel }
-                        )
-                    }
+                    LiveTvTabContent(
+                        uiState = uiState,
+                        viewModel = viewModel,
+                        onChannelLongPress = { channel -> favoriteChannelToConfirm = channel }
+                    )
                 }
                 1 -> { // Schedule Tab
                     // If the Live playlist is still loading, show the loading state
@@ -584,15 +521,25 @@ private fun LiveTvTabContent(
                 )
             }
 
-            // Categories view
+            // Regional playlist selector for countries with multiple files.
+            uiState.playlistChoices.isNotEmpty() -> {
+                CountryPlaylistChoicesContent(
+                    country = uiState.selectedCountry,
+                    playlists = uiState.playlistChoices,
+                    onPlaylistClick = viewModel::selectCountryPlaylist,
+                    onBackClick = viewModel::clearCategorySelection
+                )
+            }
+
+            // Countries are the Live TV categories. Each card uses the
+            // matching country flag and may lead to a regional playlist list.
             uiState.selectedCategory == null -> {
-                CategoriesContent(
-                    categories = uiState.categories,
-                    onCategoryClick = { category ->
-                        viewModel.selectCategory(category.name)
+                CountryCategoriesContent(
+                    countries = uiState.countryCategories,
+                    onCountryClick = { country ->
+                        viewModel.selectCountry(country.countryCode)
                     },
-                    onSearchClick = { viewModel.activateSearch() },
-                    totalChannels = viewModel.getTotalChannelCount()
+                    totalPlaylists = uiState.countryCategories.sumOf { it.playlists.size }
                 )
             }
 
@@ -1277,19 +1224,18 @@ private fun ChannelChip(
  * Content displaying all available categories.
  */
 @Composable
-private fun CategoriesContent(
-    categories: List<CategoryItem>,
-    onCategoryClick: (CategoryItem) -> Unit,
-    onSearchClick: () -> Unit,
-    totalChannels: Int
+private fun CountryCategoriesContent(
+    countries: List<CountryPlaylistCategory>,
+    onCountryClick: (CountryPlaylistCategory) -> Unit,
+    totalPlaylists: Int
 ) {
     // Focus requester for D-pad navigation
     val firstFocusRequester = remember { FocusRequester() }
     val gridState = rememberLazyGridState()
 
     // Request focus on first item when categories load
-    LaunchedEffect(categories) {
-        if (categories.isNotEmpty()) {
+    LaunchedEffect(countries) {
+        if (countries.isNotEmpty()) {
             firstFocusRequester.requestFocus()
         }
     }
@@ -1299,7 +1245,7 @@ private fun CategoriesContent(
             .fillMaxWidth()
             .padding(horizontal = 16.dp)
     ) {
-        // Header row with title and search button
+        // Header row for the country directory.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1309,22 +1255,20 @@ private fun CategoriesContent(
         ) {
             Column {
                 Text(
-                    text = "Live TV Categories",
+                    text = "Live TV by Country",
                     color = Color.White,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "$totalChannels channels available",
+                    text = "${countries.size} countries · $totalPlaylists playlists",
                     color = TextSecondary,
                     fontSize = 14.sp
                 )
             }
-
-            SearchButton(onClick = onSearchClick)
         }
 
-        if (categories.isEmpty()) {
+        if (countries.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1332,7 +1276,7 @@ private fun CategoriesContent(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "No categories available",
+                    text = "No country playlists available",
                     color = TextSecondary,
                     fontSize = 16.sp
                 )
@@ -1347,16 +1291,16 @@ private fun CategoriesContent(
                     .fillMaxWidth()
                     .padding(bottom = 16.dp)
             ) {
-                itemsIndexed(categories, key = { _, category -> category.name }) { index, category ->
+                itemsIndexed(countries, key = { _, country -> country.countryCode }) { index, country ->
                     val modifier = if (index == 0) {
                         Modifier.focusRequester(firstFocusRequester)
                     } else {
                         Modifier
                     }
-                    CategoryCard(
-                        category = category,
+                    CountryCategoryCard(
+                        country = country,
                         modifier = modifier,
-                        onClick = { onCategoryClick(category) }
+                        onClick = { onCountryClick(country) }
                     )
                 }
             }
@@ -1729,8 +1673,8 @@ private fun SearchInputField(
  * Card component for displaying a category.
  */
 @Composable
-private fun CategoryCard(
-    category: CategoryItem,
+private fun CountryCategoryCard(
+    country: CountryPlaylistCategory,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
@@ -1740,7 +1684,7 @@ private fun CategoryCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(120.dp)
+            .height(154.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(if (isFocused) DarkRed else CardDark)
             .border(
@@ -1760,8 +1704,20 @@ private fun CategoryCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(country.flagUrl)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = "${country.displayName} flag",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(42.dp),
+                contentScale = ContentScale.Fit
+            )
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = category.name,
+                text = country.displayName,
                 color = Color.White,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
@@ -1770,10 +1726,98 @@ private fun CategoryCard(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "${category.channelCount} channels",
+                text = if (country.playlists.size == 1) {
+                    "1 playlist"
+                } else {
+                    "${country.playlists.size} playlists"
+                },
                 color = TextSecondary,
                 fontSize = 14.sp
             )
+        }
+    }
+}
+
+/** Lets the viewer choose a state/region file before its channels are fetched. */
+@Composable
+private fun CountryPlaylistChoicesContent(
+    country: CountryPlaylistCategory?,
+    playlists: List<CountryPlaylist>,
+    onPlaylistClick: (CountryPlaylist) -> Unit,
+    onBackClick: () -> Unit
+) {
+    val backFocusRequester = remember { FocusRequester() }
+    val firstPlaylistFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(playlists) {
+        if (playlists.isNotEmpty()) firstPlaylistFocusRequester.requestFocus()
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .onPreviewKeyEvent { event ->
+                if (event.key == Key.Back && event.type == KeyEventType.KeyUp) {
+                    onBackClick()
+                    true
+                } else false
+            }
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Button(
+                onClick = onBackClick,
+                modifier = Modifier.focusRequester(backFocusRequester)
+            ) { Text("← Countries") }
+            Spacer(Modifier.width(16.dp))
+            Column {
+                Text(
+                    text = country?.displayName ?: "Country playlists",
+                    color = TextPrimary,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Choose a country or regional playlist",
+                    color = TextSecondary
+                )
+            }
+        }
+        Spacer(Modifier.height(20.dp))
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(3),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            itemsIndexed(playlists, key = { _, playlist -> playlist.url }) { index, playlist ->
+                val interactionSource = remember { MutableInteractionSource() }
+                val focused by interactionSource.collectIsFocusedAsState()
+                Box(
+                    modifier = (if (index == 0) Modifier.focusRequester(firstPlaylistFocusRequester) else Modifier)
+                        .fillMaxWidth()
+                        .height(92.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (focused) DarkRed else CardDark)
+                        .border(
+                            width = if (focused) 2.dp else 0.dp,
+                            color = if (focused) Color.White else Color.Transparent,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .clickable(interactionSource = interactionSource, indication = null) {
+                            onPlaylistClick(playlist)
+                        }
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = playlist.displayName,
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                }
+            }
         }
     }
 }

@@ -10,6 +10,7 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import coil.request.CachePolicy
 import coil.util.DebugLogger
+import coil.decode.SvgDecoder
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.database.FirebaseDatabase
 import com.kiduyuk.klausk.kiduyutv.data.api.ApiClient
@@ -161,6 +162,9 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
      */
     override fun newImageLoader(): ImageLoader {
         return ImageLoader.Builder(this)
+            .components {
+                add(SvgDecoder.Factory())
+            }
             // Memory cache: 15% of app memory, capped at 50MB
             .memoryCache {
                 val maxMemory = Runtime.getRuntime().maxMemory()
