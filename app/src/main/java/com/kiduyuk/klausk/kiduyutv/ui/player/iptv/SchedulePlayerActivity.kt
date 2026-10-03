@@ -1174,24 +1174,20 @@ class SchedulePlayerActivity : ComponentActivity() {
         super.onDestroy()
     }
 
-    // override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
-    //     if (isDpadKey(event)) {
-    //         isDpadNavigating = true
-    //         showCursorAndResetTimer()
-    //     }
-
-    //     if (event.action == KeyEvent.ACTION_DOWN) {
-    //         when (event.keyCode) {
-    //             KeyEvent.KEYCODE_DPAD_UP,
-    //             KeyEvent.KEYCODE_DPAD_DOWN,
-    //             KeyEvent.KEYCODE_DPAD_LEFT,
-    //             KeyEvent.KEYCODE_DPAD_RIGHT,
-    //             KeyEvent.KEYCODE_DPAD_CENTER,
-    //             KeyEvent.KEYCODE_ENTER -> return onKeyDown(event.keyCode, event)
-    //         }
-    //     }
-    //     return super.dispatchKeyEvent(event)
-    // }
+    /**
+     * Handle D-pad input before the WebView or an iframe can consume it.
+     * WebView focus may change while playback is running, so relying only on
+     * onKeyDown() leaves the hidden cursor unable to receive the next click.
+     */
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (isDpadKey(event)) {
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                return onKeyDown(event.keyCode, event)
+            }
+            return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (isDpadKeyCode(keyCode)) {
@@ -1299,7 +1295,9 @@ class SchedulePlayerActivity : ComponentActivity() {
         }
 
         cursorView.animate().cancel()
+        cursorView.visibility = View.VISIBLE
         cursorView.alpha = 1f
+        cursorView.bringToFront()
         isCursorVisible = true
         cursorHideHandler.removeCallbacks(cursorHideRunnable)
         cursorHideHandler.postDelayed(cursorHideRunnable, 5000)
