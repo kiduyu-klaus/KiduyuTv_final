@@ -156,10 +156,10 @@ private fun EpisodeOverviewContent(
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 48.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         item {
-            Box(Modifier.fillMaxWidth().height(380.dp)) {
+            Box(Modifier.fillMaxWidth().height(300.dp)) {
                 backdropPath?.let {
                     AsyncImage(
                         model = "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.BACKDROP_SIZE}$it",
@@ -178,27 +178,29 @@ private fun EpisodeOverviewContent(
                 FocusableIconButton(
                     onClick = onBackClick,
                     contentDescription = "Back",
-                    modifier = Modifier.align(Alignment.TopStart).padding(horizontal = 42.dp, vertical = 30.dp)
+                    modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
                 ) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = TextPrimary)
                 }
                 Column(
-                    modifier = Modifier.align(Alignment.BottomStart).padding(horizontal = 56.dp, vertical = 28.dp),
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(horizontal = 24.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(tvShowName, color = TextSecondary, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(episode.name, color = TextPrimary, style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(tvShowName, color = TextSecondary, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(episode.name, color = TextPrimary, style = MaterialTheme.typography.titleLarge, fontSize = 22.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     EpisodeMetaRow(episode)
                 }
             }
         }
         item {
             Card(
-                modifier = Modifier.padding(horizontal = 56.dp),
+                modifier = Modifier.padding(horizontal = 24.dp),
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(containerColor = SurfaceDark.copy(alpha = .96f))
             ) {
-                Column(Modifier.padding(28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     if (genres.isNotEmpty() || networks.isNotEmpty()) {
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             items((genres + networks).distinct().take(8)) { label ->
@@ -208,12 +210,6 @@ private fun EpisodeOverviewContent(
                             }
                         }
                     }
-                    Text(
-                        episode.overview?.takeIf { it.isNotBlank() } ?: "No description available.",
-                        color = TextSecondary,
-                        style = MaterialTheme.typography.bodyLarge,
-                        lineHeight = 24.sp
-                    )
                     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                         FocusableActionButton(onClick = onPlayClick, primary = true) {
                             Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(20.dp))
@@ -226,6 +222,14 @@ private fun EpisodeOverviewContent(
                             Text("View images")
                         }
                     }
+                    Text(
+                        episode.overview?.takeIf { it.isNotBlank() } ?: "No description available.",
+                        color = TextSecondary,
+                        style = MaterialTheme.typography.bodyMedium,
+                        lineHeight = 20.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
         }
@@ -236,12 +240,14 @@ private fun EpisodeOverviewContent(
 
 @Composable
 private fun EpisodeMetaRow(episode: Episode) {
-    Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(Icons.Default.Star, null, tint = PrimaryRed, modifier = Modifier.size(18.dp))
-        Text(String.format("%.1f", episode.voteAverage ?: 0.0), color = TextPrimary, fontWeight = FontWeight.Bold)
-        Text("S${episode.seasonNumber}E${episode.episodeNumber}", color = TextSecondary)
-        episode.airDate?.takeIf { it.isNotBlank() }?.let { Text(it, color = TextSecondary) }
-        episode.runtime?.takeIf { it > 0 }?.let { Text("${it} min", color = TextSecondary) }
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Star, null, tint = PrimaryRed, modifier = Modifier.size(14.dp))
+            Text(String.format("%.1f", episode.voteAverage ?: 0.0), color = TextPrimary, fontSize = 12.sp)
+        }
+        Text("S${episode.seasonNumber}E${episode.episodeNumber}", color = TextSecondary, fontSize = 12.sp)
+        episode.airDate?.takeIf { it.isNotBlank() }?.let { Text(it, color = TextSecondary, fontSize = 12.sp) }
+        episode.runtime?.takeIf { it > 0 }?.let { Text("${it} min", color = TextSecondary, fontSize = 12.sp) }
     }
 }
 
