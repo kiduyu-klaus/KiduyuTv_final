@@ -13,7 +13,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -30,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -153,11 +157,24 @@ private fun EpisodeOverviewContent(
                         )
                     )
                 )
+                val backInteractionSource = remember { MutableInteractionSource() }
+                val isBackFocused by backInteractionSource.collectIsFocusedAsState()
                 androidx.compose.material3.IconButton(
                     onClick = onBackClick,
-                    modifier = Modifier.align(Alignment.TopStart).padding(8.dp)
+                    interactionSource = backInteractionSource,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(8.dp)
+                        .background(
+                            color = if (isBackFocused) Color.Cyan else Color.Transparent,
+                            shape = CircleShape
+                        )
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = TextPrimary)
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        "Back",
+                        tint = if (isBackFocused) Color.Black else TextPrimary
+                    )
                 }
                 Column(
                     modifier = Modifier.align(Alignment.BottomStart).padding(horizontal = 15.dp, vertical = 8.dp)
@@ -191,9 +208,15 @@ private fun EpisodeOverviewContent(
                 Text(episode.overview?.takeIf { it.isNotBlank() } ?: "No description available.", color = TextSecondary, lineHeight = 20.sp)
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    val playInteractionSource = remember { MutableInteractionSource() }
+                    val isPlayFocused by playInteractionSource.collectIsFocusedAsState()
                     Button(
                         onClick = onPlayClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryRed),
+                        interactionSource = playInteractionSource,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isPlayFocused) Color.Cyan else PrimaryRed,
+                            contentColor = if (isPlayFocused) Color.Black else Color.White
+                        ),
                         shape = RoundedCornerShape(5.dp),
                         contentPadding = PaddingValues(horizontal = 15.dp, vertical = 10.dp)
                     ) {
@@ -201,9 +224,15 @@ private fun EpisodeOverviewContent(
                         Spacer(Modifier.width(6.dp))
                         Text("Play")
                     }
+                    val postersInteractionSource = remember { MutableInteractionSource() }
+                    val isPostersFocused by postersInteractionSource.collectIsFocusedAsState()
                     Button(
                         onClick = onImagesClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3A3A3A)),
+                        interactionSource = postersInteractionSource,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isPostersFocused) Color.Cyan else Color(0xFF3A3A3A),
+                            contentColor = if (isPostersFocused) Color.Black else Color.White
+                        ),
                         shape = RoundedCornerShape(5.dp),
                         contentPadding = PaddingValues(horizontal = 15.dp, vertical = 10.dp)
                     ) {

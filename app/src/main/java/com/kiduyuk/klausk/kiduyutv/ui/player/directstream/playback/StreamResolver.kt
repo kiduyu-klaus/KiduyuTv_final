@@ -27,6 +27,8 @@ class StreamResolver {
 
     private companion object {
         const val MAX_CONCURRENT_PROVIDER_REQUESTS = 7
+        const val EXCLUDED_STREAM_HOST = "video-downloads.googleusercontent.com"
+        const val EXCLUDED_STREAM_EXTENSION = ".zip"
     }
 
     /**
@@ -148,6 +150,11 @@ class StreamResolver {
         // Keep configured provider order; completion order is used only for
         // progress reporting.
         providerResults.flatten()
+            .filterNot { stream ->
+                val urlWithoutQuery = stream.url.substringBefore('?').substringBefore('#')
+                stream.url.contains(EXCLUDED_STREAM_HOST, ignoreCase = true) ||
+                    urlWithoutQuery.endsWith(EXCLUDED_STREAM_EXTENSION, ignoreCase = true)
+            }
             .distinctBy { "${it.provider.lowercase()}|${it.url}" }
             .also {
                 Log.i(tag, "Resolver.load returned ${it.size} combined streams")
