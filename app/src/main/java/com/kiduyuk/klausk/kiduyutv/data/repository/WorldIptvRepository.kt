@@ -137,6 +137,7 @@ class WorldIptvRepository(
                     countryCode = countryCode,
                     displayName = countryDisplayName(countryCode),
                     flagUrl = "$FLAG_RAW_BASE$countryCode.svg",
+                    flagFallbackUrl = "$FLAG_CDN_BASE$countryCode.svg",
                     playlists = playlists.sortedWith(
                         compareBy<CountryPlaylist> { it.regionCode != null }
                             .thenBy { it.displayName }
@@ -199,6 +200,8 @@ class WorldIptvRepository(
             "https://raw.githubusercontent.com/Kkbrothers8795/world_ip_tv/master/country/"
         private const val FLAG_RAW_BASE =
             "https://raw.githubusercontent.com/hampusborgos/country-flags/main/svg/"
+        private const val FLAG_CDN_BASE =
+            "https://cdn.jsdelivr.net/gh/hampusborgos/country-flags@main/svg/"
         private const val COUNTRY_INDEX_CACHE_FILE = "world_iptv_country_index.json"
         private const val COUNTRY_INDEX_CACHE_AGE_MS = 12 * 60 * 60 * 1000L
         private const val MAX_CONCURRENT_METADATA_REQUESTS = 4

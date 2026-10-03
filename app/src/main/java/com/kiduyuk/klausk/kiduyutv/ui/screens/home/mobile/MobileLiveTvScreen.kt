@@ -443,14 +443,25 @@ private fun ScrapedChannel.toMobileIptvChannel() = IptvChannel(
 
 @Composable
 private fun CountryCategoryRow(category: CategoryItem, onClick: () -> Unit) {
+    val fallbackFlagUrl = category.countryCode?.let { countryCode ->
+        "https://cdn.jsdelivr.net/gh/hampusborgos/country-flags@main/svg/$countryCode.svg"
+    }
+    var flagUrl by remember(category.countryCode, category.flagUrl) {
+        mutableStateOf(category.flagUrl)
+    }
     Row(modifier = Modifier
         .fillMaxWidth()
         .clickable { onClick() }
         .padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
         AsyncImage(
-            model = category.flagUrl,
+            model = flagUrl,
             contentDescription = "${category.name} flag",
-            modifier = Modifier.size(32.dp)
+            modifier = Modifier.size(32.dp),
+            onError = {
+                if (!fallbackFlagUrl.isNullOrBlank() && flagUrl != fallbackFlagUrl) {
+                    flagUrl = fallbackFlagUrl
+                }
+            }
         )
         Spacer(modifier = Modifier.width(12.dp))
         Text(text = category.name, modifier = Modifier.weight(1f))

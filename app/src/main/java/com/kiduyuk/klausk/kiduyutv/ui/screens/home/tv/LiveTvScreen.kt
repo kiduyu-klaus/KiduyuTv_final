@@ -1680,6 +1680,7 @@ private fun CountryCategoryCard(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
+    var flagUrl by remember(country.countryCode) { mutableStateOf(country.flagUrl) }
 
     Box(
         modifier = modifier
@@ -1706,14 +1707,19 @@ private fun CountryCategoryCard(
         ) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
-                    .data(country.flagUrl)
+                    .data(flagUrl)
                     .crossfade(true)
                     .build(),
                 contentDescription = "${country.displayName} flag",
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(42.dp),
-                contentScale = ContentScale.Fit
+                contentScale = ContentScale.Fit,
+                onError = {
+                    if (flagUrl != country.flagFallbackUrl) {
+                        flagUrl = country.flagFallbackUrl
+                    }
+                }
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(

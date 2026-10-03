@@ -52,6 +52,7 @@ data class CountryPlaylistCategory(
     val countryCode: String,
     val displayName: String,
     val flagUrl: String,
+    val flagFallbackUrl: String,
     val playlists: List<CountryPlaylist>
 )
 
