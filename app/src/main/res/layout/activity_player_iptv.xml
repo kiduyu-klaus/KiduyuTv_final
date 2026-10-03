@@ -9,25 +9,36 @@
     android:fitsSystemWindows="false">
 
     <!-- ── TOP BAR ── -->
-    <LinearLayout
+    <com.google.android.material.card.MaterialCardView
         android:id="@+id/topBar"
         android:layout_width="0dp"
-        android:layout_height="56dp"
-        android:background="#000000"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="8dp"
-        android:paddingEnd="8dp"
+        android:layout_height="64dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginEnd="16dp"
         android:descendantFocusability="afterDescendants"
+        app:cardBackgroundColor="#E61B1B1D"
+        app:cardCornerRadius="20dp"
+        app:cardElevation="8dp"
+        app:strokeColor="#33FFFFFF"
+        app:strokeWidth="1dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp">
+
         <ImageButton
             android:id="@+id/btnBack"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="@drawable/selector_button_tv"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_iptv_player_control"
             android:contentDescription="Back"
             android:focusable="true"
             android:focusableInTouchMode="true"
@@ -62,10 +73,10 @@
 
         <ImageButton
             android:id="@+id/btnPlaylist"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:layout_marginStart="8dp"
-            android:background="@drawable/selector_button_tv"
+            android:background="@drawable/bg_iptv_player_control"
             android:contentDescription="Playlist channels"
             android:focusable="true"
             android:focusableInTouchMode="true"
@@ -75,16 +86,17 @@
 
         <ImageButton
             android:id="@+id/btnInfo"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:background="@drawable/selector_button_tv"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_iptv_player_control"
             android:contentDescription="Info"
             android:focusable="true"
             android:focusableInTouchMode="true"
             android:nextFocusDown="@id/btnCC"
             android:src="@drawable/ic_info_outline"
             app:tint="#FFFFFF" />
-    </LinearLayout>
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
 
     <!-- ── VIDEO CONTAINER ── -->
     <FrameLayout
@@ -112,7 +124,7 @@
             android:id="@+id/overlayControls"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="#55000000"
+            android:background="@drawable/bg_iptv_overlay_scrim"
             android:descendantFocusability="afterDescendants"
             android:focusable="true"
             android:focusableInTouchMode="true">
@@ -125,7 +137,7 @@
                 android:layout_gravity="top|end"
                 android:layout_marginTop="8dp"
                 android:layout_marginEnd="12dp"
-                android:background="@drawable/selector_button_tv"
+                android:background="@drawable/bg_iptv_player_control"
                 android:contentDescription="Lock / Unlock overlay"
                 android:focusable="true"
                 android:focusableInTouchMode="true"
@@ -140,7 +152,7 @@
                 android:layout_height="60dp"
                 android:layout_gravity="center_vertical|start"
                 android:layout_marginStart="24dp"
-                android:background="@drawable/selector_button_tv"
+                android:background="@drawable/bg_iptv_player_control"
                 android:contentDescription="Channel up"
                 android:focusable="true"
                 android:focusableInTouchMode="true"
@@ -154,7 +166,7 @@
                 android:layout_height="60dp"
                 android:layout_gravity="center_vertical|end"
                 android:layout_marginEnd="24dp"
-                android:background="@drawable/selector_button_tv"
+                android:background="@drawable/bg_iptv_player_control"
                 android:contentDescription="Next channel"
                 android:focusable="true"
                 android:focusableInTouchMode="true"
@@ -165,13 +177,24 @@
             
             <!-- Subtitle tracks indicator (moved into bottom strip to ensure bottom-center placement) -->
 
-            <LinearLayout
+            <com.google.android.material.card.MaterialCardView
                 android:id="@+id/videoBottomStrip"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_gravity="bottom"
-                android:background="#44000000"
+                android:layout_marginStart="24dp"
+                android:layout_marginEnd="24dp"
+                android:layout_marginBottom="20dp"
                 android:focusable="false"
+                app:cardBackgroundColor="#E61B1B1D"
+                app:cardCornerRadius="24dp"
+                app:cardElevation="10dp"
+                app:strokeColor="#33FFFFFF"
+                app:strokeWidth="1dp">
+
+                <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:paddingBottom="6dp"
                 android:paddingTop="6dp">
@@ -224,7 +247,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="48dp"
                         android:layout_marginEnd="12dp"
-                        android:background="@drawable/selector_button_tv"
+                        android:background="@drawable/bg_iptv_player_control"
                         android:focusable="true"
                         android:focusableInTouchMode="true"
                         android:gravity="center"
@@ -245,7 +268,7 @@
                         android:layout_width="48dp"
                         android:layout_height="48dp"
                         android:layout_marginEnd="8dp"
-                        android:background="@drawable/selector_button_tv"
+                        android:background="@drawable/bg_iptv_player_control"
                         android:contentDescription="Closed captions"
                         android:focusable="true"
                         android:focusableInTouchMode="true"
@@ -261,7 +284,7 @@
                         android:layout_width="48dp"
                         android:layout_height="48dp"
                         android:layout_marginEnd="8dp"
-                        android:background="@drawable/selector_button_tv"
+                        android:background="@drawable/bg_iptv_player_control"
                         android:contentDescription="Settings"
                         android:focusable="true"
                         android:focusableInTouchMode="true"
@@ -277,7 +300,7 @@
                         android:layout_width="48dp"
                         android:layout_height="48dp"
                         android:layout_marginEnd="8dp"
-                        android:background="@drawable/selector_button_tv"
+                        android:background="@drawable/bg_iptv_player_control"
                         android:contentDescription="Favorite"
                         android:focusable="true"
                         android:focusableInTouchMode="true"
@@ -293,7 +316,7 @@
                         android:layout_width="48dp"
                         android:layout_height="48dp"
                         android:layout_marginEnd="8dp"
-                        android:background="@drawable/selector_button_tv"
+                        android:background="@drawable/bg_iptv_player_control"
                         android:contentDescription="Volume"
                         android:focusable="true"
                         android:focusableInTouchMode="true"
@@ -309,7 +332,7 @@
                         android:layout_width="48dp"
                         android:layout_height="48dp"
                         android:layout_marginEnd="8dp"
-                        android:background="@drawable/selector_button_tv"
+                        android:background="@drawable/bg_iptv_player_control"
                         android:contentDescription="Cast"
                         android:focusable="true"
                         android:focusableInTouchMode="true"
@@ -324,7 +347,7 @@
                         android:id="@+id/btnPip"
                         android:layout_width="48dp"
                         android:layout_height="48dp"
-                        android:background="@drawable/selector_button_tv"
+                        android:background="@drawable/bg_iptv_player_control"
                         android:contentDescription="Picture in picture"
                         android:focusable="true"
                         android:focusableInTouchMode="true"
@@ -335,7 +358,8 @@
                         app:tint="#FFFFFF" />
 
                 </LinearLayout>
-            </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
         </FrameLayout>
     </FrameLayout>
 

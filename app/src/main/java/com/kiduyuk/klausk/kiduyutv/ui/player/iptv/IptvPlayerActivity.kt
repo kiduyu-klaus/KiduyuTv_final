@@ -86,6 +86,7 @@ import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.data.model.IptvChannel
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import com.kiduyuk.klausk.kiduyutv.viewmodel.LiveTvViewModel
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -284,6 +285,7 @@ class IptvPlayerActivity : AppCompatActivity() {
         setContentView(R.layout.activity_player_iptv)
 
         bindViews()
+        applyMaterialPlayerStyling()
         liveTvViewModel.initialize(applicationContext)
         updateFavoriteButtonState()
         populateTopBar()
@@ -570,6 +572,18 @@ class IptvPlayerActivity : AppCompatActivity() {
         btnFill.requestFocus()
     }
 
+    /** Applies runtime colors that follow the active Material player theme. */
+    private fun applyMaterialPlayerStyling() {
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.BLACK
+        seekBar.progressTintList = android.content.res.ColorStateList.valueOf(
+            android.graphics.Color.WHITE
+        )
+        seekBar.thumbTintList = android.content.res.ColorStateList.valueOf(
+            0xFFFF5252.toInt()
+        )
+    }
+
     // ── Top bar ──────────────────────────────────────────────────────────────
 
     private fun populateTopBar() {
@@ -589,7 +603,11 @@ class IptvPlayerActivity : AppCompatActivity() {
             channelGroup?.let { appendLine("Group: $it") }
             appendLine("Stream: $streamUrl")
         }
-        Toast.makeText(this, info, Toast.LENGTH_LONG).show()
+        MaterialAlertDialogBuilder(this)
+            .setTitle(channelName)
+            .setMessage(info)
+            .setPositiveButton("Close", null)
+            .show()
     }
 
     private fun parsePlaylistChannels(encodedChannels: String?): List<IptvChannel> {
@@ -720,7 +738,7 @@ class IptvPlayerActivity : AppCompatActivity() {
     private fun confirmAddFavorite(channel: IptvChannel) {
         if (liveTvViewModel.isFavorite(channel)) {
             // Show dialog to confirm removal
-            androidx.appcompat.app.AlertDialog.Builder(this)
+            MaterialAlertDialogBuilder(this)
                 .setTitle("Remove from favorites")
                 .setMessage("Remove $channelName from your favorites?")
                 .setPositiveButton("Remove") { _, _ ->
@@ -734,7 +752,7 @@ class IptvPlayerActivity : AppCompatActivity() {
             return
         }
 
-        androidx.appcompat.app.AlertDialog.Builder(this)
+        MaterialAlertDialogBuilder(this)
             .setTitle("Add to favorites")
             .setMessage("Add $channelName to your favorites?")
             .setPositiveButton("Add") { _, _ ->

@@ -57,6 +57,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -323,14 +324,28 @@ fun LiveTvScreen(
                         error = daddyliveError,
                         onScrape = { loadDaddyliveChannels() },
                         onChannelClick = { channel ->
-                            context.startActivity(
-                                SchedulePlayerActivity.createIntent(
-                                    context = context,
-                                    channelId = channel.id,
-                                    channelName = channel.name,
-                                    eventTitle = channel.name
+                            val scrapedChannelId = channel.tvgId?.takeIf { id ->
+                                id.all(Char::isDigit)
+                            }
+                            if (scrapedChannelId == null) {
+                                Toast.makeText(
+                                    context,
+                                    "This DaddyLive channel has no valid playback ID.",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                // Do not pass a direct iframe URL here. SchedulePlayerActivity
+                                // loads the matching dlive.sx watch page and discovers its six
+                                // current server buttons before starting playback.
+                                context.startActivity(
+                                    SchedulePlayerActivity.createIntent(
+                                        context = context,
+                                        channelId = scrapedChannelId,
+                                        channelName = channel.name,
+                                        eventTitle = channel.name
+                                    )
                                 )
-                            )
+                            }
                         }
                     )
                 }
@@ -389,7 +404,49 @@ fun LiveTvScreen(
                 Text(scheduleUiState.error!!)
             }
         }
+
+        // Schedule fetching can involve scraping the remote listing. Keep the user on
+        // the selected tab and make that wait explicit instead of showing an empty view.
+        if (selectedTabIndex == 1 && scheduleUiState.isLoading) {
+            ScheduleLoadingDialog()
+        }
     }
+}
+
+@Composable
+private fun ScheduleLoadingDialog() {
+    AlertDialog(
+        onDismissRequest = {},
+        title = {
+            Text(
+                text = "Loading schedule",
+                color = TextPrimary,
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 4.dp)
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(36.dp),
+                    color = PrimaryRed,
+                    trackColor = CardDark
+                )
+                Spacer(modifier = Modifier.width(16.dp))
+                Text(
+                    text = "Fetching the latest events and available channels…",
+                    color = TextSecondary,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
+        },
+        confirmButton = {},
+        containerColor = CardDark,
+        titleContentColor = TextPrimary,
+        textContentColor = TextSecondary
+    )
 }
 
 /**
@@ -535,7 +592,11 @@ private fun DaddyLiveTabContent(
         }
 
         else -> {
-            LaunchedEffect(channels) {
+            // Filtering creates a new channel list for every character typed.  Keeping
+            // this keyed to that list steals focus from the text field after the first
+            // character on TV and dismisses the on-screen keyboard.  Request initial
+            // grid focus only when the DaddyLive content first enters composition.
+            LaunchedEffect(Unit) {
                 if (channels.isNotEmpty()) firstChannelFocusRequester.requestFocus()
             }
 
@@ -672,7 +733,10 @@ private fun DaddyLiveSearchField(
 private fun ScrapedChannel.toIptvChannel() = IptvChannel(
     name = name,
     logo = thumbnailUrl,
-    url = primaryStreamUrl.orEmpty(),
+    // DaddyLive is scraped as a directory of watch pages. Keeping this source URL
+    // avoids representing a channel as an empty stream while server discovery is
+    // intentionally deferred to SchedulePlayerActivity at click time.
+    url = watchPageUrl,
     group = category ?: "DaddyLive",
     tvgId = id,
     tvgName = name
@@ -1449,12 +1513,14 @@ private fun CountryCategoriesContent(
         }
     }
 
-    // Restore the last country after returning from its playlist picker. On the
-    // first load, no country is remembered, so focus starts on the first item.
-    LaunchedEffect(filteredCountries, lastSelectedCountryCode) {
-        if (filteredCountries.isNotEmpty()) {
+    // Restore the last country after returning from its playlist picker. This must
+    // not be keyed to filteredCountries: that list changes with every typed
+    // character and would move focus off the search field on TV, dismissing its
+    // on-screen keyboard.
+    LaunchedEffect(countries, lastSelectedCountryCode) {
+        if (countries.isNotEmpty()) {
             val targetIndex = lastSelectedCountryCode
-                ?.let { code -> filteredCountries.indexOfFirst { it.countryCode.equals(code, ignoreCase = true) } }
+                ?.let { code -> countries.indexOfFirst { it.countryCode.equals(code, ignoreCase = true) } }
                 ?.takeIf { it >= 0 }
                 ?: 0
             gridState.scrollToItem(targetIndex)
