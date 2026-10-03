@@ -135,9 +135,9 @@ private fun EpisodeOverviewContent(
     onCrewClick: (CrewMember) -> Unit,
     onImagesClick: () -> Unit
 ) {
-    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp)) {
+    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 25.dp)) {
         item {
-            Box(modifier = Modifier.fillMaxWidth().height(300.dp)) {
+            Box(modifier = Modifier.fillMaxWidth().height(250.dp)) {
                 backdropPath?.let {
                     AsyncImage(
                         model = "${TmdbApiService.IMAGE_BASE_URL}${TmdbApiService.BACKDROP_SIZE}$it",
@@ -160,7 +160,7 @@ private fun EpisodeOverviewContent(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = TextPrimary)
                 }
                 Column(
-                    modifier = Modifier.align(Alignment.BottomStart).padding(horizontal = 24.dp, vertical = 12.dp)
+                    modifier = Modifier.align(Alignment.BottomStart).padding(horizontal = 15.dp, vertical = 8.dp)
                 ) {
                     Text(tvShowName, color = TextSecondary, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(episode.name, color = TextPrimary, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
@@ -176,7 +176,7 @@ private fun EpisodeOverviewContent(
             }
         }
         item {
-            Column(Modifier.padding(horizontal = 24.dp)) {
+            Column(Modifier.padding(horizontal = 15.dp)) {
                 if (genres.isNotEmpty() || networks.isNotEmpty()) {
                     Spacer(Modifier.height(6.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -195,7 +195,7 @@ private fun EpisodeOverviewContent(
                         onClick = onPlayClick,
                         colors = ButtonDefaults.buttonColors(containerColor = PrimaryRed),
                         shape = RoundedCornerShape(5.dp),
-                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp)
+                        contentPadding = PaddingValues(horizontal = 15.dp, vertical = 10.dp)
                     ) {
                         Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
@@ -205,7 +205,7 @@ private fun EpisodeOverviewContent(
                         onClick = onImagesClick,
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3A3A3A)),
                         shape = RoundedCornerShape(5.dp),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
+                        contentPadding = PaddingValues(horizontal = 15.dp, vertical = 10.dp)
                     ) {
                         Icon(Icons.Default.Image, "Posters", modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
