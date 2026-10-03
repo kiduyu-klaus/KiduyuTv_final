@@ -1,7 +1,7 @@
 package com.kiduyuk.klausk.kiduyutv.util
 
 import android.content.Context
-import android.os.Process
+import android.os.Process as AndroidProcess
 import kotlinx.coroutines.*
 import java.io.BufferedWriter
 import java.io.File
@@ -44,7 +44,7 @@ object LogcatManager {
         // Build the logcat command. Restrict the stream to this process so
         // system-wide Android logs do not flood the in-app viewer. This still
         // includes logs emitted by the app's own code and SDKs in this process.
-        val processFilter = "--pid=${Process.myPid()}"
+        val processFilter = "--pid=${AndroidProcess.myPid()}"
         val command = if (tagFilter != null) {
             arrayOf("logcat", "-v", "threadtime", processFilter, "*:V", "-s", tagFilter)
         } else {
