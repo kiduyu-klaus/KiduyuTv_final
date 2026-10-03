@@ -161,6 +161,7 @@ fun LiveTvScreen(
     var daddyliveIsLoading by remember { mutableStateOf(false) }
     var daddyliveError by remember { mutableStateOf<String?>(null) }
     var daddyliveHasLoaded by remember { mutableStateOf(false) }
+    var daddyliveSearchQuery by remember { mutableStateOf("") }
     val visibleFavoriteChannels = remember(favoriteChannels, uiState.hide18PlusChannels) {
         if (uiState.hide18PlusChannels) {
             favoriteChannels.filterNot(IptvChannel::is18PlusChannel)
@@ -173,6 +174,21 @@ fun LiveTvScreen(
             daddyliveChannels.filterNot(IptvChannel::is18PlusChannel)
         } else {
             daddyliveChannels
+        }
+    }
+    val filteredDaddyliveChannels = remember(
+        visibleDaddyliveChannels,
+        daddyliveSearchQuery
+    ) {
+        val query = daddyliveSearchQuery.trim()
+        if (query.isEmpty()) {
+            visibleDaddyliveChannels
+        } else {
+            visibleDaddyliveChannels.filter { channel ->
+                channel.name.contains(query, ignoreCase = true) ||
+                    channel.tvgName?.contains(query, ignoreCase = true) == true ||
+                    channel.tvgId?.contains(query, ignoreCase = true) == true
+            }
         }
     }
 
@@ -299,7 +315,10 @@ fun LiveTvScreen(
                 }
                 2 -> { // Daddylive Tab
                     DaddyLiveTabContent(
-                        channels = visibleDaddyliveChannels,
+                        channels = filteredDaddyliveChannels,
+                        searchQuery = daddyliveSearchQuery,
+                        onSearchQueryChange = { daddyliveSearchQuery = it },
+                        onClearSearch = { daddyliveSearchQuery = "" },
                         isLoading = daddyliveIsLoading,
                         error = daddyliveError,
                         onScrape = { loadDaddyliveChannels() },
@@ -460,6 +479,9 @@ private fun LiveTvTopBar(
 @Composable
 private fun DaddyLiveTabContent(
     channels: List<IptvChannel>,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    onClearSearch: () -> Unit,
     isLoading: Boolean,
     error: String?,
     onScrape: () -> Unit,
@@ -510,8 +532,18 @@ private fun DaddyLiveTabContent(
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold
                 )
+                DaddyLiveSearchField(
+                    query = searchQuery,
+                    onQueryChange = onSearchQueryChange,
+                    onClear = onClearSearch
+                )
+                Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "${channels.size} scraped channels",
+                    text = if (searchQuery.isBlank()) {
+                        "${channels.size} scraped channels"
+                    } else {
+                        "${channels.size} matching channels"
+                    },
                     color = TextSecondary,
                     fontSize = 14.sp,
                     modifier = Modifier.padding(bottom = 16.dp)
@@ -538,6 +570,81 @@ private fun DaddyLiveTabContent(
                             onClick = { onChannelClick(channel) }
                         )
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DaddyLiveSearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onClear: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+    val focusRequester = remember { FocusRequester() }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(CardDark)
+            .border(
+                width = if (isFocused) 2.dp else 0.dp,
+                color = if (isFocused) PrimaryRed else Color.Transparent,
+                shape = RoundedCornerShape(12.dp)
+            )
+            .padding(horizontal = 16.dp),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = "Search DaddyLive channels",
+                tint = if (isFocused) PrimaryRed else TextSecondary,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            BasicTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
+                cursorBrush = SolidColor(PrimaryRed),
+                singleLine = true,
+                interactionSource = interactionSource,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                keyboardActions = KeyboardActions(
+                    // Handle both keyboard variants without clearing focus.
+                    onNext = { },
+                    onSearch = { }
+                ),
+                modifier = Modifier
+                    .weight(1f)
+                    .focusRequester(focusRequester),
+                decorationBox = { innerTextField ->
+                    if (query.isEmpty()) {
+                        Text(
+                            text = "Search DaddyLive channels...",
+                            color = TextSecondary,
+                            fontSize = 16.sp
+                        )
+                    }
+                    innerTextField()
+                }
+            )
+            if (query.isNotEmpty()) {
+                IconButton(onClick = onClear) {
+                    Icon(
+                        imageVector = Icons.Default.Clear,
+                        contentDescription = "Clear DaddyLive search",
+                        tint = TextSecondary
+                    )
                 }
             }
         }
