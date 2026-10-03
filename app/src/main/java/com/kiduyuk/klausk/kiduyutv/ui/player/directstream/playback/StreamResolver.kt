@@ -35,7 +35,8 @@ class StreamResolver {
      * At most seven provider requests are active at once. [onProviderProgress]
      * is invoked after each provider completes, so its [index] is the number
      * of completed providers. [onProviderRetry] is invoked before retrying a
-     * failed or empty request.
+     * failed or empty request. [onStreamProgress] reports the aggregate number
+     * of streams returned so far as provider requests complete.
      */
     suspend fun load(
         type: String,
@@ -44,7 +45,8 @@ class StreamResolver {
         episode: Int? = null,
         provider: StreamProviderChoice = StreamCatalog.default,
         onProviderProgress: suspend (index: Int, total: Int, providerName: String) -> Unit = { _, _, _ -> },
-        onProviderRetry: suspend (index: Int, total: Int, providerName: String) -> Unit = { _, _, _ -> }
+        onProviderRetry: suspend (index: Int, total: Int, providerName: String) -> Unit = { _, _, _ -> },
+        onStreamProgress: suspend (fetchedCount: Int) -> Unit = {}
     ): List<StreamItem> = withContext(Dispatchers.IO) {
         // Fail fast with a distinct error before provider discovery. Aggregate
         // extraction can legitimately take several minutes, but an unreachable
@@ -77,6 +79,7 @@ class StreamResolver {
 
         val totalProviders = providerNames.size
         val completedProviders = AtomicInteger(0)
+        val fetchedStreamCount = AtomicInteger(0)
         val requestLimiter = Semaphore(MAX_CONCURRENT_PROVIDER_REQUESTS)
 
         val providerResults = coroutineScope {
@@ -134,6 +137,7 @@ class StreamResolver {
 
                         val completed = completedProviders.incrementAndGet()
                         onProviderProgress(completed, totalProviders, providerName)
+                        onStreamProgress(fetchedStreamCount.addAndGet(streams.size))
                         streams
                     }
                 }

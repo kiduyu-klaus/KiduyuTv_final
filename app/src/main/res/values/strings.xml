@@ -18,6 +18,7 @@
     <string name="top_tv_shows">Top TV Shows Last Week</string>
     <string name="others_also_watched">Others Also Watched</string>
     <string name="streams_loading">Loading streams…</string>
+    <string name="stream_fetch_count">Streams fetched: %1$d</string>
     <string name="wait_a_moment">Wait a moment</string>
     <string name="buffering_animation">Loading</string>
     <string name="streams_empty">No streams returned by the server.</string>

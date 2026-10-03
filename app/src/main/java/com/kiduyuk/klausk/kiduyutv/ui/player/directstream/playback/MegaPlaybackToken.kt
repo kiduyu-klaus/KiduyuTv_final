@@ -18,9 +18,9 @@ internal object MegaPlaybackToken {
 
     fun needsRefresh(stream: StreamItem): Boolean {
         val url = stream.url.toHttpUrlOrNull() ?: return false
-        val mega = listOf(stream.name, stream.title, stream.quality)
-            .any { Regex("\\bMega\\b", RegexOption.IGNORE_CASE).containsMatchIn(it) }
-        return stream.provider.equals("cinesrc", true) && mega &&
+        val isCineSrcMega = stream.provider.equals("cinesrc", ignoreCase = true) &&
+            stream.name.contains("Mega", ignoreCase = true)
+        return isCineSrcMega &&
             url.encodedPath.startsWith("/pl/") &&
             (url.encodedPath.endsWith(".m3u8") || url.encodedPath.endsWith(".mpd"))
     }

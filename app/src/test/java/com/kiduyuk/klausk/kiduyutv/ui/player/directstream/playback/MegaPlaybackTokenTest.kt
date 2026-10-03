@@ -6,13 +6,22 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class MegaPlaybackTokenTest {
-    private val stream = StreamItem(title = "CineSrc - Mega", url = "https://cdn.example/pl/opaque/master.m3u8?token=server", quality = "Mega HLS", provider = "CineSrc")
+    private val stream = StreamItem(
+        title = "CineSrc stream",
+        name = "CineSrc Mega",
+        url = "https://cdn.example/pl/opaque/master.m3u8?token=server",
+        quality = "1080p",
+        provider = "CineSrc"
+    )
 
-    @Test fun refreshOnlyDirectMegaStreams() {
+    @Test fun refreshOnlyNamedDirectCineSrcMegaStreams() {
         assertTrue(MegaPlaybackToken.needsRefresh(stream))
         assertFalse(MegaPlaybackToken.needsRefresh(stream.copy(provider = "Vidfast")))
         assertFalse(MegaPlaybackToken.needsRefresh(stream.copy(url = "https://api.example/m3u8-proxy?url=" + stream.url)))
-        assertFalse(MegaPlaybackToken.needsRefresh(stream.copy(title = "CineSrc cld", quality = "Auto")))
+        assertFalse(MegaPlaybackToken.needsRefresh(stream.copy(name = "CineSrc Cloud")))
+        assertFalse(MegaPlaybackToken.needsRefresh(stream.copy(name = "CineSrc Cloud", title = "CineSrc Mega")))
+        assertFalse(MegaPlaybackToken.needsRefresh(stream.copy(name = "CineSrc Cloud", quality = "Mega HLS")))
+        assertTrue(MegaPlaybackToken.needsRefresh(stream.copy(name = "cinesrc mega 4K", provider = "cInEsRc")))
     }
 
     @Test fun replaceAllOldTokensAndKeepSignedParameters() {

@@ -1765,6 +1765,7 @@ class DirectStreamActivity : AppCompatActivity() {
         binding.btnPlayerStreams.visibility = View.GONE
         updateBottomFocusChain()
         showProviderFetchProgress()
+        showStreamFetchCount()
         showStatus("Fetching enabled providers", retry = false)
         streamJob = lifecycleScope.launch {
             val result = runCatching {
@@ -1790,11 +1791,17 @@ class DirectStreamActivity : AppCompatActivity() {
                                 retry = false
                             )
                         }
+                    },
+                    onStreamProgress = { fetchedCount ->
+                        withContext(Dispatchers.Main) {
+                            updateStreamFetchCount(fetchedCount)
+                        }
                     }
                 )
             }
             result.onSuccess { items ->
                 hideProviderFetchProgress()
+                hideStreamFetchCount()
                 Log.i(PROVIDER_TAG, "loadAndPlay received ${items.size} streams for provider=${provider.displayName}")
                 if (items.isEmpty()) {
                     Log.w(PROVIDER_TAG, "Empty stream list for provider=${provider.displayName}")
@@ -1811,6 +1818,7 @@ class DirectStreamActivity : AppCompatActivity() {
                 }
             }.onFailure { error ->
                 hideProviderFetchProgress()
+                hideStreamFetchCount()
                 Log.w(TAG, "Stream fetch failed: ${error.message}")
                 Log.w(PROVIDER_TAG, "Stream fetch failed for provider=${provider.displayName}: ${error.message}")
                 if (error is ProvidersBackendUnavailableException) {
@@ -2583,6 +2591,27 @@ class DirectStreamActivity : AppCompatActivity() {
         if (binding.providerFetchProgress.visibility == View.VISIBLE) {
             binding.providerFetchProgress.setProviderProgress(completed, total)
         }
+    }
+
+    private fun showStreamFetchCount() {
+        binding.streamFetchCount.text = getString(R.string.stream_fetch_count, 0)
+        binding.streamFetchCount.alpha = 1f
+        binding.streamFetchCount.visibility = View.VISIBLE
+    }
+
+    private fun updateStreamFetchCount(fetchedCount: Int) {
+        if (binding.streamFetchCount.visibility == View.VISIBLE) {
+            binding.streamFetchCount.text = getString(
+                R.string.stream_fetch_count,
+                fetchedCount.coerceAtLeast(0)
+            )
+        }
+    }
+
+    private fun hideStreamFetchCount() {
+        binding.streamFetchCount.animate().cancel()
+        binding.streamFetchCount.visibility = View.GONE
+        binding.streamFetchCount.alpha = 1f
     }
 
     /**

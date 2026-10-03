@@ -73,7 +73,7 @@ class StreamSelectionDialog(
     private val onStreamSelected: (StreamItem) -> Unit
 ) : ComponentDialog(context) {
 
-    private val streamsState = mutableStateOf(streams)
+    private val streamsState = mutableStateOf(visibleStreams(streams))
     private val activeUrlState = mutableStateOf(activeUrl)
 
     init {
@@ -122,9 +122,14 @@ class StreamSelectionDialog(
 
     fun updateStreams(updated: List<StreamItem>, activeUrl: String? = activeUrlState.value) {
         if (!isShowing) return
-        streamsState.value = updated
+        // HTTP 403 means the provider rejected the stream. Do not expose
+        // blocked candidates in the picker after background validation.
+        streamsState.value = visibleStreams(updated)
         activeUrlState.value = activeUrl
     }
+
+    private fun visibleStreams(streams: List<StreamItem>): List<StreamItem> =
+        streams.filterNot { it.httpStatusCode == 403 }
 
     private fun selectStream(stream: StreamItem) {
         activeUrlState.value = stream.url
@@ -475,11 +480,23 @@ class StreamSelectionDialog(
         )
 
         private fun detectLanguages(stream: StreamItem): List<String> {
-            if (stream.language.isNotBlank()) return listOf(stream.language)
+            if (listOf(stream.name, stream.title).any { text ->
+                    text.contains("original audio", ignoreCase = true)
+                }
+            ) {
+                return listOf("Original Audio")
+            }
+            if (stream.provider.equals("vegamovies", ignoreCase = true)) {
+                return listOf("English", "Hindi")
+            }
+            val explicitLanguage = stream.language.trim()
+            if (explicitLanguage.isNotBlank() && !explicitLanguage.equals("und", ignoreCase = true)) {
+                return listOf(explicitLanguage)
+            }
             val searchableText = "${stream.name} ${stream.title}"
             return LANGUAGE_PATTERNS.mapNotNull { (label, pattern) ->
                 label.takeIf { pattern.containsMatchIn(searchableText) }
-            }.ifEmpty { listOf("English") }
+            }.ifEmpty { listOf("Unknown") }
         }
     }
 }
