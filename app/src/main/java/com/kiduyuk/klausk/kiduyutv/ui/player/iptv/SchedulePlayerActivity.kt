@@ -159,7 +159,10 @@ class SchedulePlayerActivity : ComponentActivity() {
             playerOptions.getOrNull(selectedPlayerIndex)?.url?.let(failedPlayerUrls::add)
             if (::webView.isInitialized) webView.stopLoading()
             if (!tryNextPlayer()) {
-                Toast.makeText(this, "All available stream servers failed", Toast.LENGTH_LONG).show()
+                showRetryOrCloseDialog(
+                    message = "All available stream servers failed.",
+                    onRetry = ::retryPlayback
+                )
             }
         } else {
             finish()
@@ -203,8 +206,10 @@ class SchedulePlayerActivity : ComponentActivity() {
         }
 
         if (channelId.isEmpty() && iframeUrls.isEmpty()) {
-            Toast.makeText(this, "No channel ID or stream URLs provided", Toast.LENGTH_LONG).show()
-            finish()
+            showRetryOrCloseDialog(
+                message = "No channel ID or stream servers were provided.",
+                onRetry = { recreate() }
+            )
             return
         }
 
@@ -242,15 +247,19 @@ class SchedulePlayerActivity : ComponentActivity() {
                     playerOptions = withFallbackPlayerOptions(watchPage.playerOptions)
 
                     if (playerOptions.isEmpty()) {
-                        currentIframeHtml = generateIframeHtml(watchPage.defaultIframeUrl)
-                    } else {
-                        val playerToUse = playerOptions.getOrNull(selectedPlayerIndex)
-                            ?: playerOptions.find { it.isActive }
-                            ?: playerOptions.first()
-
-                        currentIframeHtml = generateIframeHtml(playerToUse.url)
-                        selectedPlayerIndex = playerOptions.indexOf(playerToUse)
+                        showRetryOrCloseDialog(
+                            message = "No stream servers are available for this channel.",
+                            onRetry = { fetchChannelWatchPage(channelId) }
+                        )
+                        return@fold
                     }
+
+                    val playerToUse = playerOptions.getOrNull(selectedPlayerIndex)
+                        ?: playerOptions.find { it.isActive }
+                        ?: playerOptions.first()
+
+                    currentIframeHtml = generateIframeHtml(playerToUse.url)
+                    selectedPlayerIndex = playerOptions.indexOf(playerToUse)
 
                     loadCurrentStream()
                     updateTopBar()
@@ -431,8 +440,10 @@ class SchedulePlayerActivity : ComponentActivity() {
 
     private fun setupWithDirectIframeUrls() {
         if (iframeUrls.isEmpty()) {
-            Toast.makeText(this, "No stream URLs available", Toast.LENGTH_SHORT).show()
-            finish()
+            showRetryOrCloseDialog(
+                message = "No stream servers are available for this channel.",
+                onRetry = ::setupWithDirectIframeUrls
+            )
             return
         }
 
@@ -1145,6 +1156,35 @@ class SchedulePlayerActivity : ComponentActivity() {
                     isActive = index == selectedPlayerIndex
                 )
             }
+    }
+
+    private fun retryPlayback() {
+        failedPlayerUrls.clear()
+        selectedPlayerIndex = 0
+        if (hasDirectIframeUrls) {
+            setupWithDirectIframeUrls()
+        } else if (channelId.isNotBlank()) {
+            showPageLoadingDialog()
+            fetchChannelWatchPage(channelId)
+        } else {
+            showRetryOrCloseDialog(
+                message = "No channel ID or stream servers were provided.",
+                onRetry = { recreate() }
+            )
+        }
+    }
+
+    private fun showRetryOrCloseDialog(message: String, onRetry: () -> Unit) {
+        if (isFinishing || isDestroyed) return
+
+        dismissPageLoadingDialog()
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Unable to play channel")
+            .setMessage(message)
+            .setNegativeButton("Close") { _, _ -> finish() }
+            .setPositiveButton("Retry") { _, _ -> onRetry() }
+            .setOnCancelListener { finish() }
+            .show()
     }
 
     private fun canonicalPlayerUrl(url: String): String = runCatching {

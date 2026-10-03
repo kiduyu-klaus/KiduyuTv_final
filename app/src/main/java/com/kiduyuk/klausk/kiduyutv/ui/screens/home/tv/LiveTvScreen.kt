@@ -492,8 +492,26 @@ private fun DaddyLiveTabContent(
 
     when {
         isLoading -> {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 48.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
                 LottieLoadingView(size = 300.dp)
+                Text(
+                    text = "Loading DaddyLive channels…",
+                    color = TextPrimary,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = PrimaryRed,
+                    trackColor = CardDark
+                )
             }
         }
 

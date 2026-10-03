@@ -32,6 +32,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -615,8 +616,20 @@ private fun MobileDaddyLiveContent(
 
     when {
         isLoading -> {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                LottieLoadingView(size = 200.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                CircularProgressIndicator(color = PrimaryRed)
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Loading DaddyLive channels…",
+                    color = TextPrimary,
+                    textAlign = TextAlign.Center
+                )
             }
         }
 
