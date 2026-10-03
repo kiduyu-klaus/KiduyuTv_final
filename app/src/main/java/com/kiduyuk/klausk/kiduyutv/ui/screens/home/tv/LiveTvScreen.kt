@@ -78,6 +78,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -95,6 +96,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -2436,11 +2438,24 @@ private fun ChannelCard(
     val isFocused by interactionSource.collectIsFocusedAsState()
     val context = LocalContext.current
     
-    var isRemoteLongPressDetected by remember { mutableStateOf(false) }
-    // A remote long press starts as a normal confirm press. Keep this flag until
-    // the generated click is actually consumed; a short timeout lets a late KeyUp
-    // launch playback and immediately dismiss the dialog.
-    var suppressRemoteClick by remember { mutableStateOf(false) }
+    val longPressTimeoutMs = LocalViewConfiguration.current.longPressTimeoutMillis
+
+    // A remote long press has to complete on KeyUp, never on KeyDown. Raising the
+    // dialog while the key is still held means the matching KeyUp lands on the
+    // freshly focused dialog, which reads it as a click and dismisses itself through
+    // onDismissRequest. So the hold is timed here and the dialog is only raised once
+    // the key has been released.
+    var isConfirmHeld by remember { mutableStateOf(false) }
+    var heldLongEnough by remember { mutableStateOf(false) }
+    var suppressNextClick by remember { mutableStateOf(false) }
+    val currentOnLongClick by rememberUpdatedState(onLongClick)
+
+    LaunchedEffect(isConfirmHeld, longPressTimeoutMs) {
+        if (isConfirmHeld) {
+            delay(longPressTimeoutMs)
+            heldLongEnough = true
+        }
+    }
 
     Box(
         modifier = modifier
@@ -2457,43 +2472,33 @@ private fun ChannelCard(
                 val isConfirmKey = event.key == Key.DirectionCenter ||
                     event.key == Key.Enter
                 when {
-                    // A dialog can take focus before this card receives the original
-                    // KeyUp. A fresh confirm press marks the next interaction as a
-                    // normal click again once that dialog has been closed.
+                    // Start the hold timer on the initial press. Auto-repeat KeyDowns
+                    // (repeatCount > 0) are ignored: relying on the OS to repeat
+                    // DPAD_CENTER is unreliable, since many remotes never repeat it.
                     isConfirmKey && event.type == KeyEventType.KeyDown &&
-                        event.nativeKeyEvent.repeatCount == 0 &&
-                        isRemoteLongPressDetected -> {
-                        isRemoteLongPressDetected = false
-                        suppressRemoteClick = false
+                        event.nativeKeyEvent.repeatCount == 0 -> {
+                        isConfirmHeld = true
+                        heldLongEnough = false
+                        // A fresh press means any pending suppression is stale.
+                        suppressNextClick = false
                         false
                     }
 
-                    // The long-press KeyUp was consumed above, so no click is
-                    // expected on some devices. Clear its stale suppression when a
-                    // later, fresh confirm press begins.
-                    isConfirmKey && event.type == KeyEventType.KeyDown &&
-                        event.nativeKeyEvent.repeatCount == 0 &&
-                        suppressRemoteClick -> {
-                        suppressRemoteClick = false
+                    // Release after a long enough hold: raise the dialog now that the
+                    // key is up, and flag the click combinedClickable is about to emit
+                    // so it is swallowed instead of starting playback.
+                    isConfirmKey && event.type == KeyEventType.KeyUp && heldLongEnough -> {
+                        isConfirmHeld = false
+                        heldLongEnough = false
+                        suppressNextClick = true
+                        currentOnLongClick?.invoke()
                         false
                     }
 
-                    // Android emits repeated KeyDown events while DPAD_CENTER/Enter is
-                    // held. Treat the first repeat as a long press and consume the
-                    // matching KeyUp so combinedClickable cannot also play the channel.
-                    onLongClick != null && isConfirmKey &&
-                        event.type == KeyEventType.KeyDown &&
-                        event.nativeKeyEvent.repeatCount > 0 &&
-                        !isRemoteLongPressDetected -> {
-                        isRemoteLongPressDetected = true
-                        suppressRemoteClick = true
-                        onLongClick()
-                        true
-                    }
-
-                    isConfirmKey && event.type == KeyEventType.KeyUp && isRemoteLongPressDetected -> {
-                        isRemoteLongPressDetected = false
-                        true
+                    isConfirmKey && event.type == KeyEventType.KeyUp -> {
+                        isConfirmHeld = false
+                        heldLongEnough = false
+                        false
                     }
 
                     else -> false
@@ -2503,17 +2508,14 @@ private fun ChannelCard(
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = {
-                    // Consume the release-generated click after a remote long press.
-                    // This must not be time-based: users may hold the key longer than
-                    // any arbitrary delay before releasing it.
-                    if (suppressRemoteClick) {
-                        suppressRemoteClick = false
+                    // Swallow the click generated by the release that completed a long
+                    // press. The KeyUp is deliberately not consumed, so the press cycle
+                    // still completes and combinedClickable is not left stuck pressed.
+                    if (suppressNextClick) {
+                        suppressNextClick = false
                     } else {
                         onClick()
                     }
-                },
-                onLongClick = {
-                    onLongClick?.invoke()
                 }
             )
             .padding(12.dp),
