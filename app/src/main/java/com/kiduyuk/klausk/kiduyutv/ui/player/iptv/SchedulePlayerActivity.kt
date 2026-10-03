@@ -70,10 +70,7 @@ import com.kiduyuk.klausk.kiduyutv.data.model.PlayerOption
 import com.kiduyuk.klausk.kiduyutv.data.repository.ScheduleRepository
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.AdBlockerWebViewClient
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.MouseCursorView
-import com.kiduyuk.klausk.kiduyutv.ui.player.webviewsniffer.SniffedStream
-import com.kiduyuk.klausk.kiduyutv.ui.player.webviewsniffer.WebViewStreamSniffer
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
-import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -101,11 +98,8 @@ class SchedulePlayerActivity : ComponentActivity() {
     private var currentIframeHtml: String? = null
     private var channelName: String = "Channel"
     private var eventTitle: String = "Channel"
-    private var webStreamSniffer: WebViewStreamSniffer? = null
-    private var snifferHandoffStarted = false
     private var channelId: String = ""
     private val failedPlayerUrls = mutableSetOf<String>()
-    private val failedStreamUrls = mutableSetOf<String>()
 
     // FIX: playerOptions and selectedPlayerIndex backed by mutableStateOf so
     // the Compose top bar recomposes automatically when these change.
@@ -162,12 +156,8 @@ class SchedulePlayerActivity : ComponentActivity() {
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == IptvPlayerActivity.RESULT_PLAYBACK_FAILED) {
-            result.data?.getStringExtra(IptvPlayerActivity.EXTRA_FAILED_STREAM_URL)
-                ?.let(failedStreamUrls::add)
             playerOptions.getOrNull(selectedPlayerIndex)?.url?.let(failedPlayerUrls::add)
-            snifferHandoffStarted = false
             if (::webView.isInitialized) webView.stopLoading()
-            webStreamSniffer = createStreamSniffer()
             if (!tryNextPlayer()) {
                 Toast.makeText(this, "All available stream servers failed", Toast.LENGTH_LONG).show()
             }
@@ -204,10 +194,6 @@ class SchedulePlayerActivity : ComponentActivity() {
         channelName = intent.getStringExtra(EXTRA_CHANNEL_NAME) ?: "Channel"
         eventTitle = intent.getStringExtra(EXTRA_EVENT_TITLE) ?: "Event"
         selectedPlayerIndex = intent.getIntExtra(EXTRA_SELECTED_PLAYER, 0)
-        val shouldSniffStreams = SettingsManager(this).isWebSnifferEnabled()
-        if (shouldSniffStreams) {
-            webStreamSniffer = createStreamSniffer()
-        }
 
         val passedIframeUrls = intent.getStringArrayListExtra(EXTRA_IFRAME_URLS)
         if (!passedIframeUrls.isNullOrEmpty()) {
@@ -622,8 +608,7 @@ class SchedulePlayerActivity : ComponentActivity() {
                     } else {
                         tryNextPlayer()
                     }
-                },
-                onRequest = { request -> webStreamSniffer?.inspect(request) }
+                }
             ) {
 
                 override fun shouldInterceptRequest(
@@ -790,53 +775,6 @@ class SchedulePlayerActivity : ComponentActivity() {
         scheduleTopBarHide()
     }
 
-    private fun openSniffedStream(stream: SniffedStream) {
-        runOnUiThread {
-            if (snifferHandoffStarted || isFinishing || isDestroyed) return@runOnUiThread
-            snifferHandoffStarted = true
-            val playbackHeaders = if (SettingsManager(this).isDaddyLiveEnabled()) {
-                LinkedHashMap(stream.headers).apply {
-                    putReplacingCaseInsensitive(
-                        "User-Agent",
-                        if (::webView.isInitialized) {
-                            webView.settings.userAgentString
-                        } else {
-                            "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 " +
-                                "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                        }
-                    )
-                    putReplacingCaseInsensitive("Referer", "https://dlstreams.st")
-                    putReplacingCaseInsensitive("Accept-Language", "en-US,en;q=0.5")
-                }
-            } else {
-                stream.headers
-            }
-            iptvPlayerLauncher.launch(
-                IptvPlayerActivity.createIntent(
-                    context = this,
-                    channelName = channelName,
-                    streamUrl = stream.url,
-                    tvgName = eventTitle,
-                    group = "Schedule",
-                    requestHeaders = playbackHeaders,
-                    cookie = stream.cookie,
-                    mimeType = stream.mimeType,
-                    returnToScheduleOnError = true
-                )
-            )
-        }
-    }
-
-    private fun MutableMap<String, String>.putReplacingCaseInsensitive(
-        name: String,
-        value: String
-    ) {
-        keys.filter { it.equals(name, ignoreCase = true) }
-            .toList()
-            .forEach(::remove)
-        put(name, value)
-    }
-
     /**
      * FIX: Updates selectedPlayerIndex and playerOptions together, keeping isActive in sync.
      * Previously, isActive flags on PlayerOption were never updated when switching sources,
@@ -884,12 +822,6 @@ class SchedulePlayerActivity : ComponentActivity() {
         playerOptions.getOrNull(selectedPlayerIndex)?.url?.let(failedPlayerUrls::add)
         tryNextPlayer()
     }
-
-    private fun createStreamSniffer() = WebViewStreamSniffer(
-        onStreamCaptured = ::openSniffedStream,
-        onSubtitleCaptured = {},
-        shouldIgnoreStream = { candidate -> candidate in failedStreamUrls }
-    )
 
     private fun withFallbackPlayerOptions(discovered: List<PlayerOption>): List<PlayerOption> {
         val fallbackUrls = STREAM_PATHS.map { path ->
