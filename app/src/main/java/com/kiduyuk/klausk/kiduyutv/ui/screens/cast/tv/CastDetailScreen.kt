@@ -43,6 +43,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -62,6 +63,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.key
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import coil.compose.AsyncImage
@@ -667,14 +674,27 @@ private fun BiographyDialog(
     onDismiss: () -> Unit
 ) {
     val scrollState = rememberScrollState()
+    val focusRequester = remember { FocusRequester() }
+    val coroutineScope = rememberCoroutineScope()
 
-    Dialog(onDismissRequest = onDismiss) {
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true
+        )
+    ) {
         Surface(
             color = CardDark,
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .fillMaxWidth(0.92f)
-                .fillMaxHeight(0.85f)
+                .fillMaxHeight(0.9f)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // Title
@@ -690,9 +710,32 @@ private fun BiographyDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .verticalScroll(scrollState)
                         .padding(horizontal = 24.dp)
                         .focusable()
+                        .focusRequester(focusRequester)
+                        .onPreviewKeyEvent { event ->
+                            if (event.type != KeyEventType.KeyDown) {
+                                return@onPreviewKeyEvent false
+                            }
+
+                            val scrollDelta = when (event.key) {
+                                Key.DirectionUp -> -240
+                                Key.DirectionDown -> 240
+                                else -> null
+                            }
+
+                            if (scrollDelta != null) {
+                                coroutineScope.launch {
+                                    val target = (scrollState.value + scrollDelta)
+                                        .coerceIn(0, scrollState.maxValue)
+                                    scrollState.animateScrollTo(target)
+                                }
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                        .verticalScroll(scrollState)
                 ) {
                     Text(
                         text = biography,
