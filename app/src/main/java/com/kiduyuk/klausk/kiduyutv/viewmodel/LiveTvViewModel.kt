@@ -9,8 +9,10 @@ import com.kiduyuk.klausk.kiduyutv.data.model.CountryPlaylist
 import com.kiduyuk.klausk.kiduyutv.data.model.CountryPlaylistCategory
 import com.kiduyuk.klausk.kiduyutv.data.model.IptvChannel
 import com.kiduyuk.klausk.kiduyutv.data.model.IptvPlaylist
+import com.kiduyuk.klausk.kiduyutv.data.model.is18PlusChannel
 import com.kiduyuk.klausk.kiduyutv.data.repository.IptvRepository
 import com.kiduyuk.klausk.kiduyutv.data.repository.WorldIptvRepository
+import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,7 +53,8 @@ data class LiveTvUiState(
     val searchResults: List<IptvChannel> = emptyList(),
     val isSearchActive: Boolean = false,
     val isCountryPlaylistRefreshing: Boolean = false,
-    val countryPlaylistRefreshProgress: Float? = null
+    val countryPlaylistRefreshProgress: Float? = null,
+    val hide18PlusChannels: Boolean = false
 )
 
 /**
@@ -101,7 +104,42 @@ class LiveTvViewModel : ViewModel() {
     fun initialize(context: Context) {
         appContext = context.applicationContext
         prefs = appContext?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        _uiState.update {
+            it.copy(hide18PlusChannels = SettingsManager(context).isHide18PlusChannelsEnabled())
+        }
         refreshFavoriteChannels()
+    }
+
+    /** Updates the Live TV visibility preference and reapplies it to the current channel list. */
+    fun setHide18PlusChannels(enabled: Boolean) {
+        appContext?.let { SettingsManager(it).setHide18PlusChannels(enabled) }
+        _uiState.update { state ->
+            val baseChannels = state.selectedCategory?.let { category ->
+                cachedPlaylist?.categories?.get(category)
+            } ?: state.channels
+            val baseSearchResults = if (state.searchQuery.isBlank()) {
+                emptyList()
+            } else {
+                cachedPlaylist?.allChannels.orEmpty().filter { channel ->
+                    channel.name.contains(state.searchQuery, ignoreCase = true) ||
+                        channel.group?.contains(state.searchQuery, ignoreCase = true) == true
+                }
+            }
+            state.copy(
+                hide18PlusChannels = enabled,
+                channels = visibleChannels(baseChannels, enabled),
+                searchResults = visibleChannels(baseSearchResults, enabled)
+            )
+        }
+    }
+
+    private fun visibleChannels(
+        channels: List<IptvChannel>,
+        hide18PlusChannels: Boolean = _uiState.value.hide18PlusChannels
+    ): List<IptvChannel> = if (hide18PlusChannels) {
+        channels.filterNot(IptvChannel::is18PlusChannel)
+    } else {
+        channels
     }
 
     private fun refreshFavoriteChannels() {
@@ -459,7 +497,7 @@ class LiveTvViewModel : ViewModel() {
      */
     fun selectCategory(categoryName: String) {
         cachedPlaylist?.let { playlist ->
-            val channels = playlist.categories[categoryName] ?: emptyList()
+            val channels = visibleChannels(playlist.categories[categoryName] ?: emptyList())
             _uiState.value = _uiState.value.copy(
                 selectedCategory = categoryName,
                 channels = channels,
@@ -533,7 +571,7 @@ class LiveTvViewModel : ViewModel() {
                             lastSelectedCountryCode = country.countryCode,
                             playlistChoices = emptyList(),
                             selectedCategory = playlist.displayName,
-                            channels = parsed.allChannels,
+                            channels = visibleChannels(parsed.allChannels),
                             selectedChannel = null
                         )
                     }
@@ -579,7 +617,7 @@ class LiveTvViewModel : ViewModel() {
      * @return List of all channels in the playlist
      */
     fun getAllChannels(): List<IptvChannel> {
-        return cachedPlaylist?.allChannels ?: emptyList()
+        return visibleChannels(cachedPlaylist?.allChannels ?: emptyList())
     }
 
     /**
@@ -646,7 +684,7 @@ class LiveTvViewModel : ViewModel() {
             kotlinx.coroutines.delay(150)
             
             // Filter channels off the main thread
-            val allChannels = cachedPlaylist?.allChannels ?: emptyList()
+            val allChannels = visibleChannels(cachedPlaylist?.allChannels ?: emptyList())
             val results = withContext(Dispatchers.Default) {
                 if (query.isBlank()) {
                     emptyList()
@@ -669,6 +707,6 @@ class LiveTvViewModel : ViewModel() {
      * @return Total number of channels
      */
     fun getTotalChannelCount(): Int {
-        return cachedPlaylist?.allChannels?.size ?: 0
+        return getAllChannels().size
     }
 }

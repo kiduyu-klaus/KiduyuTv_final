@@ -107,6 +107,7 @@ import com.kiduyuk.klausk.kiduyutv.data.model.ScheduleCategory
 import com.kiduyuk.klausk.kiduyutv.data.model.ScheduleChannel
 import com.kiduyuk.klausk.kiduyutv.data.model.ScheduleDay
 import com.kiduyuk.klausk.kiduyutv.data.model.ScheduleEvent
+import com.kiduyuk.klausk.kiduyutv.data.model.is18PlusChannel
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
 import com.kiduyuk.klausk.kiduyutv.ui.components.TopBar
 import com.kiduyuk.klausk.kiduyutv.ui.player.iptv.SchedulePlayerActivity
@@ -160,6 +161,20 @@ fun LiveTvScreen(
     var daddyliveIsLoading by remember { mutableStateOf(false) }
     var daddyliveError by remember { mutableStateOf<String?>(null) }
     var daddyliveHasLoaded by remember { mutableStateOf(false) }
+    val visibleFavoriteChannels = remember(favoriteChannels, uiState.hide18PlusChannels) {
+        if (uiState.hide18PlusChannels) {
+            favoriteChannels.filterNot(IptvChannel::is18PlusChannel)
+        } else {
+            favoriteChannels
+        }
+    }
+    val visibleDaddyliveChannels = remember(daddyliveChannels, uiState.hide18PlusChannels) {
+        if (uiState.hide18PlusChannels) {
+            daddyliveChannels.filterNot(IptvChannel::is18PlusChannel)
+        } else {
+            daddyliveChannels
+        }
+    }
 
     fun loadDaddyliveChannels() {
         if (daddyliveIsLoading) return
@@ -231,7 +246,7 @@ fun LiveTvScreen(
         TabItem("Live TV", Icons.Default.Tv),
         TabItem("Schedule", Icons.Default.CalendarToday),
         TabItem("Daddylive", Icons.Default.PlayCircle),
-        TabItem("My Channels (${favoriteChannels.size})", Icons.Default.List)
+        TabItem("My Channels (${visibleFavoriteChannels.size})", Icons.Default.List)
     )
 
     Box(
@@ -284,7 +299,7 @@ fun LiveTvScreen(
                 }
                 2 -> { // Daddylive Tab
                     DaddyLiveTabContent(
-                        channels = daddyliveChannels,
+                        channels = visibleDaddyliveChannels,
                         isLoading = daddyliveIsLoading,
                         error = daddyliveError,
                         onScrape = { loadDaddyliveChannels() },
@@ -306,7 +321,7 @@ fun LiveTvScreen(
                         viewModel.syncFavoriteChannelsWithFirebase()
                     }
                     FavoriteChannelsTabContent(
-                        favorites = favoriteChannels,
+                        favorites = visibleFavoriteChannels,
                         onChannelClick = { channel -> viewModel.selectChannel(channel) }
                     )
                 }

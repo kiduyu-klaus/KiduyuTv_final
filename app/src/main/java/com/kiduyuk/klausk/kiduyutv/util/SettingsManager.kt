@@ -54,6 +54,16 @@ class SettingsManager(context: Context) {
         return preferences.getBoolean(KEY_DADDYLIVE_ENABLED, false)
     }
 
+    /** Saves whether Live TV should hide channels whose title contains `18+`. */
+    fun setHide18PlusChannels(enabled: Boolean) {
+        preferences.edit().putBoolean(KEY_HIDE_18_PLUS_CHANNELS, enabled).apply()
+    }
+
+    /** Returns whether Live TV should hide channels whose title contains `18+`. */
+    fun isHide18PlusChannelsEnabled(): Boolean {
+        return preferences.getBoolean(KEY_HIDE_18_PLUS_CHANNELS, false)
+    }
+
     /**
      * Saves the ads disabled preference.
      * @param disabled true to disable all ads, false to enable ads
@@ -106,6 +116,7 @@ class SettingsManager(context: Context) {
         private const val KEY_DIRECT_STREAM_ENABLED = "direct_stream_enabled"
         private const val KEY_WEB_SNIFFER_ENABLED = "web_sniffer_enabled"
         private const val KEY_DADDYLIVE_ENABLED = "daddylive_enabled"
+        private const val KEY_HIDE_18_PLUS_CHANNELS = "hide_18_plus_channels"
         private const val KEY_AUTO_SKIP_SEGMENTS = "auto_skip_segments"
 
         /** Sentinel value meaning "ask me each time" — no automatic selection. */

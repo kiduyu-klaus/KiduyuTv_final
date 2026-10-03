@@ -36,6 +36,9 @@ data class IptvChannel(
     val id: String get() = tvgId ?: "${name}_${url}".hashCode().toString()
 }
 
+/** Returns true when the channel title explicitly contains the `18+` marker. */
+fun IptvChannel.is18PlusChannel(): Boolean = name.contains("18+", ignoreCase = true)
+
 /**
  * Represents the parsed IPTV playlist data.
  *

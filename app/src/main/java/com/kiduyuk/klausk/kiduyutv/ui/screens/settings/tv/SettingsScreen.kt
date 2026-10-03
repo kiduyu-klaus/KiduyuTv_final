@@ -413,6 +413,10 @@ fun SettingsScreen(
                     )
                 }
 
+                SettingsSection.LIVE_TV -> {
+                    LiveTvSettingsContent()
+                }
+
                 SettingsSection.ADS_SETTINGS -> {
                     AdsSettingsContent(
                         context = context,
@@ -1279,13 +1283,10 @@ private fun PlaybackContent(
     onDirectStreamProviderSelect: (String) -> Unit
 ) {
     val context = LocalContext.current
-    val liveTvViewModel: LiveTvViewModel = viewModel()
-    val liveTvUiState by liveTvViewModel.uiState.collectAsState()
     var directProviderOptions by remember { mutableStateOf<List<StreamProviderChoice>>(emptyList()) }
     var directProviderLoadError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
-        liveTvViewModel.initialize(context)
         runCatching {
             withContext(Dispatchers.IO) { StreamCatalog.enabled() }
         }.onSuccess { providers ->
@@ -1407,71 +1408,6 @@ private fun PlaybackContent(
                 },
                 colors = SwitchDefaults.colors(checkedTrackColor = PrimaryRed)
             )
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-        SettingsSectionLabel(text = "IPTV country playlists")
-
-        val playlistRefreshInteraction = remember { MutableInteractionSource() }
-        val playlistRefreshFocused by playlistRefreshInteraction.collectIsFocusedAsState()
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(CardDark)
-                .border(
-                    if (playlistRefreshFocused) 2.dp else 0.dp,
-                    if (playlistRefreshFocused) PrimaryRed else Color.Transparent,
-                    RoundedCornerShape(16.dp)
-                )
-                .clickable(
-                    interactionSource = playlistRefreshInteraction,
-                    indication = null,
-                    enabled = !liveTvUiState.isCountryPlaylistRefreshing
-                ) { liveTvViewModel.loadPlaylist(forceRefresh = true) }
-                .focusable(interactionSource = playlistRefreshInteraction)
-                .padding(24.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Refresh IPTV country playlists", color = TextPrimary, fontSize = 16.sp)
-                Text(
-                    if (liveTvUiState.isCountryPlaylistRefreshing)
-                        "Updating playlists used by Live TV..."
-                    else
-                        "Download the latest country playlists used by Live TV.",
-                    color = TextSecondary,
-                    fontSize = 13.sp
-                )
-                if (liveTvUiState.isCountryPlaylistRefreshing) {
-                    val refreshPercent = ((liveTvUiState.countryPlaylistRefreshProgress ?: 0f) * 100f)
-                        .toInt()
-                        .coerceIn(0, 100)
-                    Text(
-                        text = "$refreshPercent%",
-                        color = TextSecondary,
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(top = 6.dp)
-                    )
-                    LinearProgressIndicator(
-                        progress = { liveTvUiState.countryPlaylistRefreshProgress ?: 0f },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 10.dp),
-                        color = PrimaryRed,
-                        trackColor = SurfaceDark
-                    )
-                }
-            }
-            if (liveTvUiState.isCountryPlaylistRefreshing) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    color = PrimaryRed,
-                    strokeWidth = 2.dp
-                )
-            } else {
-                Icon(Icons.Default.Update, contentDescription = "Refresh playlists", tint = TextPrimary)
-            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -2236,17 +2172,166 @@ private fun UrlInputField(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Live TV — playlist and channel visibility settings
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Content for the LiveTv section. Country playlist refresh and channel visibility
+ * belong here because they affect the Live TV catalogue rather than playback.
+ */
+@Composable
+private fun LiveTvSettingsContent() {
+    val context = LocalContext.current
+    val liveTvViewModel: LiveTvViewModel = viewModel()
+    val liveTvUiState by liveTvViewModel.uiState.collectAsState()
+    val settingsManager = remember(context) { SettingsManager(context) }
+    var hide18PlusChannels by remember {
+        mutableStateOf(settingsManager.isHide18PlusChannelsEnabled())
+    }
+
+    LaunchedEffect(Unit) {
+        liveTvViewModel.initialize(context)
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.Top
+    ) {
+        Text(
+            text = "LiveTv",
+            color = TextPrimary,
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 24.dp)
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+        SettingsSectionLabel(text = "IPTV country playlists")
+
+        val playlistRefreshInteraction = remember { MutableInteractionSource() }
+        val playlistRefreshFocused by playlistRefreshInteraction.collectIsFocusedAsState()
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(CardDark)
+                .border(
+                    if (playlistRefreshFocused) 2.dp else 0.dp,
+                    if (playlistRefreshFocused) PrimaryRed else Color.Transparent,
+                    RoundedCornerShape(16.dp)
+                )
+                .clickable(
+                    interactionSource = playlistRefreshInteraction,
+                    indication = null,
+                    enabled = !liveTvUiState.isCountryPlaylistRefreshing
+                ) { liveTvViewModel.loadPlaylist(forceRefresh = true) }
+                .focusable(interactionSource = playlistRefreshInteraction)
+                .padding(24.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Refresh IPTV country playlists", color = TextPrimary, fontSize = 16.sp)
+                Text(
+                    if (liveTvUiState.isCountryPlaylistRefreshing)
+                        "Updating playlists used by Live TV..."
+                    else
+                        "Download the latest country playlists used by Live TV.",
+                    color = TextSecondary,
+                    fontSize = 13.sp
+                )
+                if (liveTvUiState.isCountryPlaylistRefreshing) {
+                    val refreshPercent = ((liveTvUiState.countryPlaylistRefreshProgress ?: 0f) * 100f)
+                        .toInt()
+                        .coerceIn(0, 100)
+                    Text(
+                        text = "$refreshPercent%",
+                        color = TextSecondary,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
+                    LinearProgressIndicator(
+                        progress = { liveTvUiState.countryPlaylistRefreshProgress ?: 0f },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 10.dp),
+                        color = PrimaryRed,
+                        trackColor = SurfaceDark
+                    )
+                }
+            }
+            if (liveTvUiState.isCountryPlaylistRefreshing) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = PrimaryRed,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Icon(Icons.Default.Update, contentDescription = "Refresh playlists", tint = TextPrimary)
+            }
+        }
+
+
+        Spacer(modifier = Modifier.height(24.dp))
+        SettingsSectionLabel(text = "Channel visibility")
+
+        val hide18PlusInteraction = remember { MutableInteractionSource() }
+        val hide18PlusFocused by hide18PlusInteraction.collectIsFocusedAsState()
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(CardDark)
+                .border(
+                    if (hide18PlusFocused) 2.dp else 0.dp,
+                    if (hide18PlusFocused) PrimaryRed else Color.Transparent,
+                    RoundedCornerShape(16.dp)
+                )
+                .clickable(
+                    interactionSource = hide18PlusInteraction,
+                    indication = null
+                ) {
+                    hide18PlusChannels = !hide18PlusChannels
+                    liveTvViewModel.setHide18PlusChannels(hide18PlusChannels)
+                }
+                .focusable(interactionSource = hide18PlusInteraction)
+                .padding(24.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Hide 18+ channels", color = TextPrimary, fontSize = 16.sp)
+                Text(
+                    "Hide channels with 18+ in the title from Live TV tabs and search.",
+                    color = TextSecondary,
+                    fontSize = 13.sp
+                )
+            }
+            Switch(
+                checked = hide18PlusChannels,
+                onCheckedChange = {
+                    hide18PlusChannels = it
+                    liveTvViewModel.setHide18PlusChannels(it)
+                },
+                colors = SwitchDefaults.colors(checkedTrackColor = PrimaryRed)
+            )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Enum
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Enum representing the three top-level settings sections.
+ * Enum representing the top-level settings sections.
  */
 private enum class SettingsSection(val title: String) {
     ACCOUNT("Account"),
     APP_SETTINGS("App Settings"),
     TRAKT("Trakt.tv"),
     PLAYBACK("Playback"),
+    LIVE_TV("LiveTv"),
     ADS_SETTINGS("Ads Settings"),
     APP_INFORMATION("App Information"),
     APP_VERSION("App Version"),
