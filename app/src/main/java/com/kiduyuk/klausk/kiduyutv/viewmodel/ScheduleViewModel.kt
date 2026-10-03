@@ -25,7 +25,9 @@ import kotlinx.coroutines.launch
  * @property searchResults Search results filtered by query
  */
 data class ScheduleUiState(
-    val isLoading: Boolean = true,
+    // The schedule is fetched lazily when its Live TV tab is opened. Starting
+    // idle prevents a permanent loading state before initialize() has a Context.
+    val isLoading: Boolean = false,
     val scheduleDays: List<ScheduleDay> = emptyList(),
     val expandedEventIds: Set<String> = emptySet(),
     val selectedChannel: ScheduleChannel? = null,

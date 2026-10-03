@@ -263,7 +263,6 @@ fun LiveTvScreen(
         viewModel.initialize(context)
         viewModel.loadPlaylist()
         scheduleViewModel.initialize(context)
-        scheduleViewModel.loadSchedule()
     }
 
     // Handle channel selection for playback
@@ -276,10 +275,12 @@ fun LiveTvScreen(
 
     // Track selected tab
     var selectedTabIndex by remember { mutableIntStateOf(initialTab) }
+    // Covers the short handoff between clicking Schedule and the ViewModel
+    // publishing isLoading=true, so the loading dialog is never missed.
+    var isScheduleTabOpening by remember { mutableStateOf(false) }
 
-    // Ensure the schedule is requested when the user first opens its tab.
-    // This also covers cases where the screen was restored without the initial
-    // startup request completing.
+    // Fetch schedules only once the user opens this tab, avoiding unnecessary
+    // scraping while they are browsing Live TV or DaddyLive.
     LaunchedEffect(selectedTabIndex) {
         if (selectedTabIndex == 1 &&
             scheduleUiState.scheduleDays.isEmpty() &&
@@ -290,6 +291,12 @@ fun LiveTvScreen(
         }
         if (selectedTabIndex == 2 && !daddyliveHasLoaded) {
             loadDaddyliveChannels()
+        }
+    }
+
+    LaunchedEffect(selectedTabIndex, scheduleUiState.isLoading) {
+        if (selectedTabIndex == 1 && scheduleUiState.isLoading) {
+            isScheduleTabOpening = false
         }
     }
 
@@ -321,7 +328,16 @@ fun LiveTvScreen(
                 onNotificationClick = onNotificationClick,
                 tabs = tabs,
                 selectedTabIndex = selectedTabIndex,
-                onTabSelected = { selectedTabIndex = it }
+                onTabSelected = { tabIndex ->
+                    if (tabIndex == 1 &&
+                        scheduleUiState.scheduleDays.isEmpty() &&
+                        scheduleUiState.error == null &&
+                        !scheduleUiState.isLoading
+                    ) {
+                        isScheduleTabOpening = true
+                    }
+                    selectedTabIndex = tabIndex
+                }
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -455,7 +471,7 @@ fun LiveTvScreen(
 
         // Schedule fetching can involve scraping the remote listing. Keep the user on
         // the selected tab and make that wait explicit instead of showing an empty view.
-        if (selectedTabIndex == 1 && scheduleUiState.isLoading) {
+        if (selectedTabIndex == 1 && (isScheduleTabOpening || scheduleUiState.isLoading)) {
             ScheduleLoadingDialog()
         }
     }
