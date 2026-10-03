@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
@@ -80,6 +81,7 @@ fun MobileLiveTvScreen(
     var scrapedChannelsLoading by remember { mutableStateOf(daddyLiveEnabled) }
     var scrapedChannelsError by remember { mutableStateOf<String?>(null) }
     var selectedTab by remember { mutableIntStateOf(0) }
+    val countryListState = rememberLazyListState()
 
     LaunchedEffect(daddyLiveEnabled) {
         viewModel.initialize(context)
@@ -305,8 +307,22 @@ fun MobileLiveTvScreen(
                                         onBackClick = viewModel::clearCategorySelection
                                     )
                                 } else if (uiState.selectedCategory == null) {
-                                    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp)) {
-                                        items(uiState.categories) { category ->
+                                    val lastSelectedCountryCode = uiState.lastSelectedCountryCode
+                                    LaunchedEffect(uiState.categories, lastSelectedCountryCode) {
+                                        val targetIndex = lastSelectedCountryCode
+                                            ?.let { code -> uiState.categories.indexOfFirst { it.countryCode.equals(code, ignoreCase = true) } }
+                                            ?.takeIf { it >= 0 }
+                                            ?: 0
+                                        if (uiState.categories.isNotEmpty()) {
+                                            countryListState.scrollToItem(targetIndex)
+                                        }
+                                    }
+                                    LazyColumn(
+                                        state = countryListState,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentPadding = PaddingValues(12.dp)
+                                    ) {
+                                        items(uiState.categories, key = { it.countryCode ?: it.name }) { category ->
                                             CountryCategoryRow(category) {
                                                 category.countryCode?.let(viewModel::selectCountry)
                                             }

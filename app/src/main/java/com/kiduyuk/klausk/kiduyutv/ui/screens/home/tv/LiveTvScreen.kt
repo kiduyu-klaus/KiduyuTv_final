@@ -536,6 +536,7 @@ private fun LiveTvTabContent(
             uiState.selectedCategory == null -> {
                 CountryCategoriesContent(
                     countries = uiState.countryCategories,
+                    lastSelectedCountryCode = uiState.lastSelectedCountryCode,
                     onCountryClick = { country ->
                         viewModel.selectCountry(country.countryCode)
                     },
@@ -1226,6 +1227,7 @@ private fun ChannelChip(
 @Composable
 private fun CountryCategoriesContent(
     countries: List<CountryPlaylistCategory>,
+    lastSelectedCountryCode: String?,
     onCountryClick: (CountryPlaylistCategory) -> Unit,
     totalPlaylists: Int
 ) {
@@ -1246,9 +1248,15 @@ private fun CountryCategoriesContent(
         }
     }
 
-    // Request focus on first item when categories load
-    LaunchedEffect(countries) {
-        if (countries.isNotEmpty()) {
+    // Restore the last country after returning from its playlist picker. On the
+    // first load, no country is remembered, so focus starts on the first item.
+    LaunchedEffect(filteredCountries, lastSelectedCountryCode) {
+        if (filteredCountries.isNotEmpty()) {
+            val targetIndex = lastSelectedCountryCode
+                ?.let { code -> filteredCountries.indexOfFirst { it.countryCode.equals(code, ignoreCase = true) } }
+                ?.takeIf { it >= 0 }
+                ?: 0
+            gridState.scrollToItem(targetIndex)
             firstFocusRequester.requestFocus()
         }
     }
@@ -1330,7 +1338,10 @@ private fun CountryCategoriesContent(
                     .padding(bottom = 16.dp)
             ) {
                 itemsIndexed(filteredCountries, key = { _, country -> country.countryCode }) { index, country ->
-                    val modifier = if (index == 0) {
+                    val targetCountryCode = lastSelectedCountryCode
+                        ?.takeIf { code -> filteredCountries.any { it.countryCode.equals(code, ignoreCase = true) } }
+                    val isRestoreTarget = country.countryCode.equals(targetCountryCode, ignoreCase = true)
+                    val modifier = if ((targetCountryCode == null && index == 0) || isRestoreTarget) {
                         Modifier.focusRequester(firstFocusRequester)
                     } else {
                         Modifier

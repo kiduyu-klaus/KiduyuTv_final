@@ -44,6 +44,7 @@ data class LiveTvUiState(
     val categories: List<CategoryItem> = emptyList(),
     val countryCategories: List<CountryPlaylistCategory> = emptyList(),
     val selectedCountry: CountryPlaylistCategory? = null,
+    val lastSelectedCountryCode: String? = null,
     val playlistChoices: List<CountryPlaylist> = emptyList(),
     val selectedCategory: String? = null,
     val channels: List<IptvChannel> = emptyList(),
@@ -403,6 +404,7 @@ class LiveTvViewModel : ViewModel() {
                         },
                         countryCategories = countries,
                         selectedCountry = null,
+                        lastSelectedCountryCode = null,
                         playlistChoices = emptyList(),
                         selectedCategory = null,
                         channels = emptyList(),
@@ -493,6 +495,7 @@ class LiveTvViewModel : ViewModel() {
             _uiState.update {
                 it.copy(
                     selectedCountry = country,
+                    lastSelectedCountryCode = country.countryCode,
                     playlistChoices = country.playlists,
                     selectedCategory = null,
                     channels = emptyList(),
@@ -543,6 +546,7 @@ class LiveTvViewModel : ViewModel() {
                         it.copy(
                             isLoading = false,
                             selectedCountry = country,
+                            lastSelectedCountryCode = country.countryCode,
                             playlistChoices = emptyList(),
                             selectedCategory = playlist.displayName,
                             channels = parsed.allChannels,
