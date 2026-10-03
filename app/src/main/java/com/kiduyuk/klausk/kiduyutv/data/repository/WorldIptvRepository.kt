@@ -5,6 +5,11 @@ import com.kiduyuk.klausk.kiduyutv.data.model.CountryPlaylist
 import com.kiduyuk.klausk.kiduyutv.data.model.CountryPlaylistCategory
 import com.kiduyuk.klausk.kiduyutv.data.model.IptvPlaylist
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -70,6 +75,38 @@ class WorldIptvRepository(
             }
         }
 
+    /**
+     * Replaces regional filename codes with the publisher's actual group title.
+     * For example, `br-sp.m3u` becomes "Brazil — Sao Paulo" when its first
+     * #EXTINF entry declares group-title="Sao Paulo".
+     */
+    suspend fun resolveRegionalPlaylistNames(
+        playlists: List<CountryPlaylist>
+    ): List<CountryPlaylist> = coroutineScope {
+        val requests = Semaphore(MAX_CONCURRENT_METADATA_REQUESTS)
+        playlists.map { playlist ->
+            async {
+                if (playlist.regionCode == null) {
+                    playlist
+                } else {
+                    requests.withPermit {
+                        val groupTitle = fetchFirstGroupTitle(playlist)
+                        if (groupTitle.isNullOrBlank()) {
+                            playlist
+                        } else {
+                            playlist.copy(
+                                displayName = playlistDisplayNameFromGroup(
+                                    playlist.countryCode,
+                                    groupTitle
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }.awaitAll()
+    }
+
     private fun parseCountryCategories(rawIndex: String): List<CountryPlaylistCategory> {
         val files = JSONArray(rawIndex)
         val discovered = buildList {
@@ -122,6 +159,36 @@ class WorldIptvRepository(
         return "$country — $region"
     }
 
+    private fun playlistDisplayNameFromGroup(countryCode: String, groupTitle: String): String {
+        val country = countryDisplayName(countryCode)
+        return "$country — ${groupTitle.trim()}"
+    }
+
+    private suspend fun fetchFirstGroupTitle(playlist: CountryPlaylist): String? =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val request = Request.Builder()
+                    .url(playlist.url)
+                    .header("User-Agent", "KiduyuTv")
+                    // The first EXTINF line carries group-title, so metadata lookup does not
+                    // need to download an entire regional M3U file.
+                    .header("Range", "bytes=0-${METADATA_READ_LIMIT_BYTES - 1}")
+                    .build()
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) return@use null
+                    val prefix = response.body?.byteStream()?.use { input ->
+                        val bytes = ByteArray(METADATA_READ_LIMIT_BYTES)
+                        val count = input.read(bytes)
+                        if (count > 0) String(bytes, 0, count, Charsets.UTF_8) else ""
+                    }.orEmpty()
+                    GROUP_TITLE_PATTERN.find(prefix)?.groupValues
+                        ?.drop(1)
+                        ?.firstOrNull { it.isNotBlank() }
+                        ?.trim()
+                }
+            }.getOrNull()
+        }
+
     private fun File.isFresh(): Boolean = exists() &&
         System.currentTimeMillis() - lastModified() < COUNTRY_INDEX_CACHE_AGE_MS
 
@@ -134,7 +201,13 @@ class WorldIptvRepository(
             "https://raw.githubusercontent.com/hampusborgos/country-flags/main/svg/"
         private const val COUNTRY_INDEX_CACHE_FILE = "world_iptv_country_index.json"
         private const val COUNTRY_INDEX_CACHE_AGE_MS = 12 * 60 * 60 * 1000L
+        private const val MAX_CONCURRENT_METADATA_REQUESTS = 4
+        private const val METADATA_READ_LIMIT_BYTES = 8 * 1024
         private val COUNTRY_PLAYLIST_FILE = Regex("^([a-z]{2})(?:-([a-z0-9]+))?\\.m3u$")
+        private val GROUP_TITLE_PATTERN = Regex(
+            """group-title=(?:"([^"]*)"|'([^']*)'|([^\s,]+))""",
+            RegexOption.IGNORE_CASE
+        )
         private val US_STATE_NAMES = mapOf(
             "ak" to "Alaska", "al" to "Alabama", "ar" to "Arkansas",
             "az" to "Arizona", "ca" to "California", "co" to "Colorado",

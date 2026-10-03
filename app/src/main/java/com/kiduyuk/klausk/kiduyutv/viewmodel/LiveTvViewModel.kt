@@ -488,7 +488,7 @@ class LiveTvViewModel : ViewModel() {
             .firstOrNull { it.countryCode.equals(countryCode, ignoreCase = true) }
             ?: return
         if (country.playlists.size == 1) {
-            selectCountryPlaylist(country, country.playlists.first())
+            selectCountryPlaylist(country.playlists.first())
         } else {
             _uiState.update {
                 it.copy(
@@ -499,6 +499,32 @@ class LiveTvViewModel : ViewModel() {
                     searchQuery = "",
                     searchResults = emptyList()
                 )
+            }
+            resolveRegionalPlaylistNames(country)
+        }
+    }
+
+    /** Resolves names such as `br-sp` from the first M3U group-title without blocking the picker. */
+    private fun resolveRegionalPlaylistNames(country: CountryPlaylistCategory) {
+        viewModelScope.launch {
+            val namedPlaylists = worldIptvRepository.resolveRegionalPlaylistNames(country.playlists)
+            _uiState.update { state ->
+                // Do not resurrect the picker after the viewer has selected a playlist or gone back.
+                if (state.selectedCountry?.countryCode != country.countryCode ||
+                    state.selectedCategory != null ||
+                    state.playlistChoices.isEmpty()
+                ) {
+                    state
+                } else {
+                    val updatedCountry = country.copy(playlists = namedPlaylists)
+                    state.copy(
+                        countryCategories = state.countryCategories.map { listedCountry ->
+                            if (listedCountry.countryCode == country.countryCode) updatedCountry else listedCountry
+                        },
+                        selectedCountry = updatedCountry,
+                        playlistChoices = namedPlaylists
+                    )
+                }
             }
         }
     }
