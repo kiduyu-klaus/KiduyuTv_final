@@ -16,13 +16,13 @@ import org.jsoup.nodes.Document
 import java.util.concurrent.TimeUnit
 
 /**
- * API service for fetching schedule data from dlstreams.st using Jsoup for robust parsing
+ * API service for fetching schedule data from dlive.sx using Jsoup for robust parsing.
  */
 class ScheduleApiService {
 
     companion object {
         private const val TAG = "ScheduleApi"
-        const val BASE_URL = "https://dlstreams.st"
+        const val BASE_URL = "https://dlive.sx/"
         private const val SCHEDULE_URL = BASE_URL
         private const val TIMEOUT_SECONDS = 30L
     }
@@ -36,7 +36,7 @@ class ScheduleApiService {
         .build()
 
     /**
-     * Fetches the schedule page from dlstreams.st
+     * Fetches the schedule page from dlive.sx.
      *
      * @return HTML content of the schedule page
      */
@@ -82,7 +82,7 @@ class ScheduleApiService {
      */
     suspend fun fetchChannelWatchPage(channelId: String): Result<ChannelWatchPage> = withContext(Dispatchers.IO) {
         try {
-            val watchUrl = "$BASE_URL/watch.php?id=$channelId"
+            val watchUrl = "${BASE_URL}watch.php?id=$channelId"
             Log.d(TAG, "Fetching channel watch page: $watchUrl")
 
             val request = Request.Builder()
@@ -161,8 +161,8 @@ class ScheduleApiService {
 
                             // Build full watch URL
                             val watchUrl = when {
-                                href.startsWith("/") -> "$BASE_URL$href"
-                                !href.startsWith("http") -> "$BASE_URL/$href"
+                                href.startsWith("/") -> "${BASE_URL}${href.removePrefix("/")}"
+                                !href.startsWith("http") -> "${BASE_URL}$href"
                                 else -> href
                             }
 
@@ -226,7 +226,7 @@ class ScheduleApiService {
 
             // Extract default iframe URL
             val iframe = doc.selectFirst("iframe#playerFrame")
-            val defaultIframeUrl = iframe?.attr("src") ?: "$BASE_URL/player/stream-$channelId.php"
+            val defaultIframeUrl = iframe?.attr("src") ?: "${BASE_URL}player/stream-$channelId.php"
 
             // Get channel name from page
             val channelName = doc.title().replace("Watch ", "").replace(" Live Stream", "").trim()
@@ -243,7 +243,7 @@ class ScheduleApiService {
                 channelId = channelId,
                 channelName = "Channel $channelId",
                 playerOptions = emptyList(),
-                defaultIframeUrl = "$BASE_URL/player/stream-$channelId.php"
+                defaultIframeUrl = "${BASE_URL}player/stream-$channelId.php"
             )
         }
     }

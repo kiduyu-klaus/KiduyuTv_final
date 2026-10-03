@@ -2,6 +2,7 @@ package com.kiduyuk.klausk.kiduyutv.ui.player.iptv
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -65,11 +66,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
 import com.kiduyuk.klausk.kiduyutv.R
+import com.kiduyuk.klausk.kiduyutv.data.api.ScheduleApiService
 import com.kiduyuk.klausk.kiduyutv.data.model.ChannelWatchPage
 import com.kiduyuk.klausk.kiduyutv.data.model.PlayerOption
 import com.kiduyuk.klausk.kiduyutv.data.repository.ScheduleRepository
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.AdBlockerWebViewClient
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.MouseCursorView
+import com.kiduyuk.klausk.kiduyutv.util.AdvancedAdBlocker
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -77,7 +80,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Schedule Player Activity for playing scheduled channels from dlhd.st
+ * Schedule Player Activity for playing scheduled channels from dlive.sx.
  * Extends the existing PlayerActivity functionality with schedule-specific features
  * Takes an iframe HTML as intent extra and plays the scheduled channel in WebView
  * Includes a focusable row of player source options at the top for easy stream switching
@@ -100,6 +103,8 @@ class SchedulePlayerActivity : ComponentActivity() {
     private var eventTitle: String = "Channel"
     private var channelId: String = ""
     private val failedPlayerUrls = mutableSetOf<String>()
+    private var adBlockerReady = false
+    private var pendingStreamLoad = false
 
     // FIX: playerOptions and selectedPlayerIndex backed by mutableStateOf so
     // the Compose top bar recomposes automatically when these change.
@@ -117,6 +122,7 @@ class SchedulePlayerActivity : ComponentActivity() {
 
     companion object {
         private const val TAG = "SchedulePlayer"
+        private const val SCHEDULE_HOST = "dlive.sx"
 
         // Intent extras
         const val EXTRA_CHANNEL_ID = "CHANNEL_ID"
@@ -217,6 +223,7 @@ class SchedulePlayerActivity : ComponentActivity() {
         })
 
         setupLayout()
+        initializeAdBlocker()
 
         if (hasDirectIframeUrls) {
             setupWithDirectIframeUrls()
@@ -256,7 +263,7 @@ class SchedulePlayerActivity : ComponentActivity() {
                 onFailure = { error ->
                     android.util.Log.e(TAG, "Failed to fetch watch page: ${error.message}")
                     currentIframeHtml = generateIframeHtml(
-                        "https://dlstreams.st/player/stream-$channelId.php"
+                        "${ScheduleApiService.BASE_URL}player/stream-$channelId.php"
                     )
                     loadCurrentStream()
                 }
@@ -265,10 +272,16 @@ class SchedulePlayerActivity : ComponentActivity() {
     }
 
     private fun loadCurrentStream() {
+        // Do not let the first provider document run before the cached/downloaded
+        // AdvancedAdBlocker snapshot is available to request interception.
+        if (!adBlockerReady) {
+            pendingStreamLoad = true
+            return
+        }
         currentIframeHtml?.let { html ->
             if (::webView.isInitialized) {
                 webView.loadDataWithBaseURL(
-                    "https://dlstreams.st",
+                    ScheduleApiService.BASE_URL,
                     html,
                     "text/html",
                     "UTF-8",
@@ -276,6 +289,110 @@ class SchedulePlayerActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    private fun initializeAdBlocker() {
+        lifecycleScope.launch {
+            val result = AdvancedAdBlocker.initialize(applicationContext)
+            android.util.Log.i(
+                TAG,
+                "[AdBlock] Schedule player initialized source=${result.source} " +
+                    "domains=${result.blockedDomainCount} error=${result.error.orEmpty()}"
+            )
+            adBlockerReady = true
+            if (pendingStreamLoad) {
+                pendingStreamLoad = false
+                loadCurrentStream()
+            }
+            if (result.refreshRecommended) {
+                launch {
+                    val refresh = AdvancedAdBlocker.refresh(applicationContext)
+                    android.util.Log.i(
+                        TAG,
+                        "[AdBlock] Schedule player refresh source=${refresh.source} " +
+                            "domains=${refresh.blockedDomainCount} error=${refresh.error.orEmpty()}"
+                    )
+                }
+            }
+        }
+    }
+
+    /** Applies the AdvancedAdBlocker DOM and popup guards to the wrapper document. */
+    private fun installAdvancedAdGuards(view: android.webkit.WebView?) {
+        view?.evaluateJavascript(
+            """
+            (function() {
+                ${AdvancedAdBlocker.getBlockingJavaScript()}
+                ${AdvancedAdBlocker.getCss()}
+
+                if (window.__kiduyuScheduleAdGuardInstalled) return;
+                window.__kiduyuScheduleAdGuardInstalled = true;
+                var adTerms = [
+                    'instant cash', 'claim ${'$'}', 'claim money', 'missed video',
+                    'join the video call', 'pending snaps', 'whatsapp', 'telegram',
+                    'you have won', 'click continue', 'allow notifications'
+                ];
+
+                function isPlayerContainer(node) {
+                    return !!(node && node.querySelector && node.querySelector('video, [class*="player"], [id*="player"]'));
+                }
+
+                function isAdOverlay(node) {
+                    if (!node || node.nodeType !== 1 || isPlayerContainer(node)) return false;
+                    var text = (node.innerText || node.textContent || '').toLowerCase();
+                    var identity = ((node.id || '') + ' ' + (node.className || '')).toLowerCase();
+                    var hasAdText = adTerms.some(function(term) { return text.indexOf(term) !== -1; });
+                    var hasAdIdentity = /(?:ad|ads|popup|popunder|overlay|interstitial|notification|banner)/.test(identity);
+                    var style = window.getComputedStyle(node);
+                    var floatsAbovePage = (style.position === 'fixed' || style.position === 'absolute') &&
+                        Number(style.zIndex || 0) > 9;
+                    return hasAdText || (hasAdIdentity && floatsAbovePage);
+                }
+
+                function removeAdOverlays(root) {
+                    if (!root || !root.querySelectorAll) return;
+                    root.querySelectorAll('div, section, aside, dialog, iframe, a').forEach(function(node) {
+                        if (isAdOverlay(node)) node.remove();
+                    });
+                }
+
+                removeAdOverlays(document);
+                new MutationObserver(function(mutations) {
+                    mutations.forEach(function(mutation) {
+                        mutation.addedNodes.forEach(function(node) {
+                            if (isAdOverlay(node)) {
+                                node.remove();
+                            } else {
+                                removeAdOverlays(node);
+                            }
+                        });
+                    });
+                }).observe(document.documentElement, { childList: true, subtree: true });
+
+                // Suppress click-triggered pop-under handlers before they can navigate the frame.
+                document.addEventListener('click', function(event) {
+                    var node = event.target && event.target.closest && event.target.closest('a, button, div, iframe');
+                    if (isAdOverlay(node)) {
+                        event.preventDefault();
+                        event.stopImmediatePropagation();
+                        node.remove();
+                    }
+                }, true);
+
+                // The schedule player never needs a new browsing context. Prevent links in
+                // server pages from opening a tab/window even when a provider restores a
+                // window.open implementation after the generic guard has run.
+                document.addEventListener('click', function(event) {
+                    var link = event.target && event.target.closest && event.target.closest('a[target="_blank"]');
+                    if (link) {
+                        event.preventDefault();
+                        event.stopImmediatePropagation();
+                    }
+                }, true);
+            })();
+            """.trimIndent(),
+            null
+        )
     }
 
     private fun setupWithDirectIframeUrls() {
@@ -446,8 +563,9 @@ class SchedulePlayerActivity : ComponentActivity() {
     }
 
     /**
-     * FIX: Intercepts every HTML response (including nested iframes) and injects
-     * the autoplay/unmute script directly into that frame's <head>.
+     * Intercepts every HTML response (including nested iframes), strips the known
+     * dlive.sx pop-under loaders, then injects the ad and autoplay guards directly
+     * into that frame's <head>.
      *
      * This is the only approach that reliably reaches videos inside cross-origin
      * iframes, because the script executes in the iframe's own origin context.
@@ -478,6 +596,43 @@ class SchedulePlayerActivity : ComponentActivity() {
             val originalHtml = connection.inputStream.bufferedReader(
                 charset(charset)
             ).readText()
+
+            val guardScript = """
+                <script>
+                (function() {
+                    ${AdvancedAdBlocker.getBlockingJavaScript()}
+                    ${AdvancedAdBlocker.getCss()}
+
+                    if (window.__kiduyuScheduleFrameGuardInstalled) return;
+                    window.__kiduyuScheduleFrameGuardInstalled = true;
+                    var blockedHosts = [
+                        'histats.com', 'profitableratecpmnetwork.com',
+                        'piousshiners.com', 'burstyflavia.com', 'llvpn.com'
+                    ];
+                    function isBlocked(value) {
+                        try {
+                            var host = new URL(value, location.href).hostname.toLowerCase();
+                            return blockedHosts.some(function(domain) {
+                                return host === domain || host.endsWith('.' + domain);
+                            });
+                        } catch (_) { return false; }
+                    }
+                    var appendChild = Node.prototype.appendChild;
+                    Node.prototype.appendChild = function(node) {
+                        if (node && node.tagName === 'SCRIPT' && isBlocked(node.src || '')) return node;
+                        return appendChild.call(this, node);
+                    };
+                    document.addEventListener('click', function(event) {
+                        var link = event.target && event.target.closest && event.target.closest('a');
+                        if (link && (link.target === '_blank' || isBlocked(link.href || ''))) {
+                            event.preventDefault();
+                            event.stopImmediatePropagation();
+                        }
+                    }, true);
+                    try { Notification.requestPermission = function() { return Promise.resolve('denied'); }; } catch (_) {}
+                })();
+                </script>
+            """.trimIndent()
 
             val autoplayScript = """
                 <script>
@@ -514,15 +669,31 @@ class SchedulePlayerActivity : ComponentActivity() {
                 </script>
             """.trimIndent()
 
+            // The first schedule frame currently embeds these inline/loadable ad and
+            // pop-under scripts. Remove them before WebView parses the document; DOM
+            // cleanup alone would be too late because they execute while parsing.
+            val sanitizedHtml = originalHtml
+                .replace(
+                    Regex(
+                        """(?is)<script\b[^>]*\bsrc\s*=\s*["'][^"']*(?:histats|profitableratecpmnetwork|piousshiners|burstyflavia|llvpn)[^"']*["'][^>]*>.*?</script>"""
+                    ),
+                    ""
+                )
+                .replace(
+                    Regex("""(?is)<script\b[^>]*>.*?(?:aclib\.runPop|popundersPerIP).*?</script>"""),
+                    ""
+                )
+
+            val injectedScripts = "$guardScript$autoplayScript"
             val injected = when {
-                originalHtml.contains("</head>", ignoreCase = true) ->
-                    originalHtml.replace("</head>", "$autoplayScript</head>", ignoreCase = true)
-                originalHtml.contains("<body", ignoreCase = true) ->
-                    originalHtml.replace(
+                sanitizedHtml.contains("</head>", ignoreCase = true) ->
+                    sanitizedHtml.replace("</head>", "$injectedScripts</head>", ignoreCase = true)
+                sanitizedHtml.contains("<body", ignoreCase = true) ->
+                    sanitizedHtml.replace(
                         Regex("<body", RegexOption.IGNORE_CASE),
-                        "$autoplayScript<body"
+                        "$injectedScripts<body"
                     )
-                else -> autoplayScript + originalHtml
+                else -> injectedScripts + sanitizedHtml
             }
 
             WebResourceResponse(
@@ -572,10 +743,10 @@ class SchedulePlayerActivity : ComponentActivity() {
                 displayZoomControls = false       // Keeps UI completely clean of ugly +/- buttons
                 setSupportZoom(true)         // Allows standard devices to stretch cinematic views if needed
 
-                // FIX: Multi-window support must be TRUE for standard HTML5 video elements
-                // to scale up and trigger full-screen player states natively.
-                setSupportMultipleWindows(true)
-                javaScriptCanOpenWindowsAutomatically = true // Allows player scripts to execute properly
+                // Playback does not require a second WebView. Keeping both disabled
+                // prevents `window.open`, pop-unders, and ad-created dialog windows.
+                setSupportMultipleWindows(false)
+                javaScriptCanOpenWindowsAutomatically = false
 
                 // Security layer bypass for http:// streaming streams running on https:// pages
                 if (Build.VERSION.SDK_INT >= 21) {
@@ -611,6 +782,29 @@ class SchedulePlayerActivity : ComponentActivity() {
                 }
             ) {
 
+                override fun shouldOverrideUrlLoading(
+                    view: android.webkit.WebView?,
+                    request: android.webkit.WebResourceRequest?
+                ): Boolean {
+                    val uri = request?.url
+                    // All actual stream hosts load in child iframes. If an ad tries to
+                    // replace the wrapper itself, keep playback in the trusted dlive.sx
+                    // document and discard that top-level navigation.
+                    if (request?.isForMainFrame == true &&
+                        uri?.host?.equals(SCHEDULE_HOST, ignoreCase = true) == false
+                    ) {
+                        android.util.Log.i(TAG, "[AdBlock] Blocked top-frame navigation: $uri")
+                        return true
+                    }
+                    return super.shouldOverrideUrlLoading(view, request)
+                }
+
+                override fun onPageCommitVisible(view: android.webkit.WebView?, url: String?) {
+                    super.onPageCommitVisible(view, url)
+                    // Install the popup guard before most delayed ad scripts execute.
+                    installAdvancedAdGuards(view)
+                }
+
                 override fun shouldInterceptRequest(
                     view: android.webkit.WebView?,
                     request: android.webkit.WebResourceRequest?
@@ -637,6 +831,7 @@ class SchedulePlayerActivity : ComponentActivity() {
                 override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
                     super.onPageFinished(view, url)
                     android.util.Log.i(TAG, "[WebView] Schedule stream page finished: $url")
+                    installAdvancedAdGuards(view)
 
                     // Inject CSS to suppress ad iframes and overlays that slip
                     // past the network block (e.g. JS-injected after page load).
@@ -687,6 +882,16 @@ class SchedulePlayerActivity : ComponentActivity() {
             }
 
             webChromeClient = object : android.webkit.WebChromeClient() {
+                override fun onCreateWindow(
+                    view: android.webkit.WebView?,
+                    isDialog: Boolean,
+                    isUserGesture: Boolean,
+                    resultMsg: android.os.Message?
+                ): Boolean {
+                    android.util.Log.i(TAG, "[AdBlock] Blocked Schedule player popup window")
+                    return false
+                }
+
                 override fun onProgressChanged(
                     view: android.webkit.WebView?,
                     newProgress: Int
@@ -824,12 +1029,20 @@ class SchedulePlayerActivity : ComponentActivity() {
     }
 
     private fun withFallbackPlayerOptions(discovered: List<PlayerOption>): List<PlayerOption> {
-        val fallbackUrls = STREAM_PATHS.map { path ->
-            "https://dlstreams.st${path.format(channelId)}"
+        val discoveredUrls = discovered.map { it.url }.filter { it.isNotBlank() }
+        // dlive.sx exposes the complete player list on each watch page. Appending a
+        // second hard-coded list created 12 visible entries for the six real servers.
+        // Keep fallback URLs only for a failed/empty watch-page parse.
+        val urls = if (discoveredUrls.isNotEmpty()) {
+            discoveredUrls
+        } else {
+            STREAM_PATHS.map { path ->
+                "${ScheduleApiService.BASE_URL}${path.removePrefix("/").format(channelId)}"
+            }
         }
-        return (discovered.map { it.url } + fallbackUrls)
+        return urls
             .filter { it.isNotBlank() }
-            .distinct()
+            .distinctBy(::canonicalPlayerUrl)
             .mapIndexed { index, url ->
                 PlayerOption(
                     playerNumber = index + 1,
@@ -838,6 +1051,11 @@ class SchedulePlayerActivity : ComponentActivity() {
                 )
             }
     }
+
+    private fun canonicalPlayerUrl(url: String): String = runCatching {
+        val uri = Uri.parse(url)
+        "${uri.path.orEmpty()}?${uri.query.orEmpty()}"
+    }.getOrDefault(url)
 
     private fun detectDeviceType() {
         val uiModeManager =

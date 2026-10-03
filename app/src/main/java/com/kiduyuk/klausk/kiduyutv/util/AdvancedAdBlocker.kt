@@ -68,7 +68,14 @@ object AdvancedAdBlocker {
      */
     private val MANUAL_BLOCKED_DOMAINS: Set<String> = setOf(
         "unswung.gurlleviter.cyou",
-        "princesseileen-idohyhm.work"
+        "princesseileen-idohyhm.work",
+        // Observed on dlive.sx schedule-player documents. Pinning these prevents
+        // trackers and pop-under loaders from running before an EasyList refresh.
+        "histats.com",
+        "profitableratecpmnetwork.com",
+        "piousshiners.com",
+        "burstyflavia.com",
+        "llvpn.com"
     )
 
     // The compatibility init() entry point owns application-lifetime work only.
