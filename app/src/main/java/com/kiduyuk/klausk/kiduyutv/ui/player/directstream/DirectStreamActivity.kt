@@ -71,10 +71,14 @@ import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamResolve
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamSelectionDialog
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamValidator
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.TrackSelectionDialog
+import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.MegaPlaybackToken
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -1898,14 +1902,40 @@ class DirectStreamActivity : AppCompatActivity() {
      */
     private fun validateStreamsInBackground(items: List<StreamItem>) {
         lifecycleScope.launch {
-            val validated = StreamValidator.validateAll(items)
+            // CineSrc Mega manifests contain a token bound to the requesting
+            // device. Refresh it before probing so the dialog validates the
+            // playable URL instead of labelling every stale provider token
+            // as unverified.
+            val streamsWithFreshMegaTokens = withContext(Dispatchers.IO) {
+                coroutineScope {
+                    items.map { stream ->
+                        async {
+                            if (!MegaPlaybackToken.needsRefresh(stream)) {
+                                stream
+                            } else {
+                                runCatching {
+                                    MegaPlaybackToken.refresh(stream, stream.headers)
+                                }.onFailure { error ->
+                                    Log.w(
+                                        PROVIDER_TAG,
+                                        "Could not refresh CineSrc Mega token before validation: " +
+                                            error.message
+                                    )
+                                }.getOrElse { stream }
+                            }
+                        }
+                    }.awaitAll()
+                }
+            }
+            val validated = StreamValidator.validateAll(streamsWithFreshMegaTokens)
             withContext(Dispatchers.Main) {
                 availableStreams = validated
                 if (engine.player.isPlaying) {
                     markActiveStreamPlayable()
-                } else {
-                    streamDialog?.updateStreams(validated)
                 }
+                // Update the stream picker regardless of current playback so
+                // CineSrc Mega rows receive their probe result immediately.
+                streamDialog?.updateStreams(availableStreams)
                 val okCount = validated.count { it.isValid }
                 val blockedCount = validated.count { it.httpStatusCode == 403 }
                 Log.i(
