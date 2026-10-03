@@ -250,7 +250,9 @@ data class Episode(
     @SerializedName("season_number") val seasonNumber: Int,
     @SerializedName("vote_average") val voteAverage: Double?,
     @SerializedName("air_date") val airDate: String?,
-    @SerializedName("runtime") val runtime: Int?
+    @SerializedName("runtime") val runtime: Int?,
+    @SerializedName("crew") val crew: List<CrewMember> = emptyList(),
+    @SerializedName("guest_stars") val guestStars: List<CastMember> = emptyList()
 )
 
 /**

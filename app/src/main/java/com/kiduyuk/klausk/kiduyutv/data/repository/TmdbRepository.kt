@@ -11,6 +11,7 @@ import com.kiduyuk.klausk.kiduyutv.data.local.entity.CachedMovieEntity
 import com.kiduyuk.klausk.kiduyutv.data.local.entity.CachedTvShowEntity
 import com.kiduyuk.klausk.kiduyutv.data.model.CollectionDetail
 import com.kiduyuk.klausk.kiduyutv.data.model.CompaniesNetworksResponse
+import com.kiduyuk.klausk.kiduyutv.data.model.Episode
 import com.kiduyuk.klausk.kiduyutv.data.model.Genre
 import com.kiduyuk.klausk.kiduyutv.data.model.Movie
 import com.kiduyuk.klausk.kiduyutv.data.model.MovieCreditsResponse
@@ -337,6 +338,15 @@ class TmdbRepository {
     /** Fetches detailed information for a specific season of a TV show. */
     suspend fun getSeasonDetail(tvId: Int, seasonNumber: Int): Result<SeasonDetail> = runCatching {
         api.getSeasonDetail(tvId, seasonNumber)
+    }
+
+    /** Fetches the full TMDB record for one TV episode, including credits. */
+    suspend fun getEpisodeDetails(
+        tvId: Int,
+        seasonNumber: Int,
+        episodeNumber: Int
+    ): Result<Episode> = runCatching {
+        api.getEpisodeDetails(tvId, seasonNumber, episodeNumber)
     }
 
     /**

@@ -36,6 +36,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.ImageSliderScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.MovieImagesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.company_network_list.tv.MediaListScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.MovieDetailScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.EpisodeOverviewScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.SeasonEpisodesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.StreamLinksScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.tv.TvShowDetailScreen
@@ -399,6 +400,26 @@ fun NavGraph(
                 onBackClick = { navController.popBackStack() },
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
                 showDirectStreamPrompt = !showStreamLinks.value
+            )
+        }
+
+        // Season Episodes Screen: Dedicated screen for viewing episodes of a TV show season.
+        composable(
+            route = Screen.EpisodeOverview.route,
+            arguments = listOf(
+                navArgument("tvId") { type = NavType.IntType },
+                navArgument("season") { type = NavType.IntType },
+                navArgument("episode") { type = NavType.IntType },
+                navArgument("tvShowName") { type = NavType.StringType; defaultValue = "" }
+            )
+        ) { backStackEntry ->
+            EpisodeOverviewScreen(
+                tvId = backStackEntry.arguments?.getInt("tvId") ?: return@composable,
+                seasonNumber = backStackEntry.arguments?.getInt("season") ?: 1,
+                episodeNumber = backStackEntry.arguments?.getInt("episode") ?: 1,
+                tvShowName = backStackEntry.arguments?.getString("tvShowName") ?: "",
+                onBackClick = { navController.popBackStack() },
+                onPlayClick = { route -> navController.navigate(route) }
             )
         }
 

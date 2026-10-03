@@ -25,6 +25,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.screens.cast.tv.ImageSliderScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.company_network_list.mobile.MobileMediaListScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.mobile.MobileImagesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.mobile.MobileMovieDetailScreen
+import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.mobile.MobileEpisodeOverviewScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.mobile.MobileSeasonEpisodesScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.mobile.MobileStreamLinksScreen
 import com.kiduyuk.klausk.kiduyutv.ui.screens.detail.mobile.MobileTvShowDetailScreen
@@ -357,6 +358,26 @@ fun MobileNavGraph(
                 onVideosClick = { id, isTv, title ->
                     navController.navigate(Screen.Videos.createRoute(id, isTv, title))
                 }
+            )
+        }
+
+        // Mobile Season Episodes Screen
+        composable(
+            route = Screen.MobileEpisodeOverview.route,
+            arguments = listOf(
+                navArgument("tvId") { type = NavType.IntType },
+                navArgument("season") { type = NavType.IntType },
+                navArgument("episode") { type = NavType.IntType },
+                navArgument("tvShowName") { type = NavType.StringType; defaultValue = "" }
+            )
+        ) { backStackEntry ->
+            MobileEpisodeOverviewScreen(
+                tvId = backStackEntry.arguments?.getInt("tvId") ?: return@composable,
+                seasonNumber = backStackEntry.arguments?.getInt("season") ?: 1,
+                episodeNumber = backStackEntry.arguments?.getInt("episode") ?: 1,
+                tvShowName = backStackEntry.arguments?.getString("tvShowName") ?: "",
+                onBackClick = { navController.popBackStack() },
+                onPlayClick = { route -> navController.navigate(route) }
             )
         }
 

@@ -23,6 +23,12 @@ sealed class Screen(val route: String) {
             return "season_episodes/$tvId/$totalSeasons?tvShowName=$encodedName"
         }
     }
+    object EpisodeOverview : Screen("episode_overview/{tvId}/{season}/{episode}?tvShowName={tvShowName}") {
+        fun createRoute(tvId: Int, season: Int, episode: Int, tvShowName: String): String {
+            val encodedName = android.net.Uri.encode(tvShowName)
+            return "episode_overview/$tvId/$season/$episode?tvShowName=$encodedName"
+        }
+    }
     object Settings : Screen("settings")
     object TraktProfile : Screen("trakt_profile")
     object MobileCastDetail : Screen("mobile_cast_detail/{castId}?castName={castName}&character={character}&profilePath={profilePath}&knownForDepartment={knownForDepartment}") {
@@ -116,6 +122,12 @@ sealed class Screen(val route: String) {
         fun createRoute(tvId: Int, tvShowName: String, totalSeasons: Int): String {
             val encodedName = android.net.Uri.encode(tvShowName)
             return "mobile_season_episodes/$tvId/$totalSeasons?tvShowName=$encodedName"
+        }
+    }
+    object MobileEpisodeOverview : Screen("mobile_episode_overview/{tvId}/{season}/{episode}?tvShowName={tvShowName}") {
+        fun createRoute(tvId: Int, season: Int, episode: Int, tvShowName: String): String {
+            val encodedName = android.net.Uri.encode(tvShowName)
+            return "mobile_episode_overview/$tvId/$season/$episode?tvShowName=$encodedName"
         }
     }
     object StreamLinks : Screen("stream_links/{tmdbId}/{isTv}?season={season}&episode={episode}&title={title}&overview={overview}&posterPath={posterPath}&backdropPath={backdropPath}&voteAverage={voteAverage}&releaseDate={releaseDate}&timestamp={timestamp}") {
