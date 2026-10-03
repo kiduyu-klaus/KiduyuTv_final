@@ -62,8 +62,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -86,6 +90,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.nativeKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
@@ -154,10 +159,12 @@ fun LiveTvScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val favoriteChannels by viewModel.favoriteChannels.collectAsState()
+    val savedScrapedChannels by viewModel.scrapedChannels.collectAsState()
     val scheduleUiState by scheduleViewModel.uiState.collectAsState()
     val context = LocalContext.current
     val daddyliveScope = rememberCoroutineScope()
     var favoriteChannelToConfirm by remember { mutableStateOf<IptvChannel?>(null) }
+    var scrapedChannelToConfirm by remember { mutableStateOf<IptvChannel?>(null) }
     var daddyliveChannels by remember { mutableStateOf<List<IptvChannel>>(emptyList()) }
     var daddyliveIsLoading by remember { mutableStateOf(false) }
     var daddyliveError by remember { mutableStateOf<String?>(null) }
@@ -168,6 +175,13 @@ fun LiveTvScreen(
             favoriteChannels.filterNot(IptvChannel::is18PlusChannel)
         } else {
             favoriteChannels
+        }
+    }
+    val visibleSavedScrapedChannels = remember(savedScrapedChannels, uiState.hide18PlusChannels) {
+        if (uiState.hide18PlusChannels) {
+            savedScrapedChannels.filterNot(IptvChannel::is18PlusChannel)
+        } else {
+            savedScrapedChannels
         }
     }
     val visibleDaddyliveChannels = remember(daddyliveChannels, uiState.hide18PlusChannels) {
@@ -224,6 +238,27 @@ fun LiveTvScreen(
         }
     }
 
+    fun playScrapedChannel(channel: IptvChannel) {
+        val scrapedChannelId = channel.tvgId?.takeIf { id -> id.all(Char::isDigit) }
+        if (scrapedChannelId == null) {
+            Toast.makeText(
+                context,
+                "This DaddyLive channel has no valid playback ID.",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+        // Resolve the watch page at playback time so its current six servers are used.
+        context.startActivity(
+            SchedulePlayerActivity.createIntent(
+                context = context,
+                channelId = scrapedChannelId,
+                channelName = channel.name,
+                eventTitle = channel.name
+            )
+        )
+    }
+
     // Initialize ViewModels with context
     LaunchedEffect(Unit) {
         viewModel.initialize(context)
@@ -263,7 +298,10 @@ fun LiveTvScreen(
         TabItem("Live TV", Icons.Default.Tv),
         TabItem("Schedule", Icons.Default.CalendarToday),
         TabItem("Daddylive", Icons.Default.PlayCircle),
-        TabItem("My Channels (${visibleFavoriteChannels.size})", Icons.Default.List)
+        TabItem(
+            "My Channels (${visibleFavoriteChannels.size + visibleSavedScrapedChannels.size})",
+            Icons.Default.List
+        )
     )
 
     Box(
@@ -323,30 +361,8 @@ fun LiveTvScreen(
                         isLoading = daddyliveIsLoading,
                         error = daddyliveError,
                         onScrape = { loadDaddyliveChannels() },
-                        onChannelClick = { channel ->
-                            val scrapedChannelId = channel.tvgId?.takeIf { id ->
-                                id.all(Char::isDigit)
-                            }
-                            if (scrapedChannelId == null) {
-                                Toast.makeText(
-                                    context,
-                                    "This DaddyLive channel has no valid playback ID.",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            } else {
-                                // Do not pass a direct iframe URL here. SchedulePlayerActivity
-                                // loads the matching dlive.sx watch page and discovers its six
-                                // current server buttons before starting playback.
-                                context.startActivity(
-                                    SchedulePlayerActivity.createIntent(
-                                        context = context,
-                                        channelId = scrapedChannelId,
-                                        channelName = channel.name,
-                                        eventTitle = channel.name
-                                    )
-                                )
-                            }
-                        }
+                        onChannelClick = ::playScrapedChannel,
+                        onChannelLongClick = { channel -> scrapedChannelToConfirm = channel }
                     )
                 }
                 3 -> { // My Channels (favorited)
@@ -355,8 +371,10 @@ fun LiveTvScreen(
                         viewModel.syncFavoriteChannelsWithFirebase()
                     }
                     FavoriteChannelsTabContent(
-                        favorites = visibleFavoriteChannels,
-                        onChannelClick = { channel -> viewModel.selectChannel(channel) }
+                        iptvChannels = visibleFavoriteChannels,
+                        scrapedChannels = visibleSavedScrapedChannels,
+                        onIptvChannelClick = { channel -> viewModel.selectChannel(channel) },
+                        onScrapedChannelClick = ::playScrapedChannel
                     )
                 }
             }
@@ -383,6 +401,37 @@ fun LiveTvScreen(
                 },
                 dismissButton = {
                     TextButton(onClick = { favoriteChannelToConfirm = null }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+
+        if (scrapedChannelToConfirm != null) {
+            val channelToConfirm = scrapedChannelToConfirm!!
+            AlertDialog(
+                onDismissRequest = { scrapedChannelToConfirm = null },
+                title = { Text(text = "Add to My Scraped Channels?") },
+                text = {
+                    Text(
+                        text = "Add ${channelToConfirm.name} so it is available in My Channels?"
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        if (viewModel.isScrapedChannel(channelToConfirm)) {
+                            Toast.makeText(context, "Already in My Scraped Channels", Toast.LENGTH_SHORT).show()
+                        } else {
+                            viewModel.addScrapedChannel(channelToConfirm)
+                            Toast.makeText(context, "Added to My Scraped Channels", Toast.LENGTH_SHORT).show()
+                        }
+                        scrapedChannelToConfirm = null
+                    }) {
+                        Text("Add")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { scrapedChannelToConfirm = null }) {
                         Text("Cancel")
                     }
                 }
@@ -542,7 +591,8 @@ private fun DaddyLiveTabContent(
     isLoading: Boolean,
     error: String?,
     onScrape: () -> Unit,
-    onChannelClick: (IptvChannel) -> Unit
+    onChannelClick: (IptvChannel) -> Unit,
+    onChannelLongClick: (IptvChannel) -> Unit
 ) {
     val firstChannelFocusRequester = remember { FocusRequester() }
     val gridState = rememberLazyGridState()
@@ -646,7 +696,8 @@ private fun DaddyLiveTabContent(
                             } else {
                                 Modifier
                             },
-                            onClick = { onChannelClick(channel) }
+                            onClick = { onChannelClick(channel) },
+                            onLongClick = { onChannelLongClick(channel) }
                         )
                     }
                 }
@@ -834,11 +885,48 @@ private data class TabItem(
  */
 @Composable
 private fun FavoriteChannelsTabContent(
-    favorites: List<com.kiduyuk.klausk.kiduyutv.data.model.IptvChannel>,
-    onChannelClick: (com.kiduyuk.klausk.kiduyutv.data.model.IptvChannel) -> Unit
+    iptvChannels: List<IptvChannel>,
+    scrapedChannels: List<IptvChannel>,
+    onIptvChannelClick: (IptvChannel) -> Unit,
+    onScrapedChannelClick: (IptvChannel) -> Unit
 ) {
-    Box(modifier = Modifier.fillMaxSize()) {
-        if (favorites.isEmpty()) {
+    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    val tabs = listOf(
+        "IPTV (${iptvChannels.size})",
+        "Scraped (${scrapedChannels.size})"
+    )
+    val displayedChannels = if (selectedTabIndex == 0) iptvChannels else scrapedChannels
+    val onChannelClick = if (selectedTabIndex == 0) onIptvChannelClick else onScrapedChannelClick
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        ScrollableTabRow(
+            selectedTabIndex = selectedTabIndex,
+            containerColor = Color.Transparent,
+            contentColor = PrimaryRed,
+            edgePadding = 16.dp,
+            divider = {},
+            indicator = { positions ->
+                TabRowDefaults.SecondaryIndicator(
+                    modifier = Modifier.tabIndicatorOffset(positions[selectedTabIndex]),
+                    color = PrimaryRed
+                )
+            }
+        ) {
+            tabs.forEachIndexed { index, title ->
+                Tab(
+                    selected = selectedTabIndex == index,
+                    onClick = { selectedTabIndex = index },
+                    text = {
+                        Text(
+                            text = title,
+                            color = if (selectedTabIndex == index) TextPrimary else TextSecondary
+                        )
+                    }
+                )
+            }
+        }
+
+        if (displayedChannels.isEmpty()) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -848,9 +936,19 @@ private fun FavoriteChannelsTabContent(
             ) {
                 Icon(Icons.Default.List, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(64.dp))
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(text = "No favorite channels yet", color = TextPrimary)
+                Text(
+                    text = if (selectedTabIndex == 0) "No IPTV channels yet" else "No scraped channels yet",
+                    color = TextPrimary
+                )
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(text = "Long-press a channel in a category to add it to favorites.", color = TextSecondary)
+                Text(
+                    text = if (selectedTabIndex == 0) {
+                        "Long-press an IPTV channel to add it here."
+                    } else {
+                        "Long-press a DaddyLive channel to add it here."
+                    },
+                    color = TextSecondary
+                )
             }
         } else {
             LazyVerticalGrid(
@@ -861,12 +959,8 @@ private fun FavoriteChannelsTabContent(
                     .fillMaxSize()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                itemsIndexed(favorites, key = { index, channel -> "${channel.id}_$index" }) { index, channel ->
-                    ChannelCard(
-                        channel = channel,
-                        modifier = if (index == 0) Modifier else Modifier,
-                        onClick = { onChannelClick(channel) }
-                    )
+                itemsIndexed(displayedChannels, key = { index, channel -> "${channel.id}_$index" }) { _, channel ->
+                    ChannelCard(channel = channel, onClick = { onChannelClick(channel) })
                 }
             }
         }
@@ -2296,6 +2390,7 @@ private fun ChannelCard(
     
     // Track if a long-press was detected and should block the subsequent click
     var isLongPressDetected by remember { mutableStateOf(false) }
+    var isRemoteLongPressDetected by remember { mutableStateOf(false) }
     
     // Reset long-press flag after a delay to allow normal clicks again
     LaunchedEffect(isLongPressDetected) {
@@ -2316,6 +2411,31 @@ private fun ChannelCard(
                 color = if (isFocused) Color.White else Color.Transparent,
                 shape = RoundedCornerShape(12.dp)
             )
+            .onPreviewKeyEvent { event ->
+                val isConfirmKey = event.key == Key.DirectionCenter ||
+                    event.key == Key.Enter
+                when {
+                    // Android emits repeated KeyDown events while DPAD_CENTER/Enter is
+                    // held. Treat the first repeat as a long press and consume the
+                    // matching KeyUp so combinedClickable cannot also play the channel.
+                    onLongClick != null && isConfirmKey &&
+                        event.type == KeyEventType.KeyDown &&
+                        event.nativeKeyEvent.repeatCount > 0 &&
+                        !isRemoteLongPressDetected -> {
+                        isRemoteLongPressDetected = true
+                        isLongPressDetected = true
+                        onLongClick()
+                        true
+                    }
+
+                    isConfirmKey && event.type == KeyEventType.KeyUp && isRemoteLongPressDetected -> {
+                        isRemoteLongPressDetected = false
+                        true
+                    }
+
+                    else -> false
+                }
+            }
             .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,

@@ -84,12 +84,16 @@ class LiveTvViewModel : ViewModel() {
 
     private val _favoriteChannels = MutableStateFlow<List<IptvChannel>>(emptyList())
     val favoriteChannels = _favoriteChannels.asStateFlow()
+
+    private val _scrapedChannels = MutableStateFlow<List<IptvChannel>>(emptyList())
+    val scrapedChannels = _scrapedChannels.asStateFlow()
     
     private var cachedPlaylist: IptvPlaylist? = null
     private var appContext: Context? = null
     private var prefs: SharedPreferences? = null
     private val PREFS_NAME = "live_tv_prefs"
     private val FAVORITES_KEY = "favorite_channels"
+    private val SCRAPED_CHANNELS_KEY = "saved_scraped_channels"
     
     // Debounce search to prevent excessive recompositions and main thread work
     private val searchQueryFlow = MutableStateFlow("")
@@ -108,6 +112,7 @@ class LiveTvViewModel : ViewModel() {
             it.copy(hide18PlusChannels = SettingsManager(context).isHide18PlusChannelsEnabled())
         }
         refreshFavoriteChannels()
+        refreshScrapedChannels()
     }
 
     /** Updates the Live TV visibility preference and reapplies it to the current channel list. */
@@ -144,6 +149,84 @@ class LiveTvViewModel : ViewModel() {
 
     private fun refreshFavoriteChannels() {
         _favoriteChannels.value = getFavoriteChannels()
+    }
+
+    private fun refreshScrapedChannels() {
+        _scrapedChannels.value = getScrapedChannels()
+    }
+
+    /**
+     * Returns DaddyLive channels the viewer explicitly saved from the scraped
+     * directory. These are intentionally separate from IPTV favorites because
+     * the DaddyLive channel ID is required to rediscover the current servers.
+     */
+    fun getScrapedChannels(): List<IptvChannel> {
+        val json = prefs?.getString(SCRAPED_CHANNELS_KEY, null) ?: return emptyList()
+        return try {
+            val array = JSONArray(json)
+            val channels = mutableListOf<IptvChannel>()
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val channelId = item.optString("tvgId").takeIf { it.isNotBlank() } ?: continue
+                val watchUrl = item.optString("url").takeIf { it.isNotBlank() } ?: continue
+                channels.add(
+                    IptvChannel(
+                        name = item.optString("name"),
+                        logo = item.optString("logo").takeIf { it.isNotBlank() },
+                        url = watchUrl,
+                        group = item.optString("group").takeIf { it.isNotBlank() },
+                        tvgId = channelId,
+                        tvgName = item.optString("tvgName").takeIf { it.isNotBlank() }
+                    )
+                )
+            }
+            channels
+        } catch (error: Exception) {
+            android.util.Log.w("LiveTvViewModel", "Unable to read saved scraped channels", error)
+            emptyList()
+        }
+    }
+
+    private fun saveScrapedChannels(channels: List<IptvChannel>) {
+        val array = JSONArray()
+        channels.forEach { channel ->
+            array.put(
+                JSONObject().apply {
+                    put("name", channel.name)
+                    put("logo", channel.logo)
+                    put("url", channel.url)
+                    put("group", channel.group)
+                    put("tvgId", channel.tvgId)
+                    put("tvgName", channel.tvgName)
+                }
+            )
+        }
+        prefs?.edit()?.putString(SCRAPED_CHANNELS_KEY, array.toString())?.apply()
+        _scrapedChannels.value = channels
+    }
+
+    /** Adds one DaddyLive channel to the local Scraped channels collection. */
+    fun addScrapedChannel(channel: IptvChannel) {
+        val channelId = channel.tvgId?.takeIf { it.all(Char::isDigit) } ?: return
+        val watchUrl = channel.url.takeIf { it.isNotBlank() } ?: return
+        val saved = getScrapedChannels().toMutableList()
+        if (saved.any { it.tvgId == channelId || it.url == watchUrl }) return
+        saved.add(
+            0,
+            channel.copy(
+                url = watchUrl,
+                tvgId = channelId,
+                group = channel.group ?: "DaddyLive"
+            )
+        )
+        saveScrapedChannels(saved)
+    }
+
+    fun isScrapedChannel(channel: IptvChannel): Boolean {
+        val channelId = channel.tvgId
+        return getScrapedChannels().any { saved ->
+            saved.tvgId == channelId || saved.url == channel.url
+        }
     }
 
     /**
