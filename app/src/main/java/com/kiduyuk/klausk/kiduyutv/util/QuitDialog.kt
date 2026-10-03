@@ -20,7 +20,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
@@ -36,6 +41,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -43,6 +49,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.setViewTreeLifecycleOwner
@@ -162,6 +170,10 @@ fun QuitDialogContent(
 ) {
     val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(lottieAnimRes))
     val focusRequester = remember { FocusRequester() }
+    val dialogScrollState = rememberScrollState()
+    val buttonBringIntoViewRequester = remember { BringIntoViewRequester() }
+    val coroutineScope = rememberCoroutineScope()
+    val maxDialogHeight = (LocalConfiguration.current.screenHeightDp * 0.9f).dp
 
     // Use a Box to center the dialog card on screen.
     Box(
@@ -173,6 +185,8 @@ fun QuitDialogContent(
         Column(
             modifier = Modifier
                 .width(500.dp)
+                .heightIn(max = maxDialogHeight)
+                .verticalScroll(dialogScrollState)
                 .background(ComposeColor(0xFF1A1A1A), RoundedCornerShape(16.dp))
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -230,7 +244,15 @@ fun QuitDialogContent(
                     modifier = Modifier
                         .weight(1f)
                         .focusRequester(focusRequester)
-                        .onFocusChanged { isNoFocused = it.isFocused },
+                        .bringIntoViewRequester(buttonBringIntoViewRequester)
+                        .onFocusChanged {
+                            isNoFocused = it.isFocused
+                            if (it.isFocused) {
+                                coroutineScope.launch {
+                                    buttonBringIntoViewRequester.bringIntoView()
+                                }
+                            }
+                        },
                         //.focusable(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (isNoFocused) ComposeColor.White else ComposeColor(0xFF333333),
@@ -246,7 +268,15 @@ fun QuitDialogContent(
                     onClick = onYes,
                     modifier = Modifier
                         .weight(1f)
-                        .onFocusChanged { isYesFocused = it.isFocused },
+                        .bringIntoViewRequester(buttonBringIntoViewRequester)
+                        .onFocusChanged {
+                            isYesFocused = it.isFocused
+                            if (it.isFocused) {
+                                coroutineScope.launch {
+                                    buttonBringIntoViewRequester.bringIntoView()
+                                }
+                            }
+                        },
                         //.focusable(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (isYesFocused) ComposeColor.Red else ComposeColor(0xFF333333),
