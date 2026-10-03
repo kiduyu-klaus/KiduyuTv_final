@@ -210,6 +210,14 @@ private fun EpisodeOverviewContent(
                             }
                         }
                     }
+                    Text(
+                        episode.overview?.takeIf { it.isNotBlank() } ?: "No description available.",
+                        color = TextSecondary,
+                        style = MaterialTheme.typography.bodyMedium,
+                        lineHeight = 20.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
                     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                         FocusableActionButton(onClick = onPlayClick, primary = true) {
                             Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(20.dp))
@@ -222,14 +230,6 @@ private fun EpisodeOverviewContent(
                             Text("View images")
                         }
                     }
-                    Text(
-                        episode.overview?.takeIf { it.isNotBlank() } ?: "No description available.",
-                        color = TextSecondary,
-                        style = MaterialTheme.typography.bodyMedium,
-                        lineHeight = 20.sp,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
                 }
             }
         }
