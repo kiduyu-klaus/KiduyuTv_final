@@ -1214,6 +1214,11 @@ class SchedulePlayerActivity : ComponentActivity() {
             showCursorAndResetTimer()
         }
 
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            onBackPressedDispatcher.onBackPressed()
+            return true
+        }
+
         if (isCursorDisabled) return super.onKeyDown(keyCode, event)
 
         return when (keyCode) {
@@ -1258,6 +1263,7 @@ class SchedulePlayerActivity : ComponentActivity() {
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
             KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_BACK,
             KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS
         )
     }
@@ -1267,6 +1273,7 @@ class SchedulePlayerActivity : ComponentActivity() {
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
             KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_BACK,
             KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_SETTINGS
         )
     }
