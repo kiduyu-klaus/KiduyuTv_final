@@ -402,6 +402,28 @@ class LiveTvViewModel : ViewModel() {
             
             worldIptvRepository.fetchCountryCategories(context, forceRefresh).fold(
                 onSuccess = { countries ->
+                    if (forceRefresh) {
+                        _uiState.update { it.copy(countryPlaylistRefreshProgress = 0.2f) }
+
+                        val refreshResults = worldIptvRepository.refreshAllPlaylists(countries) { completed, total ->
+                            val playlistProgress = if (total == 0) 1f else completed.toFloat() / total
+                            _uiState.update {
+                                it.copy(
+                                    countryPlaylistRefreshProgress =
+                                        (0.2f + playlistProgress * 0.8f).coerceIn(0f, 1f)
+                                )
+                            }
+                        }
+                        val failedCount = refreshResults.count { it.isFailure }
+                        if (failedCount > 0) {
+                            android.util.Log.w(
+                                "LiveTvViewModel",
+                                "Country playlist refresh completed with $failedCount " +
+                                    "failed playlist(s) out of ${refreshResults.size}"
+                            )
+                        }
+                    }
+
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         isCountryPlaylistRefreshing = false,

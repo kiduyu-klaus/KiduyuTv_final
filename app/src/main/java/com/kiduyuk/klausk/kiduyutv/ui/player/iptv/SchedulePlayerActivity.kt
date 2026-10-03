@@ -490,22 +490,38 @@ class SchedulePlayerActivity : ComponentActivity() {
 
                 function forcePlayAndUnmute(video) {
                     try {
-                        if (video.paused) {
-                            video.muted = true;
-                            video.play().catch(function(e) {
-                                console.warn('[VideoController] play() blocked:', e.message);
-                            });
-                        }
-                        setTimeout(function() {
+                        // MutationObserver and the old retry loop can see the same
+                        // element many times. Never restart its audio handshake.
+                        if (video.__kiduyuVolumeUnlockStarted) return;
+                        video.__kiduyuVolumeUnlockStarted = true;
+
+                        function enableVolume() {
                             try {
                                 video.muted = false;
                                 video.volume = 1;
-                                    markVolumeEnabled();
+                                markVolumeEnabled();
                                 console.log('[VideoController] Unmuted');
                             } catch(e) {
                                 console.warn('[VideoController] Unmute failed:', e.message);
                             }
-                        }, 800);
+                        }
+
+                        if (video.paused) {
+                            // Muting is needed only for the initial autoplay gesture.
+                            video.muted = true;
+                            var playResult = video.play();
+                            if (playResult && playResult.then) {
+                                playResult.then(function() { setTimeout(enableVolume, 800); })
+                                    .catch(function(e) {
+                                        console.warn('[VideoController] play() blocked:', e.message);
+                                    });
+                            } else {
+                                setTimeout(enableVolume, 800);
+                            }
+                        } else {
+                            // Do not mute an already-playing stream on every scan.
+                            enableVolume();
+                        }
                     } catch(e) {}
                 }
 
@@ -545,14 +561,6 @@ class SchedulePlayerActivity : ComponentActivity() {
                     });
                 }).observe(document.body, { childList: true, subtree: true });
 
-                // Retry loop — clears itself after 10 iterations
-                var retryCount = 0;
-                var retryInterval = setInterval(function() {
-                    processVideos(document);
-                    if (++retryCount >= 10) clearInterval(retryInterval);
-                }, 1000);
-
-                window.__videoControllerInterval = retryInterval;
             })();
         """.trimIndent()
         webView.evaluateJavascript(jsCode, null)
@@ -633,30 +641,39 @@ class SchedulePlayerActivity : ComponentActivity() {
             val autoplayScript = """
                 <script>
                 (function() {
+                    if (window.__kiduyuScheduleAutoplayInstalled) return;
+                    window.__kiduyuScheduleAutoplayInstalled = true;
+
                     function unlock(v) {
                         try {
+                            // A frame can be scanned repeatedly by MutationObserver;
+                            // only perform the autoplay/audio handshake once per video.
+                            if (v.__kiduyuVolumeUnlockStarted) return;
+                            v.__kiduyuVolumeUnlockStarted = true;
+
+                            function enableVolume() {
+                                try {
+                                    v.muted = false;
+                                    v.volume = 1;
+                                    if (window.Android && Android.onVolumeEnabled) Android.onVolumeEnabled();
+                                } catch(e) {}
+                            }
+
+                            if (!v.paused) {
+                                // Never mute a stream that is already playing.
+                                enableVolume();
+                                return;
+                            }
+
                             v.muted = true;
                             var p = v.play();
                             if (p && p.then) {
-                                p.then(function() {
-                                    setTimeout(function() {
-                                        try {
-                                            v.muted = false;
-                                            v.volume = 1;
-                                            if (window.Android && Android.onVolumeEnabled) Android.onVolumeEnabled();
-                                        } catch(e) {}
-                                    }, 800);
-                                }).catch(function(e) {
+                                p.then(function() { setTimeout(enableVolume, 800); })
+                                    .catch(function(e) {
                                     console.warn('[AutoplayInject] play() blocked:', e.message);
-                                });
+                                    });
                             } else {
-                                setTimeout(function() {
-                                    try {
-                                        v.muted = false;
-                                        v.volume = 1;
-                                        if (window.Android && Android.onVolumeEnabled) Android.onVolumeEnabled();
-                                    } catch(e) {}
-                                }, 800);
+                                setTimeout(enableVolume, 800);
                             }
                         } catch(e) {}
                     }
@@ -1133,16 +1150,6 @@ class SchedulePlayerActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        // Clear JS interval before destroying WebView
-        if (::webView.isInitialized) {
-            try {
-                webView.evaluateJavascript(
-                    "if(window.__videoControllerInterval) clearInterval(window.__videoControllerInterval);",
-                    null
-                )
-            } catch (e: Exception) { /* ignore — WebView may already be paused */ }
-        }
-
         cursorHideHandler.removeCallbacks(cursorHideRunnable)
         topBarHideHandler.removeCallbacks(topBarHideRunnable)
 

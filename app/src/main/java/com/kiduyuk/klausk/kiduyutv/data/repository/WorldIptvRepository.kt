@@ -17,6 +17,8 @@ import org.json.JSONArray
 import java.io.File
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Indexes the public world_ip_tv country playlists and fetches only the M3U
@@ -29,6 +31,8 @@ class WorldIptvRepository(
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
 ) {
+    private val playlistCache = ConcurrentHashMap<String, IptvPlaylist>()
+
     suspend fun fetchCountryCategories(
         context: Context,
         forceRefresh: Boolean = false
@@ -57,8 +61,14 @@ class WorldIptvRepository(
         }
     }
 
-    suspend fun fetchPlaylist(playlist: CountryPlaylist): Result<IptvPlaylist> =
+    suspend fun fetchPlaylist(
+        playlist: CountryPlaylist,
+        forceRefresh: Boolean = false
+    ): Result<IptvPlaylist> =
         withContext(Dispatchers.IO) {
+            if (!forceRefresh) {
+                playlistCache[playlist.url]?.let { return@withContext Result.success(it) }
+            }
             runCatching {
                 val request = Request.Builder()
                     .url(playlist.url)
@@ -70,10 +80,45 @@ class WorldIptvRepository(
                     }
                     val body = response.body?.string().orEmpty()
                     check(body.startsWith("#EXTM3U")) { "Selected country file was not an M3U playlist" }
-                    IptvRepository.getInstance().parseM3uPlaylist(body)
+                    IptvRepository.getInstance().parseM3uPlaylist(body).also {
+                        playlistCache[playlist.url] = it
+                    }
                 }
             }
         }
+
+    /**
+     * Downloads and parses every country/regional playlist discovered in the
+     * country index. The same fetch path used by playlist selection is used
+     * here, so refresh validates the actual M3U files rather than only the
+     * GitHub directory listing.
+     *
+     * A small concurrency limit prevents a refresh from opening hundreds of
+     * simultaneous connections. Progress is reported after each playlist
+     * completes, including failed requests, so the UI cannot remain stuck.
+     */
+    suspend fun refreshAllPlaylists(
+        countries: List<CountryPlaylistCategory>,
+        onProgress: (completed: Int, total: Int) -> Unit = { _, _ -> }
+    ): List<Result<IptvPlaylist>> = coroutineScope {
+        val playlists = countries.flatMap { it.playlists }
+        if (playlists.isEmpty()) {
+            onProgress(0, 0)
+            return@coroutineScope emptyList()
+        }
+
+        val completed = AtomicInteger(0)
+        val requests = Semaphore(MAX_CONCURRENT_PLAYLIST_REQUESTS)
+        playlists.map { playlist ->
+            async {
+                requests.withPermit {
+                    val result = fetchPlaylist(playlist, forceRefresh = true)
+                    onProgress(completed.incrementAndGet(), playlists.size)
+                    result
+                }
+            }
+        }.awaitAll()
+    }
 
     /**
      * Replaces regional filename codes with the publisher's actual group title.
@@ -204,6 +249,7 @@ class WorldIptvRepository(
             "https://cdn.jsdelivr.net/gh/hampusborgos/country-flags@main/svg/"
         private const val COUNTRY_INDEX_CACHE_FILE = "world_iptv_country_index.json"
         private const val COUNTRY_INDEX_CACHE_AGE_MS = 12 * 60 * 60 * 1000L
+        private const val MAX_CONCURRENT_PLAYLIST_REQUESTS = 4
         private const val MAX_CONCURRENT_METADATA_REQUESTS = 4
         private const val METADATA_READ_LIMIT_BYTES = 8 * 1024
         private val COUNTRY_PLAYLIST_FILE = Regex("^([a-z]{2})(?:-([a-z0-9]+))?\\.m3u$")
