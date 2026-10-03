@@ -291,7 +291,8 @@ fun MobileLiveTvScreen(
                                                     selected.logo,
                                                     selected.tvgId,
                                                     selected.tvgName,
-                                                    selected.group
+                                                    selected.group,
+                                                    playlistChannels = viewModel.getAllChannels()
                                                 )
                                                 context.startActivity(intent)
                                             }
@@ -341,7 +342,8 @@ fun MobileLiveTvScreen(
                                                     selected.logo,
                                                     selected.tvgId,
                                                     selected.tvgName,
-                                                    selected.group
+                                                    selected.group,
+                                                    playlistChannels = viewModel.getAllChannels()
                                                 )
                                                 context.startActivity(intent)
                                             }
@@ -378,7 +380,8 @@ fun MobileLiveTvScreen(
                                             selected.logo,
                                             selected.tvgId,
                                             selected.tvgName,
-                                            selected.group
+                                            selected.group,
+                                            playlistChannels = viewModel.getAllChannels()
                                         )
                                         context.startActivity(intent)
                                     }

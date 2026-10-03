@@ -66,7 +66,7 @@
             android:layout_height="40dp"
             android:layout_marginStart="8dp"
             android:background="@drawable/selector_button_tv"
-            android:contentDescription="EPG / Program guide"
+            android:contentDescription="Playlist channels"
             android:focusable="true"
             android:focusableInTouchMode="true"
             android:nextFocusDown="@id/btnFill"

@@ -5,7 +5,6 @@ import android.content.SharedPreferences
 import android.util.Base64
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.kiduyuk.klausk.kiduyutv.data.model.EpgProgram
 import com.kiduyuk.klausk.kiduyutv.data.model.CountryPlaylist
 import com.kiduyuk.klausk.kiduyutv.data.model.CountryPlaylistCategory
 import com.kiduyuk.klausk.kiduyutv.data.model.IptvChannel
@@ -27,7 +26,6 @@ import org.json.JSONObject
  * UI State for the Live TV screen.
  *
  * @param isLoading Loading state for initial playlist fetch
- * @param isEpgLoading Loading state for EPG guide
  * @param categories List of available categories
  * @param selectedCategory Currently selected category
  * @param channels Channels in the selected category
@@ -40,7 +38,6 @@ import org.json.JSONObject
  */
 data class LiveTvUiState(
     val isLoading: Boolean = true,
-    val isEpgLoading: Boolean = false,
     val categories: List<CategoryItem> = emptyList(),
     val countryCategories: List<CountryPlaylistCategory> = emptyList(),
     val selectedCountry: CountryPlaylistCategory? = null,
@@ -53,8 +50,6 @@ data class LiveTvUiState(
     val searchQuery: String = "",
     val searchResults: List<IptvChannel> = emptyList(),
     val isSearchActive: Boolean = false,
-    val currentProgram: EpgProgram? = null,
-    val nextProgram: EpgProgram? = null,
     val isCountryPlaylistRefreshing: Boolean = false,
     val countryPlaylistRefreshProgress: Float? = null
 )
@@ -74,7 +69,7 @@ data class CategoryItem(
 
 /**
  * ViewModel for the Live TV screen.
- * Manages playlist fetching, category selection, channel browsing, and EPG loading.
+ * Manages playlist fetching, category selection, channel browsing, and favorites.
  */
 class LiveTvViewModel : ViewModel() {
     
@@ -458,51 +453,6 @@ class LiveTvViewModel : ViewModel() {
     }
 
     /**
-     * Loads EPG guide data for program information.
-     * Should be called when channel is selected for playback.
-     *
-     * @param channel The channel to load EPG for
-     */
-    fun loadEpgForChannel(channel: IptvChannel) {
-        val context = appContext ?: return
-
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isEpgLoading = true)
-
-            repository.getChannelProgramInfo(channel, context).let { programInfo ->
-                _uiState.value = _uiState.value.copy(
-                    isEpgLoading = false,
-                    currentProgram = programInfo.currentProgram,
-                    nextProgram = programInfo.nextProgram
-                )
-            }
-        }
-    }
-
-    /**
-     * Loads EPG guide data for all channels.
-     * Call on app startup to pre-cache EPG data.
-     *
-     * @param forceRefresh If true, bypasses cache and fetches from network
-     */
-    fun loadEpg(forceRefresh: Boolean = false) {
-        val context = appContext ?: return
-
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isEpgLoading = true)
-
-            repository.fetchEpg(context, forceRefresh).fold(
-                onSuccess = {
-                    _uiState.value = _uiState.value.copy(isEpgLoading = false)
-                },
-                onFailure = {
-                    _uiState.value = _uiState.value.copy(isEpgLoading = false)
-                }
-            )
-        }
-    }
-    
-    /**
      * Selects a category and loads its channels.
      *
      * @param categoryName The name of the category to select
@@ -513,9 +463,7 @@ class LiveTvViewModel : ViewModel() {
             _uiState.value = _uiState.value.copy(
                 selectedCategory = categoryName,
                 channels = channels,
-                selectedChannel = null,
-                currentProgram = null,
-                nextProgram = null
+                selectedChannel = null
             )
         }
     }
@@ -586,9 +534,7 @@ class LiveTvViewModel : ViewModel() {
                             playlistChoices = emptyList(),
                             selectedCategory = playlist.displayName,
                             channels = parsed.allChannels,
-                            selectedChannel = null,
-                            currentProgram = null,
-                            nextProgram = null
+                            selectedChannel = null
                         )
                     }
                 },
@@ -614,50 +560,19 @@ class LiveTvViewModel : ViewModel() {
             selectedCategory = null,
             channels = emptyList(),
             selectedChannel = null,
-            currentProgram = null,
-            nextProgram = null
         )
     }
     
-    /**
-     * Selects a channel for playback and loads its EPG.
-     *
-     * @param channel The channel to play
-     */
+    /** Selects a channel for playback. */
     fun selectChannel(channel: IptvChannel) {
         _uiState.value = _uiState.value.copy(selectedChannel = channel)
-        loadEpgForChannel(channel)
     }
-    
-    /**
-     * Clears the selected channel.
-     */
+
+    /** Clears the selected channel. */
     fun clearSelectedChannel() {
-        _uiState.value = _uiState.value.copy(
-            selectedChannel = null,
-            currentProgram = null,
-            nextProgram = null
-        )
+        _uiState.value = _uiState.value.copy(selectedChannel = null)
     }
 
-    /**
-     * Gets the current program for the selected channel.
-     *
-     * @return Current EpgProgram or null
-     */
-    fun getCurrentProgram(): EpgProgram? {
-        return _uiState.value.currentProgram
-    }
-
-    /**
-     * Gets the next program for the selected channel.
-     *
-     * @return Next EpgProgram or null
-     */
-    fun getNextProgram(): EpgProgram? {
-        return _uiState.value.nextProgram
-    }
-    
     /**
      * Gets all channels for search across entire playlist.
      *
@@ -682,7 +597,6 @@ class LiveTvViewModel : ViewModel() {
     fun clearCache(context: Context) {
         cachedPlaylist = null
         repository.clearCache(context)
-        repository.clearEpgCache(context)
     }
 
     /**

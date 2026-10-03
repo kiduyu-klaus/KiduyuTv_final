@@ -175,8 +175,8 @@ fun NavGraph(
         composable(Screen.LiveTv.route) {
             val context = LocalContext.current
             LiveTvScreen(
-                onChannelPlay = { channel ->
-                    // Start the IPTV player activity with EPG metadata
+                onChannelPlay = { channel, playlistChannels ->
+                    // Start the IPTV player activity with the active playlist
                     val intent = IptvPlayerActivity.createIntent(
                         context = context,
                         channelName = channel.name,
@@ -184,7 +184,8 @@ fun NavGraph(
                         channelLogo = channel.logo,
                         tvgId = channel.tvgId,
                         tvgName = channel.tvgName,
-                        group = channel.group
+                        group = channel.group,
+                        playlistChannels = playlistChannels
                     )
                     context.startActivity(intent)
                 },
@@ -207,8 +208,8 @@ fun NavGraph(
         composable(Screen.Schedule.route) {
             val context = LocalContext.current
             LiveTvScreen(
-                onChannelPlay = { channel ->
-                    // Start the IPTV player activity with EPG metadata
+                onChannelPlay = { channel, playlistChannels ->
+                    // Start the IPTV player activity with the active playlist
                     val intent = IptvPlayerActivity.createIntent(
                         context = context,
                         channelName = channel.name,
@@ -216,7 +217,8 @@ fun NavGraph(
                         channelLogo = channel.logo,
                         tvgId = channel.tvgId,
                         tvgName = channel.tvgName,
-                        group = channel.group
+                        group = channel.group,
+                        playlistChannels = playlistChannels
                     )
                     context.startActivity(intent)
                 },

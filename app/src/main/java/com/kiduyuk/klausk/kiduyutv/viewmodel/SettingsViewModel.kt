@@ -477,21 +477,13 @@ class SettingsViewModel : ViewModel() {
         }
     }
 
-    fun updateEpgUrl(url: String) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(epgUrl = url) }
-        }
-    }
-
     fun updateLiveTvData(context: Context) {
         if (_uiState.value.isUpdatingLiveTv) return
 
         val playlistUrl = _uiState.value.playlistUrl
-        val epgUrl = _uiState.value.epgUrl
-
-        if (playlistUrl.isBlank() && epgUrl.isBlank()) {
+        if (playlistUrl.isBlank()) {
             _uiState.update {
-                it.copy(liveTvUpdateError = "Please enter at least one URL (playlist or EPG)")
+                it.copy(liveTvUpdateError = "Please enter a playlist URL")
             }
             return
         }
@@ -506,7 +498,7 @@ class SettingsViewModel : ViewModel() {
         }
         viewModelScope.launch {
             try {
-                LiveTvCacheManager.updateLiveTvData(context, playlistUrl, epgUrl)
+                LiveTvCacheManager.updateLiveTvData(context, playlistUrl)
                 _uiState.update {
                     it.copy(
                         isUpdatingLiveTv = false,
@@ -812,7 +804,6 @@ data class SettingsUiState(
     val firebaseItemsSynced: Int? = null,
     // Live TV settings
     val playlistUrl: String = "",
-    val epgUrl: String = "",
     val isUpdatingLiveTv: Boolean = false,
     val liveTvUpdateSuccess: Boolean = false,
     val liveTvUpdateError: String? = null,

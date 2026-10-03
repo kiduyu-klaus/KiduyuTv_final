@@ -10,8 +10,8 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 /**
- * Manager for Live TV playlist and EPG data caching.
- * Handles downloading M3U playlists and XMLTV EPG files from URLs and saving them locally.
+ * Manager for Live TV playlist caching.
+ * Handles downloading M3U playlists and saving them locally.
  */
 object LiveTvCacheManager {
 
@@ -19,12 +19,10 @@ object LiveTvCacheManager {
 
     // File names for cached data
     private const val PLAYLIST_FILE_NAME = "live_tv_playlist.m3u"
-    private const val EPG_FILE_NAME = "live_tv_epg.xml"
 
     // SharedPreferences keys
     private const val PREFS_NAME = "live_tv_prefs"
     private const val KEY_PLAYLIST_URL = "playlist_url"
-    private const val KEY_EPG_URL = "epg_url"
     private const val KEY_LAST_UPDATED = "last_updated"
 
     private val httpClient = OkHttpClient.Builder()
@@ -40,29 +38,6 @@ object LiveTvCacheManager {
     }
 
     /**
-     * Get the local cached EPG file.
-     */
-    fun getEpgFile(context: Context): File {
-        return File(context.filesDir, EPG_FILE_NAME)
-    }
-
-    /**
-     * Get the saved playlist URL.
-     */
-    fun getSavedPlaylistUrl(context: Context): String {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getString(KEY_PLAYLIST_URL, "") ?: ""
-    }
-
-    /**
-     * Get the saved EPG URL.
-     */
-    fun getSavedEpgUrl(context: Context): String {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getString(KEY_EPG_URL, "") ?: ""
-    }
-
-    /**
      * Get the last updated timestamp.
      */
     fun getLastUpdated(context: Context): Long {
@@ -71,14 +46,12 @@ object LiveTvCacheManager {
     }
 
     /**
-     * Update Live TV data from URLs.
-     * Downloads and caches both playlist and EPG data.
+     * Update the Live TV playlist from its URL.
      *
      * @param context Android context
-     * @param playlistUrl M3U playlist URL (can be blank to skip)
-     * @param epgUrl XMLTV EPG URL (can be blank to skip)
+     * @param playlistUrl M3U playlist URL
      */
-    suspend fun updateLiveTvData(context: Context, playlistUrl: String, epgUrl: String) {
+    suspend fun updateLiveTvData(context: Context, playlistUrl: String) {
         withContext(Dispatchers.IO) {
             val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val editor = prefs.edit()
@@ -99,22 +72,6 @@ object LiveTvCacheManager {
                 }
             }
 
-            // Download and cache EPG
-            if (epgUrl.isNotBlank()) {
-                try {
-                    val epgContent = downloadContent(epgUrl)
-                    if (epgContent != null) {
-                        saveToFile(getEpgFile(context), epgContent)
-                        editor.putString(KEY_EPG_URL, epgUrl)
-                        Log.i(TAG, "EPG saved successfully from: $epgUrl")
-                    } else {
-                        Log.w(TAG, "Failed to download EPG from: $epgUrl")
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error downloading EPG", e)
-                }
-            }
-
             // Update last modified timestamp
             editor.putLong(KEY_LAST_UPDATED, System.currentTimeMillis())
             editor.apply()
@@ -129,16 +86,10 @@ object LiveTvCacheManager {
         withContext(Dispatchers.IO) {
             try {
                 val playlistFile = getPlaylistFile(context)
-                val epgFile = getEpgFile(context)
 
                 if (playlistFile.exists()) {
                     playlistFile.delete()
                     Log.i(TAG, "Playlist cache deleted")
-                }
-
-                if (epgFile.exists()) {
-                    epgFile.delete()
-                    Log.i(TAG, "EPG cache deleted")
                 }
 
                 // Clear saved URLs
@@ -198,18 +149,6 @@ object LiveTvCacheManager {
     fun hasPlaylist(context: Context): Boolean {
         return try {
             getPlaylistFile(context).exists() && getPlaylistFile(context).length() > 0
-        } catch (e: Exception) {
-            false
-        }
-    }
-
-    /**
-     * Check if EPG is cached.
-     * @param context Android context
-     */
-    fun hasEpg(context: Context): Boolean {
-        return try {
-            getEpgFile(context).exists() && getEpgFile(context).length() > 0
         } catch (e: Exception) {
             false
         }

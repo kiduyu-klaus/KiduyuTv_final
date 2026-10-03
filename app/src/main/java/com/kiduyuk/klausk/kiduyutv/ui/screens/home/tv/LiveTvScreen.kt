@@ -141,7 +141,7 @@ import kotlinx.coroutines.launch
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
 fun LiveTvScreen(
-    onChannelPlay: (IptvChannel) -> Unit,
+    onChannelPlay: (IptvChannel, List<IptvChannel>) -> Unit,
     onNavigate: (String) -> Unit = {},
     onSearchClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
@@ -160,8 +160,6 @@ fun LiveTvScreen(
     LaunchedEffect(Unit) {
         viewModel.initialize(context)
         viewModel.loadPlaylist()
-        // Pre-load EPG data for program info
-        viewModel.loadEpg()
         scheduleViewModel.initialize(context)
         scheduleViewModel.loadSchedule()
     }
@@ -169,7 +167,7 @@ fun LiveTvScreen(
     // Handle channel selection for playback
     LaunchedEffect(uiState.selectedChannel) {
         uiState.selectedChannel?.let { channel ->
-            onChannelPlay(channel)
+            onChannelPlay(channel, viewModel.getAllChannels())
             viewModel.clearSelectedChannel()
         }
     }

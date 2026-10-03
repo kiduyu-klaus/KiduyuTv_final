@@ -40,6 +40,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
@@ -82,12 +84,9 @@ import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.PlayerView
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.data.model.IptvChannel
-import com.kiduyuk.klausk.kiduyutv.data.repository.IptvRepository
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import com.kiduyuk.klausk.kiduyutv.viewmodel.LiveTvViewModel
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
@@ -119,12 +118,12 @@ class IptvPlayerActivity : AppCompatActivity() {
         const val EXTRA_STREAM_COOKIE = "stream_cookie"
         const val EXTRA_STREAM_MIME_TYPE = "stream_mime_type"
         const val EXTRA_RETURN_TO_SCHEDULE_ON_ERROR = "return_to_schedule_on_error"
+        const val EXTRA_PLAYLIST_CHANNELS = "playlist_channels"
         const val EXTRA_FAILED_STREAM_URL = "failed_stream_url"
         const val RESULT_PLAYBACK_FAILED = android.app.Activity.RESULT_FIRST_USER + 41
 
         private const val OVERLAY_HIDE_DELAY_MS = 5_000L //
         private const val SEEK_POLL_MS          =   500L
-        private const val PROGRAM_UPDATE_MS     = 60_000L // Update program info every minute
 
         /** Open this player from anywhere in the app. */
         fun createIntent(
@@ -138,7 +137,8 @@ class IptvPlayerActivity : AppCompatActivity() {
             requestHeaders: Map<String, String> = emptyMap(),
             cookie: String? = null,
             mimeType: String? = null,
-            returnToScheduleOnError: Boolean = false
+            returnToScheduleOnError: Boolean = false,
+            playlistChannels: List<IptvChannel> = emptyList()
         ) = Intent(context, IptvPlayerActivity::class.java).apply {
             putExtra(EXTRA_CHANNEL_NAME, channelName)
             putExtra(EXTRA_STREAM_URL,   streamUrl)
@@ -150,6 +150,7 @@ class IptvPlayerActivity : AppCompatActivity() {
             putExtra(EXTRA_STREAM_COOKIE, cookie)
             putExtra(EXTRA_STREAM_MIME_TYPE, mimeType)
             putExtra(EXTRA_RETURN_TO_SCHEDULE_ON_ERROR, returnToScheduleOnError)
+            putExtra(EXTRA_PLAYLIST_CHANNELS, JSONArray(playlistChannels.map { it.toJson() }).toString())
         }
     }
 
@@ -211,11 +212,7 @@ class IptvPlayerActivity : AppCompatActivity() {
     private var requestHeaders: Map<String, String> = emptyMap()
     private var streamCookie: String? = null
     private var streamMimeType: String? = null
-
-    // EPG Program info
-    private var currentProgramTitle: String? = null
-    private var currentProgramTime: String? = null
-    private var nextProgramTitle: String? = null
+    private var playlistChannels: List<IptvChannel> = emptyList()
 
     private var isOverlayVisible = true
     private var isLocked         = false
@@ -242,15 +239,6 @@ class IptvPlayerActivity : AppCompatActivity() {
         }
     }
 
-    private val programUpdateHandler = Handler(Looper.getMainLooper())
-    private val programUpdateRunnable = object : Runnable {
-        override fun run() {
-            loadEpgProgram()
-            programUpdateHandler.postDelayed(this, PROGRAM_UPDATE_MS)
-        }
-    }
-
-
     private val dpadTimeoutHandler = Handler(Looper.getMainLooper())
     private val dpadTimeoutRunnable = Runnable {
         isDpadNavigating = false
@@ -271,6 +259,7 @@ class IptvPlayerActivity : AppCompatActivity() {
         requestHeaders = parseRequestHeaders(intent.getStringExtra(EXTRA_REQUEST_HEADERS))
         streamCookie = intent.getStringExtra(EXTRA_STREAM_COOKIE)
         streamMimeType = intent.getStringExtra(EXTRA_STREAM_MIME_TYPE)
+        playlistChannels = parsePlaylistChannels(intent.getStringExtra(EXTRA_PLAYLIST_CHANNELS))
 
         Log.i(
             TAG,
@@ -303,8 +292,6 @@ class IptvPlayerActivity : AppCompatActivity() {
         wireLiveSeekBar()
         initPlayer()
 
-        // Load initial EPG program info
-        loadEpgProgram()
     }
 
     private fun parseRequestHeaders(encodedHeaders: String?): Map<String, String> {
@@ -328,7 +315,6 @@ class IptvPlayerActivity : AppCompatActivity() {
         player?.play()
         seekHandler.post(seekRunnable)
         scheduleHideOverlay()
-        programUpdateHandler.post(programUpdateRunnable)
     }
 
     override fun onResume() {
@@ -346,7 +332,6 @@ class IptvPlayerActivity : AppCompatActivity() {
         player?.pause()
         seekHandler.removeCallbacks(seekRunnable)
         hideHandler.removeCallbacks(hideRunnable)
-        programUpdateHandler.removeCallbacks(programUpdateRunnable)
     }
 
     override fun onDestroy() {
@@ -603,79 +588,31 @@ class IptvPlayerActivity : AppCompatActivity() {
             tvgName?.let { appendLine("TVG Name: $it") }
             channelGroup?.let { appendLine("Group: $it") }
             appendLine("Stream: $streamUrl")
-            if (currentProgramTitle != null) {
-                appendLine()
-                appendLine("Now Playing: $currentProgramTitle")
-                currentProgramTime?.let { appendLine("Time: $it") }
-            }
-            nextProgramTitle?.let { appendLine("Up Next: $it") }
         }
         Toast.makeText(this, info, Toast.LENGTH_LONG).show()
     }
 
-    // ── EPG Program Loading ──────────────────────────────────────────────────
-
-    /**
-     * Loads current program info from EPG for the current channel.
-     * Runs on IO dispatcher and updates UI on main thread.
-     */
-    private fun loadEpgProgram() {
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val channel = IptvChannel(
-                    name = channelName,
-                    logo = channelLogo,
-                    url = streamUrl,
-                    group = channelGroup,
-                    tvgId = tvgId,
-                    tvgName = tvgName
-                )
-
-                val programInfo = IptvRepository.getInstance()
-                    .getChannelProgramInfo(channel, this@IptvPlayerActivity)
-
-                val now = System.currentTimeMillis()
-                val current = programInfo.currentProgram
-                val next = programInfo.nextProgram
-
-                val programTitle = current?.title
-                val programTime = if (current != null) {
-                    "${formatTime(current.startTime)} - ${formatTime(current.endTime)}"
-                } else null
-
-                val upcomingTitle = next?.title
-
-                // Update UI on main thread
-                CoroutineScope(Dispatchers.Main).launch {
-                    currentProgramTitle = programTitle
-                    currentProgramTime = programTime
-                    nextProgramTitle = upcomingTitle
-
-                    // Update the top bar with program info
-                    if (programTitle != null) {
-                        tvLiveBadge.text = "● $programTitle"
-                        tvLiveBadge.setTextColor(0xFFFF4444.toInt())
-                    } else {
-                        tvLiveBadge.text = "● LIVE"
-                        tvLiveBadge.setTextColor(0xFFFF4444.toInt())
+    private fun parsePlaylistChannels(encodedChannels: String?): List<IptvChannel> {
+        if (encodedChannels.isNullOrBlank()) return emptyList()
+        return runCatching {
+            val array = JSONArray(encodedChannels)
+            buildList {
+                for (index in 0 until array.length()) {
+                    val item = array.optJSONObject(index) ?: continue
+                    val url = item.optString("url")
+                    if (url.isNotBlank()) {
+                        add(IptvChannel(
+                            name = item.optString("name", "Live channel"),
+                            logo = item.optString("logo").takeIf { it.isNotBlank() },
+                            url = url,
+                            group = item.optString("group").takeIf { it.isNotBlank() },
+                            tvgId = item.optString("tvgId").takeIf { it.isNotBlank() },
+                            tvgName = item.optString("tvgName").takeIf { it.isNotBlank() }
+                        ))
                     }
                 }
-            } catch (e: Exception) {
-                // Silently fail - EPG is optional
             }
-        }
-    }
-
-    /**
-     * Formats Unix timestamp to readable time string (HH:mm).
-     */
-    private fun formatTime(timestamp: Long): String {
-        if (timestamp <= 0) return ""
-        val calendar = java.util.Calendar.getInstance()
-        calendar.timeInMillis = timestamp
-        val hour = calendar.get(java.util.Calendar.HOUR_OF_DAY)
-        val minute = calendar.get(java.util.Calendar.MINUTE)
-        return String.format("%02d:%02d", hour, minute)
+        }.getOrDefault(emptyList())
     }
 
     // ── Overlay show/hide ────────────────────────────────────────────────────
@@ -852,9 +789,9 @@ class IptvPlayerActivity : AppCompatActivity() {
             scheduleHideOverlay()
         }
 
-        // ── Channel List → EPG Dialog ──────────────────────────────────────────
+        // ── Channel List → Playlist channels ───────────────────────────────────
         btnChannelList.setOnClickListener {
-            showEpgDialog()
+            showPlaylistDialog()
             scheduleHideOverlay()
         }
 
@@ -1265,65 +1202,48 @@ class IptvPlayerActivity : AppCompatActivity() {
         }
     }
 
-    /**
-     * Shows the EPG (Electronic Program Guide) dialog for the current channel.
-     * Displays program info fetched from EPG data.
-     */
-    private fun showEpgDialog() {
-        CoroutineScope(Dispatchers.Main).launch {
-            try {
-                // Build channel info
-                val channel = IptvChannel(
-                    name = channelName,
-                    logo = channelLogo,
-                    url = streamUrl,
-                    group = channelGroup,
-                    tvgId = tvgId,
-                    tvgName = tvgName
-                )
+    /** Shows the channels from the playlist that opened this player. */
+    private fun showPlaylistDialog() {
+        if (composeDialogView != null) return
+        val channels = if (playlistChannels.isEmpty()) {
+            listOf(IptvChannel(channelName, channelLogo, streamUrl, channelGroup, tvgId, tvgName))
+        } else playlistChannels
 
-                // Get EPG data for this channel
-                val programInfo = IptvRepository.getInstance()
-                    .getChannelProgramInfo(channel, this@IptvPlayerActivity)
-
-                val currentProgram = programInfo.currentProgram
-                val nextProgram = programInfo.nextProgram
-
-                // Build EPG message
-                val epgMessage = buildString {
-                    appendLine("Channel: $channelName")
-                    appendLine()
-                    if (currentProgram != null) {
-                        appendLine("Now Playing:")
-                        appendLine("  ${currentProgram.title}")
-                        appendLine("  ${formatTime(currentProgram.startTime)} - ${formatTime(currentProgram.endTime)}")
-                        appendLine()
-                    }
-                    if (nextProgram != null) {
-                        appendLine("Up Next:")
-                        appendLine("  ${nextProgram.title}")
-                        appendLine("  ${formatTime(nextProgram.startTime)} - ${formatTime(nextProgram.endTime)}")
-                    }
-                    if (currentProgram == null && nextProgram == null) {
-                        append("No program information available.")
-                    }
+        composeDialogView = ComposeView(this).apply {
+            layoutParams = ConstraintLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            setContent {
+                MaterialTheme {
+                    PlaylistChannelDialog(
+                        channels = channels,
+                        selectedUrl = streamUrl,
+                        onChannelSelected = { selected ->
+                            dismissComposeDialog()
+                            if (selected.url != streamUrl) {
+                                startActivity(createIntent(
+                                    context = this@IptvPlayerActivity,
+                                    channelName = selected.name,
+                                    streamUrl = selected.url,
+                                    channelLogo = selected.logo,
+                                    tvgId = selected.tvgId,
+                                    tvgName = selected.tvgName,
+                                    group = selected.group,
+                                    requestHeaders = requestHeaders,
+                                    cookie = streamCookie,
+                                    mimeType = streamMimeType,
+                                    playlistChannels = channels
+                                ))
+                                finish()
+                            }
+                        },
+                        onDismissRequest = { dismissComposeDialog() }
+                    )
                 }
-
-                // Show the dialog
-                QuitDialog(
-                    context             = this@IptvPlayerActivity,
-                    title               = "Program Guide",
-                    message             = epgMessage,
-                    positiveButtonText  = "Close",
-                    negativeButtonText  = "Retry",
-                    lottieAnimRes       = R.raw.exit,
-                    onNo                = { },
-                    onYes               = {finish() }
-                ).show()
-            } catch (e: Exception) {
-                Toast.makeText(this@IptvPlayerActivity, "Failed to load program info", Toast.LENGTH_SHORT).show()
             }
         }
+        rootLayout.addView(composeDialogView)
     }
 
     private fun releasePlayer() {
@@ -1398,6 +1318,83 @@ class IptvPlayerActivity : AppCompatActivity() {
             hide(WindowInsetsCompat.Type.systemBars())
         }
     }
+}
+
+private fun IptvChannel.toJson(): JSONObject = JSONObject().apply {
+    put("name", name)
+    put("logo", logo)
+    put("url", url)
+    put("group", group)
+    put("tvgId", tvgId)
+    put("tvgName", tvgName)
+}
+
+// ============================================================================
+// COMPOSE — Playlist channel picker
+// ============================================================================
+
+@Composable
+fun PlaylistChannelDialog(
+    channels: List<IptvChannel>,
+    selectedUrl: String,
+    onChannelSelected: (IptvChannel) -> Unit,
+    onDismissRequest: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        title = { Text("Playlist channels", color = Color.White) },
+        text = {
+            if (channels.isEmpty()) {
+                Text("No channels are available in this playlist.", color = Color.White)
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 480.dp)
+                ) {
+                    itemsIndexed(channels, key = { _, channel -> channel.id }) { _, channel ->
+                        val isSelected = channel.url == selectedUrl
+                        Card(
+                            onClick = { onChannelSelected(channel) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isSelected) Color(0xFF3D1F24) else Color(0xFF242424)
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = channel.name,
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.titleSmall
+                                    )
+                                    channel.group?.takeIf { it.isNotBlank() }?.let { group ->
+                                        Text(
+                                            text = group,
+                                            color = Color.LightGray,
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                }
+                                if (isSelected) {
+                                    Text("PLAYING", color = Color(0xFFFF5A66), style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismissRequest) { Text("Close", color = Color(0xFFFF5A66)) }
+        },
+        containerColor = Color(0xFF1C1B1F)
+    )
 }
 
 // ============================================================================

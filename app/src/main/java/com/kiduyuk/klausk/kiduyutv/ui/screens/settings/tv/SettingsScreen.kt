@@ -340,20 +340,18 @@ fun SettingsScreen(
                         },
                         // Live TV
                         playlistUrl = uiState.playlistUrl,
-                        epgUrl = uiState.epgUrl,
                         isUpdatingLiveTv = uiState.isUpdatingLiveTv,
                         liveTvUpdateSuccess = uiState.liveTvUpdateSuccess,
                         liveTvUpdateError = uiState.liveTvUpdateError,
                         isClearingLiveTvCache = uiState.isClearingLiveTvCache,
                         liveTvClearSuccess = uiState.liveTvClearSuccess,
                         onPlaylistUrlChange = { viewModel.updatePlaylistUrl(it) },
-                        onEpgUrlChange = { viewModel.updateEpgUrl(it) },
                         onUpdateLiveTvClick = { viewModel.updateLiveTvData(context) },
                         onClearLiveTvCacheClick = {
                             QuitDialog(
                                 context = context,
                                 title = "Clear Live TV Cache?",
-                                message = "Are you sure you want to clear the saved Live TV playlist and EPG data? This action cannot be undone.",
+                                message = "Are you sure you want to clear the saved Live TV playlist data? This action cannot be undone.",
                                 positiveButtonText = "Clear",
                                 negativeButtonText = "Cancel",
                                 lottieAnimRes = R.raw.exit,
@@ -668,14 +666,12 @@ private fun AppSettingsContent(
     onClearWatchHistoryClick: () -> Unit,
     // Live TV
     playlistUrl: String,
-    epgUrl: String,
     isUpdatingLiveTv: Boolean,
     liveTvUpdateSuccess: Boolean,
     liveTvUpdateError: String?,
     isClearingLiveTvCache: Boolean,
     liveTvClearSuccess: Boolean,
     onPlaylistUrlChange: (String) -> Unit,
-    onEpgUrlChange: (String) -> Unit,
     onUpdateLiveTvClick: () -> Unit,
     onClearLiveTvCacheClick: () -> Unit,
     // Scrape Channels
@@ -1827,14 +1823,12 @@ private fun SettingsActionCard(
 @Composable
 private fun LiveTvSettingsCard(
     playlistUrl: String,
-    epgUrl: String,
     isUpdatingLiveTv: Boolean,
     updateSuccess: Boolean,
     updateError: String?,
     isClearingCache: Boolean,
     clearSuccess: Boolean,
     onPlaylistUrlChange: (String) -> Unit,
-    onEpgUrlChange: (String) -> Unit,
     onUpdateClick: () -> Unit,
     onClearCacheClick: () -> Unit,
     // Scrape Channels
@@ -1846,14 +1840,10 @@ private fun LiveTvSettingsCard(
     onRefreshScrapedChannelsClick: () -> Unit
 ) {
     var playlistText by remember { mutableStateOf(playlistUrl) }
-    var epgText by remember { mutableStateOf(epgUrl) }
 
     // Update local state when prop changes
     LaunchedEffect(playlistUrl) {
         playlistText = playlistUrl
-    }
-    LaunchedEffect(epgUrl) {
-        epgText = epgUrl
     }
 
     Column(
@@ -1866,7 +1856,7 @@ private fun LiveTvSettingsCard(
     ) {
         // Description
         Text(
-            text = "Configure your Live TV playlist and EPG (TV guide) data by providing URLs to M3U playlist and XMLTV EPG files.",
+            text = "Configure your Live TV playlist by providing an M3U URL.",
             color = TextSecondary,
             fontSize = 14.sp,
             lineHeight = 20.sp
@@ -1887,24 +1877,6 @@ private fun LiveTvSettingsCard(
                     onPlaylistUrlChange(it)
                 },
                 placeholder = "https://example.com/playlist.m3u"
-            )
-        }
-
-        // EPG URL input
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                text = "EPG URL (XMLTV)",
-                color = TextPrimary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
-            )
-            UrlInputField(
-                value = epgText,
-                onValueChange = {
-                    epgText = it
-                    onEpgUrlChange(it)
-                },
-                placeholder = "https://example.com/epg.xml"
             )
         }
 
@@ -4123,14 +4095,12 @@ private fun PreviewAppSettingsIdle() {
                 onClearWatchHistoryClick = {},
                 // Live TV
                 playlistUrl = "https://example.com/playlist.m3u",
-                epgUrl = "https://example.com/epg.xml",
                 isUpdatingLiveTv = false,
                 liveTvUpdateSuccess = false,
                 liveTvUpdateError = null,
                 isClearingLiveTvCache = false,
                 liveTvClearSuccess = false,
                 onPlaylistUrlChange = {},
-                onEpgUrlChange = {},
                 onUpdateLiveTvClick = {},
                 onClearLiveTvCacheClick = {},
                 // Scrape Channels
@@ -4184,14 +4154,12 @@ private fun PreviewAppSettingsCacheClearing() {
                 onClearWatchHistoryClick = {},
                 // Live TV
                 playlistUrl = "https://example.com/playlist.m3u",
-                epgUrl = "https://example.com/epg.xml",
                 isUpdatingLiveTv = false,
                 liveTvUpdateSuccess = false,
                 liveTvUpdateError = null,
                 isClearingLiveTvCache = false,
                 liveTvClearSuccess = false,
                 onPlaylistUrlChange = {},
-                onEpgUrlChange = {},
                 onUpdateLiveTvClick = {},
                 onClearLiveTvCacheClick = {},
                 // Scrape Channels
@@ -4245,14 +4213,12 @@ private fun PreviewAppSettingsAllSuccess() {
                 onClearWatchHistoryClick = {},
                 // Live TV
                 playlistUrl = "https://example.com/playlist.m3u",
-                epgUrl = "https://example.com/epg.xml",
                 isUpdatingLiveTv = false,
                 liveTvUpdateSuccess = true,
                 liveTvUpdateError = null,
                 isClearingLiveTvCache = false,
                 liveTvClearSuccess = true,
                 onPlaylistUrlChange = {},
-                onEpgUrlChange = {},
                 onUpdateLiveTvClick = {},
                 onClearLiveTvCacheClick = {},
                 // Scrape Channels
