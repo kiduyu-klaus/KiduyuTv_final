@@ -743,6 +743,12 @@ data class MovieImagesResponse(
     @SerializedName("posters") val posters: List<MovieImage>?
 )
 
+/** Response for the TV episode still-image endpoint. */
+data class EpisodeImagesResponse(
+    @SerializedName("id") val id: Int,
+    @SerializedName("stills") val stills: List<MovieImage>?
+)
+
 /**
  * Response for the person images endpoint
  */

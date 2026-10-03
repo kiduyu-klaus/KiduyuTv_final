@@ -377,7 +377,40 @@ fun MobileNavGraph(
                 episodeNumber = backStackEntry.arguments?.getInt("episode") ?: 1,
                 tvShowName = backStackEntry.arguments?.getString("tvShowName") ?: "",
                 onBackClick = { navController.popBackStack() },
-                onPlayClick = { route -> navController.navigate(route) }
+                onPlayClick = { route -> navController.navigate(route) },
+                onCastClick = { cast ->
+                    navController.navigate(
+                        Screen.CastDetail.createRoute(
+                            castId = cast.id,
+                            castName = cast.name,
+                            character = cast.character,
+                            profilePath = cast.profilePath,
+                            knownForDepartment = cast.knownForDepartment
+                        )
+                    )
+                },
+                onCrewClick = { crew ->
+                    navController.navigate(
+                        Screen.CastDetail.createRoute(
+                            castId = crew.id,
+                            castName = crew.name,
+                            character = crew.job,
+                            profilePath = crew.profilePath,
+                            knownForDepartment = crew.department
+                        )
+                    )
+                },
+                onImagesClick = {
+                    navController.navigate(
+                        Screen.MovieImages.createRoute(
+                            movieId = backStackEntry.arguments?.getInt("tvId") ?: 0,
+                            movieTitle = "${backStackEntry.arguments?.getString("tvShowName") ?: "Episode"} S${backStackEntry.arguments?.getInt("season") ?: 1}E${backStackEntry.arguments?.getInt("episode") ?: 1}",
+                            isTvShow = true,
+                            season = backStackEntry.arguments?.getInt("season") ?: 1,
+                            episode = backStackEntry.arguments?.getInt("episode") ?: 1
+                        )
+                    )
+                }
             )
         }
 
@@ -591,15 +624,23 @@ fun MobileNavGraph(
             route = Screen.MovieImages.route,
             arguments = listOf(
                 navArgument("movieId") { type = NavType.IntType },
-                navArgument("movieTitle") { type = NavType.StringType }
+                navArgument("movieTitle") { type = NavType.StringType },
+                navArgument("isTvShow") { type = NavType.BoolType; defaultValue = false },
+                navArgument("season") { type = NavType.IntType; defaultValue = 0 },
+                navArgument("episode") { type = NavType.IntType; defaultValue = 0 }
             )
         ) { backStackEntry ->
             val movieId = backStackEntry.arguments?.getInt("movieId") ?: 0
             val movieTitle = backStackEntry.arguments?.getString("movieTitle") ?: ""
+            val isTvShow = backStackEntry.arguments?.getBoolean("isTvShow") ?: false
+            val season = backStackEntry.arguments?.getInt("season") ?: 0
+            val episode = backStackEntry.arguments?.getInt("episode") ?: 0
             MobileImagesScreen(
                 mediaId = movieId,
                 title = Uri.decode(movieTitle),
-                isTv = false,
+                isTv = isTvShow,
+                seasonNumber = season.takeIf { it > 0 },
+                episodeNumber = episode.takeIf { it > 0 },
                 onBackClick = { navController.popBackStack() },
                 onImageClick = { initialIndex, imageUrls ->
                     navController.navigate(Screen.ImageSlider.createRoute(initialIndex, imageUrls))

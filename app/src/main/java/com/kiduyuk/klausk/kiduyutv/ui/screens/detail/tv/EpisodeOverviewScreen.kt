@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -43,6 +44,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.data.model.Episode
+import com.kiduyuk.klausk.kiduyutv.data.model.CastMember
+import com.kiduyuk.klausk.kiduyutv.data.model.CrewMember
 import com.kiduyuk.klausk.kiduyutv.ui.components.CastRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.CrewRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
@@ -62,6 +65,9 @@ fun EpisodeOverviewScreen(
     tvShowName: String,
     onBackClick: () -> Unit,
     onPlayClick: (String) -> Unit,
+    onCastClick: (CastMember) -> Unit,
+    onCrewClick: (CrewMember) -> Unit,
+    onImagesClick: () -> Unit,
     viewModel: EpisodeOverviewViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -102,7 +108,10 @@ fun EpisodeOverviewScreen(
                             episode = episodeNumber
                         )
                     )
-                }
+                },
+                onCastClick = onCastClick,
+                onCrewClick = onCrewClick,
+                onImagesClick = onImagesClick
             )
             else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(state.error ?: "Episode details unavailable", color = TextSecondary)
@@ -118,10 +127,13 @@ private fun EpisodeOverviewContent(
     backdropPath: String?,
     genres: List<String>,
     networks: List<String>,
-    crew: List<com.kiduyuk.klausk.kiduyutv.data.model.CrewMember>,
-    cast: List<com.kiduyuk.klausk.kiduyutv.data.model.CastMember>,
+    crew: List<CrewMember>,
+    cast: List<CastMember>,
     onBackClick: () -> Unit,
-    onPlayClick: () -> Unit
+    onPlayClick: () -> Unit,
+    onCastClick: (CastMember) -> Unit,
+    onCrewClick: (CrewMember) -> Unit,
+    onImagesClick: () -> Unit
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp)) {
         item {
@@ -178,23 +190,35 @@ private fun EpisodeOverviewContent(
                 Spacer(Modifier.height(14.dp))
                 Text(episode.overview?.takeIf { it.isNotBlank() } ?: "No description available.", color = TextSecondary, lineHeight = 20.sp)
                 Spacer(Modifier.height(16.dp))
-                Button(
-                    onClick = onPlayClick,
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryRed),
-                    shape = RoundedCornerShape(5.dp),
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp)
-                ) {
-                    Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Play")
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(
+                        onClick = onPlayClick,
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryRed),
+                        shape = RoundedCornerShape(5.dp),
+                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp)
+                    ) {
+                        Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Play")
+                    }
+                    Button(
+                        onClick = onImagesClick,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3A3A3A)),
+                        shape = RoundedCornerShape(5.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
+                    ) {
+                        Icon(Icons.Default.Image, "Posters", modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Posters")
+                    }
                 }
             }
         }
         if (crew.isNotEmpty()) {
-            item { CrewRow(title = "Writing & Production", crew = crew, onCrewClick = {}) }
+            item { CrewRow(title = "Writing & Production", crew = crew, onCrewClick = onCrewClick) }
         }
         if (cast.isNotEmpty()) {
-            item { CastRow(title = "Cast", cast = cast, onCastClick = {}) }
+            item { CastRow(title = "Cast", cast = cast, onCastClick = onCastClick) }
         }
     }
 }

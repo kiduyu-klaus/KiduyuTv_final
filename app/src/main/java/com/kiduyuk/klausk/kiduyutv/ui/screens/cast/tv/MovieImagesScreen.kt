@@ -60,11 +60,18 @@ class MovieImagesViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(MovieImagesUiState())
     val uiState: StateFlow<MovieImagesUiState> = _uiState.asStateFlow()
 
-    fun loadMediaImages(mediaId: Int, isTvShow: Boolean) {
+    fun loadMediaImages(
+        mediaId: Int,
+        isTvShow: Boolean,
+        seasonNumber: Int? = null,
+        episodeNumber: Int? = null
+    ) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-            val result = if (isTvShow) {
+            val result = if (isTvShow && seasonNumber != null && episodeNumber != null) {
+                repository.getEpisodeImages(mediaId, seasonNumber, episodeNumber)
+            } else if (isTvShow) {
                 repository.getTvShowImages(mediaId)
             } else {
                 repository.getMovieImages(mediaId)
@@ -98,6 +105,8 @@ fun MovieImagesScreen(
     movieId: Int,
     movieTitle: String,
     isTvShow: Boolean = false,
+    seasonNumber: Int? = null,
+    episodeNumber: Int? = null,
     onBackClick: () -> Unit,
     onImageClick: (initialIndex: Int, imageUrls: List<String>) -> Unit,
     viewModel: MovieImagesViewModel = remember { MovieImagesViewModel() }
@@ -111,8 +120,8 @@ fun MovieImagesScreen(
     val minCardWidth = 100.dp
     val actualColumns = maxOf(4, minOf(8, ((availableWidth + spacing) / (minCardWidth + spacing)).toInt()))
 
-    LaunchedEffect(movieId, isTvShow) {
-        viewModel.loadMediaImages(movieId, isTvShow)
+    LaunchedEffect(movieId, isTvShow, seasonNumber, episodeNumber) {
+        viewModel.loadMediaImages(movieId, isTvShow, seasonNumber, episodeNumber)
     }
 
     Box(
@@ -136,7 +145,11 @@ fun MovieImagesScreen(
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "$movieTitle Images",
+                    text = if (seasonNumber != null && episodeNumber != null) {
+                        "$movieTitle Stills"
+                    } else {
+                        "$movieTitle Images"
+                    },
                     style = MaterialTheme.typography.headlineMedium,
                     color = TextPrimary
                 )

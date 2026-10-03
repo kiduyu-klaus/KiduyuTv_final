@@ -38,8 +38,9 @@ class EpisodeOverviewViewModel : ViewModel() {
                 val episode = episodeDeferred.await().getOrElse { throw it }
                 val tvShow = showDeferred.await().getOrNull()
                 val crewJobs = listOf(
-                    "Screenplay", "Writer", "Story", "Producer", "Executive Producer",
-                    "Co-Producer", "Line Producer"
+                    "Screenplay", "Writer", "Story", "Director", "Series Director",
+                    "Co-Director", "Producer", "Executive Producer", "Co-Producer",
+                    "Line Producer", "Production Manager", "Production Supervisor"
                 )
                 val crew = episode.crew
                     .filter { member -> crewJobs.any { it.equals(member.job, ignoreCase = true) } }

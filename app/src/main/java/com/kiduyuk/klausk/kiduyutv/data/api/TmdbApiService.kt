@@ -2,6 +2,7 @@ package com.kiduyuk.klausk.kiduyutv.data.api
 
 import com.kiduyuk.klausk.kiduyutv.data.model.CollectionDetail
 import com.kiduyuk.klausk.kiduyutv.data.model.Episode
+import com.kiduyuk.klausk.kiduyutv.data.model.EpisodeImagesResponse
 import com.kiduyuk.klausk.kiduyutv.data.model.GenreResponse
 import com.kiduyuk.klausk.kiduyutv.data.model.MovieCreditsResponse
 import com.kiduyuk.klausk.kiduyutv.data.model.MovieDetail
@@ -194,6 +195,15 @@ interface TmdbApiService {
         @Path("season_number") seasonNumber: Int,
         @Path("episode_number") episodeNumber: Int
     ): Episode
+
+    /** Fetches still/backdrop images for a specific TV episode. */
+    @GET("tv/{tv_id}/season/{season_number}/episode/{episode_number}/images")
+    suspend fun getEpisodeImages(
+        @Path("tv_id") tvId: Int,
+        @Path("season_number") seasonNumber: Int,
+        @Path("episode_number") episodeNumber: Int,
+        @Query("include_image_language") includeImageLanguage: String = "en,null"
+    ): EpisodeImagesResponse
 
     /** Fetches the list of available movie genres. */
     @GET("genre/movie/list")

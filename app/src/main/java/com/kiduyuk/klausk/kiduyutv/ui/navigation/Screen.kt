@@ -69,10 +69,16 @@ sealed class Screen(val route: String) {
         }
     }
 
-    object MovieImages : Screen("movie_images/{movieId}/{movieTitle}") {
-        fun createRoute(movieId: Int, movieTitle: String): String {
+    object MovieImages : Screen("movie_images/{movieId}/{movieTitle}?isTvShow={isTvShow}&season={season}&episode={episode}") {
+        fun createRoute(
+            movieId: Int,
+            movieTitle: String,
+            isTvShow: Boolean = false,
+            season: Int? = null,
+            episode: Int? = null
+        ): String {
             val encodedTitle = android.net.Uri.encode(movieTitle)
-            return "movie_images/$movieId/$encodedTitle"
+            return "movie_images/$movieId/$encodedTitle?isTvShow=$isTvShow&season=${season ?: 0}&episode=${episode ?: 0}"
         }
     }
 

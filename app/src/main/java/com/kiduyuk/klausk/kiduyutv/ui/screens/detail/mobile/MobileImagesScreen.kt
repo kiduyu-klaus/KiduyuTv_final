@@ -50,11 +50,18 @@ class MobileImagesViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(MobileImagesUiState())
     val uiState: StateFlow<MobileImagesUiState> = _uiState.asStateFlow()
 
-    fun loadImages(mediaId: Int, isTv: Boolean) {
+    fun loadImages(
+        mediaId: Int,
+        isTv: Boolean,
+        seasonNumber: Int? = null,
+        episodeNumber: Int? = null
+    ) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
 
-            val result = if (isTv) {
+            val result = if (isTv && seasonNumber != null && episodeNumber != null) {
+                repository.getEpisodeImages(mediaId, seasonNumber, episodeNumber)
+            } else if (isTv) {
                 repository.getTvShowImages(mediaId)
             } else {
                 repository.getMovieImages(mediaId)
@@ -88,6 +95,8 @@ fun MobileImagesScreen(
     mediaId: Int,
     title: String,
     isTv: Boolean,
+    seasonNumber: Int? = null,
+    episodeNumber: Int? = null,
     onBackClick: () -> Unit,
     onImageClick: (initialIndex: Int, imageUrls: List<String>) -> Unit,
     viewModel: MobileImagesViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
@@ -97,8 +106,8 @@ fun MobileImagesScreen(
 
     BackHandler(onBack = handleBackClick)
 
-    LaunchedEffect(mediaId, isTv) {
-        viewModel.loadImages(mediaId, isTv)
+    LaunchedEffect(mediaId, isTv, seasonNumber, episodeNumber) {
+        viewModel.loadImages(mediaId, isTv, seasonNumber, episodeNumber)
     }
 
     Column(
@@ -107,7 +116,11 @@ fun MobileImagesScreen(
             .background(BackgroundDark)
     ) {
         MobileMediaHeader(
-            title = "$title Images",
+            title = if (seasonNumber != null && episodeNumber != null) {
+                "$title Stills"
+            } else {
+                "$title Images"
+            },
             onBackClick = handleBackClick
         )
 

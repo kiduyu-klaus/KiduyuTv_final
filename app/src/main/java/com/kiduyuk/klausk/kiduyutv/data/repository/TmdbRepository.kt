@@ -349,6 +349,17 @@ class TmdbRepository {
         api.getEpisodeDetails(tvId, seasonNumber, episodeNumber)
     }
 
+    /** Fetches all language-neutral and English stills for a TV episode. */
+    suspend fun getEpisodeImages(
+        tvId: Int,
+        seasonNumber: Int,
+        episodeNumber: Int
+    ): Result<List<MovieImage>> = runCatching {
+        api.getEpisodeImages(tvId, seasonNumber, episodeNumber)
+            .stills.orEmpty()
+            .filter(::isEnglishOrLanguageNeutralImage)
+    }
+
     /**
      * Fetches the canonical runtime (in minutes) for a single TV episode from
      * TMDB's `tv/{tv_id}/season/{season_number}/episode/{episode_number}`

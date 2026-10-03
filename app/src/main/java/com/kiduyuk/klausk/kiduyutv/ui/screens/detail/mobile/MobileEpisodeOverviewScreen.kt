@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -44,6 +45,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.data.model.Episode
+import com.kiduyuk.klausk.kiduyutv.data.model.CastMember
+import com.kiduyuk.klausk.kiduyutv.data.model.CrewMember
 import com.kiduyuk.klausk.kiduyutv.ui.components.CastRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.CrewRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.rememberPhoneInterstitialBackClick
@@ -64,6 +67,9 @@ fun MobileEpisodeOverviewScreen(
     tvShowName: String,
     onBackClick: () -> Unit,
     onPlayClick: (String) -> Unit,
+    onCastClick: (CastMember) -> Unit,
+    onCrewClick: (CrewMember) -> Unit,
+    onImagesClick: () -> Unit,
     viewModel: EpisodeOverviewViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -100,7 +106,10 @@ fun MobileEpisodeOverviewScreen(
                             episode = episodeNumber
                         )
                     )
-                }
+                },
+                onCastClick = onCastClick,
+                onCrewClick = onCrewClick,
+                onImagesClick = onImagesClick
             )
             else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(state.error ?: "Episode details unavailable", color = TextSecondary)
@@ -116,10 +125,13 @@ private fun MobileEpisodeOverviewContent(
     backdropPath: String?,
     genres: List<String>,
     networks: List<String>,
-    crew: List<com.kiduyuk.klausk.kiduyutv.data.model.CrewMember>,
-    cast: List<com.kiduyuk.klausk.kiduyutv.data.model.CastMember>,
+    crew: List<CrewMember>,
+    cast: List<CastMember>,
     onBackClick: () -> Unit,
-    onPlayClick: () -> Unit
+    onPlayClick: () -> Unit,
+    onCastClick: (CastMember) -> Unit,
+    onCrewClick: (CrewMember) -> Unit,
+    onImagesClick: () -> Unit
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 28.dp)) {
         item {
@@ -156,15 +168,30 @@ private fun MobileEpisodeOverviewContent(
                     episode.runtime?.takeIf { it > 0 }?.let { Text("${it}m", color = TextSecondary) }
                 }
                 Spacer(Modifier.height(16.dp))
-                Button(
-                    onClick = onPlayClick,
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryRed),
-                    shape = RoundedCornerShape(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Icon(Icons.Default.PlayArrow, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Play")
+                    Button(
+                        onClick = onPlayClick,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryRed),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.PlayArrow, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Play")
+                    }
+                    Button(
+                        onClick = onImagesClick,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = CardDark),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.Image, "Posters")
+                        Spacer(Modifier.width(8.dp))
+                        Text("Posters")
+                    }
                 }
                 Spacer(Modifier.height(18.dp))
                 Text(episode.overview?.takeIf { it.isNotBlank() } ?: "No description available.", color = TextSecondary, lineHeight = 20.sp)
@@ -194,7 +221,7 @@ private fun MobileEpisodeOverviewContent(
                 }
             }
         }
-        if (crew.isNotEmpty()) item { CrewRow(title = "Writing & Production", crew = crew, onCrewClick = {}) }
-        if (cast.isNotEmpty()) item { CastRow(title = "Cast", cast = cast, onCastClick = {}) }
+        if (crew.isNotEmpty()) item { CrewRow(title = "Writing & Production", crew = crew, onCrewClick = onCrewClick) }
+        if (cast.isNotEmpty()) item { CastRow(title = "Cast", cast = cast, onCastClick = onCastClick) }
     }
 }
