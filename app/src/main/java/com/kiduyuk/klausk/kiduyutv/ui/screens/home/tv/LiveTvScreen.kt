@@ -134,7 +134,7 @@ import kotlinx.coroutines.launch
  * @param onNavigate Lambda to handle navigation between top-level screens
  * @param onSearchClick Lambda to navigate to the search screen
  * @param onSettingsClick Lambda to navigate to the settings screen
- * @param initialTab Index of the tab to show initially (0 for Live TV, 1 for Schedule)
+ * @param initialTab Index of the tab to show initially (0 for Live TV, 1 for Schedule, 2 for Daddylive)
  * @param viewModel The [LiveTvViewModel] instance
  * @param scheduleViewModel The [ScheduleViewModel] instance
  */
@@ -154,7 +154,43 @@ fun LiveTvScreen(
     val favoriteChannels by viewModel.favoriteChannels.collectAsState()
     val scheduleUiState by scheduleViewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val daddyliveScope = rememberCoroutineScope()
     var favoriteChannelToConfirm by remember { mutableStateOf<IptvChannel?>(null) }
+    var daddyliveChannels by remember { mutableStateOf<List<IptvChannel>>(emptyList()) }
+    var daddyliveIsLoading by remember { mutableStateOf(false) }
+    var daddyliveError by remember { mutableStateOf<String?>(null) }
+    var daddyliveHasLoaded by remember { mutableStateOf(false) }
+
+    fun loadDaddyliveChannels() {
+        if (daddyliveIsLoading) return
+
+        daddyliveScope.launch {
+            daddyliveIsLoading = true
+            daddyliveError = null
+
+            val result = ChannelScraper.fetchChannels(fetchStreamUrls = false)
+            val scrapedChannels = result.getOrNull()
+            if (scrapedChannels != null) {
+                ScrapedChannelsCache.saveChannels(context, scrapedChannels)
+                daddyliveChannels = scrapedChannels.map { it.toIptvChannel() }
+                daddyliveHasLoaded = true
+                if (daddyliveChannels.isEmpty()) {
+                    daddyliveError = "No Daddylive channels were found. Please try again."
+                }
+            } else {
+                val cachedChannels = ScrapedChannelsCache.loadChannels(context)
+                    .filter { it.watchPageUrl.startsWith("https://dlive.sx/") }
+                daddyliveChannels = cachedChannels.map { it.toIptvChannel() }
+                daddyliveHasLoaded = true
+                daddyliveError = if (daddyliveChannels.isEmpty()) {
+                    result.exceptionOrNull()?.message ?: "Unable to load Daddylive channels."
+                } else {
+                    null
+                }
+            }
+            daddyliveIsLoading = false
+        }
+    }
 
     // Initialize ViewModels with context
     LaunchedEffect(Unit) {
@@ -186,11 +222,15 @@ fun LiveTvScreen(
         ) {
             scheduleViewModel.loadSchedule()
         }
+        if (selectedTabIndex == 2 && !daddyliveHasLoaded) {
+            loadDaddyliveChannels()
+        }
     }
 
     val tabs = listOf(
         TabItem("Live TV", Icons.Default.Tv),
         TabItem("Schedule", Icons.Default.CalendarToday),
+        TabItem("Daddylive", Icons.Default.PlayCircle),
         TabItem("My Channels (${favoriteChannels.size})", Icons.Default.List)
     )
 
@@ -242,7 +282,25 @@ fun LiveTvScreen(
                         }
                     )
                 }
-                2 -> { // My Channels (favorited)
+                2 -> { // Daddylive Tab
+                    DaddyLiveTabContent(
+                        channels = daddyliveChannels,
+                        isLoading = daddyliveIsLoading,
+                        error = daddyliveError,
+                        onScrape = { loadDaddyliveChannels() },
+                        onChannelClick = { channel ->
+                            context.startActivity(
+                                SchedulePlayerActivity.createIntent(
+                                    context = context,
+                                    channelId = channel.id,
+                                    channelName = channel.name,
+                                    eventTitle = channel.name
+                                )
+                            )
+                        }
+                    )
+                }
+                3 -> { // My Channels (favorited)
                     // Trigger two-way sync when user views My Channels tab
                     LaunchedEffect(Unit) {
                         viewModel.syncFavoriteChannelsWithFirebase()

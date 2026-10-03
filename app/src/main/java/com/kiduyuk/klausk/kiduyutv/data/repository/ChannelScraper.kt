@@ -8,11 +8,11 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 
 /**
- * Repository for scraping live TV channels from dlstreams.st
+ * Repository for scraping live TV channels from dlive.sx
  * Uses Jsoup for HTML parsing
  *
  * Correct flow:
- * 1. Load https://dlstreams.st/24-7-channels.php
+ * 1. Load https://dlive.sx/24-7-channels.php
  * 2. Inside div.grid, get all a tags with class="card"
  * 3. Save href as watchPageUrl, div.card__title text as name, id from link, category="Channels"
  * 4. When channel is clicked, open watchPageUrl, get iframeUrls from button data-url in div#playerBtns
@@ -21,7 +21,7 @@ import org.jsoup.nodes.Document
 object ChannelScraper {
 
     private const val TAG = "ChannelScraper"
-    private const val BASE_URL = "https://dlstreams.st"
+    private const val BASE_URL = "https://dlive.sx"
     private const val CHANNELS_URL = "$BASE_URL/24-7-channels.php"
     private const val TIMEOUT_MS = 15000
 
