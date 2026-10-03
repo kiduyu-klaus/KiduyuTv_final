@@ -675,10 +675,17 @@ private fun BiographyDialog(
 ) {
     val scrollState = rememberScrollState()
     val focusRequester = remember { FocusRequester() }
+    val closeFocusRequester = remember { FocusRequester() }
     val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
+    }
+
+    LaunchedEffect(scrollState.value, scrollState.maxValue) {
+        if (scrollState.maxValue > 0 && scrollState.value >= scrollState.maxValue) {
+            closeFocusRequester.requestFocus()
+        }
     }
 
     Dialog(
@@ -751,7 +758,10 @@ private fun BiographyDialog(
                         .padding(16.dp),
                     horizontalArrangement = Arrangement.End
                 ) {
-                    TextButton(onClick = onDismiss) {
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.focusRequester(closeFocusRequester)
+                    ) {
                         Text(
                             text = "Close",
                             color = PrimaryRed,
