@@ -71,12 +71,25 @@ object ConsentManager {
                     // non-personalized requests. A form/load error is not
                     // permission to initialize an advertising SDK.
                     consentResolved = formError == null
+                    Log.i(
+                        TAG,
+                        "Consent form flow completed: resolved=$consentResolved " +
+                            "canRequestAds=${canRequestAds(activity)}"
+                    )
                     onConsentGatheringCompleteListener.consentGatheringComplete(formError)
                 }
             },
             { formError ->
-                consentResolved = false
+                // UMP can report a transient update error even when its
+                // persisted consent state already permits ad requests (for
+                // example, outside the EEA or while the consent server is
+                // temporarily unreachable). Trust UMP's authoritative
+                // canRequestAds() result instead of permanently suppressing
+                // all ads for the rest of this process.
+                val requestsAllowed = canRequestAds(activity)
+                consentResolved = requestsAllowed
                 Log.w(TAG, "Consent info update failed: ${formError.message}")
+                Log.i(TAG, "Consent fallback: resolved=$consentResolved canRequestAds=$requestsAllowed")
                 onConsentGatheringCompleteListener.consentGatheringComplete(formError)
             }
         )

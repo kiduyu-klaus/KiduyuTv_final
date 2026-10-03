@@ -1,6 +1,7 @@
 package com.kiduyuk.klausk.kiduyutv.util
 
 import android.content.Context
+import android.os.Process
 import kotlinx.coroutines.*
 import java.io.BufferedWriter
 import java.io.File
@@ -14,7 +15,7 @@ import java.util.*
  * 
  * This object provides functionality to:
  * - Start/stop logcat capture process
- * - Write logs to a timestamped file in the app's files directory
+ * - Write this app process's logs to a timestamped file in the app's files directory
  * - Provide access to the current log file
  */
 object LogcatManager {
@@ -29,7 +30,7 @@ object LogcatManager {
      * Starts capturing logcat output to a file.
      * 
      * @param context Application context used for file operations
-     * @param tagFilter Optional tag filter to capture only specific tags (null for all logs)
+     * @param tagFilter Optional tag filter to capture only specific tags from this app process
      */
     fun start(context: Context, tagFilter: String? = null) {
         // Stop any existing capture process first
@@ -40,11 +41,14 @@ object LogcatManager {
         val logFileName = "logcat_$timestamp.txt"
         currentLogFile = File(context.filesDir, logFileName)
         
-        // Build the logcat command
+        // Build the logcat command. Restrict the stream to this process so
+        // system-wide Android logs do not flood the in-app viewer. This still
+        // includes logs emitted by the app's own code and SDKs in this process.
+        val processFilter = "--pid=${Process.myPid()}"
         val command = if (tagFilter != null) {
-            arrayOf("logcat", "-v", "threadtime", "*:V", "-s", tagFilter)
+            arrayOf("logcat", "-v", "threadtime", processFilter, "*:V", "-s", tagFilter)
         } else {
-            arrayOf("logcat", "-v", "threadtime")
+            arrayOf("logcat", "-v", "threadtime", processFilter)
         }
         
         try {

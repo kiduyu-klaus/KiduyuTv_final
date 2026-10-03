@@ -2634,7 +2634,7 @@ private fun LogcatContent(
                 }
 
                 Text(
-                    text = "Logcat is ${if (isCapturing) "currently capturing" else "not capturing"} all system and app logs to a file.",
+                    text = "Logcat is ${if (isCapturing) "currently capturing" else "not capturing"} logs from this app process only.",
                     color = TextSecondary,
                     fontSize = 14.sp,
                     lineHeight = 20.sp
