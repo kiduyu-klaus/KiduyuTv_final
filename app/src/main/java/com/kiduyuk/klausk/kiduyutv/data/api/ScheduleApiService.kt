@@ -206,10 +206,17 @@ class ScheduleApiService {
         try {
             val doc: Document = Jsoup.parse(html)
             
-            // Parse player buttons
-            val playerButtons = doc.select("button.player-btn")
+            // Daddylive exposes six server buttons inside #playerBtns:
+            // button.player-btn[data-url] with title="PLAYER 1" through "PLAYER 6".
+            // Keep the fallback for minor markup changes, but only accept buttons
+            // that actually contain a non-empty data-url.
+            val playerButtons = doc.select("#playerBtns button.player-btn[data-url]").ifEmpty {
+                doc.select("button.player-btn[data-url]")
+            }
+            val discoveredUrls = mutableSetOf<String>()
             for (button in playerButtons) {
-                val url = button.attr("data-url")
+                val url = button.attr("data-url").trim()
+                if (url.isBlank() || !discoveredUrls.add(url)) continue
                 val title = button.attr("title")
                 val isActive = button.hasClass("is-active")
 

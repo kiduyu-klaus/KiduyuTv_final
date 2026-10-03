@@ -202,12 +202,15 @@ object ChannelScraper {
      *
      * HTML structure:
      * <div class="watch__player">
-     *   <div class="watch__actions is-scrollable" id="playerActions">
-     *     <div class="btn-group" id="playerBtns">
-     *       <button type="button" class="btn player-btn is-active" data-url="https://dlstreams.st/stream/stream-283.php">
-     *         Player 1
-     *       </button>
-     *       ...
+ *   <div class="watch__actions is-scrollable" id="playerActions">
+ *     <div class="btn-group" id="playerBtns">
+ *       <button type="button" class="btn player-btn is-active" data-url="https://dlive.sx/stream/stream-51.php" title="PLAYER 1">
+ *         Player 1
+ *       </button>
+ *       <button type="button" class="btn player-btn" data-url="https://dlive.sx/cast/stream-51.php" title="PLAYER 2">
+ *         Player 2
+ *       </button>
+ *       ... Player 3 through Player 6 ...
      *     </div>
      *   </div>
      * </div>
