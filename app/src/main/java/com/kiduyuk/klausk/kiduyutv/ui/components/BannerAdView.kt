@@ -47,7 +47,7 @@ fun BannerAdView(modifier: Modifier = Modifier) {
     if (isPreviewMode) {
         Box(modifier = modifier) {
             Text(
-                text = "Google Mobile Ads preview banner.",
+                text = "Start.io primary banner preview.",
                 modifier = Modifier.align(Alignment.Center)
             )
         }
@@ -61,7 +61,7 @@ fun BannerAdView(modifier: Modifier = Modifier) {
             setAdSize(AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(context, screenWidthDp))
             adListener = object : AdListener() {
                 override fun onAdLoaded() {
-                    Log.i(TAG, "Phone banner ad loaded")
+                    Log.i(TAG, "Phone banner ad loaded after Start.io no-fill")
                 }
 
                 override fun onAdFailedToLoad(error: LoadAdError) {
@@ -69,11 +69,8 @@ fun BannerAdView(modifier: Modifier = Modifier) {
                     AdManager.logMetaMediationFailure("phone banner", error)
                     val container = containerRef.value
                     if (activity != null && container != null) {
-                        Log.i(TAG, "Loading Unity phone banner fallback")
-                        UnityAdManager.loadBanner(activity, container) {
-                            Log.i(TAG, "Loading Start.io phone banner fallback")
-                            StartAppAdManager.loadBanner(activity, container)
-                        }
+                        Log.i(TAG, "Loading Unity phone banner after Start.io and AdMob no-fill")
+                        UnityAdManager.loadBanner(activity, container)
                     }
                 }
 
@@ -92,9 +89,27 @@ fun BannerAdView(modifier: Modifier = Modifier) {
         modifier = modifier.wrapContentSize(),
         factory = { ctx ->
             FrameLayout(ctx).apply {
-                containerRef.value = this
-                addView(adView)
-                adView.loadAd(AdRequest.Builder().build())
+                val bannerContainer = this
+                containerRef.value = bannerContainer
+                if (activity == null) {
+                    Log.w(TAG, "No Activity available for the banner request")
+                } else {
+                    // Start.io is the primary banner network. Only add AdMob after
+                    // Start.io reports a failure, keeping exactly one banner visible.
+                    StartAppAdManager.loadBanner(
+                        activity = activity,
+                        container = bannerContainer,
+                        onLoaded = { Log.i(TAG, "Phone banner served by Start.io") },
+                        onFailed = {
+                            if (containerRef.value === bannerContainer) {
+                                Log.i(TAG, "Start.io phone banner unavailable; loading AdMob fallback")
+                                removeAllViews()
+                                addView(adView)
+                                adView.loadAd(AdRequest.Builder().build())
+                            }
+                        }
+                    )
+                }
             }
         }
     )

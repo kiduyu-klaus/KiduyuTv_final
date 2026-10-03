@@ -8,7 +8,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * Unified ad dispatcher.
  *
- * Provides a single entry-point for AdMob, Unity Ads, and Start.io. Only one
+ * Provides a single entry-point for Start.io, AdMob, and Unity Ads. Only one
  * network is shown for each request, so enabling both SDKs never produces
  * stacked interstitials or banners.
  *
@@ -21,11 +21,7 @@ object AdFallbackDispatcher {
 
     // ── Interstitial ──────────────────────────────────────────────────────
 
-    /**
-     * Shows a ready AdMob interstitial, then a ready Unity ad. If neither is
-     * already loaded, playback/navigation continues immediately; this method
-     * never starts an on-demand ad load that can hold the caller's callback.
-     */
+    /** Shows Start.io first, then ready AdMob and Unity fallback inventory. */
     fun showInterstitial(activity: Activity, onDismissed: () -> Unit) {
         showInterstitial(activity, AdPlacement.CONTENT_TRANSITION, onDismissed)
     }
@@ -41,6 +37,7 @@ object AdFallbackDispatcher {
         onDismissed: () -> Unit
     ) {
         val complete = once(onDismissed)
+        val fallbackStarted = AtomicBoolean(false)
         if (!AdEligibility.canRequestAds(activity)) {
             AdEventReporter.report(placement.name, "interstitial", "none", "suppressed_ineligible")
             complete()
@@ -51,21 +48,34 @@ object AdFallbackDispatcher {
             complete()
             return
         }
-        if (AdManager.isInterstitialReady) {
-            Log.i(TAG, "Interstitial flow: AdMob")
-            AdEventReporter.report(placement.name, "interstitial", "admob", "show_requested")
-            AdManager.showInterstitial(activity, complete)
-        } else if (UnityAdManager.isInterstitialReady) {
-            Log.i(TAG, "Interstitial flow: Unity Ads fallback")
-            AdEventReporter.report(placement.name, "interstitial", "unity", "show_requested")
-            UnityAdManager.showInterstitial(activity, complete)
-        } else {
-            Log.i(TAG, "Interstitial flow: no ad ready; continuing immediately")
-            AdEventReporter.report(placement.name, "interstitial", "none", "not_ready")
-            complete()
-            AdManager.preloadInterstitial(activity)
-            UnityAdManager.preloadAds(activity)
+        fun showReadyFallback() {
+            if (!fallbackStarted.compareAndSet(false, true)) return
+            if (AdManager.isInterstitialReady) {
+                Log.i(TAG, "Interstitial flow: AdMob fallback")
+                AdEventReporter.report(placement.name, "interstitial", "admob", "show_requested")
+                AdManager.showInterstitial(activity, complete)
+            } else if (UnityAdManager.isInterstitialReady) {
+                Log.i(TAG, "Interstitial flow: Unity Ads fallback")
+                AdEventReporter.report(placement.name, "interstitial", "unity", "show_requested")
+                UnityAdManager.showInterstitial(activity, complete)
+            } else {
+                Log.i(TAG, "Interstitial flow: no ad ready; continuing immediately")
+                AdEventReporter.report(placement.name, "interstitial", "none", "not_ready")
+                complete()
+                AdManager.preloadInterstitial(activity)
+                UnityAdManager.preloadAds(activity)
+            }
         }
+
+        // Start.io is the primary full-screen network. Unlike the other SDKs it
+        // loads on demand, so only advance to a fallback after it reports no fill.
+        Log.i(TAG, "Interstitial flow: Start.io primary")
+        AdEventReporter.report(placement.name, "interstitial", "startio", "show_requested")
+        StartAppAdManager.showInterstitial(
+            activity = activity,
+            onDismissed = complete,
+            onUnavailable = ::showReadyFallback
+        )
     }
 
     // ── Rewarded ──────────────────────────────────────────────────────────

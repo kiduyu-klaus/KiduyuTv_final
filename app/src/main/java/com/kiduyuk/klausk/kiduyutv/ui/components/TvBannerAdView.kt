@@ -55,7 +55,7 @@ fun TvBannerAdView(modifier: Modifier = Modifier) {
     if (isPreviewMode) {
         Box(modifier = modifier) {
             Text(
-                text = "Google Mobile Ads preview banner.",
+                text = "Start.io primary banner preview.",
                 modifier = Modifier.align(Alignment.Center)
             )
         }
@@ -69,7 +69,7 @@ fun TvBannerAdView(modifier: Modifier = Modifier) {
             setAdSize(AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(context, screenWidthDp))
             adListener = object : AdListener() {
                 override fun onAdLoaded() {
-                    Log.i(TAG, "TV banner ad loaded")
+                    Log.i(TAG, "TV banner ad loaded after Start.io no-fill")
                 }
 
                 override fun onAdFailedToLoad(error: LoadAdError) {
@@ -77,11 +77,8 @@ fun TvBannerAdView(modifier: Modifier = Modifier) {
                     AdManager.logMetaMediationFailure("TV banner", error)
                     val container = containerRef.value
                     if (activity != null && container != null) {
-                        Log.i(TAG, "Loading Unity TV banner fallback")
-                        UnityAdManager.loadBanner(activity, container) {
-                            Log.i(TAG, "Loading Start.io TV banner fallback")
-                            StartAppAdManager.loadBanner(activity, container)
-                        }
+                        Log.i(TAG, "Loading Unity TV banner after Start.io and AdMob no-fill")
+                        UnityAdManager.loadBanner(activity, container)
                     }
                 }
 
@@ -116,9 +113,26 @@ fun TvBannerAdView(modifier: Modifier = Modifier) {
             },
         factory = { ctx ->
             FrameLayout(ctx).apply {
-                containerRef.value = this
-                addView(adView)
-                adView.loadAd(AdRequest.Builder().build())
+                val bannerContainer = this
+                containerRef.value = bannerContainer
+                if (activity == null) {
+                    Log.w(TAG, "No Activity available for the banner request")
+                } else {
+                    // Keep the persistent TV placement Start.io-first as well.
+                    StartAppAdManager.loadBanner(
+                        activity = activity,
+                        container = bannerContainer,
+                        onLoaded = { Log.i(TAG, "TV banner served by Start.io") },
+                        onFailed = {
+                            if (containerRef.value === bannerContainer) {
+                                Log.i(TAG, "Start.io TV banner unavailable; loading AdMob fallback")
+                                removeAllViews()
+                                addView(adView)
+                                adView.loadAd(AdRequest.Builder().build())
+                            }
+                        }
+                    )
+                }
             }
         }
     )

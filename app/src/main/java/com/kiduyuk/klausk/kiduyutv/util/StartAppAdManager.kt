@@ -74,20 +74,33 @@ object StartAppAdManager {
      * Loads a StartApp banner into the supplied [container].
      * The caller is responsible for placing the container in the layout.
      */
-    fun loadBanner(activity: Activity, container: ViewGroup) {
-        if (!shouldShowAds(activity)) return
+    fun loadBanner(
+        activity: Activity,
+        container: ViewGroup,
+        onLoaded: () -> Unit = {},
+        onFailed: () -> Unit = {}
+    ) {
+        if (!shouldShowAds(activity)) {
+            onFailed()
+            return
+        }
         if (!isInitialised) preloadAds(activity)
-        if (!isInitialised) return
+        if (!isInitialised) {
+            onFailed()
+            return
+        }
         try {
             container.removeAllViews()
             val banner = Banner(activity)
             banner.setBannerListener(object : BannerListener {
                 override fun onReceiveAd(view: View) {
                     Log.i(TAG, "StartApp banner received")
+                    onLoaded()
                 }
 
                 override fun onFailedToReceiveAd(view: View) {
                     Log.w(TAG, "StartApp banner failed")
+                    onFailed()
                 }
 
                 override fun onClick(view: View) {
@@ -107,6 +120,7 @@ object StartAppAdManager {
             )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load StartApp banner", e)
+            onFailed()
         }
     }
 
@@ -116,14 +130,18 @@ object StartAppAdManager {
      * Shows a StartApp interstitial if ads are enabled and the cooldown has elapsed.
      * Always calls [onDismissed] when done (or immediately if skipped).
      */
-    fun showInterstitial(activity: Activity, onDismissed: () -> Unit = {}) {
+    fun showInterstitial(
+        activity: Activity,
+        onDismissed: () -> Unit = {},
+        onUnavailable: () -> Unit = {}
+    ) {
         if (!shouldShowAds(activity)) {
-            onDismissed()
+            onUnavailable()
             return
         }
         if (!isInitialised) preloadAds(activity)
         if (!isInitialised) {
-            onDismissed()
+            onUnavailable()
             return
         }
         if (!FullscreenAdPolicy.canShowInterstitial(activity)) {
@@ -153,19 +171,19 @@ object StartAppAdManager {
 
                         override fun adNotDisplayed(ad: Ad?) {
                             Log.w(TAG, "StartApp interstitial not displayed")
-                            onDismissed()
+                            onUnavailable()
                         }
                     })
                 }
 
                 override fun onFailedToReceiveAd(ad: Ad?) {
                     Log.w(TAG, "StartApp interstitial failed to load")
-                    onDismissed()
+                    onUnavailable()
                 }
             })
         } catch (e: Exception) {
             Log.e(TAG, "Failed to show StartApp interstitial", e)
-            onDismissed()
+            onUnavailable()
         }
     }
 

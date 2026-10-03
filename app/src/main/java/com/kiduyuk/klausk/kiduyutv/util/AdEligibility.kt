@@ -13,13 +13,21 @@ object AdEligibility {
 
     fun canRequestAds(context: Context): Boolean {
         val allowed = try {
-            !SettingsManager(context).isAdsDisabled() &&
-                ConsentManager.canRequestAds(context)
+            val adsDisabled = SettingsManager(context).isAdsDisabled()
+            val consentAllowsRequests = ConsentManager.canRequestAds(context)
+            val eligible = !adsDisabled && consentAllowsRequests
+            if (!eligible) {
+                Log.i(
+                    TAG,
+                    "Ad request suppressed: adsDisabled=$adsDisabled, " +
+                        "consentAllowsRequests=$consentAllowsRequests"
+                )
+            }
+            eligible
         } catch (error: Exception) {
             Log.w(TAG, "Unable to evaluate ad eligibility", error)
             false
         }
-        if (!allowed) Log.i(TAG, "Ad request suppressed")
         return allowed
     }
 }
