@@ -621,6 +621,7 @@ class DirectStreamActivity : AppCompatActivity() {
                 it.contains("/m3u8-proxy") ||
                 it.contains("/m3u8_proxy")
         }
+        val isGoogleusercontentUrl = isGoogleusercontentHost(normalizedUrl)
         val stream = StreamItem(
             name = "Web Sniffer",
             title = intent.getStringExtra(EXTRA_TITLE).orEmpty().ifBlank { "Captured WebView stream" },
@@ -631,8 +632,11 @@ class DirectStreamActivity : AppCompatActivity() {
             // a stale/misreported WebView MIME value such as text/vtt from
             // sending the manifest through the subtitle decoder.
             type = if (isHlsUrl) "hls" else intent.getStringExtra(EXTRA_SNIFFED_TYPE).orEmpty(),
-            mimeType = if (isHlsUrl) "application/vnd.apple.mpegurl"
-            else intent.getStringExtra(EXTRA_SNIFFED_MIME_TYPE).orEmpty(),
+            mimeType = when {
+                isHlsUrl -> "application/vnd.apple.mpegurl"
+                isGoogleusercontentUrl -> "video/x-matroska"
+                else -> intent.getStringExtra(EXTRA_SNIFFED_MIME_TYPE).orEmpty()
+            },
             headers = headers
         )
         availableStreams = listOf(stream)

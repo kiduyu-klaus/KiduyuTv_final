@@ -440,9 +440,12 @@ object ProvidersApi {
                 }
                 val mimeType = when {
                     isVixsrcHls || isGifPlaylist || isHlsUrlHint -> HLS_MIME_TYPE
+                    isGoogleusercontentHost(url) -> MATROSKA_MIME_TYPE
                     else -> rawMimeType
                 }
-                if (isHlsUrlHint && rawMimeType.equals("image/jpeg", ignoreCase = true)) {
+                if (isGoogleusercontentHost(url) && !rawMimeType.equals(MATROSKA_MIME_TYPE, ignoreCase = true)) {
+                    Log.i(TAG, "Overriding provider MIME with Matroska for Googleusercontent stream")
+                } else if (isHlsUrlHint && rawMimeType.equals("image/jpeg", ignoreCase = true)) {
                     Log.i(TAG, "Overriding image/jpeg MIME hint with HLS for provider=${provider.ifBlank { "?" }}")
                 }
                 val headers = s.optJSONObject("headers")?.let { h ->
@@ -624,6 +627,7 @@ object ProvidersApi {
     }
 
     private const val HLS_MIME_TYPE = "application/vnd.apple.mpegurl"
+    private const val MATROSKA_MIME_TYPE = "video/x-matroska"
     private const val GOOGLE_DOWNLOADS_HOST = "video-downloads.googleusercontent.com"
 
     private val PROVIDERS_WITHOUT_SOURCE_HEADERS = setOf(
