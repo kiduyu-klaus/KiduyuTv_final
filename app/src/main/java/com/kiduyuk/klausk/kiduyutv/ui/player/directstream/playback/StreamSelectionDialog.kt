@@ -478,6 +478,8 @@ class StreamSelectionDialog(
             "Telugu" to Regex("\\btelugu\\b", RegexOption.IGNORE_CASE),
             "Tamil" to Regex("\\btamil\\b", RegexOption.IGNORE_CASE)
         )
+        private val HINDI_MARKER = Regex("\\bhi\\b", RegexOption.IGNORE_CASE)
+        private val ENGLISH_MARKER = Regex("\\ben\\b", RegexOption.IGNORE_CASE)
 
         private fun detectLanguages(stream: StreamItem): List<String> {
             if (listOf(stream.name, stream.title).any { text ->
@@ -489,11 +491,22 @@ class StreamSelectionDialog(
             if (stream.provider.equals("vegamovies", ignoreCase = true)) {
                 return listOf("English", "Hindi")
             }
+            val searchableText = "${stream.name} ${stream.title}"
+            val hasHindiMarker = HINDI_MARKER.containsMatchIn(searchableText)
+            val hasEnglishMarker = ENGLISH_MARKER.containsMatchIn(searchableText)
+            if (hasHindiMarker && hasEnglishMarker) {
+                return listOf("Hindi . English")
+            }
+            if (hasHindiMarker) {
+                return listOf("Hindi")
+            }
+            if (hasEnglishMarker) {
+                return listOf("English")
+            }
             val explicitLanguage = stream.language.trim()
             if (explicitLanguage.isNotBlank() && !explicitLanguage.equals("und", ignoreCase = true)) {
                 return listOf(explicitLanguage)
             }
-            val searchableText = "${stream.name} ${stream.title}"
             return LANGUAGE_PATTERNS.mapNotNull { (label, pattern) ->
                 label.takeIf { pattern.containsMatchIn(searchableText) }
             }.ifEmpty { listOf("Unknown") }
