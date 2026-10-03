@@ -16,18 +16,33 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.EventBusy
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -41,6 +56,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -48,6 +65,9 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.model.IptvChannel
 import com.kiduyuk.klausk.kiduyutv.data.model.CountryPlaylist
+import com.kiduyuk.klausk.kiduyutv.data.model.ScheduleChannel
+import com.kiduyuk.klausk.kiduyutv.data.model.ScheduleEvent
+import com.kiduyuk.klausk.kiduyutv.data.model.is18PlusChannel
 import com.kiduyuk.klausk.kiduyutv.viewmodel.CategoryItem
 import com.kiduyuk.klausk.kiduyutv.data.model.ScrapedChannel
 import com.kiduyuk.klausk.kiduyutv.data.repository.ChannelScraper
@@ -57,46 +77,63 @@ import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileSearchTopBar
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.player.iptv.IptvPlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.player.iptv.SchedulePlayerActivity
+import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
+import com.kiduyuk.klausk.kiduyutv.ui.theme.CardDark
+import com.kiduyuk.klausk.kiduyutv.ui.theme.DarkRed
 import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
+import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextSecondary
 import com.kiduyuk.klausk.kiduyutv.util.ScrapedChannelsCache
-import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.LiveTvViewModel
+import com.kiduyuk.klausk.kiduyutv.viewmodel.ScheduleUiState
+import com.kiduyuk.klausk.kiduyutv.viewmodel.ScheduleViewModel
 import kotlinx.coroutines.launch
 
 @Composable
 fun MobileLiveTvScreen(
     navController: NavController,
     onNavigate: (String) -> Unit = {},
-    viewModel: LiveTvViewModel = viewModel()
+    viewModel: LiveTvViewModel = viewModel(),
+    scheduleViewModel: ScheduleViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val daddyLiveScope = rememberCoroutineScope()
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
     val uiState by viewModel.uiState.collectAsState()
-    val daddyLiveEnabled = remember(context) {
-        SettingsManager(context).isDaddyLiveEnabled()
-    }
+    val scheduleUiState by scheduleViewModel.uiState.collectAsState()
     var scrapedChannels by remember { mutableStateOf<List<IptvChannel>>(emptyList()) }
-    var scrapedChannelsLoading by remember { mutableStateOf(daddyLiveEnabled) }
+    var scrapedChannelsLoading by remember { mutableStateOf(false) }
     var scrapedChannelsError by remember { mutableStateOf<String?>(null) }
     var selectedTab by remember { mutableIntStateOf(0) }
     val countryListState = rememberLazyListState()
+    val visibleScrapedChannels = remember(scrapedChannels, uiState.hide18PlusChannels) {
+        if (uiState.hide18PlusChannels) {
+            scrapedChannels.filterNot(IptvChannel::is18PlusChannel)
+        } else {
+            scrapedChannels
+        }
+    }
 
-    LaunchedEffect(daddyLiveEnabled) {
+    // Initialize both data sources once; tabs then render their own loading states.
+    LaunchedEffect(Unit) {
         viewModel.initialize(context)
-        if (daddyLiveEnabled) {
+        viewModel.loadPlaylist()
+        scheduleViewModel.initialize(context)
+        scheduleViewModel.loadSchedule()
+    }
+
+    // Load cached DaddyLive channels when its tab is opened without blocking Live TV.
+    LaunchedEffect(selectedTab) {
+        if (selectedTab == 2 && scrapedChannels.isEmpty() && !scrapedChannelsLoading) {
             scrapedChannelsLoading = true
             val cached = ScrapedChannelsCache.loadChannels(context)
             scrapedChannels = cached.map { it.toMobileIptvChannel() }
             scrapedChannelsError = if (scrapedChannels.isEmpty()) {
-                "No scraped channels are cached. Scrape channels from Settings first."
+                "No cached channels yet. Tap Scrape Channels to load DaddyLive."
             } else {
                 null
             }
             scrapedChannelsLoading = false
-        } else {
-            viewModel.loadPlaylist()
         }
     }
 
@@ -113,50 +150,6 @@ fun MobileLiveTvScreen(
         Box(modifier = Modifier
             .fillMaxSize()
             .padding(innerPadding)) {
-
-            if (daddyLiveEnabled) {
-                MobileDaddyLiveContent(
-                    channels = scrapedChannels,
-                    isLoading = scrapedChannelsLoading,
-                    error = scrapedChannelsError,
-                    onScrape = {
-                        daddyLiveScope.launch {
-                            scrapedChannelsLoading = true
-                            scrapedChannelsError = null
-                            val result = ChannelScraper.fetchChannels(fetchStreamUrls = true)
-                            val scraped = result.getOrNull()
-                            if (scraped != null) {
-                                ScrapedChannelsCache.saveChannels(context, scraped)
-                                scrapedChannels = scraped.map { it.toMobileIptvChannel() }
-                                scrapedChannelsError = if (scrapedChannels.isEmpty()) {
-                                    "No channels were found. Check the DaddyLive address and try again."
-                                } else {
-                                    null
-                                }
-                            } else {
-                                scrapedChannelsError = result.exceptionOrNull()?.message
-                                    ?: "Unable to scrape DaddyLive channels."
-                            }
-                            scrapedChannelsLoading = false
-                        }
-                    },
-                    onChannelClick = { channel ->
-                        context.startActivity(
-                            SchedulePlayerActivity.createIntent(
-                                context = context,
-                                channelId = channel.id,
-                                channelName = channel.name,
-                                eventTitle = channel.name,
-                                iframeUrls = channel.url
-                                    .takeIf { it.isNotBlank() }
-                                    ?.let { listOf(it) }
-                                    .orEmpty()
-                            )
-                        )
-                    }
-                )
-                return@Box
-            }
 
             if (uiState.isLoading && selectedTab == 0) {
                 Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
@@ -177,27 +170,45 @@ fun MobileLiveTvScreen(
             }
 
             Column(modifier = Modifier.fillMaxSize()) {
-                // Tab row
-                TabRow(
+                // Scrollable Material tabs keep all four destinations usable on phones.
+                val tabItems = listOf(
+                    "Live TV" to Icons.Default.PlayCircle,
+                    "Schedule" to Icons.Default.CalendarToday,
+                    "DaddyLive" to Icons.Default.Tv,
+                    "My Channels" to Icons.Default.List
+                )
+                ScrollableTabRow(
                     selectedTabIndex = selectedTab,
-                    containerColor = Color.Black,
-                    contentColor = Color.White
+                    containerColor = CardDark,
+                    contentColor = TextPrimary,
+                    edgePadding = 12.dp,
+                    divider = {}
                 ) {
-                    Tab(
-                        selected = selectedTab == 0,
-                        onClick = { selectedTab = 0 },
-                        text = { Text("Live TV") }
-                    )
-                    Tab(
-                        selected = selectedTab == 1,
-                        onClick = { selectedTab = 1 },
-                        text = {
-                            val favCount = viewModel.getFavoriteChannels().size
-                            Text(
-                                text = if (favCount > 0) "My Channels ($favCount)" else "My Channels"
-                            )
-                        }
-                    )
+                    tabItems.forEachIndexed { index, (title, icon) ->
+                        Tab(
+                            selected = selectedTab == index,
+                            onClick = { selectedTab = index },
+                            selectedContentColor = Color.White,
+                            unselectedContentColor = TextSecondary,
+                            icon = {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            },
+                            text = {
+                                Text(
+                                    text = if (index == 3) {
+                                        val count = viewModel.getFavoriteChannels()
+                                            .count { !uiState.hide18PlusChannels || !it.is18PlusChannel() }
+                                        if (count > 0) "$title ($count)" else title
+                                    } else title,
+                                    maxLines = 1
+                                )
+                            }
+                        )
+                    }
                 }
 
                 // Tab content
@@ -354,9 +365,15 @@ fun MobileLiveTvScreen(
                             }
                         }
                     }
-                    1 -> {
+                    3 -> {
                         // My Channels tab - favorites
-                        val favorites = viewModel.getFavoriteChannels()
+                        val favorites = viewModel.getFavoriteChannels().let { channels ->
+                            if (uiState.hide18PlusChannels) {
+                                channels.filterNot(IptvChannel::is18PlusChannel)
+                            } else {
+                                channels
+                            }
+                        }
                         if (favorites.isEmpty()) {
                             Column(
                                 modifier = Modifier
@@ -390,8 +407,191 @@ fun MobileLiveTvScreen(
                             }
                         }
                     }
+                    1 -> {
+                        MobileScheduleTabContent(
+                            uiState = scheduleUiState,
+                            viewModel = scheduleViewModel,
+                            onChannelClick = { channel, event ->
+                                context.startActivity(
+                                    SchedulePlayerActivity.createIntent(
+                                        context = context,
+                                        channelId = channel.id,
+                                        channelName = channel.name,
+                                        eventTitle = event.title
+                                    )
+                                )
+                            }
+                        )
+                    }
+                    2 -> {
+                        MobileDaddyLiveContent(
+                            channels = visibleScrapedChannels,
+                            isLoading = scrapedChannelsLoading,
+                            error = scrapedChannelsError,
+                            onScrape = {
+                                daddyLiveScope.launch {
+                                    scrapedChannelsLoading = true
+                                    scrapedChannelsError = null
+                                    val result = ChannelScraper.fetchChannels(fetchStreamUrls = true)
+                                    val scraped = result.getOrNull()
+                                    if (scraped != null) {
+                                        ScrapedChannelsCache.saveChannels(context, scraped)
+                                        scrapedChannels = scraped.map { it.toMobileIptvChannel() }
+                                        scrapedChannelsError = if (scrapedChannels.isEmpty()) {
+                                            "No channels were found. Check the DaddyLive address and try again."
+                                        } else null
+                                    } else {
+                                        scrapedChannelsError = result.exceptionOrNull()?.message
+                                            ?: "Unable to scrape DaddyLive channels."
+                                    }
+                                    scrapedChannelsLoading = false
+                                }
+                            },
+                            onChannelClick = { channel ->
+                                context.startActivity(
+                                    SchedulePlayerActivity.createIntent(
+                                        context = context,
+                                        channelId = channel.id,
+                                        channelName = channel.name,
+                                        eventTitle = channel.name,
+                                        iframeUrls = channel.url.takeIf { it.isNotBlank() }?.let(::listOf).orEmpty()
+                                    )
+                                )
+                            }
+                        )
+                    }
                 }
             }
+    }
+}
+
+}
+
+/**
+ * Compact schedule presentation for phones. Events expand to reveal playable channels.
+ */
+@Composable
+private fun MobileScheduleTabContent(
+    uiState: ScheduleUiState,
+    viewModel: ScheduleViewModel,
+    onChannelClick: (ScheduleChannel, ScheduleEvent) -> Unit
+) {
+    when {
+        uiState.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            LottieLoadingView(size = 180.dp)
+        }
+        uiState.error != null -> MobileScheduleEmptyState(
+            message = uiState.error ?: "Unable to load schedule",
+            actionLabel = "Retry",
+            onAction = { viewModel.loadSchedule(forceRefresh = true) }
+        )
+        uiState.scheduleDays.isEmpty() -> MobileScheduleEmptyState(
+            message = "No schedule is available right now.",
+            actionLabel = "Refresh",
+            onAction = { viewModel.loadSchedule(forceRefresh = true) }
+        )
+        else -> LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            uiState.scheduleDays.forEach { day ->
+                item(key = day.date) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = CardDark),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text(
+                                text = day.dateTitle,
+                                color = PrimaryRed,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            day.categories.forEach { category ->
+                                Text(
+                                    text = category.name,
+                                    color = TextSecondary,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    modifier = Modifier.padding(vertical = 6.dp)
+                                )
+                                category.events.forEach { event ->
+                                    val expanded = event.id in uiState.expandedEventIds
+                                    Surface(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { viewModel.toggleEventExpansion(event.id) },
+                                        color = if (expanded) DarkRed.copy(alpha = 0.35f) else BackgroundDark,
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Column(Modifier.padding(10.dp)) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    text = event.displayTime,
+                                                    color = PrimaryRed,
+                                                    style = MaterialTheme.typography.labelMedium
+                                                )
+                                                Spacer(Modifier.width(10.dp))
+                                                Text(
+                                                    text = event.title,
+                                                    color = TextPrimary,
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    modifier = Modifier.weight(1f)
+                                                )
+                                                Icon(
+                                                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                                    contentDescription = if (expanded) "Collapse" else "Expand",
+                                                    tint = TextSecondary
+                                                )
+                                            }
+                                            if (expanded) {
+                                                event.channels.forEach { channel ->
+                                                    TextButton(
+                                                        onClick = { onChannelClick(channel, event) },
+                                                        modifier = Modifier.fillMaxWidth()
+                                                    ) {
+                                                        Text(channel.name, color = Color.White, modifier = Modifier.weight(1f))
+                                                        Icon(Icons.Default.PlayCircle, contentDescription = "Play")
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Spacer(Modifier.height(6.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Displays a consistent retry state for mobile schedule loading failures. */
+@Composable
+private fun MobileScheduleEmptyState(
+    message: String,
+    actionLabel: String,
+    onAction: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(Icons.Default.EventBusy, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(52.dp))
+        Spacer(Modifier.height(12.dp))
+        Text(message, color = TextSecondary, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(16.dp))
+        Button(
+            onClick = onAction,
+            colors = ButtonDefaults.buttonColors(containerColor = PrimaryRed)
+        ) {
+            Icon(Icons.Default.Refresh, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text(actionLabel)
         }
     }
 }

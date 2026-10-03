@@ -159,6 +159,9 @@ fun MobileSettingsScreen(
     var directStreamEnabled by remember {
         mutableStateOf(settingsManager.isDirectStreamEnabled())
     }
+    var hide18PlusChannels by remember {
+        mutableStateOf(settingsManager.isHide18PlusChannelsEnabled())
+    }
     var webSnifferEnabled by remember {
         mutableStateOf(settingsManager.isWebSnifferEnabled())
     }
@@ -727,21 +730,6 @@ fun MobileSettingsScreen(
                     }
                 )
                 SettingsItem(
-                    icon = Icons.Default.Update,
-                    title = "Refresh IPTV country playlists",
-                    subtitle = if (liveTvUiState.isCountryPlaylistRefreshing) {
-                        val refreshPercent = ((liveTvUiState.countryPlaylistRefreshProgress ?: 0f) * 100f)
-                            .toInt()
-                            .coerceIn(0, 100)
-                        "Updating playlists used by Live TV... $refreshPercent%"
-                    } else {
-                        "Download the latest country playlists used by Live TV"
-                    },
-                    onClick = { liveTvViewModel.loadPlaylist(forceRefresh = true) },
-                    isLoading = liveTvUiState.isCountryPlaylistRefreshing,
-                    progress = liveTvUiState.countryPlaylistRefreshProgress
-                )
-                SettingsItem(
                     icon = Icons.Default.PlayCircle,
                     title = "Default Direct Stream Provider",
                     subtitle = if (uiState.defaultDirectStreamProvider == SettingsManager.AUTO) {
@@ -776,6 +764,50 @@ fun MobileSettingsScreen(
                             checked = settingsManager.isAutoSkipSegmentsEnabled(),
                             onCheckedChange = {
                                 settingsManager.setAutoSkipSegmentsEnabled(it)
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color.White,
+                                checkedTrackColor = PrimaryRed
+                            )
+                        )
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // ── LiveTv Section ──────────────────────────────────────────────────
+            // Settings that control the Live TV catalogue and its visibility.
+            SettingsGroup(title = "LiveTv") {
+                SettingsItem(
+                    icon = Icons.Default.Update,
+                    title = "Refresh IPTV country playlists",
+                    subtitle = if (liveTvUiState.isCountryPlaylistRefreshing) {
+                        val refreshPercent = ((liveTvUiState.countryPlaylistRefreshProgress ?: 0f) * 100f)
+                            .toInt()
+                            .coerceIn(0, 100)
+                        "Updating playlists used by Live TV... $refreshPercent%"
+                    } else {
+                        "Download the latest country playlists used by Live TV"
+                    },
+                    onClick = { liveTvViewModel.loadPlaylist(forceRefresh = true) },
+                    isLoading = liveTvUiState.isCountryPlaylistRefreshing,
+                    progress = liveTvUiState.countryPlaylistRefreshProgress
+                )
+                SettingsItem(
+                    icon = Icons.Default.Tv,
+                    title = "Hide 18+ channels",
+                    subtitle = "Hide channels with 18+ in the title from Live TV",
+                    onClick = {
+                        hide18PlusChannels = !hide18PlusChannels
+                        liveTvViewModel.setHide18PlusChannels(hide18PlusChannels)
+                    },
+                    trailingContent = {
+                        Switch(
+                            checked = hide18PlusChannels,
+                            onCheckedChange = {
+                                hide18PlusChannels = it
+                                liveTvViewModel.setHide18PlusChannels(it)
                             },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Color.White,
