@@ -1283,10 +1283,13 @@ private fun PlaybackContent(
     onDirectStreamProviderSelect: (String) -> Unit
 ) {
     val context = LocalContext.current
+    val liveTvViewModel: LiveTvViewModel = viewModel()
+    val liveTvUiState by liveTvViewModel.uiState.collectAsState()
     var directProviderOptions by remember { mutableStateOf<List<StreamProviderChoice>>(emptyList()) }
     var directProviderLoadError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
+        liveTvViewModel.initialize(context)
         runCatching {
             withContext(Dispatchers.IO) { StreamCatalog.enabled() }
         }.onSuccess { providers ->
@@ -1302,9 +1305,6 @@ private fun PlaybackContent(
     }
     var webSnifferEnabled by remember {
         mutableStateOf(settingsManager.isWebSnifferEnabled())
-    }
-    var daddyLiveEnabled by remember {
-        mutableStateOf(settingsManager.isDaddyLiveEnabled())
     }
     var autoSkipEnabled by remember {
         mutableStateOf(settingsManager.isAutoSkipSegmentsEnabled())
@@ -1414,47 +1414,59 @@ private fun PlaybackContent(
         }
 
         Spacer(modifier = Modifier.height(24.dp))
-        SettingsSectionLabel(text = "Use DaddyLive")
+        SettingsSectionLabel(text = "IPTV country playlists")
 
-        val daddyLiveInteraction = remember { MutableInteractionSource() }
-        val daddyLiveFocused by daddyLiveInteraction.collectIsFocusedAsState()
+        val playlistRefreshInteraction = remember { MutableInteractionSource() }
+        val playlistRefreshFocused by playlistRefreshInteraction.collectIsFocusedAsState()
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(16.dp))
                 .background(CardDark)
                 .border(
-                    if (daddyLiveFocused) 2.dp else 0.dp,
-                    if (daddyLiveFocused) PrimaryRed else Color.Transparent,
+                    if (playlistRefreshFocused) 2.dp else 0.dp,
+                    if (playlistRefreshFocused) PrimaryRed else Color.Transparent,
                     RoundedCornerShape(16.dp)
                 )
                 .clickable(
-                    interactionSource = daddyLiveInteraction,
-                    indication = null
-                ) {
-                    daddyLiveEnabled = !daddyLiveEnabled
-                    settingsManager.setDaddyLiveEnabled(daddyLiveEnabled)
-                }
-                .focusable(interactionSource = daddyLiveInteraction)
+                    interactionSource = playlistRefreshInteraction,
+                    indication = null,
+                    enabled = !liveTvUiState.isCountryPlaylistRefreshing
+                ) { liveTvViewModel.loadPlaylist(forceRefresh = true) }
+                .focusable(interactionSource = playlistRefreshInteraction)
                 .padding(24.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("Use DaddyLive channels", color = TextPrimary, fontSize = 16.sp)
+                Text("Refresh IPTV country playlists", color = TextPrimary, fontSize = 16.sp)
                 Text(
-                    "Replace the Live TV playlist with cached scraped channels.",
+                    if (liveTvUiState.isCountryPlaylistRefreshing)
+                        "Updating playlists used by Live TV..."
+                    else
+                        "Download the latest country playlists used by Live TV.",
                     color = TextSecondary,
                     fontSize = 13.sp
                 )
+                if (liveTvUiState.isCountryPlaylistRefreshing) {
+                    LinearProgressIndicator(
+                        progress = { liveTvUiState.countryPlaylistRefreshProgress ?: 0f },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 10.dp),
+                        color = PrimaryRed,
+                        trackColor = SurfaceDark
+                    )
+                }
             }
-            Switch(
-                checked = daddyLiveEnabled,
-                onCheckedChange = {
-                    daddyLiveEnabled = it
-                    settingsManager.setDaddyLiveEnabled(it)
-                },
-                colors = SwitchDefaults.colors(checkedTrackColor = PrimaryRed)
-            )
+            if (liveTvUiState.isCountryPlaylistRefreshing) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = PrimaryRed,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Icon(Icons.Default.Update, contentDescription = "Refresh playlists", tint = TextPrimary)
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))

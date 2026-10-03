@@ -54,7 +54,9 @@ data class LiveTvUiState(
     val searchResults: List<IptvChannel> = emptyList(),
     val isSearchActive: Boolean = false,
     val currentProgram: EpgProgram? = null,
-    val nextProgram: EpgProgram? = null
+    val nextProgram: EpgProgram? = null,
+    val isCountryPlaylistRefreshing: Boolean = false,
+    val countryPlaylistRefreshProgress: Float? = null
 )
 
 /**
@@ -388,12 +390,22 @@ class LiveTvViewModel : ViewModel() {
         val context = appContext ?: return
         
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                error = null,
+                isCountryPlaylistRefreshing = forceRefresh,
+                countryPlaylistRefreshProgress = if (forceRefresh) 0.1f else null
+            )
+            if (forceRefresh) {
+                _uiState.update { it.copy(countryPlaylistRefreshProgress = 0.25f) }
+            }
             
             worldIptvRepository.fetchCountryCategories(context, forceRefresh).fold(
                 onSuccess = { countries ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
+                        isCountryPlaylistRefreshing = false,
+                        countryPlaylistRefreshProgress = null,
                         categories = countries.map { country ->
                             CategoryItem(
                                 name = country.displayName,
@@ -414,6 +426,8 @@ class LiveTvViewModel : ViewModel() {
                 onFailure = { error ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
+                        isCountryPlaylistRefreshing = false,
+                        countryPlaylistRefreshProgress = null,
                         error = error.message ?: "Failed to load playlist"
                     )
                 }

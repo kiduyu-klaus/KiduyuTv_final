@@ -142,6 +142,7 @@ fun MobileSettingsScreen(
     val context = LocalContext.current
     val activity = context.findActivity()
     val liveTvViewModel: LiveTvViewModel = viewModel()
+    val liveTvUiState by liveTvViewModel.uiState.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
     val myList by MyListManager.myList.collectAsState()
@@ -160,9 +161,6 @@ fun MobileSettingsScreen(
     }
     var webSnifferEnabled by remember {
         mutableStateOf(settingsManager.isWebSnifferEnabled())
-    }
-    var daddyLiveEnabled by remember {
-        mutableStateOf(settingsManager.isDaddyLiveEnabled())
     }
     var showWhatsNewDialog by remember { mutableStateOf(false) }
     var showDeleteAccountDialog by remember { mutableStateOf(false) }
@@ -729,29 +727,15 @@ fun MobileSettingsScreen(
                     }
                 )
                 SettingsItem(
-                    icon = Icons.Default.Tv,
-                    title = "Use DaddyLive",
-                    subtitle = if (daddyLiveEnabled)
-                        "Show scraped DaddyLive channels in Live TV"
+                    icon = Icons.Default.Update,
+                    title = "Refresh IPTV country playlists",
+                    subtitle = if (liveTvUiState.isCountryPlaylistRefreshing)
+                        "Updating playlists used by Live TV..."
                     else
-                        "Use the configured IPTV playlist",
-                    onClick = {
-                        daddyLiveEnabled = !daddyLiveEnabled
-                        settingsManager.setDaddyLiveEnabled(daddyLiveEnabled)
-                    },
-                    trailingContent = {
-                        Switch(
-                            checked = daddyLiveEnabled,
-                            onCheckedChange = {
-                                daddyLiveEnabled = it
-                                settingsManager.setDaddyLiveEnabled(it)
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = PrimaryRed
-                            )
-                        )
-                    }
+                        "Download the latest country playlists used by Live TV",
+                    onClick = { liveTvViewModel.loadPlaylist(forceRefresh = true) },
+                    isLoading = liveTvUiState.isCountryPlaylistRefreshing,
+                    progress = liveTvUiState.countryPlaylistRefreshProgress
                 )
                 SettingsItem(
                     icon = Icons.Default.PlayCircle,
