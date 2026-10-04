@@ -45,6 +45,10 @@ class AppOpenAdObserver private constructor(private val application: Application
     }
 
     override fun onStart(owner: LifecycleOwner) {
+        // Consent may have resolved since the previous foreground — the privacy
+        // options form, or a network that was down at launch. Retry before
+        // anything else so the next ad request has a live SDK behind it.
+        AdManager.retryInitIfEligible(application)
         if (!initialLaunchComplete) return
         currentActivity?.let { activity ->
             Log.i(TAG, "App moved to foreground, checking app open ad")

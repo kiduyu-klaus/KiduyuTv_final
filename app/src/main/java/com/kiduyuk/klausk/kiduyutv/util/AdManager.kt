@@ -2,6 +2,8 @@ package com.kiduyuk.klausk.kiduyutv.util
 
 import android.app.Activity
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.ViewGroup
 import androidx.compose.ui.platform.ComposeView
@@ -26,6 +28,9 @@ import com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAd
 import com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAdLoadCallback
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.ui.components.BannerAdView
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.util.Date
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -52,6 +57,23 @@ object AdManager {
      */
     @Volatile private var pendingBannerLoad: (() -> Unit)? = null
 
+    /**
+     * MobileAds.initialize is not guaranteed to call back. On some TV images and on
+     * devices where Play Services is missing or disabled the completion lambda never
+     * fires, which would leave the splash waiting on this forever. This bounds it.
+     */
+    private const val INIT_TIMEOUT_MS = 10_000L
+    private val mainHandler = Handler(Looper.getMainLooper())
+    @Volatile private var initWatchdog: Runnable? = null
+
+    /**
+     * Observable init state. Ad placements key their load attempt on this so a
+     * screen that composed before the SDK came up retries once it does, instead
+     * of staying empty until the user navigates away and back.
+     */
+    private val _isInitialisedState = MutableStateFlow(false)
+    val isInitialisedState: StateFlow<Boolean> = _isInitialisedState.asStateFlow()
+
     // ── Initialisation ────────────────────────────────────────────────────
 
     /**
@@ -74,7 +96,11 @@ object AdManager {
      */
     fun initAndAwait(context: Context, onReady: () -> Unit) {
         if (!shouldShowAds(context)) {
-            Log.i(TAG, "Ads disabled or consent unavailable - skipping initialization")
+            // Park the request rather than abandoning it. Consent can still resolve
+            // later — the privacy options form, a restored network, or the next
+            // process foreground — and retryInitIfEligible will pick it up from
+            // there. onReady still runs now so the splash is never blocked.
+            Log.i(TAG, "Ads not eligible yet - deferring initialization until consent resolves")
             onReady()
             return
         }
@@ -108,9 +134,12 @@ object AdManager {
             )
         }
 
+        scheduleInitWatchdog()
+
         MobileAds.initialize(context.applicationContext) { initStatus ->
             val callbacks = synchronized(this) {
                 isInitialised = true
+                _isInitialisedState.value = true
                 pendingInitCallbacks.toList().also { pendingInitCallbacks.clear() }
             }
             val statuses = initStatus.adapterStatusMap.entries
@@ -150,6 +179,48 @@ object AdManager {
             }
             callbacks.forEach { it.invoke() }
         }
+    }
+
+    /**
+     * Releases anything waiting on [MobileAds.initialize] if it never calls back,
+     * and clears the in-flight latch so a later [retryInitIfEligible] can make a
+     * genuine second attempt. Deliberately does NOT mark the SDK initialised:
+     * ad loads must keep refusing until initialize really completes.
+     */
+    private fun scheduleInitWatchdog() {
+        // Only one watchdog may be outstanding. A retry can arrive while an
+        // earlier initialize is still in flight; two watchdogs would race and
+        // the second could clear the latch under a live attempt.
+        initWatchdog?.let(mainHandler::removeCallbacks)
+        val watchdog = Runnable {
+            val drained: List<() -> Unit>
+            synchronized(this) {
+                if (isInitialised) return@Runnable
+                isMobileAdsInitializeCalled.set(false)
+                drained = pendingInitCallbacks.toList().also { pendingInitCallbacks.clear() }
+            }
+            Log.w(
+                TAG,
+                "MobileAds.initialize did not complete within ${INIT_TIMEOUT_MS}ms; " +
+                    "releasing waiters and allowing a later retry"
+            )
+            drained.forEach { it.invoke() }
+        }
+        initWatchdog = watchdog
+        mainHandler.postDelayed(watchdog, INIT_TIMEOUT_MS)
+    }
+
+    /**
+     * Re-checks eligibility and initialises the SDK if ads were previously
+     * suppressed, so a request blocked at splash is not lost for the rest of the
+     * process. Called on every process foreground and after the UMP privacy
+     * options form completes. Safe to call often; a no-op once initialised.
+     */
+    fun retryInitIfEligible(context: Context) {
+        if (isInitialised) return
+        if (!shouldShowAds(context)) return
+        Log.i(TAG, "Ads are now eligible; retrying MobileAds initialization")
+        initAndAwait(context) { }
     }
 
     /**

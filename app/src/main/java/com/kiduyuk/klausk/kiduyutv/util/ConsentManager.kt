@@ -171,6 +171,9 @@ object ConsentManager {
                 Log.w(TAG, "Privacy options form error: ${formError.message}")
             }
             propagateConsentToAllNetworks(activity)
+            // The viewer just resolved consent in-app, so initialise the ad SDK now
+            // rather than waiting for the next process foreground.
+            AdManager.retryInitIfEligible(activity)
             onConsentFormDismissedListener?.onConsentFormDismissed(formError)
         }
     }

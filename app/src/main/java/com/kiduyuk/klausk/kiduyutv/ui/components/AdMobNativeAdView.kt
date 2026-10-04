@@ -9,6 +9,7 @@ import android.widget.TextView
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,9 +32,12 @@ fun AdMobNativeAdView(
 ) {
     val context = LocalContext.current
     val isPreviewMode = LocalInspectionMode.current
+    // Retry once consent resolves: gating on the SDK's init state means this
+    // placement mounts as soon as the SDK is live, not only on a later visit.
+    val isInitialised by AdManager.isInitialisedState.collectAsState()
     var nativeAd by remember { mutableStateOf<NativeAd?>(null) }
 
-    if (isPreviewMode || !AdEligibility.canRequestAds(context)) {
+    if (isPreviewMode || !isInitialised || !AdEligibility.canRequestAds(context)) {
         Box(modifier = modifier)
         return
     }
