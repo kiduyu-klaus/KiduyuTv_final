@@ -113,7 +113,9 @@ object ConsentManager {
         Log.i(TAG, "Propagating consent to all networks: personalize=$canPersonalize")
 
         // ── StartApp ──────────────────────────────────────────────────────
-        Log.i(TAG, "StartApp: consent will be applied during SDK initialization.")
+        // Applied explicitly rather than left to SDK initialisation, so a consent
+        // change reaches a Start.io SDK that is already running.
+        StartAppAdManager.applyConsent(context)
 
         // ── Unity Ads ─────────────────────────────────────────────────────
         try {
@@ -171,9 +173,10 @@ object ConsentManager {
                 Log.w(TAG, "Privacy options form error: ${formError.message}")
             }
             propagateConsentToAllNetworks(activity)
-            // The viewer just resolved consent in-app, so initialise the ad SDK now
-            // rather than waiting for the next process foreground.
+            // The viewer just resolved consent in-app, so initialise the ad SDKs
+            // now rather than waiting for the next process foreground.
             AdManager.retryInitIfEligible(activity)
+            StartAppAdManager.retryInitIfEligible(activity)
             onConsentFormDismissedListener?.onConsentFormDismissed(formError)
         }
     }

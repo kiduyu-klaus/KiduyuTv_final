@@ -15,6 +15,9 @@ import com.startapp.sdk.adsbase.StartAppSDK
 import com.startapp.sdk.adsbase.VideoListener
 import com.startapp.sdk.adsbase.adlisteners.AdDisplayListener
 import com.startapp.sdk.adsbase.adlisteners.AdEventListener
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * StartApp (Start.io) Ad Manager — singleton.
@@ -33,13 +36,25 @@ object StartAppAdManager {
         private set
 
     /**
+     * Observable init state. Start.io is the primary TV banner leg, so a
+     * placement must be able to mount on Start.io being ready without waiting
+     * for AdMob — otherwise an AdMob init failure silently removes the network
+     * that was supposed to be the first attempt.
+     */
+    private val _isInitialisedState = MutableStateFlow(false)
+    val isInitialisedState: StateFlow<Boolean> = _isInitialisedState.asStateFlow()
+
+    /**
      * Initialize Start.io once after UMP consent has resolved.
      */
     @Synchronized
     fun preloadAds(context: Context) {
         if (isInitialised) return
         if (!shouldShowAds(context)) {
-            Log.i(TAG, "Ads disabled - skipping StartApp preload")
+            // Deferred, not abandoned: consent can still resolve later via the
+            // privacy options form or a restored network, and
+            // retryInitIfEligible picks this up from there.
+            Log.i(TAG, "Ads not eligible yet - deferring StartApp initialisation")
             return
         }
         try {
@@ -52,18 +67,49 @@ object StartAppAdManager {
                 false
             )
 
+            applyConsent(context)
+            isInitialised = true
+            _isInitialisedState.value = true
+            Log.i(TAG, "StartApp ads pre-loaded")
+        } catch (e: Exception) {
+            Log.e(TAG, "StartApp preload failed", e)
+        }
+    }
+
+    /**
+     * Pushes the current UMP decision to Start.io. Safe to call repeatedly —
+     * this is what makes a consent change reach an already-initialised SDK,
+     * since consent used to be applied only during [preloadAds].
+     */
+    fun applyConsent(context: Context) {
+        try {
             StartAppSDK.setUserConsent(
                 context,
                 "pas",
                 System.currentTimeMillis(),
                 ConsentManager.canShowPersonalizedAds(context)
             )
-
-            isInitialised = true
-            Log.i(TAG, "StartApp ads pre-loaded")
         } catch (e: Exception) {
-            Log.e(TAG, "StartApp preload failed", e)
+            Log.e(TAG, "Failed to apply consent to StartApp", e)
         }
+    }
+
+    /**
+     * Re-checks eligibility and initialises Start.io when it was previously
+     * suppressed, then refreshes consent. Called on every process foreground and
+     * after the UMP privacy options form completes, so a blocked first attempt
+     * is not lost for the rest of the process.
+     */
+    @Synchronized
+    fun retryInitIfEligible(context: Context) {
+        if (!isInitialised) {
+            if (!shouldShowAds(context)) return
+            Log.i(TAG, "Ads are now eligible; retrying StartApp initialisation")
+            preloadAds(context)
+            return
+        }
+        // Already running: make sure a later consent change is honoured.
+        applyConsent(context)
     }
 
     private fun shouldShowAds(context: Context): Boolean = AdEligibility.canRequestAds(context)

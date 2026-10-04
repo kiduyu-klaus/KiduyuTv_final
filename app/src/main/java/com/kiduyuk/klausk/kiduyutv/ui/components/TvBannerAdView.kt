@@ -44,15 +44,17 @@ fun TvBannerAdView(modifier: Modifier = Modifier) {
     val isPreviewMode = LocalInspectionMode.current
     val focusManager = LocalFocusManager.current
     val context: Context = LocalContext.current
-    // Retry once consent resolves: gating on the SDK's init state means this
-    // placement mounts as soon as the SDK is live, not only on a later visit.
-    val isInitialised by AdManager.isInitialisedState.collectAsState()
+    // Start.io is the first leg here, so mounting must not depend on AdMob: an
+    // AdMob init failure would otherwise remove the network we try first.
+    // Either SDK coming up re-runs this composable and the load starts.
+    val isAdMobReady by AdManager.isInitialisedState.collectAsState()
+    val isStartAppReady by StartAppAdManager.isInitialisedState.collectAsState()
     val activity = context as? Activity
     val screenWidthPx = LocalWindowInfo.current.containerSize.width
     val density = LocalResources.current.displayMetrics.density
     val screenWidthDp = (screenWidthPx / density).toInt().takeIf { it > 0 } ?: 360
 
-    if (!AdEligibility.canRequestAds(context) || !isInitialised) {
+    if (!AdEligibility.canRequestAds(context) || (!isAdMobReady && !isStartAppReady)) {
         Box(modifier = modifier)
         return
     }

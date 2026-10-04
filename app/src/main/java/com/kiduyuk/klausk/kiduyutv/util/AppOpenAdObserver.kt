@@ -49,6 +49,7 @@ class AppOpenAdObserver private constructor(private val application: Application
         // options form, or a network that was down at launch. Retry before
         // anything else so the next ad request has a live SDK behind it.
         AdManager.retryInitIfEligible(application)
+        StartAppAdManager.retryInitIfEligible(application)
         if (!initialLaunchComplete) return
         currentActivity?.let { activity ->
             Log.i(TAG, "App moved to foreground, checking app open ad")
