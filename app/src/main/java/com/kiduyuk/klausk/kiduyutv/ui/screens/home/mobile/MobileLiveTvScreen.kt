@@ -1,6 +1,8 @@
 package com.kiduyuk.klausk.kiduyutv.ui.screens.home.mobile
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +30,7 @@ import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -63,6 +66,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import android.content.Context
+import android.widget.Toast
 import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.model.IptvChannel
 import com.kiduyuk.klausk.kiduyutv.data.model.CountryPlaylist
@@ -106,6 +111,8 @@ fun MobileLiveTvScreen(
     var scrapedChannelsLoading by remember { mutableStateOf(false) }
     var scrapedChannelsError by remember { mutableStateOf<String?>(null) }
     var selectedTab by remember { mutableIntStateOf(0) }
+    var favoriteChannelToConfirm by remember { mutableStateOf<IptvChannel?>(null) }
+    var scrapedChannelToConfirm by remember { mutableStateOf<IptvChannel?>(null) }
     val countryListState = rememberLazyListState()
     val visibleScrapedChannels = remember(scrapedChannels, uiState.hide18PlusChannels) {
         if (uiState.hide18PlusChannels) {
@@ -114,20 +121,35 @@ fun MobileLiveTvScreen(
             scrapedChannels
         }
     }
+    // DaddyLive channels the viewer saved live in the ViewModel, mirroring TV, so
+    // they survive rotation and stay in sync with the My Channels badge.
+    val savedScrapedChannels by viewModel.scrapedChannels.collectAsState()
+    val visibleSavedScrapedChannels = remember(savedScrapedChannels, uiState.hide18PlusChannels) {
+        if (uiState.hide18PlusChannels) {
+            savedScrapedChannels.filterNot(IptvChannel::is18PlusChannel)
+        } else {
+            savedScrapedChannels
+        }
+    }
 
     // Initialize both data sources once; tabs then render their own loading states.
     LaunchedEffect(Unit) {
         viewModel.initialize(context)
         viewModel.loadPlaylist()
         scheduleViewModel.initialize(context)
-        scheduleViewModel.loadSchedule()
     }
 
     // Load cached DaddyLive channels when its tab is opened without blocking Live TV.
+    // The schedule is fetched on first visit only, like TV, so opening the app does
+    // not scrape the schedule the viewer may never look at.
     LaunchedEffect(selectedTab) {
+        if (selectedTab == 1 && scheduleUiState.scheduleDays.isEmpty()) {
+            scheduleViewModel.loadSchedule()
+        }
         if (selectedTab == 2 && scrapedChannels.isEmpty() && !scrapedChannelsLoading) {
             scrapedChannelsLoading = true
             val cached = ScrapedChannelsCache.loadChannels(context)
+                .filter { it.watchPageUrl.startsWith("https://dlive.sx/") }
             scrapedChannels = cached.map { it.toMobileIptvChannel() }
             scrapedChannelsError = if (scrapedChannels.isEmpty()) {
                 "No cached channels yet. Tap Scrape Channels to load DaddyLive."
@@ -173,9 +195,9 @@ fun MobileLiveTvScreen(
             Column(modifier = Modifier.fillMaxSize()) {
                 // Scrollable Material tabs keep all four destinations usable on phones.
                 val tabItems = listOf(
-                    "Live TV" to Icons.Default.PlayCircle,
+                    "Live TV" to Icons.Default.Tv,
                     "Schedule" to Icons.Default.CalendarToday,
-                    "DaddyLive" to Icons.Default.Tv,
+                    "DaddyLive" to Icons.Default.PlayCircle,
                     "My Channels" to Icons.Default.List
                 )
                 ScrollableTabRow(
@@ -202,7 +224,8 @@ fun MobileLiveTvScreen(
                                 Text(
                                     text = if (index == 3) {
                                         val count = viewModel.getFavoriteChannels()
-                                            .count { !uiState.hide18PlusChannels || !it.is18PlusChannel() }
+                                            .count { !uiState.hide18PlusChannels || !it.is18PlusChannel() } +
+                                            visibleSavedScrapedChannels.size
                                         if (count > 0) "$title ($count)" else title
                                     } else title,
                                     maxLines = 1
@@ -295,7 +318,10 @@ fun MobileLiveTvScreen(
                                 } else {
                                     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp)) {
                                         items(uiState.searchResults) { channel ->
-                                            ChannelRow(channel) { selected ->
+                                            ChannelRow(
+                                                channel,
+                                                onLongClick = { favoriteChannelToConfirm = channel }
+                                            ) { selected ->
                                                 val intent = IptvPlayerActivity.createIntent(
                                                     context,
                                                     selected.name,
@@ -346,7 +372,10 @@ fun MobileLiveTvScreen(
                                     // Channels list for selected category
                                     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp)) {
                                         items(uiState.channels) { channel ->
-                                            ChannelRow(channel) { selected ->
+                                            ChannelRow(
+                                                channel,
+                                                onLongClick = { favoriteChannelToConfirm = channel }
+                                            ) { selected ->
                                                 val intent = IptvPlayerActivity.createIntent(
                                                     context,
                                                     selected.name,
@@ -368,6 +397,9 @@ fun MobileLiveTvScreen(
                     }
                     3 -> {
                         // My Channels tab - favorites
+                        LaunchedEffect(Unit) {
+                            viewModel.syncFavoriteChannelsWithFirebase()
+                        }
                         val favorites = viewModel.getFavoriteChannels().let { channels ->
                             if (uiState.hide18PlusChannels) {
                                 channels.filterNot(IptvChannel::is18PlusChannel)
@@ -375,7 +407,7 @@ fun MobileLiveTvScreen(
                                 channels
                             }
                         }
-                        if (favorites.isEmpty()) {
+                        if (favorites.isEmpty() && visibleSavedScrapedChannels.isEmpty()) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -389,6 +421,36 @@ fun MobileLiveTvScreen(
                             }
                         } else {
                             LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp)) {
+                                if (visibleSavedScrapedChannels.isNotEmpty()) {
+                                    item {
+                                        Text(
+                                            text = "Saved DaddyLive",
+                                            color = PrimaryRed,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                    }
+                                    items(visibleSavedScrapedChannels, key = { "saved_scraped_${it.tvgId}" }) { channel ->
+                                        ChannelRow(channel) { selected ->
+                                            playScrapedChannelIntent(context, selected)
+                                                ?.let { context.startActivity(it) }
+                                        }
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                    }
+                                    item { Spacer(modifier = Modifier.height(8.dp)) }
+                                }
+                                if (favorites.isNotEmpty()) {
+                                    item {
+                                        Text(
+                                            text = "Favorites",
+                                            color = PrimaryRed,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                    }
+                                }
                                 items(favorites) { channel ->
                                     ChannelRow(channel) { selected ->
                                         val intent = IptvPlayerActivity.createIntent(
@@ -433,7 +495,9 @@ fun MobileLiveTvScreen(
                                 daddyLiveScope.launch {
                                     scrapedChannelsLoading = true
                                     scrapedChannelsError = null
-                                    val result = ChannelScraper.fetchChannels(fetchStreamUrls = true)
+                                    // Stream URLs are resolved by the player at click
+                                    // time, so the scrape only collects watch pages.
+                                    val result = ChannelScraper.fetchChannels(fetchStreamUrls = false)
                                     val scraped = result.getOrNull()
                                     if (scraped != null) {
                                         ScrapedChannelsCache.saveChannels(context, scraped)
@@ -442,28 +506,87 @@ fun MobileLiveTvScreen(
                                             "No channels were found. Check the DaddyLive address and try again."
                                         } else null
                                     } else {
-                                        scrapedChannelsError = result.exceptionOrNull()?.message
-                                            ?: "Unable to scrape DaddyLive channels."
+                                        val cachedChannels = ScrapedChannelsCache.loadChannels(context)
+                                            .filter { it.watchPageUrl.startsWith("https://dlive.sx/") }
+                                        scrapedChannels = cachedChannels.map { it.toMobileIptvChannel() }
+                                        scrapedChannelsError = if (scrapedChannels.isEmpty()) {
+                                            result.exceptionOrNull()?.message
+                                                ?: "Unable to scrape DaddyLive channels."
+                                        } else {
+                                            null
+                                        }
                                     }
                                     scrapedChannelsLoading = false
                                 }
                             },
                             onChannelClick = { channel ->
-                                context.startActivity(
-                                    SchedulePlayerActivity.createIntent(
-                                        context = context,
-                                        channelId = channel.id,
-                                        channelName = channel.name,
-                                        eventTitle = channel.name,
-                                        iframeUrls = channel.url.takeIf { it.isNotBlank() }?.let(::listOf).orEmpty()
-                                    )
-                                )
+                                playScrapedChannelIntent(context, channel)
+                                    ?.let { context.startActivity(it) }
+                            },
+                            onChannelLongClick = { channel ->
+                                scrapedChannelToConfirm = channel
                             }
                         )
                     }
                 }
             }
     }
+
+        favoriteChannelToConfirm?.let { channelToConfirm ->
+            AlertDialog(
+                onDismissRequest = { favoriteChannelToConfirm = null },
+                title = { Text(text = "Add to favorites?") },
+                text = { Text(text = "Add ${channelToConfirm.name} to your favorites?") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        if (viewModel.isFavorite(channelToConfirm)) {
+                            Toast.makeText(context, "Already in favorites", Toast.LENGTH_SHORT).show()
+                        } else {
+                            viewModel.addFavorite(channelToConfirm)
+                            Toast.makeText(context, "Added to favorites", Toast.LENGTH_SHORT).show()
+                        }
+                        favoriteChannelToConfirm = null
+                    }) {
+                        Text("Add")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { favoriteChannelToConfirm = null }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+
+        scrapedChannelToConfirm?.let { channelToConfirm ->
+            AlertDialog(
+                onDismissRequest = { scrapedChannelToConfirm = null },
+                title = { Text(text = "Add to My Scraped Channels?") },
+                text = {
+                    Text(
+                        text = "Add ${channelToConfirm.name} so it is available in My Channels?"
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        if (viewModel.isScrapedChannel(channelToConfirm)) {
+                            Toast.makeText(context, "Already in My Scraped Channels", Toast.LENGTH_SHORT).show()
+                        } else {
+                            viewModel.addScrapedChannel(channelToConfirm)
+                            Toast.makeText(context, "Added to My Scraped Channels", Toast.LENGTH_SHORT).show()
+                        }
+                        scrapedChannelToConfirm = null
+                    }) {
+                        Text("Add")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { scrapedChannelToConfirm = null }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
 }
 
 }
@@ -603,7 +726,8 @@ private fun MobileDaddyLiveContent(
     isLoading: Boolean,
     error: String?,
     onScrape: () -> Unit,
-    onChannelClick: (IptvChannel) -> Unit
+    onChannelClick: (IptvChannel) -> Unit,
+    onChannelLongClick: (IptvChannel) -> Unit
 ) {
     var query by remember { mutableStateOf("") }
     val filteredChannels = remember(channels, query) {
@@ -689,7 +813,11 @@ private fun MobileDaddyLiveContent(
                         contentPadding = PaddingValues(12.dp)
                     ) {
                         items(filteredChannels, key = { "daddylive_${it.id}" }) { channel ->
-                            ChannelRow(channel = channel, onPlay = onChannelClick)
+                            ChannelRow(
+                                channel = channel,
+                                onLongClick = { onChannelLongClick(channel) },
+                                onPlay = onChannelClick
+                            )
                             Spacer(modifier = Modifier.height(8.dp))
                         }
                     }
@@ -702,11 +830,36 @@ private fun MobileDaddyLiveContent(
 private fun ScrapedChannel.toMobileIptvChannel() = IptvChannel(
     name = name,
     logo = thumbnailUrl,
-    url = primaryStreamUrl.orEmpty(),
+    // DaddyLive is scraped as a directory of watch pages. Keeping this source URL
+    // avoids representing a channel as an empty stream while server discovery is
+    // intentionally deferred to SchedulePlayerActivity at click time.
+    url = watchPageUrl,
     group = category ?: "DaddyLive",
     tvgId = id,
     tvgName = name
 )
+
+/**
+ * Mirrors the TV path: pass only the numeric channel ID so the player resolves the
+ * watch page's current servers at click time. Handing it a baked stream URL instead
+ * would make SchedulePlayerActivity skip resolution and play a stale source.
+ */
+private fun playScrapedChannelIntent(
+    context: Context,
+    channel: IptvChannel
+): android.content.Intent? {
+    val scrapedChannelId = channel.tvgId?.takeIf { id -> id.all(Char::isDigit) }
+    if (scrapedChannelId == null) {
+        Toast.makeText(context, "This DaddyLive channel has no valid playback ID.", Toast.LENGTH_SHORT).show()
+        return null
+    }
+    return SchedulePlayerActivity.createIntent(
+        context = context,
+        channelId = scrapedChannelId,
+        channelName = channel.name,
+        eventTitle = channel.name
+    )
+}
 
 @Composable
 private fun CountryCategoryRow(category: CategoryItem, onClick: () -> Unit) {
@@ -764,11 +917,19 @@ private fun CountryPlaylistList(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ChannelRow(channel: IptvChannel, onPlay: (IptvChannel) -> Unit) {
+private fun ChannelRow(
+    channel: IptvChannel,
+    onLongClick: (() -> Unit)? = null,
+    onPlay: (IptvChannel) -> Unit
+) {
     Row(modifier = Modifier
         .fillMaxWidth()
-        .clickable { onPlay(channel) }
+        .combinedClickable(
+            onClick = { onPlay(channel) },
+            onLongClick = onLongClick
+        )
         .padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
         AsyncImage(model = channel.logo, contentDescription = null, modifier = Modifier.size(64.dp))
         Spacer(modifier = Modifier.width(12.dp))
