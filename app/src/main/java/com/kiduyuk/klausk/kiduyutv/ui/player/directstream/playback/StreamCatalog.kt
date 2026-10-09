@@ -7,14 +7,15 @@ import java.util.Locale
  * Display name + server-side key for a provider reported by the
  * kiduyuTv_providers backend.
  *
- * The empty key is the special "aggregate" mode: when chosen, the app calls
- * `/api/streams/{type}/{tmdbId}` and the server merges results from every
- * enabled provider. Otherwise the app calls
- * `/api/streams/{key}/{type}/{tmdbId}` to scope the request to one provider.
+ * The empty key is the special "aggregate" mode. The resolver uses the live
+ * backend catalog to query every provider compatible with the current title.
+ * A non-empty key scopes the request to that compatible provider.
  */
 data class StreamProviderChoice(
     val displayName: String,
-    val key: String
+    val key: String,
+    /** Category supplied by the backend, such as MoviesTv or Anime. */
+    val category: String? = null
 )
 
 object StreamCatalog {
@@ -29,8 +30,12 @@ object StreamCatalog {
      * network I/O and must be called on Dispatchers.IO.
      */
     fun enabled(): List<StreamProviderChoice> =
-        listOf(aggregate) + ProvidersApi.enabledProviderNames().map { key ->
-            StreamProviderChoice(formatDisplayName(key), key)
+        listOf(aggregate) + ProvidersApi.enabledProviders().map { provider ->
+            StreamProviderChoice(
+                displayName = formatDisplayName(provider.name),
+                key = provider.name,
+                category = provider.category
+            )
         }
 
     fun resolve(name: String?): StreamProviderChoice {

@@ -131,6 +131,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
+private fun String.displayDirectStreamCategory(): String = when (lowercase()) {
+    "moviestv" -> "Movies & TV"
+    "anime" -> "Anime"
+    else -> this
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MobileSettingsScreen( 
@@ -733,9 +739,10 @@ fun MobileSettingsScreen(
                     icon = Icons.Default.PlayCircle,
                     title = "Default Direct Stream Provider",
                     subtitle = if (uiState.defaultDirectStreamProvider == SettingsManager.AUTO) {
-                        "All enabled providers"
+                        "Uses compatible enabled providers for each title"
                     } else {
-                        StreamCatalog.resolve(uiState.defaultDirectStreamProvider).displayName
+                        "${StreamCatalog.resolve(uiState.defaultDirectStreamProvider).displayName} " +
+                            "(used only when compatible)"
                     },
                     onClick = { showDirectProviderPicker = true }
                 )
@@ -987,8 +994,9 @@ fun MobileSettingsScreen(
                         .verticalScroll(rememberScrollState())
                 ) {
                     Text(
-                        "Choose one enabled provider for direct-stream playback. " +
-                            "Select All Providers to aggregate every enabled provider.",
+                        "Provider categories are loaded from the backend. Anime titles use " +
+                            "Anime providers only; other titles use Movies & TV providers. " +
+                            "A default is used only when it matches the title category.",
                         color = TextSecondary,
                         fontSize = 13.sp,
                         modifier = Modifier.padding(bottom = 12.dp)
@@ -1020,7 +1028,8 @@ fun MobileSettingsScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = option.displayName,
+                                text = option.category?.let { "${option.displayName} · ${it.displayDirectStreamCategory()}" }
+                                    ?: option.displayName,
                                 color = if (isSelected) TextPrimary else TextSecondary,
                                 fontSize = 15.sp,
                                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal

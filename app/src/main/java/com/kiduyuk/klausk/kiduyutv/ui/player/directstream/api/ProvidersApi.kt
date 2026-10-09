@@ -71,7 +71,8 @@ object ProvidersApi {
         val category: String
     )
 
-    private data class ProviderCatalogEntry(
+    /** An enabled provider as advertised by the live backend catalog. */
+    data class EnabledProvider(
         val name: String,
         val category: String
     )
@@ -147,7 +148,7 @@ object ProvidersApi {
      * are intentionally not duplicated in the Android client, so backend
      * provider changes take effect without an app release.
      */
-    private fun enabledProviderCatalog(): List<ProviderCatalogEntry> {
+    private fun enabledProviderCatalog(): List<EnabledProvider> {
         val urlString = "$baseUrl/api/providers"
         Log.i(TAG, "GET $urlString")
         val connection = (URL(urlString).openConnection() as HttpURLConnection).apply {
@@ -177,7 +178,7 @@ object ProvidersApi {
                     val name = item.optString("name").trim().lowercase()
                     val category = item.optString("category").trim().lowercase(Locale.ROOT)
                     if (item.optBoolean("enabled", false) && name.isNotBlank() && category.isNotBlank()) {
-                        add(ProviderCatalogEntry(name, category))
+                        add(EnabledProvider(name, category))
                     }
                 }
             }.distinctBy { it.name }.also {
@@ -193,10 +194,11 @@ object ProvidersApi {
     }
 
     /**
-     * Provider names for UI catalog presentation. Media playback must use
-     * [providerRouteForMedia] so category and anime-path routing are applied.
+     * Reads enabled provider names and their backend-defined categories for
+     * UI presentation. Playback must use [providerRouteForMedia] to enforce
+     * compatibility with the title being played.
      */
-    fun enabledProviderNames(): List<String> = enabledProviderCatalog().map { it.name }
+    fun enabledProviders(): List<EnabledProvider> = enabledProviderCatalog()
 
     /**
      * Returns the backend category and request type for a TMDB title.

@@ -127,6 +127,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.tasks.await
 
+private fun String.displayDirectStreamCategory(): String = when (lowercase()) {
+    "moviestv" -> "Movies & TV"
+    "anime" -> "Anime"
+    else -> this
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Root Screen
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1474,8 +1480,9 @@ private fun PlaybackContent(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = "Choose one enabled provider for direct-stream playback. " +
-                            "Set to \"All Providers\" to fetch from every enabled provider.",
+                    text = "Provider categories are loaded from the backend. Anime titles use " +
+                            "Anime providers only; other titles use Movies & TV providers. " +
+                            "A default is used only when it matches the title category.",
                     color = TextSecondary,
                     fontSize = 14.sp,
                     lineHeight = 20.sp,
@@ -1497,7 +1504,8 @@ private fun PlaybackContent(
                     ) {
                         rowOptions.forEach { option ->
                             ProviderOptionItem(
-                                option = option.displayName,
+                                option = option.category?.let { "${option.displayName} · ${it.displayDirectStreamCategory()}" }
+                                    ?: option.displayName,
                                 isSelected = option.key.ifBlank { SettingsManager.AUTO } ==
                                     defaultDirectStreamProvider,
                                 onClick = {
