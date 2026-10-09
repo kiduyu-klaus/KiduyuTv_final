@@ -34,6 +34,13 @@ data class StreamItem(
      */
     val subtitles: List<SubtitleItem> = emptyList(),
     /**
+     * Anime-provider opening interval. Backend values are supplied in seconds
+     * and normalized to milliseconds at the providers API boundary.
+     */
+    val intro: StreamSegment? = null,
+    /** Anime-provider ending interval, normalized to milliseconds. */
+    val outro: StreamSegment? = null,
+    /**
      * Mutable validation status. Set to `true` after a successful HEAD/Range
      * probe confirms the upstream is reachable and returns 2xx. The
      * `StreamSelectionDialog` reads this flag to render the "stream ok"
@@ -58,6 +65,12 @@ data class StreamItem(
      * `null` until the first probe completes.
      */
     var httpStatusCode: Int? = null
+)
+
+/** A validated opening or ending interval supplied with an anime stream. */
+data class StreamSegment(
+    val startMs: Long,
+    val endMs: Long
 )
 
 /**

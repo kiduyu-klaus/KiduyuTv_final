@@ -19,7 +19,7 @@ import kotlin.math.roundToLong
  * intro, recap, outro, preview, or credits intervals on the track.
  *
  * The native SeekBar progress remains normalized to 0..1000, matching the
- * existing DirectStreamActivity seek logic.
+ * existing DirectStreamActivity seek logic. setSegments
  */
 class SegmentedSeekBar @JvmOverloads constructor(
     context: Context,

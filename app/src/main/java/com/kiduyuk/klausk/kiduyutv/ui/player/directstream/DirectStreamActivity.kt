@@ -37,6 +37,7 @@ import androidx.media3.common.util.UnstableApi
 import com.kiduyuk.klausk.kiduyutv.data.model.SkipSegment
 import com.kiduyuk.klausk.kiduyutv.data.model.SkipSegmentQuality
 import com.kiduyuk.klausk.kiduyutv.data.model.SkipSegmentType
+import com.kiduyuk.klausk.kiduyutv.data.model.SkipSegments
 import com.kiduyuk.klausk.kiduyutv.data.model.SkipSegmentsResponse
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -59,6 +60,7 @@ import com.kiduyuk.klausk.kiduyutv.activity.mainactivity.MainActivity
 import com.kiduyuk.klausk.kiduyutv.databinding.ActivityDirectStreamBinding
 import com.kiduyuk.klausk.kiduyutv.ui.player.cloudflareBypass.CloudflareBypassActivity
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamItem
+import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamSegment
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.SubtitleItem
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.OpenSubtitlesClient
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.HttpCookieStore
@@ -159,6 +161,8 @@ class DirectStreamActivity : AppCompatActivity() {
     private var configuredDirectProviderIsSet = false
     private var currentImdbId: String? = null
     private var skipData: SkipSegmentsResponse? = null
+    /** Opening/ending intervals embedded in the active anime provider stream. */
+    private var providerSkipSegments: SkipSegments? = null
     private var shownSkipType: SkipSegmentType? = null
     // Track which content the skipData corresponds to so we don't clear
     // the UI when a transient fetch failure happens while switching
@@ -1075,7 +1079,7 @@ class DirectStreamActivity : AppCompatActivity() {
                 // Draw every valid intro/recap/outro/preview interval once
                 // the SkipDB response arrives. The custom SeekBar keeps these
                 // colors visible while playback continues.
-                binding.seekBar.setSegments(result.segments)
+                refreshDisplayedSkipSegments()
             } else {
                 val sameContent = (skipLoadedForImdbId != null && skipLoadedForImdbId == requestImdb) ||
                     (skipLoadedForTmdbId != null && skipLoadedForTmdbId == requestTmdb && requestImdb.isNullOrBlank())
@@ -1083,16 +1087,82 @@ class DirectStreamActivity : AppCompatActivity() {
                     skipData = null
                     skipLoadedForImdbId = null
                     skipLoadedForTmdbId = null
-                    binding.seekBar.clearHighlights()
-                    hideSkipButton()
+                    refreshDisplayedSkipSegments()
+                    if (activeSkipSegments() == null) hideSkipButton()
                 }
                 // else: keep existing skipData for the same content
             }
         }
     }
 
+    /**
+     * The anime backend's per-stream timings are exact for the selected
+     * source, so they override SkipDB's intro/outro where present. SkipDB
+     * still supplies recap/preview and fills either missing provider interval.
+     */
+    private fun activeSkipSegments(): SkipSegments? {
+        val provider = providerSkipSegments
+        val fallback = skipSegmentsForCurrentContent()
+        if (provider == null) return fallback
+        return SkipSegments(
+            intro = provider.intro ?: fallback?.intro,
+            recap = fallback?.recap,
+            outro = provider.outro ?: fallback?.outro,
+            preview = fallback?.preview
+        )
+    }
+
+    private fun skipSegmentsForCurrentContent(): SkipSegments? {
+        val imdbMatches = !currentImdbId.isNullOrBlank() && skipLoadedForImdbId == currentImdbId
+        val tmdbMatches = currentImdbId.isNullOrBlank() &&
+            currentTmdbId > 0 &&
+            skipLoadedForTmdbId == currentTmdbId
+        return if (imdbMatches || tmdbMatches) skipData?.segments else null
+    }
+
+    private fun refreshDisplayedSkipSegments() {
+        activeSkipSegments()?.let(binding.seekBar::setSegments)
+            ?: binding.seekBar.clearHighlights()
+    }
+
+    private fun applyProviderSkipSegments(stream: StreamItem) {
+        providerSkipSegments = stream.toProviderSkipSegments()
+        if (providerSkipSegments != null) {
+            Log.i(
+                TAG,
+                "Using provider anime segments provider=${stream.provider.ifBlank { "?" }} " +
+                    "intro=${stream.intro?.startMs ?: "-"}-${stream.intro?.endMs ?: "-"} " +
+                    "outro=${stream.outro?.startMs ?: "-"}-${stream.outro?.endMs ?: "-"}"
+            )
+        }
+        refreshDisplayedSkipSegments()
+    }
+
+    private fun StreamItem.toProviderSkipSegments(): SkipSegments? {
+        fun StreamSegment.toSkipSegment() = SkipSegment(
+            startMs = startMs,
+            endMs = endMs,
+            match = "provider",
+            adjusted = false,
+            offsetMs = null,
+            confidence = 1.0
+        )
+        val introSegment = intro?.toSkipSegment()
+        val outroSegment = outro?.toSkipSegment()
+        return if (introSegment == null && outroSegment == null) {
+            null
+        } else {
+            SkipSegments(
+                intro = introSegment,
+                recap = null,
+                outro = outroSegment,
+                preview = null
+            )
+        }
+    }
+
     private fun updateSkipButton() {
-        val data = skipData ?: run {
+        val segments = activeSkipSegments() ?: run {
             binding.seekBar.clearHighlights()
             return
         }
@@ -1100,10 +1170,10 @@ class DirectStreamActivity : AppCompatActivity() {
         if (duration > 0L) binding.seekBar.setDurationMs(duration)
         val positionMs = engine.player.currentPosition.coerceAtLeast(0L)
         val candidates = listOf(
-            SkipSegmentType.RECAP to data.segments.recap,
-            SkipSegmentType.INTRO to data.segments.intro,
-            SkipSegmentType.OUTRO to data.segments.outro,
-            SkipSegmentType.PREVIEW to data.segments.preview
+            SkipSegmentType.RECAP to segments.recap,
+            SkipSegmentType.INTRO to segments.intro,
+            SkipSegmentType.OUTRO to segments.outro,
+            SkipSegmentType.PREVIEW to segments.preview
         ).mapNotNull { (type, segment) ->
             val resolved = segment ?: return@mapNotNull null
             if (!SkipSegmentQuality.isUsable(resolved)) return@mapNotNull null
@@ -1223,7 +1293,7 @@ class DirectStreamActivity : AppCompatActivity() {
 
     private fun onSkipClicked() {
         val type = shownSkipType ?: return
-        val segment = skipData?.segments?.get(type) ?: return
+        val segment = activeSkipSegments()?.get(type) ?: return
         val targetMs = segment.endMs ?: (segment.startMs + 5 * 60_000L)
         cancelAutoSkipCountdown()
         engine.player.seekTo(targetMs)
@@ -1772,6 +1842,7 @@ class DirectStreamActivity : AppCompatActivity() {
         backendDownDialog = null
         availableStreams = emptyList()
         activeStream = null
+        providerSkipSegments = null
         providerSubtitles = emptyList()
         supplementalSubtitles = emptyList()
         pendingReadySeekPositionMs = 0L
@@ -2300,6 +2371,8 @@ class DirectStreamActivity : AppCompatActivity() {
             return
         }
         handlingPlaybackError = false
+        activeStream = stream
+        applyProviderSkipSegments(stream)
         providerSubtitles = stream.subtitles
         stopWatchProgressUpdates()
         showLoadingArtwork()

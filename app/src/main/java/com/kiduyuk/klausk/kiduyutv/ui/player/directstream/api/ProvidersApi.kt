@@ -5,6 +5,7 @@ import android.util.Log
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.data.api.ApiClient
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamItem
+import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamSegment
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamResponse
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.SubtitleItem
 import com.kiduyuk.klausk.kiduyutv.util.UrlUtils
@@ -315,7 +316,10 @@ object ProvidersApi {
                 Log.w(TAG, "Body[0..200]=${body.take(200)}")
                 throw ProvidersApiHttpException(status)
             }
-            val response = parse(JSONObject(body))
+            val response = parse(
+                json = JSONObject(body),
+                acceptsAnimeSegments = type == ANIME_STREAM_TYPE
+            )
             Log.i(
                 TAG,
                 "Response provider=$providerLabel tmdbId=${response.tmdbId} " +
@@ -343,7 +347,10 @@ object ProvidersApi {
      * in, so we coerce it. `imdbId` may be JSON `null`, which `optString`
      * surfaces as the literal `"null"` — we treat that as absent.
      */
-    private fun parse(json: JSONObject): StreamResponse {
+    private fun parse(
+        json: JSONObject,
+        acceptsAnimeSegments: Boolean = false
+    ): StreamResponse {
         val tmdbId = json.optString("tmdbId")
             .toIntOrNull()
             ?: json.optInt("tmdbId", 0)
@@ -459,6 +466,8 @@ object ProvidersApi {
                 val subtitles = parseSubtitles(
                     s.optJSONArray("subtitles") ?: s.optJSONArray("captions")
                 )
+                val intro = if (acceptsAnimeSegments) parseAnimeSegment(s.optJSONObject("intro")) else null
+                val outro = if (acceptsAnimeSegments) parseAnimeSegment(s.optJSONObject("outro")) else null
                 add(
                     StreamItem(
                         title = title,
@@ -470,12 +479,31 @@ object ProvidersApi {
                         type = normalizedType,
                         mimeType = mimeType,
                         headers = headers,
-                        subtitles = subtitles
+                        subtitles = subtitles,
+                        intro = intro,
+                        outro = outro
                     )
                 )
             }
         }
         return StreamResponse(tmdbId, imdbId, items)
+    }
+
+    /**
+     * Anime providers report opening/ending offsets in seconds. Keep only
+     * positive, ordered intervals and convert once at the API boundary so the
+     * player can use its normal millisecond-based segment code.
+     */
+    private fun parseAnimeSegment(segment: JSONObject?): StreamSegment? {
+        val startSeconds = segment?.optDouble("start", Double.NaN) ?: return null
+        val endSeconds = segment.optDouble("end", Double.NaN)
+        if (!startSeconds.isFinite() || !endSeconds.isFinite() || startSeconds < 0.0 || endSeconds <= startSeconds) {
+            return null
+        }
+        return StreamSegment(
+            startMs = (startSeconds * 1_000).toLong(),
+            endMs = (endSeconds * 1_000).toLong()
+        )
     }
 
     private fun extractMovieBoxLanguage(provider: String, title: String): String {
