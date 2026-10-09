@@ -148,16 +148,18 @@ class StreamResolver {
             }.awaitAll()
         }
 
-        // A provider can occasionally return the same stream more than once.
-        // Keep configured provider order; completion order is used only for
-        // progress reporting.
+        // Every stream a provider reports is surfaced. Only genuinely
+        // unusable sources are dropped here; duplicate suppression is left to
+        // the provider server, because collapsing identical URLs here would hide
+        // how many sources a provider actually returned.
+        // Order follows configured provider order; completion order is used only
+        // for progress reporting.
         providerResults.flatten()
             .filterNot { stream ->
                 val urlWithoutQuery = stream.url.substringBefore('?').substringBefore('#')
                 stream.url.contains(EXCLUDED_STREAM_HOST, ignoreCase = true) ||
                     urlWithoutQuery.endsWith(EXCLUDED_STREAM_EXTENSION, ignoreCase = true)
             }
-            .distinctBy { "${it.provider.lowercase()}|${it.url}" }
             .also {
                 Log.i(tag, "Resolver.load returned ${it.size} combined streams")
             }
