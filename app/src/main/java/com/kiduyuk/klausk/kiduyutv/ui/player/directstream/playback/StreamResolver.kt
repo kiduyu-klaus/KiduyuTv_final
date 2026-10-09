@@ -55,11 +55,12 @@ class StreamResolver {
         // backend should be reported to the player immediately.
         ProvidersApi.requireBackendAvailable()
 
-        // Category-based routing is intentionally disabled for now. Query all
-        // enabled providers for every movie/series so providers are not lost
-        // when TMDB genre metadata is missing or incomplete. An explicitly
-        // selected/default provider is still narrowed below.
-        val enabledProviderNames = ProvidersApi.enabledProviderNames()
+        // The backend catalog is authoritative for enabled provider categories.
+        // Anime media uses the backend's separate `anime` route, while all
+        // other media remains on its movie/series route.
+        val providerRoute = ProvidersApi.providerRouteForMedia(type, tmdbId)
+        val enabledProviderNames = providerRoute.providerNames
+        val requestType = providerRoute.streamType
         val selectedProvider = provider.key.takeIf { selected ->
             enabledProviderNames.any { it.equals(selected, ignoreCase = true) }
         }
@@ -90,7 +91,8 @@ class StreamResolver {
                     requestLimiter.withPermit {
                         Log.i(
                             tag,
-                            "Resolver.load provider=$providerName type=$type tmdbId=$tmdbId " +
+                            "Resolver.load provider=$providerName type=$requestType category=" +
+                                "${providerRoute.category} tmdbId=$tmdbId " +
                                 "season=${season ?: "-"} episode=${episode ?: "-"}"
                         )
 
@@ -101,7 +103,7 @@ class StreamResolver {
 
                             runCatching {
                                 ProvidersApi.streams(
-                                    type = type,
+                                    type = requestType,
                                     tmdbId = tmdbId,
                                     season = season,
                                     episode = episode,

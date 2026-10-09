@@ -167,6 +167,7 @@ data class MovieDetail(
     @SerializedName("vote_average") val voteAverage: Double,
     @SerializedName("release_date") val releaseDate: String?,
     @SerializedName("runtime") val runtime: Int?,
+    @SerializedName("original_language") val originalLanguage: String? = null,
     @SerializedName("genres") val genres: List<Genre>?,
     @SerializedName("production_companies") val productionCompanies: List<ProductionCompany>?,
     @SerializedName("belongs_to_collection") val belongsToCollection: MovieCollection?
@@ -197,6 +198,7 @@ data class TvShowDetail(
     @SerializedName("first_air_date") val firstAirDate: String?,
     @SerializedName("number_of_seasons") val numberOfSeasons: Int?,
     @SerializedName("number_of_episodes") val numberOfEpisodes: Int?,
+    @SerializedName("original_language") val originalLanguage: String? = null,
     @SerializedName("genres") val genres: List<Genre>?,
     @SerializedName("networks") val networks: List<Network>?,
     @SerializedName("seasons") val seasons: List<Season>?,
