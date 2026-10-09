@@ -60,7 +60,19 @@ class PlayerEngine(context: Context) {
         // 403 any UA that claims a browser version newer than the latest
         // stable release; vixsrc.to in particular ships "Chrome/150"
         // which doesn't exist and triggers 403 on the manifest request.
-        val safeHeaders = playbackHeaders(stream)
+        val safeHeaders = playbackHeaders(stream).toMutableMap().apply {
+            // Vidlink's Hakuna Matata MP4 CDN responds with HTTP 428 to
+            // browser-style Chrome user agents, including our normal default.
+            // It accepts Media3/ExoPlayer requests (including byte ranges), which
+            // preserves progressive MP4 seeking instead of requiring a proxy or a
+            // full-file download. This is host-scoped because many other CDNs do
+            // require a browser identity.
+            if (isHakunaMatataVideoCdn(stream.url)) {
+                keys.removeAll { key -> key.equals("User-Agent", ignoreCase = true) }
+                put("User-Agent", HAKUNA_MATATA_USER_AGENT)
+                Log.i(TAG, "Using Media3 user agent for Hakuna Matata CDN playback")
+            }
+        }
         val httpFactory = DefaultHttpDataSource.Factory()
             .setUserAgent(USER_AGENT)
             .setConnectTimeoutMs(HTTP_CONNECT_TIMEOUT_MS)
@@ -130,6 +142,16 @@ class PlayerEngine(context: Context) {
             ?: return null
         return CloudflareBypassActivity.loadCookies(appContext, host)
     }
+
+    /**
+     * The provider currently returns Vidlink MP4 files through this host. Do
+     * not generalize this by provider name: only the CDN itself has the
+     * non-browser User-Agent requirement.
+     */
+    private fun isHakunaMatataVideoCdn(url: String): Boolean =
+        runCatching { Uri.parse(url).host }
+            .getOrNull()
+            ?.equals("bcdn.hakunaymatata.com", ignoreCase = true) == true
 
     /**
      * The DahmerMovies worker expects the nested origin's scheme and host
@@ -822,6 +844,13 @@ class PlayerEngine(context: Context) {
          * overrides this when present.
          */
         private const val USER_AGENT = REAL_BROWSER_USER_AGENT
+
+        /**
+         * bcdn.hakunaymatata.com returns 428 for Chrome-like User-Agent values
+         * but allows native Media3 requests. Keep this explicit rather than
+         * relying on Media3's version-dependent default identity.
+         */
+        private const val HAKUNA_MATATA_USER_AGENT = "ExoPlayer/1.6.1"
         private const val DAHMER_MOVIES_REFERER = "https://a.111477.xyz/"
         private const val DAHMER_MOVIES_RAW_PREFIX =
             "https://p.111477.xyz/bulk?u=https://a.111477.xyz"
