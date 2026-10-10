@@ -177,10 +177,10 @@ object ProvidersApi {
             }
             val providers = json.optJSONArray("providers")
                 ?: throw IOException("Providers API response has no providers array")
-            buildList {
+            val catalog = buildList {
                 for (index in 0 until providers.length()) {
                     val item = providers.optJSONObject(index) ?: continue
-                    val name = item.optString("name").trim().lowercase()
+                    val name = item.optString("name").trim().lowercase(Locale.ROOT)
                     val legacyCategory = item.optString("category").trim()
                     val categories = buildList {
                         item.optJSONArray("categories")?.let { categoryArray ->
@@ -213,6 +213,37 @@ object ProvidersApi {
                             .distinct()
                     )
                 }
+                .let { entries ->
+                    // MovieBox is a dual-category provider. Keep it available
+                    // for both movie/TV and anime routes even if the backend
+                    // returns only one category, splits it across records, or
+                    // omits it from the catalog entirely.
+                    val movieBox = entries.firstOrNull { it.name.equals("moviebox", ignoreCase = true) }
+                    val normalized = if (movieBox == null) {
+                        entries + EnabledProvider(
+                            name = "moviebox",
+                            categories = listOf(MOVIES_TV_CATEGORY, ANIME_CATEGORY)
+                        )
+                    } else {
+                        entries.map { provider ->
+                            if (provider.name.equals("moviebox", ignoreCase = true)) {
+                                provider.copy(
+                                    categories = (provider.categories + MOVIES_TV_CATEGORY + ANIME_CATEGORY)
+                                        .map(::normalizeCategory)
+                                        .distinct()
+                                )
+                            } else {
+                                provider
+                            }
+                        }
+                    }
+                    Log.i(
+                        TAG,
+                        "MovieBox fallback applied: " +
+                            normalized.firstOrNull { it.name == "moviebox" }?.categories.orEmpty()
+                    )
+                    normalized
+                }
                 .also {
                 Log.i(
                     TAG,
@@ -220,6 +251,7 @@ object ProvidersApi {
                         it.joinToString { provider -> "${provider.name}:${provider.categories.joinToString("/")}" }
                 )
             }
+            catalog
         } finally {
             connection.disconnect()
         }
