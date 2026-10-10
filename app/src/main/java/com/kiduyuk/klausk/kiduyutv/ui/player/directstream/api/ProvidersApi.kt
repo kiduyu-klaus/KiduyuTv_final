@@ -194,12 +194,26 @@ object ProvidersApi {
                         if (legacyCategory.isNotBlank()) {
                             add(legacyCategory)
                         }
-                    }.map { it.lowercase(Locale.ROOT) }.distinct()
+                    }.map(::normalizeCategory).distinct()
                     if (item.optBoolean("enabled", false) && name.isNotBlank() && categories.isNotEmpty()) {
                         add(EnabledProvider(name, categories))
                     }
                 }
-            }.distinctBy { it.name }.also {
+            }
+                // Some catalog versions can advertise one provider in more than
+                // one record. Merge those records instead of letting distinctBy
+                // keep only the first category (for example MovieBox's
+                // MoviesTv + Anime support).
+                .groupBy { it.name }
+                .map { (name, entries) ->
+                    EnabledProvider(
+                        name = name,
+                        categories = entries
+                            .flatMap { it.categories }
+                            .distinct()
+                    )
+                }
+                .also {
                 Log.i(
                     TAG,
                     "Enabled providers (${it.size}): " +
@@ -234,7 +248,7 @@ object ProvidersApi {
         val category = if (classification.isAnime) ANIME_CATEGORY else MOVIES_TV_CATEGORY
         val selected = enabledProviderCatalog()
             .filter { provider ->
-                provider.categories.any { it.equals(category, ignoreCase = true) }
+                provider.categories.any { normalizeCategory(it) == normalizeCategory(category) }
             }
             .map { it.name }
         Log.i(
@@ -281,6 +295,9 @@ object ProvidersApi {
             )
         }.getOrDefault(MediaClassification(isAnime = false, originalLanguage = null))
     }
+
+    private fun normalizeCategory(value: String): String =
+        value.lowercase(Locale.ROOT).filter { it.isLetterOrDigit() }
 
     fun streams(
         type: String,
