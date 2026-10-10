@@ -81,6 +81,7 @@
     <string name="subtitle_loaded">Subtitle loaded: %1$s</string>
     <string name="stream_sources">Streams</string>
     <string name="stream_sources_cd">Choose playback stream</string>
+    <string name="reload_streams_cd">Reload streams for this title</string>
     <string name="stream_choose">Choose Stream</string>
     <string name="stream_choose_hint">Select another playback source</string>
     <string name="stream_source_count">%1$d sources available</string>

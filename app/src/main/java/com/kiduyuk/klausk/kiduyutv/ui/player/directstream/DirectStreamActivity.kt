@@ -532,6 +532,7 @@ class DirectStreamActivity : AppCompatActivity() {
         binding.btnSkipSegment.setOnClickListener { onSkipClicked() }
         binding.btnPlayerTracks.setOnClickListener { showTrackDialog() }
         binding.btnPlayerStreams.setOnClickListener { showStreamDialog() }
+        binding.btnReloadStreams.setOnClickListener { reloadCurrentMediaStreams() }
         binding.btnPlayerSubtitles.setOnClickListener { searchExternalSubtitles() }
         binding.playerView.setOnClickListener { showControls() }
         binding.overlayControls.setOnClickListener { showControls() }
@@ -1342,6 +1343,31 @@ class DirectStreamActivity : AppCompatActivity() {
         )
     }
 
+    private fun reloadCurrentMediaStreams() {
+        if (streamJob?.isActive == true) return
+
+        pendingStartPositionMs = if (::engine.isInitialized) {
+            engine.player.currentPosition.coerceAtLeast(0L)
+        } else {
+            0L
+        }
+        lastLoadSignature = null
+        Log.i(
+            PROVIDER_TAG,
+            "Reloading streams for current media type=$currentMediaType " +
+                "tmdbId=$currentTmdbId season=${currentSeason ?: "-"} " +
+                "episode=${currentEpisode ?: "-"} position=${pendingStartPositionMs}ms"
+        )
+        loadAndPlay(
+            currentMediaType,
+            currentTmdbId,
+            currentSeason,
+            currentEpisode,
+            currentProvider
+        )
+        showControls()
+    }
+
     /**
      * Show the custom tracks button only when the manifest exposes at
      * least one track the user can switch to. HLS playlists with a single
@@ -1400,6 +1426,7 @@ class DirectStreamActivity : AppCompatActivity() {
             binding.btnPlayerSubtitles,
             binding.btnPlayerTracks,
             binding.btnPlayerStreams,
+            binding.btnReloadStreams,
             binding.btnVolume,
             binding.btnNextEpisode,
             binding.btnEpisodes,
@@ -3024,6 +3051,7 @@ class DirectStreamActivity : AppCompatActivity() {
             binding.btnPlayerSubtitles,
             binding.btnPlayerTracks,
             binding.btnPlayerStreams,
+            binding.btnReloadStreams,
             binding.btnVolume,
             binding.btnNextEpisode,
             binding.btnEpisodes

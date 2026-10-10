@@ -362,17 +362,27 @@
                         android:layout_marginStart="6dp"
                         android:contentDescription="@string/stream_sources_cd"
                         android:nextFocusLeft="@id/btnPlayerTracks"
-                        android:nextFocusRight="@id/btnVolume"
+                        android:nextFocusRight="@id/btnReloadStreams"
                         android:nextFocusUp="@id/btnPlayerBack"
                         android:visibility="gone"
                         app:icon="@drawable/ic_server" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnReloadStreams"
+                        style="@style/DirectStreamIconButton"
+                        android:layout_marginStart="6dp"
+                        android:contentDescription="@string/reload_streams_cd"
+                        android:nextFocusLeft="@id/btnPlayerStreams"
+                        android:nextFocusRight="@id/btnVolume"
+                        android:nextFocusUp="@id/btnPlayerBack"
+                        app:icon="@drawable/ic_refresh" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnVolume"
                         style="@style/DirectStreamIconButton"
                         android:layout_marginStart="6dp"
                         android:contentDescription="@string/player_volume"
-                        android:nextFocusLeft="@id/btnPlayerStreams"
+                        android:nextFocusLeft="@id/btnReloadStreams"
                         android:nextFocusRight="@id/btnFill"
                         android:nextFocusUp="@id/btnPlayerBack"
                         app:icon="@drawable/ic_vol" />
