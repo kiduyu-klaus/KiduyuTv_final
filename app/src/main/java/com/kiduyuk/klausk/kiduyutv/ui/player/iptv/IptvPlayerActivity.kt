@@ -423,20 +423,6 @@ class IptvPlayerActivity : AppCompatActivity() {
         }
 
         when (keyCode) {
-            // ── Show/Hide Controls ──────────────────────────────────────────────
-            KeyEvent.KEYCODE_DPAD_UP,
-            KeyEvent.KEYCODE_DPAD_CENTER,
-            KeyEvent.KEYCODE_ENTER -> {
-                if (isLocked) return true
-                if (!isOverlayVisible) {
-                    showOverlay()
-                } else {
-                    //Toggle visibility on repeated press
-                    hideOverlay()
-                }
-                return true
-            }
-
             // ── Playback Controls ──────────────────────────────────────────────
             KeyEvent.KEYCODE_MEDIA_PLAY,
             KeyEvent.KEYCODE_MEDIA_PAUSE,

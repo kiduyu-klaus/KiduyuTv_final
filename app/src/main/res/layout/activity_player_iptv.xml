@@ -42,6 +42,7 @@
             android:contentDescription="Back"
             android:focusable="true"
             android:focusableInTouchMode="true"
+            android:nextFocusRight="@id/btnPlaylist"
             android:nextFocusDown="@id/btnFill"
             android:src="@drawable/ic_arrow_back"
             app:tint="#FFFFFF" />
@@ -80,6 +81,8 @@
             android:contentDescription="Playlist channels"
             android:focusable="true"
             android:focusableInTouchMode="true"
+            android:nextFocusLeft="@id/btnBack"
+            android:nextFocusRight="@id/btnInfo"
             android:nextFocusDown="@id/btnFill"
             android:src="@drawable/ic_menu"
             app:tint="#FFFFFF" />
@@ -92,6 +95,7 @@
             android:contentDescription="Info"
             android:focusable="true"
             android:focusableInTouchMode="true"
+            android:nextFocusLeft="@id/btnPlaylist"
             android:nextFocusDown="@id/btnCC"
             android:src="@drawable/ic_info_outline"
             app:tint="#FFFFFF" />
@@ -141,6 +145,7 @@
                 android:contentDescription="Lock / Unlock overlay"
                 android:focusable="true"
                 android:focusableInTouchMode="true"
+                android:nextFocusUp="@id/btnInfo"
                 android:nextFocusDown="@id/btnCC"
                 android:src="@drawable/ic_lock_open"
                 app:tint="#FFFFFF" />
@@ -156,6 +161,8 @@
                 android:contentDescription="Channel up"
                 android:focusable="true"
                 android:focusableInTouchMode="true"
+                android:nextFocusUp="@id/btnBack"
+                android:nextFocusDown="@id/btnFill"
                 android:src="@drawable/ic_forward_15"
                 app:tint="#FFFFFF" />
 
@@ -170,6 +177,8 @@
                 android:contentDescription="Next channel"
                 android:focusable="true"
                 android:focusableInTouchMode="true"
+                android:nextFocusUp="@id/btnPlaylist"
+                android:nextFocusDown="@id/btnPip"
                 android:src="@drawable/ic_chevron_right"
                 app:tint="#FFFFFF" />
 
@@ -364,4 +373,3 @@
     </FrameLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
-
