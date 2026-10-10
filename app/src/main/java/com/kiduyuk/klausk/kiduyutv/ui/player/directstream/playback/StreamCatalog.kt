@@ -15,8 +15,12 @@ data class StreamProviderChoice(
     val displayName: String,
     val key: String,
     /** Category supplied by the backend, such as MoviesTv or Anime. */
-    val category: String? = null
-)
+    val categories: List<String> = emptyList()
+) {
+    /** Primary category retained for compatibility with existing callers. */
+    val category: String?
+        get() = categories.firstOrNull()
+}
 
 object StreamCatalog {
 
@@ -34,7 +38,7 @@ object StreamCatalog {
             StreamProviderChoice(
                 displayName = formatDisplayName(provider.name),
                 key = provider.name,
-                category = provider.category
+                categories = provider.categories
             )
         }
 

@@ -1028,8 +1028,13 @@ fun MobileSettingsScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = option.category?.let { "${option.displayName} · ${it.displayDirectStreamCategory()}" }
-                                    ?: option.displayName,
+                                text = if (option.categories.isNotEmpty()) {
+                                    "${option.displayName} · " + option.categories.joinToString(" · ") {
+                                        it.displayDirectStreamCategory()
+                                    }
+                                } else {
+                                    option.displayName
+                                },
                                 color = if (isSelected) TextPrimary else TextSecondary,
                                 fontSize = 15.sp,
                                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal

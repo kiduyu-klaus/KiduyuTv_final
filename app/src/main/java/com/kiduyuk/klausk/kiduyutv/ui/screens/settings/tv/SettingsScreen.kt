@@ -1504,8 +1504,13 @@ private fun PlaybackContent(
                     ) {
                         rowOptions.forEach { option ->
                             ProviderOptionItem(
-                                option = option.category?.let { "${option.displayName} · ${it.displayDirectStreamCategory()}" }
-                                    ?: option.displayName,
+                                option = if (option.categories.isNotEmpty()) {
+                                    "${option.displayName} · " + option.categories.joinToString(" · ") {
+                                        it.displayDirectStreamCategory()
+                                    }
+                                } else {
+                                    option.displayName
+                                },
                                 isSelected = option.key.ifBlank { SettingsManager.AUTO } ==
                                     defaultDirectStreamProvider,
                                 onClick = {
