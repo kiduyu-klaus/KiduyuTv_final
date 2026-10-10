@@ -122,10 +122,8 @@ class StreamSelectionDialog(
 
     fun updateStreams(updated: List<StreamItem>, activeUrl: String? = activeUrlState.value) {
         if (!isShowing) return
-        // A probe can receive 403/404 from a signed CDN, while Media3's
-        // manifest request (with its normal retry timing) can still play the
-        // source. Keep every backend-returned stream selectable and render
-        // its validation state as a label instead of removing it.
+        // Keep probe-rejected sources selectable when possible, but hide
+        // streams that have been confirmed as HTTP 404 / file-not-found.
         streamsState.value = visibleStreams(updated)
         activeUrlState.value = activeUrl
     }
