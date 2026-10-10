@@ -87,6 +87,10 @@ import com.kiduyuk.klausk.kiduyutv.data.model.IptvChannel
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import com.kiduyuk.klausk.kiduyutv.viewmodel.LiveTvViewModel
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.skydoves.balloon.ArrowPositionRules
+import com.skydoves.balloon.Balloon
+import com.skydoves.balloon.BalloonAnimation
+import com.skydoves.balloon.BalloonSizeSpec
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -220,6 +224,10 @@ class IptvPlayerActivity : AppCompatActivity() {
     private var currentResizeMode = VideoResizeMode.FIT
     private var isMuted = false
 
+    // Focus-driven hints for TV/D-pad and touch navigation.
+    private val playerTooltips = mutableMapOf<View, Balloon>()
+    private var activePlayerTooltip: Balloon? = null
+
     // D-pad navigation tracking for keeping controls visible
     private var isDpadNavigating = false
 
@@ -291,6 +299,7 @@ class IptvPlayerActivity : AppCompatActivity() {
         populateTopBar()
         wireOverlayToggle()
         wireOverlayButtons()
+        installPlayerControlTooltips()
         wireLiveSeekBar()
         initPlayer()
 
@@ -337,6 +346,9 @@ class IptvPlayerActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        playerTooltips.values.forEach(Balloon::dismiss)
+        playerTooltips.clear()
+        activePlayerTooltip = null
         super.onDestroy()
         releasePlayer()
         composeDialogView = null
@@ -866,6 +878,82 @@ class IptvPlayerActivity : AppCompatActivity() {
         // ── Picture-in-Picture ───────────────────────────────────────────────
         btnPip.setOnClickListener {
             enterPipMode()
+        }
+    }
+
+    /**
+     * Shows short, focus-driven labels for the IPTV player controls. This
+     * follows DirectStreamActivity's TV-friendly tooltip behavior without
+     * replacing any existing click listeners.
+     */
+    private fun installPlayerControlTooltips() {
+        btnFill.contentDescription = "Resize video: Fit, Fill, or Stretch"
+
+        listOf(
+            btnBack,
+            btnInfo,
+            btnLock,
+            btnChannelUp,
+            btnNextChannel,
+            btnChannelList,
+            btnFill,
+            btnCC,
+            btnSettings,
+            btnFavorite,
+            btnVolume,
+            btnCast,
+            btnPip
+        ).forEach { control ->
+            control.setOnFocusChangeListener { view, hasFocus ->
+                if (hasFocus) {
+                    showPlayerTooltip(view)
+                } else {
+                    playerTooltips[view]?.dismiss()
+                    if (activePlayerTooltip === playerTooltips[view]) {
+                        activePlayerTooltip = null
+                    }
+                }
+            }
+        }
+    }
+
+    private fun showPlayerTooltip(anchor: View) {
+        if (!anchor.isShown || !anchor.hasFocus()) return
+        val label = anchor.contentDescription?.toString()?.trim().orEmpty()
+        if (label.isBlank()) return
+
+        anchor.post {
+            if (!anchor.isShown || !anchor.hasFocus() || isFinishing || isDestroyed) return@post
+
+            val balloon = playerTooltips.getOrPut(anchor) {
+                Balloon.Builder(this)
+                    .setWidth(BalloonSizeSpec.WRAP)
+                    .setHeight(BalloonSizeSpec.WRAP)
+                    .setText(label)
+                    .setTextSize(14f)
+                    .setTextColorResource(R.color.text_primary)
+                    .setPadding(10)
+                    .setCornerRadius(8f)
+                    .setBackgroundColorResource(R.color.direct_stream_surface_high)
+                    .setArrowSize(8)
+                    .setArrowPositionRules(ArrowPositionRules.ALIGN_ANCHOR)
+                    .setBalloonAnimation(BalloonAnimation.FADE)
+                    .setAutoDismissDuration(1_800L)
+                    .setFocusable(false)
+                    .setLifecycleOwner(this)
+                    .build()
+            }
+
+            if (activePlayerTooltip !== balloon) {
+                activePlayerTooltip?.dismiss()
+                activePlayerTooltip = balloon
+            }
+
+            if (anchor === btnBack || anchor === btnInfo || anchor === btnLock) {
+                balloon.showAlignBottom(anchor)
+            } else {
+                balloon.showAlignTop(anchor)
+            }
         }
     }
 

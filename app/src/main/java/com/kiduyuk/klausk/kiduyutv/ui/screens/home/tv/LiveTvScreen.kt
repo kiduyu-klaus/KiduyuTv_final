@@ -133,6 +133,16 @@ import com.kiduyuk.klausk.kiduyutv.viewmodel.ScheduleViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+private val SPORTS_CHANNEL_NAME_REGEX = Regex("\\bsports?\\b", RegexOption.IGNORE_CASE)
+
+/** Keeps the scraper's order while moving sport/sports channels to the front. */
+private fun List<IptvChannel>.sportsChannelsFirst(): List<IptvChannel> {
+    val (sportsChannels, otherChannels) = partition { channel ->
+        SPORTS_CHANNEL_NAME_REGEX.containsMatchIn(channel.name)
+    }
+    return sportsChannels + otherChannels
+}
+
 /**
  * Composable function for the Live TV screen.
  * Displays categories, channels, and search functionality for IPTV playlist.
@@ -186,11 +196,12 @@ fun LiveTvScreen(
         }
     }
     val visibleDaddyliveChannels = remember(daddyliveChannels, uiState.hide18PlusChannels) {
-        if (uiState.hide18PlusChannels) {
+        val visibleChannels = if (uiState.hide18PlusChannels) {
             daddyliveChannels.filterNot(IptvChannel::is18PlusChannel)
         } else {
             daddyliveChannels
         }
+        visibleChannels.sportsChannelsFirst()
     }
     val filteredDaddyliveChannels = remember(
         visibleDaddyliveChannels,
