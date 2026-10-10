@@ -34,6 +34,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.player.webviewsniffer.SniffedStream
 import com.kiduyuk.klausk.kiduyutv.ui.player.webviewsniffer.SniffedSubtitle
 import com.kiduyuk.klausk.kiduyutv.ui.player.webviewsniffer.WebViewStreamSniffer
 import com.kiduyuk.klausk.kiduyutv.util.AdvancedAdBlocker
+import com.kiduyuk.klausk.kiduyutv.util.FullEasyListEngine
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import kotlinx.coroutines.launch
@@ -546,6 +547,8 @@ class PlayerActivity : AppCompatActivity() {
      */
     private fun initializeAdBlockerAndLoadPlayer(baseUrl: String, html: String) {
         lifecycleScope.launch {
+            val fullEngineReady = FullEasyListEngine.initialize(applicationContext)
+            Log.i(TAG, "[AdBlock] Full EasyList engine ready=$fullEngineReady")
             val initialization = AdvancedAdBlocker.initialize(applicationContext)
             Log.i(
                 TAG,
@@ -553,6 +556,10 @@ class PlayerActivity : AppCompatActivity() {
                     "domains=${initialization.blockedDomainCount} " +
                     "error=${initialization.error.orEmpty()}"
             )
+
+            if (fullEngineReady) {
+                FullEasyListEngine.setupWebView(webView)
+            }
 
             // The bridge and WebView clients are already attached before provider HTML executes.
             webView.loadDataWithBaseURL(baseUrl, html, "text/html", "UTF-8", null)

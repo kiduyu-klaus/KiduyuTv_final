@@ -8,6 +8,7 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.kiduyuk.klausk.kiduyutv.util.AdvancedAdBlocker
+import com.kiduyuk.klausk.kiduyutv.util.FullEasyListEngine
 import java.io.ByteArrayInputStream
 
 open class AdBlockerWebViewClient(
@@ -18,6 +19,13 @@ open class AdBlockerWebViewClient(
 
     override fun shouldInterceptRequest(view: WebView?, request: WebResourceRequest?): WebResourceResponse? {
         val uri = request?.url
+
+        if (view != null && request != null) {
+            FullEasyListEngine.shouldIntercept(view, request)?.let { response ->
+                Log.d("AdblockWebview", "Full EasyList blocked: $uri")
+                return response
+            }
+        }
 
         // Never replace the top-level document; evaluate only player subresources.
         if (request?.isForMainFrame != true && uri != null && AdvancedAdBlocker.shouldBlock(uri)) {
@@ -45,6 +53,11 @@ open class AdBlockerWebViewClient(
             return true
         }
 
+        if (view != null && request != null && FullEasyListEngine.shouldBlock(view, request)) {
+            Log.i("AdblockWebview", "Full EasyList blocked top-level navigation to $host")
+            return true
+        }
+
         if (AdvancedAdBlocker.shouldBlock(uri)) {
             Log.i("AdblockWebview", "Blocked top-level navigation to ad domain: $host")
             return true
@@ -56,12 +69,14 @@ open class AdBlockerWebViewClient(
     // Crucial: Run the purging engine early, the moment the page structure becomes visible
     override fun onPageCommitVisible(view: WebView?, url: String?) {
         super.onPageCommitVisible(view, url)
+        FullEasyListEngine.performScript(view, url)
         executeAntiAdScript(view)
     }
 
     override fun onPageFinished(view: WebView?, url: String?) {
         super.onPageFinished(view, url)
         onPageFinished()
+        FullEasyListEngine.performScript(view, url)
         // Run again on finish to catch lazy-loaded assets
         executeAntiAdScript(view)
     }

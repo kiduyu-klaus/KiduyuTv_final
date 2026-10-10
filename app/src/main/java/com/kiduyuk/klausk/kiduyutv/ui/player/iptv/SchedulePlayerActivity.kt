@@ -64,6 +64,7 @@ import com.kiduyuk.klausk.kiduyutv.data.repository.ScheduleRepository
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.AdBlockerWebViewClient
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.MouseCursorView
 import com.kiduyuk.klausk.kiduyutv.util.AdvancedAdBlocker
+import com.kiduyuk.klausk.kiduyutv.util.FullEasyListEngine
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
@@ -336,12 +337,17 @@ class SchedulePlayerActivity : ComponentActivity() {
 
     private fun initializeAdBlocker() {
         lifecycleScope.launch {
+            val fullEngineReady = FullEasyListEngine.initialize(applicationContext)
+            android.util.Log.i(TAG, "[AdBlock] Full EasyList engine ready=$fullEngineReady")
             val result = AdvancedAdBlocker.initialize(applicationContext)
             android.util.Log.i(
                 TAG,
                 "[AdBlock] Schedule player initialized source=${result.source} " +
                     "domains=${result.blockedDomainCount} error=${result.error.orEmpty()}"
             )
+            if (fullEngineReady && ::webView.isInitialized) {
+                FullEasyListEngine.setupWebView(webView)
+            }
             adBlockerReady = true
             if (pendingStreamLoad) {
                 pendingStreamLoad = false
