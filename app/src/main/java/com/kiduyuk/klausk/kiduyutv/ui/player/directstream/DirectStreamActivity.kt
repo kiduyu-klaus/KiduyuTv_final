@@ -247,10 +247,11 @@ class DirectStreamActivity : AppCompatActivity() {
             return@registerForActivityResult
         }
         val domain = result.data?.getStringExtra(CloudflareBypassActivity.EXTRA_DOMAIN)
+        val captureHeadersOnly = isGoogleusercontentHost(stream.url)
         Log.i(
             TAG,
             "CloudflareBypass solved; domain=$domain stream=${stream.provider} ${stream.quality} " +
-                "url=${stream.url}"
+                "url=${stream.url} captureHeadersOnly=$captureHeadersOnly"
         )
         Toast.makeText(
             this,
@@ -262,9 +263,16 @@ class DirectStreamActivity : AppCompatActivity() {
         // final URL reached by the WebView (for DahmerMovies this is the
         // cfok-122.workers.dev download URL), and carry the solved cookie on
         // this exact retry instead of recreating and fetching streams again.
-        val finalUrl = result.data?.getStringExtra(CloudflareBypassActivity.EXTRA_URL)
-            ?.takeIf { it.startsWith("http://", ignoreCase = true) || it.startsWith("https://", ignoreCase = true) }
-            ?: stream.url
+        val finalUrl = if (captureHeadersOnly) {
+            // Googleusercontent URLs are already signed media URLs. The
+            // WebView is used only to collect the headers needed by Media3;
+            // never replace the original URL with a WebView navigation URL.
+            stream.url
+        } else {
+            result.data?.getStringExtra(CloudflareBypassActivity.EXTRA_URL)
+                ?.takeIf { it.startsWith("http://", ignoreCase = true) || it.startsWith("https://", ignoreCase = true) }
+                ?: stream.url
+        }
         val capturedHeaders = linkedMapOf<String, String>()
         result.data?.getStringExtra(CloudflareBypassActivity.EXTRA_HEADERS)
             ?.takeIf { it.isNotBlank() }
@@ -283,7 +291,16 @@ class DirectStreamActivity : AppCompatActivity() {
         val retryHeaders = if (capturedHeaders.isNotEmpty()) {
             capturedHeaders
         } else {
-            stream.headers
+            stream.headers.toMutableMap()
+        }.apply {
+            if (captureHeadersOnly) {
+                keys.removeAll { headerName ->
+                    headerName.equals("Connection", ignoreCase = true) ||
+                        headerName.equals("Host", ignoreCase = true) ||
+                        headerName.equals("Content-Length", ignoreCase = true) ||
+                        headerName.equals("Range", ignoreCase = true)
+                }
+            }
         }
         val retryStream = stream.copy(
             url = finalUrl,
@@ -304,7 +321,12 @@ class DirectStreamActivity : AppCompatActivity() {
         lastStreamPlaybackKey = null
         engine.player.stop()
         handlingPlaybackError = false
-        startStreamPlayback(retryStream, resumeMs, skipDahmerMoviesBypass = true)
+        startStreamPlayback(
+            retryStream,
+            resumeMs,
+            skipDahmerMoviesBypass = true,
+            skipGoogleusercontentHeaderCapture = captureHeadersOnly
+        )
     }
 
     private val watchProgressTick = object : Runnable {
@@ -2346,13 +2368,28 @@ class DirectStreamActivity : AppCompatActivity() {
     private fun startStreamPlayback(
         stream: StreamItem,
         startPositionMs: Long = 0L,
-        skipDahmerMoviesBypass: Boolean = false
+        skipDahmerMoviesBypass: Boolean = false,
+        skipGoogleusercontentHeaderCapture: Boolean = false
     ) {
         val playableStartPositionMs = playableStartPosition(stream, startPositionMs)
         val streamKey = "${stream.url}|${stream.provider}|${playableStartPositionMs}"
         if (lastStreamPlaybackKey == streamKey && engine.player.currentMediaItem != null) return
         lastStreamPlaybackKey = streamKey
         skipSegmentsFetchJob?.cancel()
+
+        if (!skipGoogleusercontentHeaderCapture && isGoogleusercontentHost(stream.url)) {
+            Log.i(
+                TAG,
+                "Googleusercontent stream selected; opening CloudflareBypassActivity " +
+                    "to capture download headers while preserving the URL"
+            )
+            pendingCloudflareStream = stream
+            pendingCloudflareResumeMs = playableStartPositionMs
+            showStatus(getString(R.string.cloudflare_blocked_checking), retry = false)
+            showLoadingArtwork()
+            launchCloudflareBypass(stream, captureResponseHeaders = true)
+            return
+        }
 
         // This also covers stream switching, subtitle reloads and sniffed
         // playback paths that do not pass through playBest().
@@ -2492,7 +2529,8 @@ class DirectStreamActivity : AppCompatActivity() {
      */
     private fun launchCloudflareBypass(
         stream: StreamItem,
-        preserveCookies: Boolean = false
+        preserveCookies: Boolean = false,
+        captureResponseHeaders: Boolean = false
     ) {
         // Cloudflare challenges can be scoped to a path/query rather than the
         // host root. Always pass the exact URL that returned 403; invalid stream
@@ -2511,7 +2549,8 @@ class DirectStreamActivity : AppCompatActivity() {
         }
 
         val waitForDownload = isDahmerMoviesStream(stream) ||
-            isCfokDownloadStream(stream)
+            isCfokDownloadStream(stream) ||
+            captureResponseHeaders
         val intent = Intent(this, CloudflareBypassActivity::class.java).apply {
             putExtra(CloudflareBypassActivity.EXTRA_HOST, bypassHost)
             putExtra(CloudflareBypassActivity.EXTRA_URL, fullVerificationUrl)
@@ -2521,7 +2560,7 @@ class DirectStreamActivity : AppCompatActivity() {
             )
             putExtra(
                 CloudflareBypassActivity.EXTRA_COMPLETE_ON_UNLOCK,
-                isCfokDownloadStream(stream)
+                isCfokDownloadStream(stream) || captureResponseHeaders
             )
             putExtra(
                 CloudflareBypassActivity.EXTRA_REQUEST_HEADERS,
