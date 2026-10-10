@@ -131,7 +131,7 @@ class StreamSelectionDialog(
     }
 
     private fun visibleStreams(streams: List<StreamItem>): List<StreamItem> =
-        streams
+        streams.filterNot { it.httpStatusCode == HTTP_NOT_FOUND }
 
     private fun selectStream(stream: StreamItem) {
         activeUrlState.value = stream.url
@@ -474,6 +474,8 @@ class StreamSelectionDialog(
     }
 
     companion object {
+        private const val HTTP_NOT_FOUND = 404
+
         private val LANGUAGE_PATTERNS = listOf(
             "English" to Regex("\\benglish\\b", RegexOption.IGNORE_CASE),
             "Hindi" to Regex("\\bhindi\\b", RegexOption.IGNORE_CASE),

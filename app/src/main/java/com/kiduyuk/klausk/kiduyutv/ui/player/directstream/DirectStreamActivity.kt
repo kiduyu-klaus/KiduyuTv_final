@@ -1766,6 +1766,22 @@ class DirectStreamActivity : AppCompatActivity() {
                     StreamValidator.probeStatus(active)
                 }
                 if (isFinishing || isDestroyed) return@launch
+                if (statusCode == HTTP_NOT_FOUND && isFileNotFoundPlaybackError(code)) {
+                    availableStreams = availableStreams.filterNot { it.url == active.url }
+                    playbackErrorDialog?.dismiss()
+                    activeStream = null
+                    streamDialog?.updateStreams(availableStreams, activeUrl = null)
+                    if (availableStreams.size < 2) {
+                        binding.btnPlayerStreams.visibility = View.GONE
+                        updateBottomFocusChain()
+                    }
+                    handlingPlaybackError = false
+                    Log.w(
+                        TAG,
+                        "Removed stream after Media3 error 2004 / HTTP 404: ${active.url}"
+                    )
+                    return@launch
+                }
                 if (statusCode == 429 || statusCode == 426) {
                     val (_, isLocked) = withContext(Dispatchers.IO) {
                         StreamValidator.responseBodyContains(active, "<h1>Download Locked</h1>")
@@ -1826,6 +1842,9 @@ class DirectStreamActivity : AppCompatActivity() {
             Toast.LENGTH_LONG
         ).show()
     }
+
+    private fun isFileNotFoundPlaybackError(error: String): Boolean =
+        error.contains("Error code: 2004", ignoreCase = true)
 
     private fun loadAndPlay(
         type: String,
@@ -3421,6 +3440,7 @@ class DirectStreamActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "KiduyuLitePlayer"
         private const val PROVIDER_TAG = "KiduyuLiteProvider"
+        private const val HTTP_NOT_FOUND = 404
         private const val SKIP_DURATION_POLL_INTERVAL_MS = 100L
 
         const val EXTRA_TYPE = "MEDIA_TYPE"

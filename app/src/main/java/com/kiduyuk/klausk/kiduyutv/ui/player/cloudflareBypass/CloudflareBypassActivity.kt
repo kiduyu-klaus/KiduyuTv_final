@@ -339,6 +339,8 @@ class CloudflareBypassActivity : AppCompatActivity() {
     // ── Cursor (TV remote navigation) ───────────────────────────────────────
     /** False on phones/tablets, true on TVs/Fire TV. */
     private var isCursorDisabled: Boolean = true
+    /** DahmerMovies' download CAPTCHA must remain unobstructed by the cursor overlay. */
+    private var isDahmerMoviesDownloadCaptcha: Boolean = false
     private var cursorX: Float = 0f
     private var cursorY: Float = 0f
     private var screenWidth: Int = 0
@@ -435,6 +437,8 @@ class CloudflareBypassActivity : AppCompatActivity() {
             .coerceAtLeast(MIN_SOLVE_TIME_MS)
         waitForDownload = intent.getBooleanExtra(EXTRA_WAIT_FOR_DOWNLOAD, false)
         completeOnUnlock = intent.getBooleanExtra(EXTRA_COMPLETE_ON_UNLOCK, false)
+        isDahmerMoviesDownloadCaptcha = waitForDownload &&
+            displayTitle.contains("DahmerMovies", ignoreCase = true)
         initialRequestHeaders = parseRequestHeaders(
             intent.getStringExtra(EXTRA_REQUEST_HEADERS).orEmpty()
         )
@@ -1159,9 +1163,13 @@ class CloudflareBypassActivity : AppCompatActivity() {
      * starts the inactivity fade timer.
      */
     private fun setupCursor() {
-        isCursorDisabled = !detectTvDevice()
+        isCursorDisabled = isDahmerMoviesDownloadCaptcha || !detectTvDevice()
         if (isCursorDisabled) {
-            Log.i(TAG, "Non-TV device — cursor disabled")
+            if (isDahmerMoviesDownloadCaptcha) {
+                Log.i(TAG, "DahmerMovies download CAPTCHA — cursor disabled")
+            } else {
+                Log.i(TAG, "Non-TV device — cursor disabled")
+            }
             // Even on mobile, the root must be focusable so back key works.
             rootLayout.isFocusable = true
             rootLayout.isFocusableInTouchMode = true
