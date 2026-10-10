@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusable
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -323,9 +324,10 @@ private fun NotificationDialog(
                                         if (index == 0) Modifier.focusRequester(firstItemFocusRequester)
                                         else Modifier
                                     )
-                                    // clickable already makes the item focusable on TV (D-pad center
-                                    // fires onClick). A separate .focusable() with the same
-                                    // interactionSource would duplicate focus handling and break clicks.
+                                    // Explicitly participate in TV focus navigation. Do not rely
+                                    // on clickable alone, since some Compose TV/device versions
+                                    // do not expose clickable semantics as a D-pad focus target.
+                                    .focusable(interactionSource = interactionSource)
                                     .clickable(
                                         interactionSource = interactionSource,
                                         indication = null,
@@ -463,4 +465,3 @@ fun TopBarPreview() {
         }
     }
 }
-

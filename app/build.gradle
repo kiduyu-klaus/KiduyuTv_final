@@ -178,7 +178,7 @@ dependencies {
     implementation 'androidx.recyclerview:recyclerview:1.3.2'
     // Native EasyList-compatible filtering for WebView requests, cosmetic rules,
     // and scriptlet injection. The legacy AdvancedAdBlocker remains as fallback.
-    implementation 'com.github.Edsuns.AdblockAndroid:ad-filter:1.0'
+    implementation 'com.github.Edsuns.AdblockAndroid:ad-filter:0.9.1'
 
     // ─────────────────────────────────────────────
     // Jetpack Compose (BOM manages all versions)

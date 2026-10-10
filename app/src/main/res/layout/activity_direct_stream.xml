@@ -365,7 +365,7 @@
                         android:nextFocusRight="@id/btnVolume"
                         android:nextFocusUp="@id/btnPlayerBack"
                         android:visibility="gone"
-                        app:icon="@drawable/ic_streams" />
+                        app:icon="@drawable/ic_server" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnVolume"
