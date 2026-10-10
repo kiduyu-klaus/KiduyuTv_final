@@ -78,6 +78,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamValidat
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.TrackSelectionDialog
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.MegaPlaybackToken
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
+import com.kiduyuk.klausk.kiduyutv.util.AuthManager
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -3209,8 +3210,13 @@ class DirectStreamActivity : AppCompatActivity() {
                     currentTmdbId,
                     isTv
                 )
-                val firebaseHistory = withTimeoutOrNull(FIREBASE_HISTORY_TIMEOUT_MS) {
-                    FirebaseManager.getWatchHistoryOnce()
+                val firebaseHistory = if (AuthManager.isSignedIn.value) {
+                    withTimeoutOrNull(FIREBASE_HISTORY_TIMEOUT_MS) {
+                        FirebaseManager.getWatchHistoryOnce()
+                    }
+                } else {
+                    Log.d(TAG, "[WatchHistory] User is signed out; skipping Firebase read")
+                    null
                 }
                 val remoteHistory = extractFirebaseResumeHistory(firebaseHistory, isTv)
                 val localResume = localHistory?.let {
@@ -3398,6 +3404,10 @@ class DirectStreamActivity : AppCompatActivity() {
         season: Int? = currentSeason,
         episode: Int? = currentEpisode
     ) {
+        if (!AuthManager.isSignedIn.value) {
+            Log.d(TAG, "[WatchHistory] User is signed out; skipping Firebase write")
+            return
+        }
         val isTv = currentMediaType == TYPE_SERIES
         FirebaseManager.syncWatchHistory(
             tmdbId = currentTmdbId,

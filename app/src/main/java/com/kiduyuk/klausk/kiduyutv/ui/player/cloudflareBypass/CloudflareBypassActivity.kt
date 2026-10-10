@@ -269,6 +269,7 @@ class CloudflareBypassActivity : AppCompatActivity() {
     private var isFinishingForResult: Boolean = false
     private var waitForDownload: Boolean = false
     private var completeOnUnlock: Boolean = false
+    private var downloadLockPageScrolled: Boolean = false
     private var initialRequestHeaders: Map<String, String> = emptyMap()
     private var lastRequestHeaders: Map<String, String> = emptyMap()
 
@@ -279,7 +280,9 @@ class CloudflareBypassActivity : AppCompatActivity() {
             mainHandler.post {
                 if (isFinishing || isDestroyed) return@post
                 isDownloadLocked = true
-                disableCursorForDownloadLock()
+                if (isDahmerMoviesDownloadFlow()) {
+                    scrollDownloadLockPageToFortyPercent()
+                }
                 // The lock page is authoritative. It may be reached after
                 // the original bulk URL has already redirected to a CFOK
                 // worker, so do not rely on the URL/mode supplied at launch.
@@ -1198,20 +1201,33 @@ class CloudflareBypassActivity : AppCompatActivity() {
         }
     }
 
-    /** Hides the TV cursor only after the download-lock page is detected. */
-    private fun disableCursorForDownloadLock() {
-        if (isCursorDisabled) return
-        isCursorDisabled = true
-        rootLayout.isFocusable = true
-        rootLayout.isFocusableInTouchMode = true
-        rootLayout.requestFocus()
-        cursorHideHandler.removeCallbacks(cursorHideRunnable)
-        if (::cursorView.isInitialized) {
-            cursorView.animate().cancel()
-            cursorView.alpha = 0f
-            cursorView.visibility = View.GONE
-        }
-        Log.i(TAG, "Download-lock CAPTCHA detected — cursor disabled")
+    /** Returns true for the DahmerMovies interactive download-lock flow. */
+    private fun isDahmerMoviesDownloadFlow(): Boolean =
+        waitForDownload && targetHost.equals("p.111477.xyz", ignoreCase = true)
+
+    /** Scrolls the DahmerMovies lock page far enough to expose its CAPTCHA. */
+    private fun scrollDownloadLockPageToFortyPercent() {
+        if (downloadLockPageScrolled || !::webView.isInitialized) return
+        downloadLockPageScrolled = true
+        webView.postDelayed({
+            if (isFinishing || isDestroyed || !::webView.isInitialized) return@postDelayed
+            webView.evaluateJavascript(
+                """
+                (function() {
+                    var documentHeight = Math.max(
+                        document.body ? document.body.scrollHeight : 0,
+                        document.documentElement ? document.documentElement.scrollHeight : 0
+                    );
+                    var viewportHeight = window.innerHeight || 0;
+                    var maxScroll = Math.max(0, documentHeight - viewportHeight);
+                    window.scrollTo({ top: maxScroll * 0.40, left: 0, behavior: 'smooth' });
+                    return maxScroll * 0.40;
+                })();
+                """.trimIndent()
+            ) { result ->
+                Log.i(TAG, "DahmerMovies download-lock page scrolled to 40%: $result")
+            }
+        }, 250L)
     }
 
     /**
