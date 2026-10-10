@@ -75,8 +75,12 @@ object ProvidersApi {
     /** An enabled provider as advertised by the live backend catalog. */
     data class EnabledProvider(
         val name: String,
+        val categories: List<String>
+    ) {
+        /** Primary category retained for existing settings/UI labels. */
         val category: String
-    )
+            get() = categories.firstOrNull().orEmpty()
+    }
 
     private data class MediaClassification(
         val isAnime: Boolean,
@@ -177,16 +181,29 @@ object ProvidersApi {
                 for (index in 0 until providers.length()) {
                     val item = providers.optJSONObject(index) ?: continue
                     val name = item.optString("name").trim().lowercase()
-                    val category = item.optString("category").trim().lowercase(Locale.ROOT)
-                    if (item.optBoolean("enabled", false) && name.isNotBlank() && category.isNotBlank()) {
-                        add(EnabledProvider(name, category))
+                    val legacyCategory = item.optString("category").trim()
+                    val categories = buildList {
+                        item.optJSONArray("categories")?.let { categoryArray ->
+                            for (categoryIndex in 0 until categoryArray.length()) {
+                                categoryArray.optString(categoryIndex)
+                                    .trim()
+                                    .takeIf { it.isNotBlank() }
+                                    ?.let(::add)
+                            }
+                        }
+                        if (legacyCategory.isNotBlank()) {
+                            add(legacyCategory)
+                        }
+                    }.map { it.lowercase(Locale.ROOT) }.distinct()
+                    if (item.optBoolean("enabled", false) && name.isNotBlank() && categories.isNotEmpty()) {
+                        add(EnabledProvider(name, categories))
                     }
                 }
             }.distinctBy { it.name }.also {
                 Log.i(
                     TAG,
                     "Enabled providers (${it.size}): " +
-                        it.joinToString { provider -> "${provider.name}:${provider.category}" }
+                        it.joinToString { provider -> "${provider.name}:${provider.categories.joinToString("/")}" }
                 )
             }
         } finally {
@@ -216,7 +233,9 @@ object ProvidersApi {
         val classification = classifyMedia(type, tmdbId)
         val category = if (classification.isAnime) ANIME_CATEGORY else MOVIES_TV_CATEGORY
         val selected = enabledProviderCatalog()
-            .filter { it.category.equals(category, ignoreCase = true) }
+            .filter { provider ->
+                provider.categories.any { it.equals(category, ignoreCase = true) }
+            }
             .map { it.name }
         Log.i(
             TAG,
