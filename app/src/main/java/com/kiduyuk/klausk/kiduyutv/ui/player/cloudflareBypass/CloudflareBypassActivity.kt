@@ -1202,6 +1202,9 @@ class CloudflareBypassActivity : AppCompatActivity() {
     private fun disableCursorForDownloadLock() {
         if (isCursorDisabled) return
         isCursorDisabled = true
+        rootLayout.isFocusable = true
+        rootLayout.isFocusableInTouchMode = true
+        rootLayout.requestFocus()
         cursorHideHandler.removeCallbacks(cursorHideRunnable)
         if (::cursorView.isInitialized) {
             cursorView.animate().cancel()
