@@ -100,12 +100,11 @@ object StreamValidator {
                     }.awaitAll()
                 }
 
-                streams.filter { it.httpStatusCode == 404 }.forEach { stream ->
+                streams.filter { it.httpStatusCode == 403 || it.httpStatusCode == 404 }.forEach { stream ->
                     Log.i(
                         TAG,
-                        "Removing stream after HTTP 404 " +
-                            "provider=${stream.provider.ifBlank { "?" }} " +
-                            "quality=${stream.quality} url=${stream.url}"
+                        "Keeping probe-rejected stream selectable HTTP ${stream.httpStatusCode} " +
+                            "provider=${stream.provider.ifBlank { "?" }} quality=${stream.quality}"
                     )
                 }
             } catch (error: Throwable) {
@@ -113,7 +112,10 @@ object StreamValidator {
             } finally {
                 streams.forEach { it.isChecking = false }
             }
-            streams.filterNot { it.httpStatusCode == 404 }
+            // Provider/CDN probe results are advisory. Do not silently remove
+            // a backend-returned source: signed URLs can reject a preliminary
+            // HEAD/Range request yet succeed when Media3 opens the manifest.
+            streams
         }
 
     /**

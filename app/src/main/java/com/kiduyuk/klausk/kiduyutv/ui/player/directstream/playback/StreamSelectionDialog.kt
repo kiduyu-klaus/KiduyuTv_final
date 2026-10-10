@@ -122,14 +122,16 @@ class StreamSelectionDialog(
 
     fun updateStreams(updated: List<StreamItem>, activeUrl: String? = activeUrlState.value) {
         if (!isShowing) return
-        // HTTP 403 means the provider rejected the stream. Do not expose
-        // blocked candidates in the picker after background validation.
+        // A probe can receive 403/404 from a signed CDN, while Media3's
+        // manifest request (with its normal retry timing) can still play the
+        // source. Keep every backend-returned stream selectable and render
+        // its validation state as a label instead of removing it.
         streamsState.value = visibleStreams(updated)
         activeUrlState.value = activeUrl
     }
 
     private fun visibleStreams(streams: List<StreamItem>): List<StreamItem> =
-        streams.filterNot { it.httpStatusCode == 403 }
+        streams
 
     private fun selectStream(stream: StreamItem) {
         activeUrlState.value = stream.url
