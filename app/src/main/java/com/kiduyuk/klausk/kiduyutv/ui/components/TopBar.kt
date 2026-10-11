@@ -4,7 +4,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -49,6 +48,8 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -231,8 +232,8 @@ private fun NotificationDialog(
     onDismiss: () -> Unit,
     onNotificationClick: (Int, String) -> Unit
 ) {
-    var selectedNotificationId by remember(notifications) {
-        mutableStateOf(notifications.firstOrNull()?.id)
+    var focusedNotificationId by remember(notifications) {
+        mutableStateOf<Int?>(null)
     }
     val firstItemFocusRequester = remember { FocusRequester() }
     // Used to route D-pad DOWN out of the LazyColumn into the Close button
@@ -301,38 +302,48 @@ private fun NotificationDialog(
                     ) {
                         itemsIndexed(notifications) { index, notification ->
                             val interactionSource = remember { MutableInteractionSource() }
-                            val isFocused by interactionSource.collectIsFocusedAsState()
-                            val isSelected = selectedNotificationId == notification.id
-                            val isHighlighted = isFocused || isSelected
+                            val isFocused = focusedNotificationId == notification.id
 
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(if (isHighlighted) DarkRed else CardDark)
+                                    .background(if (isFocused) PrimaryRed else CardDark)
                                     .border(
                                         width = 1.dp,
-                                        color = if (isHighlighted) Color.White else Color.Transparent,
+                                        color = if (isFocused) Color.White else Color.Transparent,
                                         shape = RoundedCornerShape(12.dp)
                                     )
                                     .onFocusChanged { focusState ->
                                         if (focusState.isFocused) {
-                                            selectedNotificationId = notification.id
+                                            focusedNotificationId = notification.id
                                         }
                                     }
                                     .then(
                                         if (index == 0) Modifier.focusRequester(firstItemFocusRequester)
                                         else Modifier
                                     )
-                                    // Explicitly participate in TV focus navigation. Do not rely
-                                    // on clickable alone, since some Compose TV/device versions
-                                    // do not expose clickable semantics as a D-pad focus target.
-                                    .focusable(interactionSource = interactionSource)
+                                    .onPreviewKeyEvent { keyEvent ->
+                                        if (
+                                            keyEvent.type == KeyEventType.KeyDown &&
+                                            keyEvent.nativeKeyEvent.repeatCount == 0 &&
+                                            keyEvent.nativeKeyEvent.keyCode in setOf(
+                                                android.view.KeyEvent.KEYCODE_DPAD_CENTER,
+                                                android.view.KeyEvent.KEYCODE_ENTER
+                                            )
+                                        ) {
+                                            focusedNotificationId = notification.id
+                                            onNotificationClick(notification.id, notification.type)
+                                            true
+                                        } else {
+                                            false
+                                        }
+                                    }
                                     .clickable(
                                         interactionSource = interactionSource,
                                         indication = null,
                                         onClick = {
-                                            selectedNotificationId = notification.id
+                                            focusedNotificationId = notification.id
                                             onNotificationClick(notification.id, notification.type)
                                         }
                                     )
