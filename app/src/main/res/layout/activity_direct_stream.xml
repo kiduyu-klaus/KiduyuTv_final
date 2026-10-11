@@ -365,7 +365,7 @@
                         android:nextFocusRight="@id/btnReloadStreams"
                         android:nextFocusUp="@id/btnPlayerBack"
                         android:visibility="gone"
-                        app:icon="@drawable/ic_server" />
+                        app:icon="@drawable/ic_streams" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnReloadStreams"
