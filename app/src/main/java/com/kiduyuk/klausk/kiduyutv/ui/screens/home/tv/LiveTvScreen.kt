@@ -51,6 +51,7 @@ import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
+import androidx.compose.material.icons.filled.SportsSoccer
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -317,6 +318,7 @@ fun LiveTvScreen(
         TabItem("Live TV", Icons.Default.Tv),
         TabItem("Schedule", Icons.Default.CalendarToday),
         TabItem("Daddylive", Icons.Default.PlayCircle),
+        TabItem("Live Sports", Icons.Default.SportsSoccer),
         TabItem(
             "My Channels (${visibleFavoriteChannels.size + visibleSavedScrapedChannels.size})",
             Icons.Default.List
@@ -393,7 +395,27 @@ fun LiveTvScreen(
                         onChannelLongClick = { channel -> scrapedChannelToConfirm = channel }
                     )
                 }
-                3 -> { // My Channels (favorited)
+                3 -> { // Live Sports
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SportsSoccer,
+                            contentDescription = null,
+                            tint = PrimaryRed,
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "To be Implemented",
+                            color = TextPrimary,
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                    }
+                }
+                4 -> { // My Channels (favorited)
                     // Trigger two-way sync when user views My Channels tab
                     LaunchedEffect(Unit) {
                         viewModel.syncFavoriteChannelsWithFirebase()

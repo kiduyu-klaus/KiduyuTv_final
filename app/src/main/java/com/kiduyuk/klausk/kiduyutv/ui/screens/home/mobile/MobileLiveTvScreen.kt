@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SportsSoccer
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -193,11 +194,12 @@ fun MobileLiveTvScreen(
             }
 
             Column(modifier = Modifier.fillMaxSize()) {
-                // Scrollable Material tabs keep all four destinations usable on phones.
+                // Scrollable Material tabs keep all destinations usable on phones.
                 val tabItems = listOf(
                     "Live TV" to Icons.Default.Tv,
                     "Schedule" to Icons.Default.CalendarToday,
                     "DaddyLive" to Icons.Default.PlayCircle,
+                    "Live Sports" to Icons.Default.SportsSoccer,
                     "My Channels" to Icons.Default.List
                 )
                 ScrollableTabRow(
@@ -222,7 +224,7 @@ fun MobileLiveTvScreen(
                             },
                             text = {
                                 Text(
-                                    text = if (index == 3) {
+                                    text = if (index == 4) {
                                         val count = viewModel.getFavoriteChannels()
                                             .count { !uiState.hide18PlusChannels || !it.is18PlusChannel() } +
                                             visibleSavedScrapedChannels.size
@@ -396,6 +398,26 @@ fun MobileLiveTvScreen(
                         }
                     }
                     3 -> {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.SportsSoccer,
+                                contentDescription = null,
+                                tint = PrimaryRed,
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "To be Implemented",
+                                color = TextPrimary,
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                        }
+                    }
+                    4 -> {
                         // My Channels tab - favorites
                         LaunchedEffect(Unit) {
                             viewModel.syncFavoriteChannelsWithFirebase()
