@@ -396,7 +396,7 @@ fun LiveTvScreen(
                         onChannelLongClick = { channel -> scrapedChannelToConfirm = channel }
                     )
                 }
-                3 -> LiveSportsTabContent { event ->
+                3 -> LiveSportsTabContent(onEventClick = { event ->
                     context.startActivity(
                         SchedulePlayerActivity.createIntent(
                             context = context,
@@ -406,7 +406,7 @@ fun LiveTvScreen(
                             iframeUrls = event.playbackUrls
                         )
                     )
-                }
+                })
                 4 -> { // My Channels (favorited)
                     // Trigger two-way sync when user views My Channels tab
                     LaunchedEffect(Unit) {

@@ -398,7 +398,7 @@ fun MobileLiveTvScreen(
                             }
                         }
                     }
-                    3 -> LiveSportsTabContent { event ->
+                    3 -> LiveSportsTabContent(onEventClick = { event ->
                         context.startActivity(
                             SchedulePlayerActivity.createIntent(
                                 context = context,
@@ -408,7 +408,7 @@ fun MobileLiveTvScreen(
                                 iframeUrls = event.playbackUrls
                             )
                         )
-                    }
+                    })
                     4 -> {
                         // My Channels tab - favorites
                         LaunchedEffect(Unit) {

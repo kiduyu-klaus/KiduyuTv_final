@@ -152,6 +152,7 @@ object LiveSportsRepository {
                     ?.map { it.optString("url") }
                     ?.filter { it.isNotBlank() }
                     ?.distinct()
+                    ?.toList()
                     .orEmpty()
                 LiveSportsEvent(
                     id = "timst-$index-${event.optString("url", event.optString("name"))}",
@@ -167,6 +168,7 @@ object LiveSportsRepository {
                     embedUrl = urls.firstOrNull().orEmpty()
                 )
             }
+            ?.toList()
             .orEmpty()
         return sortEvents(events)
     }

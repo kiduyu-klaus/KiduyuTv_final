@@ -104,7 +104,12 @@ object UnityAdManager {
             context.packageName,
             PackageManager.GET_META_DATA
         )
-        ai.metaData?.getString(UNITY_GAME_ID_META)
+        // Android stores a numeric manifest placeholder as an Integer. Unity's
+        // game id is logically a string, so accept either manifest representation.
+        ai.metaData?.get(UNITY_GAME_ID_META)
+            ?.toString()
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
     } catch (e: Exception) {
         Log.w(TAG, "Failed to read Unity game id from manifest", e)
         null
