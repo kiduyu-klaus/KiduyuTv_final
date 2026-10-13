@@ -1165,8 +1165,8 @@ class SchedulePlayerActivity : ComponentActivity() {
         // dlive.sx exposes the complete player list on each watch page. Appending a
         // second hard-coded list created 12 visible entries for the six real servers.
         // Keep fallback URLs only for a failed/empty watch-page parse.
-        if (validDiscovered.isNotEmpty()) {
-            return validDiscovered
+        return if (validDiscovered.isNotEmpty()) {
+            validDiscovered
                 .distinctBy { canonicalPlayerUrl(it.url) }
                 .mapIndexed { index, option ->
                     option.copy(playerNumber = index + 1, isActive = index == selectedPlayerIndex)
