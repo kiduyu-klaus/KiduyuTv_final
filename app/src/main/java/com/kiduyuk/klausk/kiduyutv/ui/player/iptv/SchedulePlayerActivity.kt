@@ -109,6 +109,7 @@ class SchedulePlayerActivity : ComponentActivity() {
 
     // Direct iframe URLs passed from scraped channels
     private var iframeUrls: List<String> = emptyList()
+    private var iframeNames: List<String> = emptyList()
     private var hasDirectIframeUrls: Boolean = false
 
     // UI State — backed by Compose state so the UI reacts to changes
@@ -125,6 +126,7 @@ class SchedulePlayerActivity : ComponentActivity() {
         const val EXTRA_EVENT_TITLE = "EVENT_TITLE"
         const val EXTRA_SELECTED_PLAYER = "SELECTED_PLAYER"
         const val EXTRA_IFRAME_URLS = "IFRAME_URLS"
+        const val EXTRA_IFRAME_NAMES = "IFRAME_NAMES"
         private val STREAM_PATHS = listOf(
             "/stream/stream-%s.php",
             "/cast/stream-%s.php",
@@ -143,6 +145,7 @@ class SchedulePlayerActivity : ComponentActivity() {
             channelName: String,
             eventTitle: String,
             iframeUrls: List<String> = emptyList(),
+            iframeNames: List<String> = emptyList(),
             selectedPlayerIndex: Int = 0
         ) = android.content.Intent(context, SchedulePlayerActivity::class.java).apply {
             putExtra(EXTRA_CHANNEL_ID, channelId)
@@ -150,6 +153,7 @@ class SchedulePlayerActivity : ComponentActivity() {
             putExtra(EXTRA_EVENT_TITLE, eventTitle)
             putExtra(EXTRA_SELECTED_PLAYER, selectedPlayerIndex)
             putStringArrayListExtra(EXTRA_IFRAME_URLS, ArrayList(iframeUrls))
+            putStringArrayListExtra(EXTRA_IFRAME_NAMES, ArrayList(iframeNames))
         }
     }
 
@@ -202,6 +206,7 @@ class SchedulePlayerActivity : ComponentActivity() {
         val passedIframeUrls = intent.getStringArrayListExtra(EXTRA_IFRAME_URLS)
         if (!passedIframeUrls.isNullOrEmpty()) {
             iframeUrls = passedIframeUrls
+            iframeNames = intent.getStringArrayListExtra(EXTRA_IFRAME_NAMES).orEmpty()
             hasDirectIframeUrls = true
             android.util.Log.i(TAG, "Received ${iframeUrls.size} iframe URLs from intent")
         }
@@ -463,11 +468,12 @@ class SchedulePlayerActivity : ComponentActivity() {
         // FIX: assign to mutableStateOf-backed property
         playerOptions = withFallbackPlayerOptions(
             iframeUrls.mapIndexed { index, url ->
-            PlayerOption(
-                playerNumber = index + 1,
-                url = url,
-                isActive = index == selectedPlayerIndex
-            )
+                PlayerOption(
+                    playerNumber = index + 1,
+                    url = url,
+                    name = iframeNames.getOrNull(index).orEmpty().ifBlank { "Server ${index + 1}" },
+                    isActive = index == selectedPlayerIndex
+                )
             }
         )
 
@@ -492,6 +498,7 @@ class SchedulePlayerActivity : ComponentActivity() {
      * Chromium to permit autoplay inside nested iframes.
      */
     private fun generateIframeHtml(streamUrl: String): String {
+        val autoplayUrl = withAutoplayParameter(streamUrl)
         return """
             <!DOCTYPE html>
             <html>
@@ -505,7 +512,7 @@ class SchedulePlayerActivity : ComponentActivity() {
             </head>
             <body>
                 <iframe
-                    src="$streamUrl"
+                    src="$autoplayUrl"
                     width="100%"
                     height="100%"
                     scrolling="no"
@@ -519,6 +526,19 @@ class SchedulePlayerActivity : ComponentActivity() {
             </html>
         """.trimIndent()
     }
+
+    /** Requests autoplay from providers that support an autoplay query parameter. */
+    private fun withAutoplayParameter(streamUrl: String): String = runCatching {
+        val uri = Uri.parse(streamUrl)
+        if (uri.getQueryParameter("autoplay") != null) {
+            streamUrl
+        } else {
+            uri.buildUpon()
+                .appendQueryParameter("autoplay", "1")
+                .build()
+                .toString()
+        }
+    }.getOrDefault(streamUrl)
 
     private fun updateTopBar() {
         isTopBarVisible.value = true
@@ -1109,7 +1129,7 @@ class SchedulePlayerActivity : ComponentActivity() {
             loadCurrentStream()
             Toast.makeText(
                 this,
-                "Switched to: Server ${player.playerNumber}",
+                "Switched to: ${player.name}",
                 Toast.LENGTH_SHORT
             ).show()
         }
@@ -1124,7 +1144,7 @@ class SchedulePlayerActivity : ComponentActivity() {
             val player = playerOptions[nextIndex]
             Toast.makeText(
                 this,
-                "Stream failed. Trying: Server ${player.playerNumber}",
+                "Stream failed. Trying: ${player.name}",
                 Toast.LENGTH_SHORT
             ).show()
             switchToPlayer(nextIndex)
@@ -1141,18 +1161,21 @@ class SchedulePlayerActivity : ComponentActivity() {
     }
 
     private fun withFallbackPlayerOptions(discovered: List<PlayerOption>): List<PlayerOption> {
-        val discoveredUrls = discovered.map { it.url }.filter { it.isNotBlank() }
+        val validDiscovered = discovered.filter { it.url.isNotBlank() }
         // dlive.sx exposes the complete player list on each watch page. Appending a
         // second hard-coded list created 12 visible entries for the six real servers.
         // Keep fallback URLs only for a failed/empty watch-page parse.
-        val urls = if (discoveredUrls.isNotEmpty()) {
-            discoveredUrls
+        if (validDiscovered.isNotEmpty()) {
+            return validDiscovered
+                .distinctBy { canonicalPlayerUrl(it.url) }
+                .mapIndexed { index, option ->
+                    option.copy(playerNumber = index + 1, isActive = index == selectedPlayerIndex)
+                }
         } else {
             STREAM_PATHS.map { path ->
                 "${ScheduleApiService.BASE_URL}${path.removePrefix("/").format(channelId)}"
             }
         }
-        return urls
             .filter { it.isNotBlank() }
             .distinctBy(::canonicalPlayerUrl)
             .mapIndexed { index, url ->
@@ -1473,7 +1496,7 @@ private fun SchedulePlayerOverlay(
             ) {
                 ServerMenuHeader(
                     count = playerOptions.size,
-                    selected = playerOptions.getOrNull(selectedIndex)?.playerNumber
+                    selected = playerOptions.getOrNull(selectedIndex)?.name
                 )
                 playerOptions.forEachIndexed { index, option ->
                     ServerMenuItem(
@@ -1530,7 +1553,7 @@ private fun SchedulePlayerOverlay(
 }
 
 @Composable
-private fun ServerMenuHeader(count: Int, selected: Int?) {
+private fun ServerMenuHeader(count: Int, selected: String?) {
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
         Text(
             text = "Playback servers",
@@ -1540,7 +1563,7 @@ private fun ServerMenuHeader(count: Int, selected: Int?) {
         )
         Text(
             text = if (selected != null) {
-                "$count available · Server $selected selected"
+                "$count available · $selected selected"
             } else {
                 "$count available"
             },
@@ -1560,7 +1583,7 @@ private fun ServerMenuItem(
         text = {
             Column {
                 Text(
-                    text = "Server ${option.playerNumber}",
+                    text = option.name,
                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                     color = if (selected) Color(0xFF80CBC4) else Color.White
                 )

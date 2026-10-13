@@ -2,6 +2,9 @@ package com.kiduyuk.klausk.kiduyutv.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,8 +16,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayCircle
@@ -122,10 +126,12 @@ private fun SportsEventsBody(
             Spacer(Modifier.height(12.dp))
             Text("No ${source.tabLabel} events are available right now.", color = TextSecondary)
         }
-        else -> LazyColumn(
+        else -> LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
             modifier = Modifier.fillMaxSize(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(uiState.events, key = { it.id }) { event ->
                 LiveSportsEventCard(event) { onEventClick(event) }
@@ -137,9 +143,22 @@ private fun SportsEventsBody(
 @Composable
 private fun LiveSportsEventCard(event: LiveSportsEvent, onClick: () -> Unit) {
     val canPlay = event.playbackUrls.isNotEmpty()
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
     Card(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable(enabled = canPlay, onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = CardDark),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .focusable(enabled = canPlay, interactionSource = interactionSource)
+            .clickable(
+                enabled = canPlay,
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            ),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isFocused) PrimaryRed.copy(alpha = 0.6f) else CardDark
+        ),
         shape = RoundedCornerShape(14.dp)
     ) {
         Box(Modifier.fillMaxWidth().height(170.dp)) {

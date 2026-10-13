@@ -2,6 +2,7 @@ package com.kiduyuk.klausk.kiduyutv.data.repository
 
 import com.kiduyuk.klausk.kiduyutv.data.model.LiveSportsEvent
 import com.kiduyuk.klausk.kiduyutv.data.model.LiveSportsSource
+import com.kiduyuk.klausk.kiduyutv.data.model.LiveSportsStream
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -75,7 +76,8 @@ object LiveSportsRepository {
                     embed = stream.optString("iframe"),
                     category = categoryName,
                     league = stream.optString("tag"),
-                    now = now
+                    now = now,
+                    fallbackStreamName = stream.optString("source_tag")
                 )
                 if (base != null) add(base)
 
@@ -89,7 +91,9 @@ object LiveSportsRepository {
                             embed = substream.optString("iframe"),
                             category = categoryName,
                             league = stream.optString("tag"),
-                            now = now
+                            now = now,
+                            fallbackStreamName = substream.optString("source_tag")
+                                .ifBlank { stream.optString("source_tag") }
                         )?.let(::add)
                     }
             }
@@ -104,7 +108,8 @@ object LiveSportsRepository {
         embed: String,
         category: String,
         league: String,
-        now: Long
+        now: Long,
+        fallbackStreamName: String
     ): LiveSportsEvent? {
         val starts = stream.optLong("starts_at")
         val ends = stream.optLong("ends_at")
@@ -122,8 +127,9 @@ object LiveSportsRepository {
             isLive = isLive,
             startsAtMillis = starts.takeIf { it >= MIN_VALID_TIMESTAMP_SECONDS }?.times(1_000L),
             viewerCount = stream.optInt("viewers"),
-            streamUrls = emptyList(),
-            embedUrl = embed
+            streams = emptyList(),
+            embedUrl = embed,
+            fallbackStreamName = fallbackStreamName
         )
     }
 
@@ -146,12 +152,17 @@ object LiveSportsRepository {
             ?.mapIndexedNotNull { index, event ->
                 val startsAtMillis = parseTimstTime(event.optString("time"))
                 val isLive = startsAtMillis?.div(1_000L)?.let { it <= now } ?: false
-                val urls = event.optJSONArray("streams")
+                val streams = event.optJSONArray("streams")
                     ?.asSequence()
                     ?.mapNotNull { it as? JSONObject }
-                    ?.map { it.optString("url") }
-                    ?.filter { it.isNotBlank() }
-                    ?.distinct()
+                    ?.mapIndexed { streamIndex, stream ->
+                        LiveSportsStream(
+                            name = stream.optString("name").ifBlank { "Server ${streamIndex + 1}" },
+                            url = stream.optString("url")
+                        )
+                    }
+                    ?.filter { it.url.isNotBlank() }
+                    ?.distinctBy { it.url }
                     ?.toList()
                     .orEmpty()
                 LiveSportsEvent(
@@ -164,8 +175,8 @@ object LiveSportsRepository {
                     isLive = isLive,
                     startsAtMillis = startsAtMillis,
                     viewerCount = event.optInt("viewers"),
-                    streamUrls = urls,
-                    embedUrl = urls.firstOrNull().orEmpty()
+                    streams = streams,
+                    embedUrl = streams.firstOrNull()?.url.orEmpty()
                 )
             }
             ?.toList()

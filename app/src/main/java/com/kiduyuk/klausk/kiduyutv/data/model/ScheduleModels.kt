@@ -67,11 +67,13 @@ data class ScheduleDay(
  *
  * @property playerNumber Player number (1-6)
  * @property url Player stream URL
+ * @property name Display name shown in the player source menu
  * @property isActive Whether this player is selected by default
  */
 data class PlayerOption(
     val playerNumber: Int,
     val url: String,
+    val name: String = "Server $playerNumber",
     val isActive: Boolean = false
 )
 

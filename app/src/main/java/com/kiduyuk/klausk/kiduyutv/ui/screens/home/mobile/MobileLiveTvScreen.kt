@@ -405,7 +405,8 @@ fun MobileLiveTvScreen(
                                 channelId = "",
                                 channelName = event.name,
                                 eventTitle = event.name,
-                                iframeUrls = event.playbackUrls
+                                iframeUrls = event.playbackUrls,
+                                iframeNames = event.playbackNames
                             )
                         )
                     })
