@@ -398,23 +398,44 @@ fun MobileLiveTvScreen(
                         }
                     }
                     3 -> {
+                        var selectedSportsTab by remember { mutableIntStateOf(0) }
                         Column(
-                            modifier = Modifier.fillMaxSize(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
+                            modifier = Modifier.fillMaxSize()
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.SportsSoccer,
-                                contentDescription = null,
-                                tint = PrimaryRed,
-                                modifier = Modifier.size(48.dp)
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "To be Implemented",
-                                color = TextPrimary,
-                                style = MaterialTheme.typography.titleLarge
-                            )
+                            val sportsTabs = listOf("PPV", "TIMST")
+                            ScrollableTabRow(
+                                selectedTabIndex = selectedSportsTab,
+                                containerColor = CardDark,
+                                contentColor = TextPrimary,
+                                edgePadding = 12.dp,
+                                divider = {}
+                            ) {
+                                sportsTabs.forEachIndexed { index, title ->
+                                    Tab(
+                                        selected = selectedSportsTab == index,
+                                        onClick = { selectedSportsTab = index },
+                                        text = { Text(title) }
+                                    )
+                                }
+                            }
+                            Column(
+                                modifier = Modifier.fillMaxSize(),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.SportsSoccer,
+                                    contentDescription = null,
+                                    tint = PrimaryRed,
+                                    modifier = Modifier.size(48.dp)
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "${sportsTabs[selectedSportsTab]} — To be Implemented",
+                                    color = TextPrimary,
+                                    style = MaterialTheme.typography.titleLarge
+                                )
+                            }
                         }
                     }
                     4 -> {
