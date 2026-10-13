@@ -79,6 +79,7 @@ import com.kiduyuk.klausk.kiduyutv.viewmodel.CategoryItem
 import com.kiduyuk.klausk.kiduyutv.data.model.ScrapedChannel
 import com.kiduyuk.klausk.kiduyutv.data.repository.ChannelScraper
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
+import com.kiduyuk.klausk.kiduyutv.ui.components.LiveSportsTabContent
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileBottomNavigation
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.MobileSearchTopBar
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
@@ -397,46 +398,16 @@ fun MobileLiveTvScreen(
                             }
                         }
                     }
-                    3 -> {
-                        var selectedSportsTab by remember { mutableIntStateOf(0) }
-                        Column(
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            val sportsTabs = listOf("PPV", "TIMST")
-                            ScrollableTabRow(
-                                selectedTabIndex = selectedSportsTab,
-                                containerColor = CardDark,
-                                contentColor = TextPrimary,
-                                edgePadding = 12.dp,
-                                divider = {}
-                            ) {
-                                sportsTabs.forEachIndexed { index, title ->
-                                    Tab(
-                                        selected = selectedSportsTab == index,
-                                        onClick = { selectedSportsTab = index },
-                                        text = { Text(title) }
-                                    )
-                                }
-                            }
-                            Column(
-                                modifier = Modifier.fillMaxSize(),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.SportsSoccer,
-                                    contentDescription = null,
-                                    tint = PrimaryRed,
-                                    modifier = Modifier.size(48.dp)
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Text(
-                                    text = "${sportsTabs[selectedSportsTab]} — To be Implemented",
-                                    color = TextPrimary,
-                                    style = MaterialTheme.typography.titleLarge
-                                )
-                            }
-                        }
+                    3 -> LiveSportsTabContent { event ->
+                        context.startActivity(
+                            SchedulePlayerActivity.createIntent(
+                                context = context,
+                                channelId = "",
+                                channelName = event.name,
+                                eventTitle = event.name,
+                                iframeUrls = event.playbackUrls
+                            )
+                        )
                     }
                     4 -> {
                         // My Channels tab - favorites
