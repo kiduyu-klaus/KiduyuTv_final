@@ -1165,16 +1165,16 @@ class SchedulePlayerActivity : ComponentActivity() {
         // dlive.sx exposes the complete player list on each watch page. Appending a
         // second hard-coded list created 12 visible entries for the six real servers.
         // Keep fallback URLs only for a failed/empty watch-page parse.
-        return if (validDiscovered.isNotEmpty()) {
-            validDiscovered
+        if (validDiscovered.isNotEmpty()) {
+            return validDiscovered
                 .distinctBy { canonicalPlayerUrl(it.url) }
                 .mapIndexed { index, option ->
                     option.copy(playerNumber = index + 1, isActive = index == selectedPlayerIndex)
                 }
-        } else {
-            STREAM_PATHS.map { path ->
-                "${ScheduleApiService.BASE_URL}${path.removePrefix("/").format(channelId)}"
-            }
+        }
+
+        return STREAM_PATHS.map { path ->
+            "${ScheduleApiService.BASE_URL}${path.removePrefix("/").format(channelId)}"
         }
             .filter { it.isNotBlank() }
             .distinctBy(::canonicalPlayerUrl)
