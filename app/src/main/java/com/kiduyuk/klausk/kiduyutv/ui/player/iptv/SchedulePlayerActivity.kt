@@ -595,10 +595,11 @@ class SchedulePlayerActivity : ComponentActivity() {
 
                 function forcePlayAndUnmute(video) {
                     try {
-                        // MutationObserver and the old retry loop can see the same
-                        // element many times. Never restart its audio handshake.
-                        if (video.__kiduyuVolumeUnlockStarted) return;
-                        video.__kiduyuVolumeUnlockStarted = true;
+                        if (video.__kiduyuVolumeUnlockInstalled) return;
+                        video.__kiduyuVolumeUnlockInstalled = true;
+                        video.autoplay = true;
+                        video.setAttribute('autoplay', '');
+                        video.setAttribute('playsinline', '');
 
                         function enableVolume() {
                             try {
@@ -611,31 +612,47 @@ class SchedulePlayerActivity : ComponentActivity() {
                             }
                         }
 
-                        if (video.paused) {
-                            // Try unmuted autoplay first. If the browser blocks it,
-                            // retry muted once and unmute after playback starts.
-                            video.addEventListener('playing', function() {
-                                setTimeout(enableVolume, 300);
-                            }, { once: true });
-                            var playResult = video.play();
-                            if (playResult && playResult.catch) {
-                                playResult.catch(function(e) {
-                                    console.warn('[VideoController] Unmuted play blocked; retrying muted:', e.message);
-                                    video.muted = true;
-                                    var mutedPlay = video.play();
-                                    if (mutedPlay && mutedPlay.then) {
-                                        mutedPlay.then(function() { setTimeout(enableVolume, 800); })
-                                            .catch(function(error) {
-                                                console.warn('[VideoController] Muted play blocked:', error.message);
-                                            });
-                                    }
-                                });
-                            }
-                            setTimeout(enableVolume, 1200);
-                        } else {
-                            // Do not mute an already-playing stream on every scan.
-                            enableVolume();
+                        function attemptPlay() {
+                            try {
+                                if (!video.paused) {
+                                    enableVolume();
+                                    return;
+                                }
+                                // Live players often attach MediaSource/HLS after the
+                                // element is created. Do not permanently give up when
+                                // play() runs before a source is ready.
+                                var playResult = video.play();
+                                if (playResult && playResult.catch) {
+                                    playResult.catch(function(error) {
+                                        console.warn('[VideoController] play deferred:', error && error.message);
+                                        if (!video.__kiduyuMutedAutoplayTried) {
+                                            video.__kiduyuMutedAutoplayTried = true;
+                                            video.muted = true;
+                                            setTimeout(attemptPlay, 0);
+                                        }
+                                    });
+                                }
+                            } catch(e) {}
                         }
+
+                        video.addEventListener('playing', function() { setTimeout(enableVolume, 300); });
+                        video.addEventListener('canplay', attemptPlay);
+                        video.addEventListener('canplaythrough', attemptPlay);
+                        video.addEventListener('loadedmetadata', attemptPlay);
+                        video.addEventListener('durationchange', attemptPlay);
+                        attemptPlay();
+                        var attempts = 0;
+                        var retryTimer = setInterval(function() {
+                            if (!document.contains(video) || !video.paused) {
+                                clearInterval(retryTimer);
+                                return;
+                            }
+                            if (++attempts > 20) {
+                                clearInterval(retryTimer);
+                                return;
+                            }
+                            attemptPlay();
+                        }, 500);
                     } catch(e) {}
                 }
 
@@ -788,10 +805,11 @@ class SchedulePlayerActivity : ComponentActivity() {
 
                     function unlock(v) {
                         try {
-                            // A frame can be scanned repeatedly by MutationObserver;
-                            // only perform the autoplay/audio handshake once per video.
-                            if (v.__kiduyuVolumeUnlockStarted) return;
-                            v.__kiduyuVolumeUnlockStarted = true;
+                            if (v.__kiduyuVolumeUnlockInstalled) return;
+                            v.__kiduyuVolumeUnlockInstalled = true;
+                            v.autoplay = true;
+                            v.setAttribute('autoplay', '');
+                            v.setAttribute('playsinline', '');
 
                             function enableVolume() {
                                 try {
@@ -801,32 +819,44 @@ class SchedulePlayerActivity : ComponentActivity() {
                                 } catch(e) {}
                             }
 
-                            if (!v.paused) {
-                                // Never mute a stream that is already playing.
-                                enableVolume();
-                                return;
+                            function attemptPlay() {
+                                try {
+                                    if (!v.paused) {
+                                        enableVolume();
+                                        return;
+                                    }
+                                    var p = v.play();
+                                    if (p && p.catch) {
+                                        p.catch(function(e) {
+                                            console.warn('[AutoplayInject] play deferred:', e && e.message);
+                                            if (!v.__kiduyuMutedAutoplayTried) {
+                                                v.__kiduyuMutedAutoplayTried = true;
+                                                v.muted = true;
+                                                setTimeout(attemptPlay, 0);
+                                            }
+                                        });
+                                    }
+                                } catch(e) {}
                             }
 
-                            // Try unmuted autoplay first. If blocked, retry muted
-                            // once and restore audio after the stream starts.
-                            v.addEventListener('playing', function() {
-                                setTimeout(enableVolume, 300);
-                            }, { once: true });
-                            var p = v.play();
-                            if (p && p.catch) {
-                                p.catch(function(e) {
-                                    console.warn('[AutoplayInject] Unmuted play blocked; retrying muted:', e.message);
-                                    v.muted = true;
-                                    var mutedPlay = v.play();
-                                    if (mutedPlay && mutedPlay.then) {
-                                        mutedPlay.then(function() { setTimeout(enableVolume, 800); })
-                                            .catch(function(error) {
-                                                console.warn('[AutoplayInject] Muted play blocked:', error.message);
-                                            });
-                                    }
-                                });
-                            }
-                            setTimeout(enableVolume, 1200);
+                            v.addEventListener('playing', function() { setTimeout(enableVolume, 300); });
+                            v.addEventListener('canplay', attemptPlay);
+                            v.addEventListener('canplaythrough', attemptPlay);
+                            v.addEventListener('loadedmetadata', attemptPlay);
+                            v.addEventListener('durationchange', attemptPlay);
+                            attemptPlay();
+                            var attempts = 0;
+                            var retryTimer = setInterval(function() {
+                                if (!document.contains(v) || !v.paused) {
+                                    clearInterval(retryTimer);
+                                    return;
+                                }
+                                if (++attempts > 20) {
+                                    clearInterval(retryTimer);
+                                    return;
+                                }
+                                attemptPlay();
+                            }, 500);
                         } catch(e) {}
                     }
                     function scan(root) {
