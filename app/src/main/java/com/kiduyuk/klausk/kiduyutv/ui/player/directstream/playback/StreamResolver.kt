@@ -54,12 +54,10 @@ class StreamResolver {
         // backend should be reported to the player immediately.
         ProvidersApi.requireBackendAvailable()
 
-        // The backend catalog is authoritative for enabled provider categories.
-        // Anime media uses the backend's separate `anime` route, while all
-        // other media remains on its movie/series route.
-        val providerRoute = ProvidersApi.providerRouteForMedia(type, tmdbId)
-        val enabledProviderNames = providerRoute.providerNames
-        val requestType = providerRoute.streamType
+        // The backend selects providers compatible with this media. The
+        // request type remains the caller's movie/series type.
+        val enabledProviderNames = ProvidersApi.enabledProviderNamesForMedia(type, tmdbId)
+        val requestType = type
         val selectedProvider = provider.key.takeIf { selected ->
             enabledProviderNames.any { it.equals(selected, ignoreCase = true) }
         }
@@ -90,8 +88,7 @@ class StreamResolver {
                     requestLimiter.withPermit {
                         Log.i(
                             tag,
-                            "Resolver.load provider=$providerName type=$requestType category=" +
-                                "${providerRoute.category} tmdbId=$tmdbId " +
+                            "Resolver.load provider=$providerName type=$requestType tmdbId=$tmdbId " +
                                 "season=${season ?: "-"} episode=${episode ?: "-"}"
                         )
 
