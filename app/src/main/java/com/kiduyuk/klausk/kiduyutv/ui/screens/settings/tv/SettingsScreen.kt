@@ -412,9 +412,13 @@ fun SettingsScreen(
                     PlaybackContent(
                         defaultProvider = uiState.defaultProvider,
                         defaultDirectStreamProvider = uiState.defaultDirectStreamProvider,
+                        directStreamEndpoint = uiState.directStreamEndpoint,
                         onProviderSelect = { viewModel.setDefaultProvider(context, it) },
                         onDirectStreamProviderSelect = {
                             viewModel.setDefaultDirectStreamProvider(context, it)
+                        },
+                        onDirectStreamEndpointSelect = {
+                            viewModel.setDirectStreamEndpoint(context, it)
                         }
                     )
                 }
@@ -1285,8 +1289,10 @@ private fun AppVersionContent(
 private fun PlaybackContent(
     defaultProvider: String,
     defaultDirectStreamProvider: String,
+    directStreamEndpoint: String,
     onProviderSelect: (String) -> Unit,
-    onDirectStreamProviderSelect: (String) -> Unit
+    onDirectStreamProviderSelect: (String) -> Unit,
+    onDirectStreamEndpointSelect: (String) -> Unit
 ) {
     val context = LocalContext.current
     var directProviderOptions by remember { mutableStateOf<List<StreamProviderChoice>>(emptyList()) }
@@ -1467,6 +1473,44 @@ private fun PlaybackContent(
                 },
                 colors = SwitchDefaults.colors(checkedTrackColor = PrimaryRed)
             )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        SettingsSectionLabel(text = "Endpoint URL")
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(CardDark)
+                .padding(24.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "Choose the backend used to load provider categories and direct streams.",
+                    color = TextSecondary,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                SettingsManager.DIRECT_STREAM_ENDPOINTS.chunked(2).forEach { rowEndpoints ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        rowEndpoints.forEach { endpoint ->
+                            ProviderOptionItem(
+                                option = endpoint,
+                                isSelected = endpoint == directStreamEndpoint,
+                                onClick = { onDirectStreamEndpointSelect(endpoint) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        if (rowEndpoints.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))

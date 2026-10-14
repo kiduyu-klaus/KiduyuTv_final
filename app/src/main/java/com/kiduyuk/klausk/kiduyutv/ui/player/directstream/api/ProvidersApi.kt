@@ -4,11 +4,13 @@ import android.net.Uri
 import android.util.Log
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.data.api.ApiClient
+import com.kiduyuk.klausk.kiduyutv.network.AndroidApp
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamItem
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamSegment
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamResponse
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.SubtitleItem
 import com.kiduyuk.klausk.kiduyutv.util.UrlUtils
+import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import okhttp3.CacheControl
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -62,7 +64,14 @@ object ProvidersApi {
     // request bounded but do not fail while those providers are still working.
     private const val STREAMS_READ_TIMEOUT_MS = 180_000
 
-    private const val baseUrl = "https://secondbanklabs.com/kiduyuTv_providers"
+    /**
+     * Resolve on every request so changing Settings takes effect immediately,
+     * including for the provider catalog opened after the Settings screen.
+     */
+    private val baseUrl: String
+        get() = runCatching {
+            SettingsManager(AndroidApp.instance).getDirectStreamEndpoint()
+        }.getOrDefault(SettingsManager.DEFAULT_DIRECT_STREAM_ENDPOINT)
     private const val streamApiToken = BuildConfig.STREAM_API_TOKEN
 
     data class ProviderRoute(

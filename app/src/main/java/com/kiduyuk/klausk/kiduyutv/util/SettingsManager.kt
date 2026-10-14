@@ -30,6 +30,24 @@ class SettingsManager(context: Context) {
         return preferences.getString(KEY_DEFAULT_DIRECT_STREAM_PROVIDER, AUTO) ?: AUTO
     }
 
+    /** Stores the trusted backend used for direct-stream provider requests. */
+    fun saveDirectStreamEndpoint(endpoint: String) {
+        val safeEndpoint = endpoint.takeIf { it in DIRECT_STREAM_ENDPOINTS }
+            ?: DEFAULT_DIRECT_STREAM_ENDPOINT
+        preferences.edit().putString(KEY_DIRECT_STREAM_ENDPOINT, safeEndpoint).apply()
+    }
+
+    /**
+     * Returns a supported direct-stream backend. Invalid or legacy values are
+     * deliberately reset to the primary endpoint rather than being used as an
+     * arbitrary network URL.
+     */
+    fun getDirectStreamEndpoint(): String {
+        return preferences.getString(KEY_DIRECT_STREAM_ENDPOINT, DEFAULT_DIRECT_STREAM_ENDPOINT)
+            ?.takeIf { it in DIRECT_STREAM_ENDPOINTS }
+            ?: DEFAULT_DIRECT_STREAM_ENDPOINT
+    }
+
     fun setDirectStreamEnabled(enabled: Boolean) {
         preferences.edit().putBoolean(KEY_DIRECT_STREAM_ENABLED, enabled).apply()
     }
@@ -111,6 +129,7 @@ class SettingsManager(context: Context) {
         private const val PREFS_NAME = "app_settings"
         private const val KEY_DEFAULT_PROVIDER = "default_provider"
         private const val KEY_DEFAULT_DIRECT_STREAM_PROVIDER = "default_direct_stream_provider"
+        private const val KEY_DIRECT_STREAM_ENDPOINT = "direct_stream_endpoint"
         private const val KEY_DEVICE_ID = "device_id"
         private const val KEY_ADS_DISABLED = "ads_disabled"
         private const val KEY_DIRECT_STREAM_ENABLED = "direct_stream_enabled"
@@ -121,6 +140,17 @@ class SettingsManager(context: Context) {
 
         /** Sentinel value meaning "ask me each time" — no automatic selection. */
         const val AUTO = "Auto"
+
+        const val DEFAULT_DIRECT_STREAM_ENDPOINT =
+            "https://secondbanklabs.com/kiduyuTv_providers"
+        const val WORKER_DIRECT_STREAM_ENDPOINT =
+            "https://d018ec54-kiduyutv-providers.muigakiduyu1995.workers.dev/kiduyuTv_providers"
+
+        /** Only endpoints surfaced in Settings are accepted by the API client. */
+        val DIRECT_STREAM_ENDPOINTS: List<String> = listOf(
+            DEFAULT_DIRECT_STREAM_ENDPOINT,
+            WORKER_DIRECT_STREAM_ENDPOINT
+        )
 
         /**
          * All active providers in display order.
