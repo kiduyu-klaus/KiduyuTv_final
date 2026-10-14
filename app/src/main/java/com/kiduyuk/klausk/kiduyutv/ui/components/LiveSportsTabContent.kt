@@ -39,13 +39,21 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -63,6 +71,7 @@ import com.kiduyuk.klausk.kiduyutv.viewmodel.LiveSportsViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.delay
 
 /** Shared PPV/TIMST browser for the phone and TV Live TV surfaces. */
 @Composable
@@ -70,6 +79,7 @@ import java.util.Locale
 fun LiveSportsTabContent(
     onEventClick: (LiveSportsEvent) -> Unit,
     onEventLongClick: (LiveSportsEvent) -> Unit = {},
+    columns: Int = 2,
     viewModel: LiveSportsViewModel = viewModel()
 ) {
     var selectedSourceIndex by remember { mutableIntStateOf(0) }
@@ -96,7 +106,14 @@ fun LiveSportsTabContent(
                 )
             }
         }
-        SportsEventsBody(source, uiState, { viewModel.load(source, forceRefresh = true) }, onEventClick, onEventLongClick)
+        SportsEventsBody(
+            source = source,
+            uiState = uiState,
+            onRetry = { viewModel.load(source, forceRefresh = true) },
+            onEventClick = onEventClick,
+            onEventLongClick = onEventLongClick,
+            columns = columns
+        )
     }
 }
 
@@ -106,7 +123,8 @@ private fun SportsEventsBody(
     uiState: LiveSportsUiState,
     onRetry: () -> Unit,
     onEventClick: (LiveSportsEvent) -> Unit,
-    onEventLongClick: (LiveSportsEvent) -> Unit
+    onEventLongClick: (LiveSportsEvent) -> Unit,
+    columns: Int
 ) {
     when {
         uiState.isLoading && uiState.events.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) {
@@ -131,7 +149,7 @@ private fun SportsEventsBody(
             Text("No ${source.tabLabel} events are available right now.", color = TextSecondary)
         }
         else -> LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
+            columns = GridCells.Fixed(columns.coerceAtLeast(1)),
             modifier = Modifier.fillMaxSize(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -158,16 +176,65 @@ private fun LiveSportsEventCard(
     val canPlay = event.playbackUrls.isNotEmpty()
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
+    val longPressTimeoutMs = LocalViewConfiguration.current.longPressTimeoutMillis
+    var isConfirmHeld by remember { mutableStateOf(false) }
+    var heldLongEnough by remember { mutableStateOf(false) }
+    var suppressNextClick by remember { mutableStateOf(false) }
+    val currentOnLongClick by rememberUpdatedState(onLongClick)
+
+    LaunchedEffect(isConfirmHeld, longPressTimeoutMs) {
+        if (isConfirmHeld) {
+            delay(longPressTimeoutMs)
+            heldLongEnough = true
+        }
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .focusable(enabled = canPlay, interactionSource = interactionSource)
+            .onPreviewKeyEvent { keyEvent ->
+                val isConfirmKey = keyEvent.key == Key.DirectionCenter ||
+                    keyEvent.key == Key.Enter
+
+                when {
+                    isConfirmKey && keyEvent.type == KeyEventType.KeyDown &&
+                        keyEvent.nativeKeyEvent.repeatCount == 0 -> {
+                        isConfirmHeld = true
+                        heldLongEnough = false
+                        suppressNextClick = false
+                        false
+                    }
+
+                    isConfirmKey && keyEvent.type == KeyEventType.KeyUp && heldLongEnough -> {
+                        isConfirmHeld = false
+                        heldLongEnough = false
+                        suppressNextClick = true
+                        currentOnLongClick()
+                        false
+                    }
+
+                    isConfirmKey && keyEvent.type == KeyEventType.KeyUp -> {
+                        isConfirmHeld = false
+                        heldLongEnough = false
+                        false
+                    }
+
+                    else -> false
+                }
+            }
             .combinedClickable(
                 enabled = true,
                 interactionSource = interactionSource,
                 indication = null,
-                onClick = { if (canPlay) onClick() },
+                onClick = {
+                    if (suppressNextClick) {
+                        suppressNextClick = false
+                    } else if (canPlay) {
+                        onClick()
+                    }
+                },
                 onLongClick = onLongClick
             ),
         colors = CardDefaults.cardColors(

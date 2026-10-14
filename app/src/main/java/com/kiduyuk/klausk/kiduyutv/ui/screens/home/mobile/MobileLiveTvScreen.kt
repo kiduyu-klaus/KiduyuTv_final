@@ -586,6 +586,26 @@ fun MobileLiveTvScreen(
                             }
                         )
                     }
+                    3 -> {
+                        LiveSportsTabContent(
+                            columns = 1,
+                            onEventClick = { event ->
+                                context.startActivity(
+                                    SchedulePlayerActivity.createIntent(
+                                        context = context,
+                                        channelId = "",
+                                        channelName = event.name,
+                                        eventTitle = event.name,
+                                        iframeUrls = event.playbackUrls,
+                                        iframeNames = event.playbackNames
+                                    )
+                                )
+                            },
+                            onEventLongClick = { event ->
+                                liveSportsToConfirm = event
+                            }
+                        )
+                    }
                 }
             }
     }
