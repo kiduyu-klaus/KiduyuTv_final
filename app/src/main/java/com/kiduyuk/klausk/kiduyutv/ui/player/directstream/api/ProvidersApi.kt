@@ -4,13 +4,10 @@ import android.net.Uri
 import android.util.Log
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.data.api.ApiClient
-import com.kiduyuk.klausk.kiduyutv.network.AndroidApp
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamItem
-import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamSegment
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamResponse
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.SubtitleItem
 import com.kiduyuk.klausk.kiduyutv.util.UrlUtils
-import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import okhttp3.CacheControl
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -43,10 +40,10 @@ class ProvidersBackendUnavailableException(
  *   - GET api/streams/{provider}/{type}/{tmdbId}?token=...[&season=&episode=]  (single)
  *
  * Where:
- *   - `type` is "movie", "series", or "anime"
+ *   - `type` is "movie" or "series"
  *   - `provider` is one of the lowercased provider keys recognised by the
  *     server (see [com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamCatalog])
- *   - `season` / `episode` are required for episodic `series` and `anime`
+ *   - `season` / `episode` are required only when `type == "series"`
  */
 object ProvidersApi {
 
@@ -55,44 +52,108 @@ object ProvidersApi {
     private const val PROVIDERS_READ_TIMEOUT_MS = 30_000
     private const val BACKEND_HEALTH_TIMEOUT_SECONDS = 10L
     private const val ANIMATION_GENRE_ID = 16
-    private const val MOVIES_TV_CATEGORY = "moviestv"
+    private const val MOVIES_CATEGORY = "movies"
+    private const val TV_CATEGORY = "tv"
     private const val ANIME_CATEGORY = "anime"
-    private const val ANIME_STREAM_TYPE = "anime"
 
-    // A stalled provider must not block the stream picker indefinitely.
-    private const val STREAMS_READ_TIMEOUT_MS = 30_000
+    // Aggregate stream requests wait for several enabled providers on the
+    // backend. Some valid scrapers need well over 30 seconds, so keep the
+    // request bounded but do not fail while those providers are still working.
+    private const val STREAMS_READ_TIMEOUT_MS = 180_000
 
-    /**
-     * Resolve on every request so changing Settings takes effect immediately,
-     * including for the provider catalog opened after the Settings screen.
-     */
-    private val baseUrl: String
-        get() = runCatching {
-            SettingsManager(AndroidApp.instance).getDirectStreamEndpoint()
-        }.getOrDefault(SettingsManager.DEFAULT_DIRECT_STREAM_ENDPOINT)
+    private const val baseUrl = "https://sflatransport.com/kiduyuTv_providers"
     private const val streamApiToken = BuildConfig.STREAM_API_TOKEN
 
-    data class ProviderRoute(
-        val providerNames: List<String>,
-        /** The backend path type: movie, series, or anime. */
-        val streamType: String,
-        val category: String
-    )
-
-    /** An enabled provider as advertised by the live backend catalog. */
-    data class EnabledProvider(
-        val name: String,
-        val categories: List<String>
-    ) {
-        /** Primary category retained for existing settings/UI labels. */
-        val category: String
-            get() = categories.firstOrNull().orEmpty()
-    }
-
-    private data class MediaClassification(
-        val isAnime: Boolean,
-        val originalLanguage: String?
-    )
+    /**
+     * Current enabled-provider routing map. These categories are used only to
+     * select among providers the backend says are currently enabled.
+     */
+    private val providerPreferences: Map<String, Set<String>> = mapOf(
+        "2dhive" to setOf(ANIME_CATEGORY),
+        "4khdhub" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "showbox" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "allwish" to setOf(ANIME_CATEGORY),
+        "anibd" to setOf(ANIME_CATEGORY),
+        "anichan" to setOf(ANIME_CATEGORY),
+        "anidoor" to setOf(ANIME_CATEGORY),
+        "anikage" to setOf(ANIME_CATEGORY),
+        "anikai" to setOf(ANIME_CATEGORY),
+        "anikoto" to setOf(ANIME_CATEGORY),
+        "anikototv" to setOf(ANIME_CATEGORY),
+        "animeflix" to setOf(ANIME_CATEGORY),
+        "animegg" to setOf(ANIME_CATEGORY),
+        "animekai" to setOf(ANIME_CATEGORY),
+        "animepahe" to setOf(ANIME_CATEGORY),
+        "animeparadise" to setOf(ANIME_CATEGORY),
+        "animesalt" to setOf(ANIME_CATEGORY),
+        "animesdigital" to setOf(ANIME_CATEGORY),
+        "animesuge" to setOf(ANIME_CATEGORY),
+        "animezey" to setOf(ANIME_CATEGORY),
+        "animotvslash" to setOf(ANIME_CATEGORY),
+        "aniwaves" to setOf(ANIME_CATEGORY),
+        "antarctica" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "bollyflix" to setOf(MOVIES_CATEGORY),
+        "castletv" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "cineby" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "cinefreak" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "cinejoy" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "cinemacity" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "cinemaos" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "cinesrc" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "cinesrc_provider" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "cinewave" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "dahmermovies" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "desiflix" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "flixcloud" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "framextv" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "hdghartv" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "hdhub4u" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "hdmovie2" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "hexa" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "hianime" to setOf(ANIME_CATEGORY),
+        "hindmoviez" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "imdbplay" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "kisskh" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "kmmovies" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "lordflix" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "meowtv" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "movieblast" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "moviebox" to setOf(MOVIES_CATEGORY, TV_CATEGORY, ANIME_CATEGORY),
+        "movielinkbd" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "moviesdrive" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "movieshunt" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "necro" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "netlio" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "netmirror" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "nikastream" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "notorrent" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "pantyflix" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "peachify" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "playimdb" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "primeshows" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "raflix" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "stellar" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "streamflix" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "streamxtv" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "uhdmovies" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "vaplayer" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "vegamovies" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "vidbox" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "vidcore" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "videasy" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "vidfast" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "vidking" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "vidlink" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "vidlove" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "vidlux" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "vidrock" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "vidsrcsbs" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "vidup" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "vixsrc" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "watchseries" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "webstreamr" to setOf(MOVIES_CATEGORY, TV_CATEGORY),
+        "zxcstreams" to setOf(MOVIES_CATEGORY, TV_CATEGORY)
+)
     private val backendHealthClient by lazy {
         OkHttpClient.Builder()
             // callTimeout bounds DNS, connection, TLS, request and response as
@@ -156,11 +217,10 @@ object ProvidersApi {
     }
 
     /**
-     * Reads the authoritative provider catalog from the backend. Categories
-     * are intentionally not duplicated in the Android client, so backend
-     * provider changes take effect without an app release.
+     * Returns the server-side keys of providers currently enabled by
+     * `/api/providers`. Disabled entries are deliberately omitted.
      */
-    private fun enabledProviderCatalog(): List<EnabledProvider> {
+    fun enabledProviderNames(): List<String> {
         val urlString = "$baseUrl/api/providers"
         Log.i(TAG, "GET $urlString")
         val connection = (URL(urlString).openConnection() as HttpURLConnection).apply {
@@ -184,159 +244,74 @@ object ProvidersApi {
             }
             val providers = json.optJSONArray("providers")
                 ?: throw IOException("Providers API response has no providers array")
-            val catalog = buildList {
+            buildList {
                 for (index in 0 until providers.length()) {
                     val item = providers.optJSONObject(index) ?: continue
-                    val name = item.optString("name").trim().lowercase(Locale.ROOT)
-                    val legacyCategory = item.optString("category").trim()
-                    val categories = buildList {
-                        item.optJSONArray("categories")?.let { categoryArray ->
-                            for (categoryIndex in 0 until categoryArray.length()) {
-                                categoryArray.optString(categoryIndex)
-                                    .trim()
-                                    .takeIf { it.isNotBlank() }
-                                    ?.let(::add)
-                            }
-                        }
-                        if (legacyCategory.isNotBlank()) {
-                            add(legacyCategory)
-                        }
-                    }.map(::normalizeCategory).distinct()
-                    if (item.optBoolean("enabled", false) && name.isNotBlank() && categories.isNotEmpty()) {
-                        add(EnabledProvider(name, categories))
-                    }
+                    val name = item.optString("name").trim().lowercase()
+                    if (item.optBoolean("enabled", false) && name.isNotBlank()) add(name)
                 }
+            }.distinct().also {
+                Log.i(TAG, "Enabled providers (${it.size}): ${it.joinToString()}")
             }
-                // Some catalog versions can advertise one provider in more than
-                // one record. Merge those records instead of letting distinctBy
-                // keep only the first category (for example MovieBox's
-                // MoviesTv + Anime support).
-                .groupBy { it.name }
-                .map { (name, entries) ->
-                    EnabledProvider(
-                        name = name,
-                        categories = entries
-                            .flatMap { it.categories }
-                            .distinct()
-                    )
-                }
-                .let { entries ->
-                    // MovieBox is a dual-category provider. Keep it available
-                    // for both movie/TV and anime routes even if the backend
-                    // returns only one category, splits it across records, or
-                    // omits it from the catalog entirely.
-                    val movieBox = entries.firstOrNull { it.name.equals("moviebox", ignoreCase = true) }
-                    val normalized = if (movieBox == null) {
-                        entries + EnabledProvider(
-                            name = "moviebox",
-                            categories = listOf(MOVIES_TV_CATEGORY, ANIME_CATEGORY)
-                        )
-                    } else {
-                        entries.map { provider ->
-                            if (provider.name.equals("moviebox", ignoreCase = true)) {
-                                provider.copy(
-                                    categories = (provider.categories + MOVIES_TV_CATEGORY + ANIME_CATEGORY)
-                                        .map(::normalizeCategory)
-                                        .distinct()
-                                )
-                            } else {
-                                provider
-                            }
-                        }
-                    }
-                    Log.i(
-                        TAG,
-                        "MovieBox fallback applied: " +
-                            normalized.firstOrNull { it.name == "moviebox" }?.categories.orEmpty()
-                    )
-                    normalized
-                }
-                .also {
-                Log.i(
-                    TAG,
-                    "Enabled providers (${it.size}): " +
-                        it.joinToString { provider -> "${provider.name}:${provider.categories.joinToString("/")}" }
-                )
-            }
-            catalog
         } finally {
             connection.disconnect()
         }
     }
 
     /**
-     * Reads enabled provider names and their backend-defined categories for
-     * UI presentation. Playback must use [providerRouteForMedia] to enforce
-     * compatibility with the title being played.
-     */
-    fun enabledProviders(): List<EnabledProvider> = enabledProviderCatalog()
-
-    /**
-     * Returns the backend category and request type for a TMDB title.
+     * Returns enabled providers compatible with the requested TMDB media.
      *
-     * A title is anime only when it has TMDB Animation (16) and its original
-     * language is Japanese, Chinese, or Korean. Those titles query only the
-     * backend's enabled Anime providers via its `anime` stream route; all
-     * remaining movies and series query only enabled MoviesTv providers.
+     * Non-animation movies use the movies category and non-animation series use the
+     * tv category. TMDB Animation genre (ID 16) routes a movie or series exclusively
+     * to anime providers, so anime and non-anime provider groups are never mixed.
+     * A failed TMDB lookup keeps the base category so an incidental metadata failure
+     * never blocks playback.
      */
-    suspend fun providerRouteForMedia(type: String, tmdbId: Int): ProviderRoute {
+    suspend fun enabledProviderNamesForMedia(type: String, tmdbId: Int): List<String> {
         require(type == "movie" || type == "series") { "invalid type: $type" }
         require(tmdbId > 0) { "invalid tmdbId: $tmdbId" }
 
-        val classification = classifyMedia(type, tmdbId)
-        val category = if (classification.isAnime) ANIME_CATEGORY else MOVIES_TV_CATEGORY
-        val selected = enabledProviderCatalog()
-            .filter { provider ->
-                provider.categories.any { normalizeCategory(it) == normalizeCategory(category) }
-            }
-            .map { it.name }
+        val enabled = enabledProviderNames()
+        val animation = hasAnimationGenre(type, tmdbId)
+        val category = when {
+            animation -> ANIME_CATEGORY
+            type == "movie" -> MOVIES_CATEGORY
+            else -> TV_CATEGORY
+        }
+        val selected = enabled.filter { provider ->
+            providerPreferences[provider.lowercase(Locale.ROOT)]
+                ?.contains(category) == true
+        }
+        val skipped = enabled.filterNot(selected::contains)
         Log.i(
             TAG,
-            "Provider selection type=$type tmdbId=$tmdbId originalLanguage=" +
-                "${classification.originalLanguage ?: "-"} anime=${classification.isAnime} " +
+            "Provider selection type=$type tmdbId=$tmdbId animation=$animation " +
                 "category=$category selected=${selected.joinToString()}"
         )
-        return ProviderRoute(
-            providerNames = selected,
-            streamType = if (classification.isAnime) ANIME_STREAM_TYPE else type,
-            category = category
-        )
+        if (skipped.isNotEmpty()) {
+            Log.i(TAG, "Skipped incompatible or unmapped enabled providers: ${skipped.joinToString()}")
+        }
+        return selected
     }
 
-    private suspend fun classifyMedia(type: String, tmdbId: Int): MediaClassification {
+    private suspend fun hasAnimationGenre(type: String, tmdbId: Int): Boolean {
         return runCatching {
-            val (genres, originalLanguage) = if (type == "movie") {
-                ApiClient.tmdbApiService.getMovieDetail(tmdbId).let { detail ->
-                    detail.genres to detail.originalLanguage
-                }
+            val genres = if (type == "movie") {
+                ApiClient.tmdbApiService.getMovieDetail(tmdbId).genres
             } else {
-                ApiClient.tmdbApiService.getTvShowDetail(tmdbId).let { detail ->
-                    detail.genres to detail.originalLanguage
-                }
+                ApiClient.tmdbApiService.getTvShowDetail(tmdbId).genres
             }
-            val normalizedLanguage = originalLanguage?.lowercase(Locale.ROOT)
-            MediaClassification(
-                isAnime = genres.orEmpty().any { it.id == ANIMATION_GENRE_ID } &&
-                    normalizedLanguage in ANIME_ORIGINAL_LANGUAGES,
-                originalLanguage = normalizedLanguage
-            )
-        }.onSuccess { classification ->
-            Log.i(
-                TAG,
-                "TMDB metadata type=$type tmdbId=$tmdbId originalLanguage=" +
-                    "${classification.originalLanguage ?: "-"} anime=${classification.isAnime}"
-            )
+            genres.orEmpty().any { it.id == ANIMATION_GENRE_ID }
+        }.onSuccess { isAnimation ->
+            Log.i(TAG, "TMDB genres type=$type tmdbId=$tmdbId animation=$isAnimation")
         }.onFailure { error ->
             Log.w(
                 TAG,
-                "Could not read TMDB metadata for $type/$tmdbId; using MoviesTv providers",
+                "Could not read TMDB genres for $type/$tmdbId; using only the base provider category",
                 error
             )
-        }.getOrDefault(MediaClassification(isAnime = false, originalLanguage = null))
+        }.getOrDefault(false)
     }
-
-    private fun normalizeCategory(value: String): String =
-        value.lowercase(Locale.ROOT).filter { it.isLetterOrDigit() }
 
     fun streams(
         type: String,
@@ -345,9 +320,7 @@ object ProvidersApi {
         episode: Int? = null,
         provider: String? = null
     ): StreamResponse {
-        require(type == "movie" || type == "series" || type == ANIME_STREAM_TYPE) {
-            "invalid type: $type"
-        }
+        require(type == "movie" || type == "series") { "invalid type: $type" }
         require(tmdbId > 0) { "invalid tmdbId: $tmdbId" }
 
         val pathSegment = if (provider.isNullOrBlank()) {
@@ -357,7 +330,7 @@ object ProvidersApi {
         }
         val urlBuilder = Uri.parse("$baseUrl/$pathSegment").buildUpon()
             .appendQueryParameter("token", streamApiToken)
-        if (type == "series" || type == ANIME_STREAM_TYPE) {
+        if (type == "series") {
             season?.let { urlBuilder.appendQueryParameter("season", it.toString()) }
             episode?.let { urlBuilder.appendQueryParameter("episode", it.toString()) }
         }
@@ -391,10 +364,7 @@ object ProvidersApi {
                 Log.w(TAG, "Body[0..200]=${body.take(200)}")
                 throw ProvidersApiHttpException(status)
             }
-            val response = parse(
-                json = JSONObject(body),
-                acceptsAnimeSegments = type == ANIME_STREAM_TYPE
-            )
+            val response = parse(JSONObject(body))
             Log.i(
                 TAG,
                 "Response provider=$providerLabel tmdbId=${response.tmdbId} " +
@@ -422,10 +392,7 @@ object ProvidersApi {
      * in, so we coerce it. `imdbId` may be JSON `null`, which `optString`
      * surfaces as the literal `"null"` — we treat that as absent.
      */
-    private fun parse(
-        json: JSONObject,
-        acceptsAnimeSegments: Boolean = false
-    ): StreamResponse {
+    private fun parse(json: JSONObject): StreamResponse {
         val tmdbId = json.optString("tmdbId")
             .toIntOrNull()
             ?: json.optInt("tmdbId", 0)
@@ -438,15 +405,6 @@ object ProvidersApi {
                 val url = s.optString("url").takeIf { it.isNotBlank() } ?: continue
                 val provider = s.optString("provider", "")
                     .ifBlank { json.optString("provider", "") }
-                if (provider.equals("vidlink", ignoreCase = true) && !hasVidlinkSignature(url)) {
-                    Log.w(
-                        TAG,
-                        "Dropping unsigned Vidlink stream " +
-                            "quality=${s.optString("quality", "?")} " +
-                            "path=${runCatching { Uri.parse(url).path }.getOrNull() ?: "?"}"
-                    )
-                    continue
-                }
                 val type = s.optString("type", "")
                 val isVixsrcHls = provider.equals("vixsrc", ignoreCase = true) &&
                     url.contains("vixsrc.to/playlist/", ignoreCase = true)
@@ -473,12 +431,9 @@ object ProvidersApi {
                 }
                 val mimeType = when {
                     isVixsrcHls || isGifPlaylist || isHlsUrlHint -> HLS_MIME_TYPE
-                    isGoogleusercontentHost(url) -> MATROSKA_MIME_TYPE
                     else -> rawMimeType
                 }
-                if (isGoogleusercontentHost(url) && !rawMimeType.equals(MATROSKA_MIME_TYPE, ignoreCase = true)) {
-                    Log.i(TAG, "Overriding provider MIME with Matroska for Googleusercontent stream")
-                } else if (isHlsUrlHint && rawMimeType.equals("image/jpeg", ignoreCase = true)) {
+                if (isHlsUrlHint && rawMimeType.equals("image/jpeg", ignoreCase = true)) {
                     Log.i(TAG, "Overriding image/jpeg MIME hint with HLS for provider=${provider.ifBlank { "?" }}")
                 }
                 val headers = s.optJSONObject("headers")?.let { h ->
@@ -486,6 +441,17 @@ object ProvidersApi {
                     h.keys().forEach { k -> map[k] = h.optString(k) }
                     map
                 } ?: linkedMapOf()
+                if (provider.equals("vidlink", ignoreCase = true) &&
+                    !hasVidlinkSignature(url, headers)
+                ) {
+                    Log.w(
+                        TAG,
+                        "Dropping unsigned Vidlink stream " +
+                            "quality=${s.optString("quality", "?")} " +
+                            "host=${runCatching { Uri.parse(url).host }.getOrNull() ?: "?"}"
+                    )
+                    continue
+                }
                 if (isGoogleusercontentHost(url)) {
                     // These are controlled by OkHttp/Media3. Forwarding
                     // provider-supplied values can break signed direct-file
@@ -541,8 +507,6 @@ object ProvidersApi {
                 val subtitles = parseSubtitles(
                     s.optJSONArray("subtitles") ?: s.optJSONArray("captions")
                 )
-                val intro = if (acceptsAnimeSegments) parseAnimeSegment(s.optJSONObject("intro")) else null
-                val outro = if (acceptsAnimeSegments) parseAnimeSegment(s.optJSONObject("outro")) else null
                 add(
                     StreamItem(
                         title = title,
@@ -554,31 +518,12 @@ object ProvidersApi {
                         type = normalizedType,
                         mimeType = mimeType,
                         headers = headers,
-                        subtitles = subtitles,
-                        intro = intro,
-                        outro = outro
+                        subtitles = subtitles
                     )
                 )
             }
         }
         return StreamResponse(tmdbId, imdbId, items)
-    }
-
-    /**
-     * Anime providers report opening/ending offsets in seconds. Keep only
-     * positive, ordered intervals and convert once at the API boundary so the
-     * player can use its normal millisecond-based segment code.
-     */
-    private fun parseAnimeSegment(segment: JSONObject?): StreamSegment? {
-        val startSeconds = segment?.optDouble("start", Double.NaN) ?: return null
-        val endSeconds = segment.optDouble("end", Double.NaN)
-        if (!startSeconds.isFinite() || !endSeconds.isFinite() || startSeconds < 0.0 || endSeconds <= startSeconds) {
-            return null
-        }
-        return StreamSegment(
-            startMs = (startSeconds * 1_000).toLong(),
-            endMs = (endSeconds * 1_000).toLong()
-        )
     }
 
     private fun extractMovieBoxLanguage(provider: String, title: String): String {
@@ -595,16 +540,32 @@ object ProvidersApi {
     }
 
     /**
-     * Vidlink media URLs are signed CDN URLs. Without both query parameters,
-     * the CDN returns HTTP 428 and Media3 reports ERROR_CODE_IO_BAD_HTTP_STATUS.
+     * Vidlink currently returns signed DASH URLs in two forms:
+     * query-signed URLs with `sign` and `t`, or CloudFront-signed URLs whose
+     * policy, signature, and key-pair values are supplied in a Cookie header.
+     * The latter is used by `sacdn.hakunaymatata.com` responses.
      */
-    private fun hasVidlinkSignature(url: String): Boolean {
+    private fun hasVidlinkSignature(url: String, headers: Map<String, String>): Boolean {
         val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return false
         if (!uri.scheme.equals("https", ignoreCase = true)) return false
-        val host = uri.host.orEmpty()
-        if (!host.equals("bcdn.hakunaymatata.com", ignoreCase = true)) return false
-        return !uri.getQueryParameter("sign").isNullOrBlank() &&
+        val host = uri.host.orEmpty().lowercase(Locale.ROOT)
+        if (!host.endsWith(".hakunaymatata.com")) return false
+
+        val querySigned = !uri.getQueryParameter("sign").isNullOrBlank() &&
             !uri.getQueryParameter("t").isNullOrBlank()
+        if (querySigned) return true
+
+        val cookie = headers.entries
+            .firstOrNull { it.key.equals("Cookie", ignoreCase = true) }
+            ?.value
+            .orEmpty()
+            .lowercase(Locale.ROOT)
+        val cloudFrontCookieNames = listOf(
+            "cloudfront-policy=",
+            "cloudfront-signature=",
+            "cloudfront-key-pair-id="
+        )
+        return cloudFrontCookieNames.all { cookieName -> cookie.contains(cookieName) }
     }
 
     private fun isGoogleusercontentHost(url: String): Boolean =
@@ -681,9 +642,7 @@ object ProvidersApi {
     }
 
     private const val HLS_MIME_TYPE = "application/vnd.apple.mpegurl"
-    private const val MATROSKA_MIME_TYPE = "video/x-matroska"
     private const val GOOGLE_DOWNLOADS_HOST = "video-downloads.googleusercontent.com"
-    private val ANIME_ORIGINAL_LANGUAGES = setOf("ja", "zh", "ko")
 
     private val PROVIDERS_WITHOUT_SOURCE_HEADERS = setOf(
         // "cinesrc_provider",
