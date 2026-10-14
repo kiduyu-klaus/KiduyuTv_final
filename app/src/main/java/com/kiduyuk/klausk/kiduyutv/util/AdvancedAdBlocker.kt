@@ -239,12 +239,18 @@ object AdvancedAdBlocker {
         })();
     """.trimIndent()
 
-    /** Returns a small popup guard retained for callers of the previous blocker API. */
+    /** Returns a popup/dialog guard retained for callers of the previous blocker API. */
     fun getBlockingJavaScript(): String = """
         (function() {
             if (!window.__kiduyuPopupGuardInstalled) {
                 window.__kiduyuPopupGuardInstalled = true;
                 window.open = function() { return null; };
+                window.showModalDialog = function() { return null; };
+                window.alert = function() {};
+                // Streaming ad gates commonly use confirm() as a fake popup.
+                // Return true so the player continues without showing a dialog.
+                window.confirm = function() { return true; };
+                window.prompt = function() { return null; };
             }
         })();
     """.trimIndent()

@@ -110,13 +110,17 @@ open class AdBlockerWebViewClient(
 
                                     var text = (el.textContent || el.innerText || '').toLowerCase();
                                     var identity = (el.id + ' ' + el.className).toLowerCase();
-                                    var badKeywords = ['video call', 'missed call', 'missed video', 'join the video', 'snapchat', 'pending snaps', 'whatsapp'];
+                    var badKeywords = [
+                        'video call', 'missed call', 'missed video', 'join the video',
+                        'snapchat', 'pending snaps', 'whatsapp',
+                        'please confirm to continue', 'allow notifications'
+                    ];
                                     
                                     // Match 1: Text patterns matching sneaky notifications
                                     var hasBadText = badKeywords.some(function(k) { return text.includes(k); });
                                     
                                     // Match 2: Layout structural matching signatures
-                                    var hasAdIdentity = identity.includes('notification') || identity.includes('popup') || identity.includes('alert') || identity.includes('social-bar');
+                                    var hasAdIdentity = identity.includes('notification') || identity.includes('popup') || identity.includes('alert') || identity.includes('social-bar') || identity.includes('interstitial');
                                     
                                     // Match 3: only remove iframes with an explicit advertising
                                     // signature. TIMST and similar providers use dynamically

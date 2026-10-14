@@ -382,10 +382,11 @@ class SchedulePlayerActivity : ComponentActivity() {
 
                 if (window.__kiduyuScheduleAdGuardInstalled) return;
                 window.__kiduyuScheduleAdGuardInstalled = true;
-                var adTerms = [
+                    var adTerms = [
                     'instant cash', 'claim ${'$'}', 'claim money', 'missed video',
                     'join the video call', 'pending snaps', 'whatsapp', 'telegram',
-                    'you have won', 'click continue', 'allow notifications'
+                    'you have won', 'click continue', 'allow notifications',
+                    'please confirm to continue'
                 ];
 
                 function isPlayerContainer(node) {
@@ -757,6 +758,9 @@ class SchedulePlayerActivity : ComponentActivity() {
                         try {
                             window.open = function() { return null; };
                             window.showModalDialog = function() { return null; };
+                            window.alert = function() {};
+                            window.confirm = function() { return true; };
+                            window.prompt = function() { return null; };
                         } catch (_) {}
                         try {
                             document.querySelectorAll('a, form').forEach(function(node) {
@@ -1117,7 +1121,7 @@ class SchedulePlayerActivity : ComponentActivity() {
                     result: android.webkit.JsResult?
                 ): Boolean {
                     android.util.Log.i(TAG, "[AdBlock] Blocked JavaScript alert from $url")
-                    result?.cancel()
+                    result?.confirm()
                     return true
                 }
 
@@ -1128,7 +1132,7 @@ class SchedulePlayerActivity : ComponentActivity() {
                     result: android.webkit.JsResult?
                 ): Boolean {
                     android.util.Log.i(TAG, "[AdBlock] Blocked JavaScript confirm from $url")
-                    result?.cancel()
+                    result?.confirm()
                     return true
                 }
 

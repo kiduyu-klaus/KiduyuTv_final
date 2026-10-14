@@ -17,9 +17,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayCircle
@@ -80,6 +81,7 @@ fun LiveSportsTabContent(
     onEventClick: (LiveSportsEvent) -> Unit,
     onEventLongClick: (LiveSportsEvent) -> Unit = {},
     columns: Int = 2,
+    useGrid: Boolean = true,
     viewModel: LiveSportsViewModel = viewModel()
 ) {
     var selectedSourceIndex by remember { mutableIntStateOf(0) }
@@ -112,7 +114,8 @@ fun LiveSportsTabContent(
             onRetry = { viewModel.load(source, forceRefresh = true) },
             onEventClick = onEventClick,
             onEventLongClick = onEventLongClick,
-            columns = columns
+            columns = columns,
+            useGrid = useGrid
         )
     }
 }
@@ -124,7 +127,8 @@ private fun SportsEventsBody(
     onRetry: () -> Unit,
     onEventClick: (LiveSportsEvent) -> Unit,
     onEventLongClick: (LiveSportsEvent) -> Unit,
-    columns: Int
+    columns: Int,
+    useGrid: Boolean
 ) {
     when {
         uiState.isLoading && uiState.events.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) {
@@ -148,19 +152,38 @@ private fun SportsEventsBody(
             Spacer(Modifier.height(12.dp))
             Text("No ${source.tabLabel} events are available right now.", color = TextSecondary)
         }
-        else -> LazyVerticalGrid(
-            columns = GridCells.Fixed(columns.coerceAtLeast(1)),
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(uiState.events, key = { it.id }) { event ->
-                LiveSportsEventCard(
-                    event,
-                    onClick = { onEventClick(event) },
-                    onLongClick = { onEventLongClick(event) }
-                )
+        else -> {
+            val contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp)
+            if (useGrid) {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(columns.coerceAtLeast(1)),
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = contentPadding,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(uiState.events, key = { it.id }) { event ->
+                        LiveSportsEventCard(
+                            event,
+                            onClick = { onEventClick(event) },
+                            onLongClick = { onEventLongClick(event) }
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = contentPadding,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(uiState.events, key = { it.id }) { event ->
+                        LiveSportsEventCard(
+                            event,
+                            onClick = { onEventClick(event) },
+                            onLongClick = { onEventLongClick(event) }
+                        )
+                    }
+                }
             }
         }
     }

@@ -403,7 +403,9 @@ fun MobileLiveTvScreen(
                             }
                         }
                     }
-                    3 -> LiveSportsTabContent(onEventClick = { event ->
+                    3 -> LiveSportsTabContent(
+                        useGrid = false,
+                        onEventClick = { event ->
                         context.startActivity(
                             SchedulePlayerActivity.createIntent(
                                 context = context,
@@ -588,7 +590,7 @@ fun MobileLiveTvScreen(
                     }
                     3 -> {
                         LiveSportsTabContent(
-                            columns = 1,
+                            useGrid = false,
                             onEventClick = { event ->
                                 context.startActivity(
                                     SchedulePlayerActivity.createIntent(
