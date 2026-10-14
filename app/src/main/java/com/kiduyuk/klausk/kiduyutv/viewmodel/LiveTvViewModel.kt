@@ -9,6 +9,9 @@ import com.kiduyuk.klausk.kiduyutv.data.model.CountryPlaylist
 import com.kiduyuk.klausk.kiduyutv.data.model.CountryPlaylistCategory
 import com.kiduyuk.klausk.kiduyutv.data.model.IptvChannel
 import com.kiduyuk.klausk.kiduyutv.data.model.IptvPlaylist
+import com.kiduyuk.klausk.kiduyutv.data.model.LiveSportsEvent
+import com.kiduyuk.klausk.kiduyutv.data.model.LiveSportsSource
+import com.kiduyuk.klausk.kiduyutv.data.model.LiveSportsStream
 import com.kiduyuk.klausk.kiduyutv.data.model.is18PlusChannel
 import com.kiduyuk.klausk.kiduyutv.data.repository.IptvRepository
 import com.kiduyuk.klausk.kiduyutv.data.repository.WorldIptvRepository
@@ -87,6 +90,9 @@ class LiveTvViewModel : ViewModel() {
 
     private val _scrapedChannels = MutableStateFlow<List<IptvChannel>>(emptyList())
     val scrapedChannels = _scrapedChannels.asStateFlow()
+
+    private val _favoriteLiveSports = MutableStateFlow<List<LiveSportsEvent>>(emptyList())
+    val favoriteLiveSports = _favoriteLiveSports.asStateFlow()
     
     private var cachedPlaylist: IptvPlaylist? = null
     private var appContext: Context? = null
@@ -94,6 +100,7 @@ class LiveTvViewModel : ViewModel() {
     private val PREFS_NAME = "live_tv_prefs"
     private val FAVORITES_KEY = "favorite_channels"
     private val SCRAPED_CHANNELS_KEY = "saved_scraped_channels"
+    private val FAVORITE_LIVE_SPORTS_KEY = "favorite_live_sports"
     
     // Debounce search to prevent excessive recompositions and main thread work
     private val searchQueryFlow = MutableStateFlow("")
@@ -113,6 +120,7 @@ class LiveTvViewModel : ViewModel() {
         }
         refreshFavoriteChannels()
         refreshScrapedChannels()
+        refreshFavoriteLiveSports()
     }
 
     /** Updates the Live TV visibility preference and reapplies it to the current channel list. */
@@ -153,6 +161,86 @@ class LiveTvViewModel : ViewModel() {
 
     private fun refreshScrapedChannels() {
         _scrapedChannels.value = getScrapedChannels()
+    }
+
+    private fun refreshFavoriteLiveSports() {
+        _favoriteLiveSports.value = getFavoriteLiveSports()
+    }
+
+    fun getFavoriteLiveSports(): List<LiveSportsEvent> {
+        val json = prefs?.getString(FAVORITE_LIVE_SPORTS_KEY, null) ?: return emptyList()
+        return runCatching {
+            val array = JSONArray(json)
+            buildList {
+                for (index in 0 until array.length()) {
+                    val item = array.optJSONObject(index) ?: continue
+                    val source = runCatching {
+                        LiveSportsSource.valueOf(item.optString("source"))
+                    }.getOrNull() ?: continue
+                    val streamArray = item.optJSONArray("streams") ?: JSONArray()
+                    val streams = buildList {
+                        for (streamIndex in 0 until streamArray.length()) {
+                            val stream = streamArray.optJSONObject(streamIndex) ?: continue
+                            add(LiveSportsStream(stream.optString("name"), stream.optString("url")))
+                        }
+                    }
+                    add(LiveSportsEvent(
+                        id = item.optString("id"),
+                        source = source,
+                        name = item.optString("name"),
+                        category = item.optString("category"),
+                        league = item.optString("league"),
+                        posterUrl = item.optString("posterUrl"),
+                        isLive = item.optBoolean("isLive"),
+                        startsAtMillis = if (item.isNull("startsAtMillis")) null else item.optLong("startsAtMillis"),
+                        viewerCount = item.optInt("viewerCount"),
+                        streams = streams,
+                        embedUrl = item.optString("embedUrl"),
+                        fallbackStreamName = item.optString("fallbackStreamName")
+                    ))
+                }
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    private fun saveFavoriteLiveSports(events: List<LiveSportsEvent>) {
+        val array = JSONArray()
+        events.forEach { event ->
+            val streams = JSONArray()
+            event.streams.forEach { stream ->
+                streams.put(JSONObject().apply {
+                    put("name", stream.name)
+                    put("url", stream.url)
+                })
+            }
+            array.put(JSONObject().apply {
+                put("id", event.id)
+                put("source", event.source.name)
+                put("name", event.name)
+                put("category", event.category)
+                put("league", event.league)
+                put("posterUrl", event.posterUrl)
+                put("isLive", event.isLive)
+                put("startsAtMillis", event.startsAtMillis ?: JSONObject.NULL)
+                put("viewerCount", event.viewerCount)
+                put("streams", streams)
+                put("embedUrl", event.embedUrl)
+                put("fallbackStreamName", event.fallbackStreamName)
+            })
+        }
+        prefs?.edit()?.putString(FAVORITE_LIVE_SPORTS_KEY, array.toString())?.apply()
+        _favoriteLiveSports.value = events
+    }
+
+    fun isFavoriteLiveSport(event: LiveSportsEvent): Boolean =
+        getFavoriteLiveSports().any { it.id == event.id && it.source == event.source }
+
+    fun addFavoriteLiveSport(event: LiveSportsEvent) {
+        val saved = getFavoriteLiveSports().toMutableList()
+        if (saved.none { it.id == event.id && it.source == event.source }) {
+            saved.add(0, event)
+            saveFavoriteLiveSports(saved)
+        }
     }
 
     /**

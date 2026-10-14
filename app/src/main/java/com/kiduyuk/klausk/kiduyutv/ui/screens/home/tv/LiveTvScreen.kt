@@ -108,6 +108,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.kiduyuk.klausk.kiduyutv.data.model.IptvChannel
+import com.kiduyuk.klausk.kiduyutv.data.model.LiveSportsEvent
 import com.kiduyuk.klausk.kiduyutv.data.model.CountryPlaylist
 import com.kiduyuk.klausk.kiduyutv.data.model.CountryPlaylistCategory
 import com.kiduyuk.klausk.kiduyutv.data.model.ScrapedChannel
@@ -173,11 +174,13 @@ fun LiveTvScreen(
     val uiState by viewModel.uiState.collectAsState()
     val favoriteChannels by viewModel.favoriteChannels.collectAsState()
     val savedScrapedChannels by viewModel.scrapedChannels.collectAsState()
+    val favoriteLiveSports by viewModel.favoriteLiveSports.collectAsState()
     val scheduleUiState by scheduleViewModel.uiState.collectAsState()
     val context = LocalContext.current
     val daddyliveScope = rememberCoroutineScope()
     var favoriteChannelToConfirm by remember { mutableStateOf<IptvChannel?>(null) }
     var scrapedChannelToConfirm by remember { mutableStateOf<IptvChannel?>(null) }
+    var liveSportsToConfirm by remember { mutableStateOf<LiveSportsEvent?>(null) }
     var daddyliveChannels by remember { mutableStateOf<List<IptvChannel>>(emptyList()) }
     var daddyliveIsLoading by remember { mutableStateOf(false) }
     var daddyliveError by remember { mutableStateOf<String?>(null) }
@@ -321,7 +324,7 @@ fun LiveTvScreen(
         TabItem("Daddylive", Icons.Default.PlayCircle),
         TabItem("Live Sports", Icons.Default.SportsSoccer),
         TabItem(
-            "My Channels (${visibleFavoriteChannels.size + visibleSavedScrapedChannels.size})",
+            "My Channels (${visibleFavoriteChannels.size + visibleSavedScrapedChannels.size + favoriteLiveSports.size})",
             Icons.Default.List
         )
     )
@@ -407,7 +410,7 @@ fun LiveTvScreen(
                             iframeNames = event.playbackNames
                         )
                     )
-                })
+                }, onEventLongClick = { event -> liveSportsToConfirm = event })
                 4 -> { // My Channels (favorited)
                     // Trigger two-way sync when user views My Channels tab
                     LaunchedEffect(Unit) {
@@ -416,8 +419,19 @@ fun LiveTvScreen(
                     FavoriteChannelsTabContent(
                         iptvChannels = visibleFavoriteChannels,
                         scrapedChannels = visibleSavedScrapedChannels,
+                        liveSports = favoriteLiveSports,
                         onIptvChannelClick = { channel -> viewModel.selectChannel(channel) },
-                        onScrapedChannelClick = ::playScrapedChannel
+                        onScrapedChannelClick = ::playScrapedChannel,
+                        onLiveSportsClick = { event ->
+                            context.startActivity(SchedulePlayerActivity.createIntent(
+                                context = context,
+                                channelId = "",
+                                channelName = event.name,
+                                eventTitle = event.name,
+                                iframeUrls = event.playbackUrls,
+                                iframeNames = event.playbackNames
+                            ))
+                        }
                     )
                 }
             }
@@ -477,6 +491,29 @@ fun LiveTvScreen(
                     TextButton(onClick = { scrapedChannelToConfirm = null }) {
                         Text("Cancel")
                     }
+                }
+            )
+        }
+
+        if (liveSportsToConfirm != null) {
+            val eventToConfirm = liveSportsToConfirm!!
+            AlertDialog(
+                onDismissRequest = { liveSportsToConfirm = null },
+                title = { Text("Add to My Live Sports?") },
+                text = { Text("Add ${eventToConfirm.name} so it is available in My Channels?") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        if (viewModel.isFavoriteLiveSport(eventToConfirm)) {
+                            Toast.makeText(context, "Already in My Live Sports", Toast.LENGTH_SHORT).show()
+                        } else {
+                            viewModel.addFavoriteLiveSport(eventToConfirm)
+                            Toast.makeText(context, "Added to My Live Sports", Toast.LENGTH_SHORT).show()
+                        }
+                        liveSportsToConfirm = null
+                    }) { Text("Add") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { liveSportsToConfirm = null }) { Text("Cancel") }
                 }
             )
         }
@@ -963,16 +1000,21 @@ private data class TabItem(
 private fun FavoriteChannelsTabContent(
     iptvChannels: List<IptvChannel>,
     scrapedChannels: List<IptvChannel>,
+    liveSports: List<LiveSportsEvent>,
     onIptvChannelClick: (IptvChannel) -> Unit,
-    onScrapedChannelClick: (IptvChannel) -> Unit
+    onScrapedChannelClick: (IptvChannel) -> Unit,
+    onLiveSportsClick: (LiveSportsEvent) -> Unit
 ) {
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     val tabs = listOf(
         "IPTV (${iptvChannels.size})",
-        "Scraped (${scrapedChannels.size})"
+        "Scraped (${scrapedChannels.size})",
+        "Live Sports (${liveSports.size})"
     )
-    val displayedChannels = if (selectedTabIndex == 0) iptvChannels else scrapedChannels
-    val onChannelClick = if (selectedTabIndex == 0) onIptvChannelClick else onScrapedChannelClick
+    val displayedChannels = when (selectedTabIndex) {
+        0 -> iptvChannels
+        else -> scrapedChannels
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         ScrollableTabRow(
@@ -1002,7 +1044,23 @@ private fun FavoriteChannelsTabContent(
             }
         }
 
-        if (displayedChannels.isEmpty()) {
+        if (selectedTabIndex == 2) {
+            if (liveSports.isEmpty()) {
+                Column(Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                    Icon(Icons.Default.SportsSoccer, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(64.dp))
+                    Spacer(Modifier.height(16.dp))
+                    Text("No Live Sports favorites yet", color = TextPrimary)
+                    Spacer(Modifier.height(8.dp))
+                    Text("Long-press a Live Sports event to add it here.", color = TextSecondary)
+                }
+            } else {
+                LazyVerticalGrid(columns = GridCells.Fixed(4), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    itemsIndexed(liveSports, key = { index, event -> "live_sports_${event.source}_${event.id}_$index" }) { _, event ->
+                        LiveSportsFavoriteCard(event = event, onClick = { onLiveSportsClick(event) })
+                    }
+                }
+            }
+        } else if (displayedChannels.isEmpty()) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -1036,9 +1094,32 @@ private fun FavoriteChannelsTabContent(
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 itemsIndexed(displayedChannels, key = { index, channel -> "${channel.id}_$index" }) { _, channel ->
-                    ChannelCard(channel = channel, onClick = { onChannelClick(channel) })
+                    ChannelCard(channel = channel, onClick = {
+                        if (selectedTabIndex == 0) onIptvChannelClick(channel) else onScrapedChannelClick(channel)
+                    })
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun LiveSportsFavoriteCard(event: LiveSportsEvent, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = CardDark)
+    ) {
+        if (event.posterUrl.isNotBlank()) {
+            AsyncImage(
+                model = event.posterUrl,
+                contentDescription = event.name,
+                modifier = Modifier.fillMaxWidth().height(130.dp),
+                contentScale = ContentScale.Crop
+            )
+        }
+        Column(Modifier.padding(12.dp)) {
+            Text(event.name, color = TextPrimary, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(event.source.tabLabel, color = TextSecondary, style = MaterialTheme.typography.labelSmall)
         }
     }
 }

@@ -71,6 +71,7 @@ import android.content.Context
 import android.widget.Toast
 import coil.compose.AsyncImage
 import com.kiduyuk.klausk.kiduyutv.data.model.IptvChannel
+import com.kiduyuk.klausk.kiduyutv.data.model.LiveSportsEvent
 import com.kiduyuk.klausk.kiduyutv.data.model.CountryPlaylist
 import com.kiduyuk.klausk.kiduyutv.data.model.ScheduleChannel
 import com.kiduyuk.klausk.kiduyutv.data.model.ScheduleEvent
@@ -115,6 +116,8 @@ fun MobileLiveTvScreen(
     var selectedTab by remember { mutableIntStateOf(0) }
     var favoriteChannelToConfirm by remember { mutableStateOf<IptvChannel?>(null) }
     var scrapedChannelToConfirm by remember { mutableStateOf<IptvChannel?>(null) }
+    var liveSportsToConfirm by remember { mutableStateOf<LiveSportsEvent?>(null) }
+    var selectedFavoriteTab by remember { mutableIntStateOf(0) }
     val countryListState = rememberLazyListState()
     val visibleScrapedChannels = remember(scrapedChannels, uiState.hide18PlusChannels) {
         if (uiState.hide18PlusChannels) {
@@ -126,6 +129,7 @@ fun MobileLiveTvScreen(
     // DaddyLive channels the viewer saved live in the ViewModel, mirroring TV, so
     // they survive rotation and stay in sync with the My Channels badge.
     val savedScrapedChannels by viewModel.scrapedChannels.collectAsState()
+    val favoriteLiveSports by viewModel.favoriteLiveSports.collectAsState()
     val visibleSavedScrapedChannels = remember(savedScrapedChannels, uiState.hide18PlusChannels) {
         if (uiState.hide18PlusChannels) {
             savedScrapedChannels.filterNot(IptvChannel::is18PlusChannel)
@@ -228,7 +232,8 @@ fun MobileLiveTvScreen(
                                     text = if (index == 4) {
                                         val count = viewModel.getFavoriteChannels()
                                             .count { !uiState.hide18PlusChannels || !it.is18PlusChannel() } +
-                                            visibleSavedScrapedChannels.size
+                                            visibleSavedScrapedChannels.size +
+                                            favoriteLiveSports.size
                                         if (count > 0) "$title ($count)" else title
                                     } else title,
                                     maxLines = 1
@@ -409,7 +414,7 @@ fun MobileLiveTvScreen(
                                 iframeNames = event.playbackNames
                             )
                         )
-                    })
+                    }, onEventLongClick = { event -> liveSportsToConfirm = event })
                     4 -> {
                         // My Channels tab - favorites
                         LaunchedEffect(Unit) {
@@ -422,7 +427,28 @@ fun MobileLiveTvScreen(
                                 channels
                             }
                         }
-                        if (favorites.isEmpty() && visibleSavedScrapedChannels.isEmpty()) {
+                        val favoriteTabs = listOf("IPTV (${favorites.size})", "DaddyLive (${visibleSavedScrapedChannels.size})", "Live Sports (${favoriteLiveSports.size})")
+                        ScrollableTabRow(
+                            selectedTabIndex = selectedFavoriteTab,
+                            containerColor = Color.Transparent,
+                            contentColor = PrimaryRed,
+                            edgePadding = 12.dp,
+                            divider = {}
+                        ) {
+                            favoriteTabs.forEachIndexed { index, title ->
+                                Tab(
+                                    selected = selectedFavoriteTab == index,
+                                    onClick = { selectedFavoriteTab = index },
+                                    text = { Text(title, color = if (selectedFavoriteTab == index) TextPrimary else TextSecondary) }
+                                )
+                            }
+                        }
+                        val hasSelectedFavorites = when (selectedFavoriteTab) {
+                            0 -> favorites.isNotEmpty()
+                            1 -> visibleSavedScrapedChannels.isNotEmpty()
+                            else -> favoriteLiveSports.isNotEmpty()
+                        }
+                        if (!hasSelectedFavorites) {
                             Column(
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -430,13 +456,17 @@ fun MobileLiveTvScreen(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Center
                             ) {
-                                Text(text = "No favorite channels yet")
+                                Text(text = when (selectedFavoriteTab) {
+                                    0 -> "No IPTV favorites yet"
+                                    1 -> "No DaddyLive favorites yet"
+                                    else -> "No Live Sports favorites yet"
+                                })
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Text(text = "Long-press a channel to add it to favorites")
+                                Text(text = "Long-press an item to add it here")
                             }
                         } else {
                             LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp)) {
-                                if (visibleSavedScrapedChannels.isNotEmpty()) {
+                                if (selectedFavoriteTab == 1) {
                                     item {
                                         Text(
                                             text = "Saved DaddyLive",
@@ -455,7 +485,7 @@ fun MobileLiveTvScreen(
                                     }
                                     item { Spacer(modifier = Modifier.height(8.dp)) }
                                 }
-                                if (favorites.isNotEmpty()) {
+                                if (selectedFavoriteTab == 0 && favorites.isNotEmpty()) {
                                     item {
                                         Text(
                                             text = "Favorites",
@@ -466,7 +496,7 @@ fun MobileLiveTvScreen(
                                         Spacer(modifier = Modifier.height(8.dp))
                                     }
                                 }
-                                items(favorites) { channel ->
+                                if (selectedFavoriteTab == 0) items(favorites) { channel ->
                                     ChannelRow(channel) { selected ->
                                         val intent = IptvPlayerActivity.createIntent(
                                             context,
@@ -479,6 +509,19 @@ fun MobileLiveTvScreen(
                                             playlistChannels = viewModel.getAllChannels()
                                         )
                                         context.startActivity(intent)
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                }
+                                if (selectedFavoriteTab == 2) items(favoriteLiveSports, key = { "saved_sports_${it.source}_${it.id}" }) { event ->
+                                    LiveSportsFavoriteRow(event) {
+                                        context.startActivity(SchedulePlayerActivity.createIntent(
+                                            context = context,
+                                            channelId = "",
+                                            channelName = event.name,
+                                            eventTitle = event.name,
+                                            iframeUrls = event.playbackUrls,
+                                            iframeNames = event.playbackNames
+                                        ))
                                     }
                                     Spacer(modifier = Modifier.height(8.dp))
                                 }
@@ -599,6 +642,28 @@ fun MobileLiveTvScreen(
                     TextButton(onClick = { scrapedChannelToConfirm = null }) {
                         Text("Cancel")
                     }
+                }
+            )
+        }
+
+        liveSportsToConfirm?.let { eventToConfirm ->
+            AlertDialog(
+                onDismissRequest = { liveSportsToConfirm = null },
+                title = { Text("Add to My Live Sports?") },
+                text = { Text("Add ${eventToConfirm.name} so it is available in My Channels?") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        if (viewModel.isFavoriteLiveSport(eventToConfirm)) {
+                            Toast.makeText(context, "Already in My Live Sports", Toast.LENGTH_SHORT).show()
+                        } else {
+                            viewModel.addFavoriteLiveSport(eventToConfirm)
+                            Toast.makeText(context, "Added to My Live Sports", Toast.LENGTH_SHORT).show()
+                        }
+                        liveSportsToConfirm = null
+                    }) { Text("Add") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { liveSportsToConfirm = null }) { Text("Cancel") }
                 }
             )
         }
@@ -929,6 +994,25 @@ private fun CountryPlaylistList(
             }
             Spacer(modifier = Modifier.height(8.dp))
         }
+    }
+}
+
+@Composable
+private fun LiveSportsFavoriteRow(event: LiveSportsEvent, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AsyncImage(model = event.posterUrl, contentDescription = event.name, modifier = Modifier.size(64.dp))
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(event.name, color = TextPrimary, fontWeight = FontWeight.Bold)
+            Text(event.source.tabLabel, color = TextSecondary, modifier = Modifier.padding(top = 4.dp))
+        }
+        Button(onClick = onClick) { Text("Play") }
     }
 }
 

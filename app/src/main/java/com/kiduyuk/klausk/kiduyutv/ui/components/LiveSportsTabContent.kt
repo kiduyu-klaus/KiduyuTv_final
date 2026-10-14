@@ -1,7 +1,8 @@
 package com.kiduyuk.klausk.kiduyutv.ui.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -65,8 +66,10 @@ import java.util.Locale
 
 /** Shared PPV/TIMST browser for the phone and TV Live TV surfaces. */
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 fun LiveSportsTabContent(
     onEventClick: (LiveSportsEvent) -> Unit,
+    onEventLongClick: (LiveSportsEvent) -> Unit = {},
     viewModel: LiveSportsViewModel = viewModel()
 ) {
     var selectedSourceIndex by remember { mutableIntStateOf(0) }
@@ -93,7 +96,7 @@ fun LiveSportsTabContent(
                 )
             }
         }
-        SportsEventsBody(source, uiState, { viewModel.load(source, forceRefresh = true) }, onEventClick)
+        SportsEventsBody(source, uiState, { viewModel.load(source, forceRefresh = true) }, onEventClick, onEventLongClick)
     }
 }
 
@@ -102,7 +105,8 @@ private fun SportsEventsBody(
     source: LiveSportsSource,
     uiState: LiveSportsUiState,
     onRetry: () -> Unit,
-    onEventClick: (LiveSportsEvent) -> Unit
+    onEventClick: (LiveSportsEvent) -> Unit,
+    onEventLongClick: (LiveSportsEvent) -> Unit
 ) {
     when {
         uiState.isLoading && uiState.events.isEmpty() -> Box(Modifier.fillMaxSize(), Alignment.Center) {
@@ -134,14 +138,23 @@ private fun SportsEventsBody(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(uiState.events, key = { it.id }) { event ->
-                LiveSportsEventCard(event) { onEventClick(event) }
+                LiveSportsEventCard(
+                    event,
+                    onClick = { onEventClick(event) },
+                    onLongClick = { onEventLongClick(event) }
+                )
             }
         }
     }
 }
 
 @Composable
-private fun LiveSportsEventCard(event: LiveSportsEvent, onClick: () -> Unit) {
+@OptIn(ExperimentalFoundationApi::class)
+private fun LiveSportsEventCard(
+    event: LiveSportsEvent,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+) {
     val canPlay = event.playbackUrls.isNotEmpty()
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
@@ -150,11 +163,12 @@ private fun LiveSportsEventCard(event: LiveSportsEvent, onClick: () -> Unit) {
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .focusable(enabled = canPlay, interactionSource = interactionSource)
-            .clickable(
-                enabled = canPlay,
+            .combinedClickable(
+                enabled = true,
                 interactionSource = interactionSource,
                 indication = null,
-                onClick = onClick
+                onClick = { if (canPlay) onClick() },
+                onLongClick = onLongClick
             ),
         colors = CardDefaults.cardColors(
             containerColor = if (isFocused) PrimaryRed.copy(alpha = 0.6f) else CardDark
