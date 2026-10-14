@@ -5,7 +5,6 @@ import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.ProvidersApi
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.ProvidersApiHttpException
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamItem
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamResponse
-import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -46,7 +45,7 @@ class StreamResolver {
         season: Int? = null,
         episode: Int? = null,
         provider: StreamProviderChoice = StreamCatalog.default,
-        endpoint: String = SettingsManager.DEFAULT_DIRECT_STREAM_ENDPOINT,
+        endpoint: String? = null,
         onProviderProgress: suspend (index: Int, total: Int, providerName: String) -> Unit = { _, _, _ -> },
         onProviderRetry: suspend (index: Int, total: Int, providerName: String) -> Unit = { _, _, _ -> },
         onStreamProgress: suspend (fetchedCount: Int) -> Unit = {}
@@ -56,10 +55,11 @@ class StreamResolver {
         // backend should be reported to the player immediately.
         ProvidersApi.requireBackendAvailable(endpoint)
 
-        // The backend selects providers compatible with this media. The
-        // request type remains the caller's movie/series type.
-        val enabledProviderNames = ProvidersApi.enabledProviderNamesForMedia(type, tmdbId, endpoint)
-        val requestType = type
+        // Use the backend's category assignments and anime route. This keeps
+        // provider compatibility authoritative on the server.
+        val providerRoute = ProvidersApi.providerRouteForMedia(type, tmdbId, endpoint)
+        val enabledProviderNames = providerRoute.providerNames
+        val requestType = providerRoute.streamType
         val selectedProvider = provider.key.takeIf { selected ->
             enabledProviderNames.any { it.equals(selected, ignoreCase = true) }
         }
@@ -90,8 +90,8 @@ class StreamResolver {
                     requestLimiter.withPermit {
                         Log.i(
                             tag,
-                            "Resolver.load provider=$providerName type=$requestType tmdbId=$tmdbId " +
-                                "season=${season ?: "-"} episode=${episode ?: "-"}"
+                            "Resolver.load provider=$providerName type=$requestType category=${providerRoute.category} " +
+                                "tmdbId=$tmdbId season=${season ?: "-"} episode=${episode ?: "-"}"
                         )
 
                         var response: StreamResponse? = null

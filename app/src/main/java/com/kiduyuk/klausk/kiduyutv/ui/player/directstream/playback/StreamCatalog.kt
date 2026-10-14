@@ -34,10 +34,11 @@ object StreamCatalog {
      * network I/O and must be called on Dispatchers.IO.
      */
     fun enabled(): List<StreamProviderChoice> =
-        listOf(aggregate) + ProvidersApi.enabledProviderNames().map { providerName ->
+        listOf(aggregate) + ProvidersApi.enabledProviders().map { provider ->
             StreamProviderChoice(
-                displayName = formatDisplayName(providerName),
-                key = providerName
+                displayName = formatDisplayName(provider.name),
+                key = provider.name,
+                categories = provider.categories
             )
         }
 
