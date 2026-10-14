@@ -118,8 +118,13 @@ open class AdBlockerWebViewClient(
                                     // Match 2: Layout structural matching signatures
                                     var hasAdIdentity = identity.includes('notification') || identity.includes('popup') || identity.includes('alert') || identity.includes('social-bar');
                                     
-                                    // Match 3: Iframes that are clearly not the video stream container
-                                    var isAdIframe = el.tagName.toLowerCase() === 'iframe' && !identity.includes('player') && !el.src.includes('player');
+                                    // Match 3: only remove iframes with an explicit advertising
+                                    // signature. TIMST and similar providers use dynamically
+                                    // generated iframe paths that do not contain "player"; the
+                                    // old broad rule removed those legitimate stream frames.
+                                    var iframeSrc = (el.src || '').toLowerCase();
+                                    var isAdIframe = el.tagName.toLowerCase() === 'iframe' &&
+                                        /adbanner|popunder|pop-up|doubleclick|googlesyndication|histats/.test(iframeSrc);
 
                                     // If any signature matches, drop the entire element tree immediately regardless of its size wrapper
                                     if (hasBadText || hasAdIdentity || isAdIframe) {

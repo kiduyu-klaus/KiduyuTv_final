@@ -119,6 +119,7 @@ class SchedulePlayerActivity : ComponentActivity() {
     companion object {
         private const val TAG = "SchedulePlayer"
         private const val SCHEDULE_HOST = "dlive.sx"
+        private const val DIRECT_IFRAME_LOADING_DELAY_MS = 1_200L
 
         // Intent extras
         const val EXTRA_CHANNEL_ID = "CHANNEL_ID"
@@ -1034,7 +1035,19 @@ class SchedulePlayerActivity : ComponentActivity() {
 
                 override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
                     super.onPageFinished(view, url)
-                    dismissPageLoadingDialog()
+                    if (hasDirectIframeUrls) {
+                        // TIMST URLs first load an outer HTML page and then create
+                        // the actual player iframe dynamically. Keep the loading
+                        // dialog visible during that handoff instead of dismissing
+                        // it on the outer page's onPageFinished callback.
+                        view?.postDelayed({
+                            if (!isFinishing && !isDestroyed) {
+                                dismissPageLoadingDialog()
+                            }
+                        }, DIRECT_IFRAME_LOADING_DELAY_MS)
+                    } else {
+                        dismissPageLoadingDialog()
+                    }
                     android.util.Log.i(TAG, "[WebView] Schedule stream page finished: $url")
                     installAdvancedAdGuards(view)
 
