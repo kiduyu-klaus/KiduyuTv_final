@@ -2437,20 +2437,6 @@ class DirectStreamActivity : AppCompatActivity() {
         lastStreamPlaybackKey = streamKey
         skipSegmentsFetchJob?.cancel()
 
-        if (!skipGoogleusercontentHeaderCapture && isGoogleusercontentHost(stream.url)) {
-            Log.i(
-                TAG,
-                "Googleusercontent stream selected; opening CloudflareBypassActivity " +
-                    "to capture download headers while preserving the URL"
-            )
-            pendingCloudflareStream = stream
-            pendingCloudflareResumeMs = playableStartPositionMs
-            showStatus(getString(R.string.cloudflare_blocked_checking), retry = false)
-            showLoadingArtwork()
-            launchCloudflareBypass(stream, captureResponseHeaders = true)
-            return
-        }
-
         // This also covers stream switching, subtitle reloads and sniffed
         // playback paths that do not pass through playBest().
         // DahmerMovies must resolve the browser redirect whenever an
