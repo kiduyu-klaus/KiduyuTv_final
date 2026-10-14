@@ -9,6 +9,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamItem
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamSegment
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamResponse
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.SubtitleItem
+import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.normalizeStreamLanguage
 import com.kiduyuk.klausk.kiduyutv.util.UrlUtils
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import okhttp3.CacheControl
@@ -474,7 +475,7 @@ object ProvidersApi {
                         name = s.optString("name"),
                         url = UrlUtils.normalize(url),
                         quality = s.optString("quality", "Auto"),
-                        language = extractMovieBoxLanguage(provider, title),
+                        language = extractStreamLanguage(s, provider, title),
                         provider = provider,
                         type = normalizedType,
                         mimeType = mimeType,
@@ -499,17 +500,41 @@ object ProvidersApi {
         return StreamSegment((startSeconds * 1_000).toLong(), (endSeconds * 1_000).toLong())
     }
 
-    private fun extractMovieBoxLanguage(provider: String, title: String): String {
-        if (!provider.equals("moviebox", ignoreCase = true)) return ""
-        val value = Regex("\\(([^()]*)\\)")
-            .find(title)
-            ?.groupValues
-            ?.getOrNull(1)
-            ?.trim()
-            .orEmpty()
-        return value.replaceFirstChar { char ->
-            if (char.isLowerCase()) char.titlecase(Locale.ROOT) else char.toString()
+    /**
+     * Reads the language reported by the provider, while retaining MovieBox's
+     * legacy title convention when no explicit JSON field is present.
+     */
+    private fun extractStreamLanguage(
+        stream: JSONObject,
+        provider: String,
+        title: String
+    ): String {
+        val explicitLanguage = listOf(
+            "language",
+            "lang",
+            "audioLanguage",
+            "audio_language",
+            "originalLanguage",
+            "original_language"
+        ).firstNotNullOfOrNull { key ->
+            stream.optString(key).trim().takeIf { it.isNotBlank() }
         }
+        if (explicitLanguage != null) return normalizeStreamLanguage(explicitLanguage)
+
+        if (provider.equals("moviesdrive1providers", ignoreCase = true)) {
+            return "English . Hindi"
+        }
+
+        if (provider.equals("moviebox", ignoreCase = true)) {
+            val titleLanguage = Regex("\\(([^()]*)\\)")
+                .find(title)
+                ?.groupValues
+                ?.getOrNull(1)
+                ?.trim()
+                .orEmpty()
+            if (titleLanguage.isNotBlank()) return normalizeStreamLanguage(titleLanguage)
+        }
+        return "Original"
     }
 
     /**

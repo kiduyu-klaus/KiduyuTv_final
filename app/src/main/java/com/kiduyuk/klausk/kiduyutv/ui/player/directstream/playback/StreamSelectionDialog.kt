@@ -60,6 +60,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamItem
+import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.displayLanguage
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.CardDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.DarkRed
@@ -157,12 +158,13 @@ class StreamSelectionDialog(
         var selectedLanguage by remember { mutableStateOf(LanguageFilter.ALL) }
         var isGridLayout by remember { mutableStateOf(false) }
         val filteredStreams = remember(streams, selectedLanguage) {
-            streams.filter { stream ->
-                when (selectedLanguage) {
-                    LanguageFilter.ALL -> true
-                    LanguageFilter.ENGLISH -> detectLanguages(stream).contains("English")
-                    LanguageFilter.HINDI -> detectLanguages(stream).contains("Hindi")
-                }
+                streams.filter { stream ->
+                    val language = stream.displayLanguage()
+                    when (selectedLanguage) {
+                        LanguageFilter.ALL -> true
+                        LanguageFilter.ENGLISH -> language.contains("English")
+                        LanguageFilter.HINDI -> language.contains("Hindi")
+                    }
             }
         }
         val firstStreamFocusRequester = remember { FocusRequester() }
@@ -457,7 +459,7 @@ class StreamSelectionDialog(
                     Text(
                         text = context.getString(
                             R.string.stream_language_label,
-                            detectLanguages(stream).joinToString(" • ")
+                            stream.displayLanguage()
                         ),
                         color = TextSecondary,
                         style = MaterialTheme.typography.labelSmall,
@@ -488,44 +490,5 @@ class StreamSelectionDialog(
     companion object {
         private const val HTTP_NOT_FOUND = 404
 
-        private val LANGUAGE_PATTERNS = listOf(
-            "English" to Regex("\\benglish\\b", RegexOption.IGNORE_CASE),
-            "Hindi" to Regex("\\bhindi\\b", RegexOption.IGNORE_CASE),
-            "Telugu" to Regex("\\btelugu\\b", RegexOption.IGNORE_CASE),
-            "Tamil" to Regex("\\btamil\\b", RegexOption.IGNORE_CASE)
-        )
-        private val HINDI_MARKER = Regex("\\bhi\\b", RegexOption.IGNORE_CASE)
-        private val ENGLISH_MARKER = Regex("\\ben\\b", RegexOption.IGNORE_CASE)
-
-        private fun detectLanguages(stream: StreamItem): List<String> {
-            if (listOf(stream.name, stream.title).any { text ->
-                    text.contains("original audio", ignoreCase = true)
-                }
-            ) {
-                return listOf("Original Audio")
-            }
-            if (stream.provider.equals("vegamovies", ignoreCase = true)) {
-                return listOf("English", "Hindi")
-            }
-            val searchableText = "${stream.name} ${stream.title}"
-            val hasHindiMarker = HINDI_MARKER.containsMatchIn(searchableText)
-            val hasEnglishMarker = ENGLISH_MARKER.containsMatchIn(searchableText)
-            if (hasHindiMarker && hasEnglishMarker) {
-                return listOf("Hindi . English")
-            }
-            if (hasHindiMarker) {
-                return listOf("Hindi")
-            }
-            if (hasEnglishMarker) {
-                return listOf("English")
-            }
-            val explicitLanguage = stream.language.trim()
-            if (explicitLanguage.isNotBlank() && !explicitLanguage.equals("und", ignoreCase = true)) {
-                return listOf(explicitLanguage)
-            }
-            return LANGUAGE_PATTERNS.mapNotNull { (label, pattern) ->
-                label.takeIf { pattern.containsMatchIn(searchableText) }
-            }.ifEmpty { listOf("Unknown") }
-        }
     }
 }

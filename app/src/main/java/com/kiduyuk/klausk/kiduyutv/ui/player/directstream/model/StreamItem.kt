@@ -1,5 +1,7 @@
 package com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model
 
+import java.util.Locale
+
 /**
  * One stream returned by the kiduyuTv_providers server.
  *
@@ -83,3 +85,23 @@ data class StreamResponse(
     val imdbId: String?,
     val streams: List<StreamItem>
 )
+
+/**
+ * Keeps the provider's language label unchanged for display.
+ * Unknown, missing, and undetermined values intentionally become `Original`.
+ */
+fun normalizeStreamLanguage(value: String?): String {
+    val raw = value?.trim().orEmpty()
+    if (raw.isBlank()) return "Original"
+
+    val normalized = raw.lowercase(Locale.ROOT)
+    if (normalized in setOf("unknown", "und", "undefined", "null", "n/a", "na") ||
+        normalized.contains("unknown") || normalized.contains("undetermined")
+    ) {
+        return "Original"
+    }
+    return raw
+}
+
+/** Returns the best user-facing language label for a provider stream. */
+fun StreamItem.displayLanguage(): String = normalizeStreamLanguage(language)
