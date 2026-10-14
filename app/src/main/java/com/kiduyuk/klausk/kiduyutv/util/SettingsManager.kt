@@ -7,6 +7,12 @@ import com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager.Companion.AUTO
 import java.util.UUID
 
+/**
+ * A named, user-selectable direct-stream backend. [name] is what Settings shows;
+ * [url] is the only value ever sent to the API client.
+ */
+data class DirectStreamEndpoint(val name: String, val url: String)
+
 class SettingsManager(context: Context) {
 
     private val preferences: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -144,13 +150,22 @@ class SettingsManager(context: Context) {
         const val DEFAULT_DIRECT_STREAM_ENDPOINT =
             "https://secondbanklabs.com/kiduyuTv_providers"
         const val WORKER_DIRECT_STREAM_ENDPOINT =
-            "https://d018ec54-kiduyutv-providers.muigakiduyu1995.workers.dev/kiduyuTv_providers"
+            "https://kiduyutv-providers.muigakiduyu1995.workers.dev/kiduyuTv_providers"
+
+        /** User-selectable backends, in display order. The first is the default. */
+        val DIRECT_STREAM_ENDPOINT_OPTIONS: List<DirectStreamEndpoint> = listOf(
+            DirectStreamEndpoint("SecondBanksLabs", DEFAULT_DIRECT_STREAM_ENDPOINT),
+            DirectStreamEndpoint("CloudFlare", WORKER_DIRECT_STREAM_ENDPOINT)
+        )
 
         /** Only endpoints surfaced in Settings are accepted by the API client. */
-        val DIRECT_STREAM_ENDPOINTS: List<String> = listOf(
-            DEFAULT_DIRECT_STREAM_ENDPOINT,
-            WORKER_DIRECT_STREAM_ENDPOINT
-        )
+        val DIRECT_STREAM_ENDPOINTS: List<String> =
+            DIRECT_STREAM_ENDPOINT_OPTIONS.map { it.url }
+
+        /** Friendly label for an endpoint URL, falling back to the raw URL. */
+        fun endpointDisplayName(endpointUrl: String): String =
+            DIRECT_STREAM_ENDPOINT_OPTIONS.firstOrNull { it.url == endpointUrl }?.name
+                ?: endpointUrl
 
         /**
          * All active providers in display order.

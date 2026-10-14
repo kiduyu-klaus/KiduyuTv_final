@@ -1492,16 +1492,16 @@ private fun PlaybackContent(
                     lineHeight = 20.sp,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
-                SettingsManager.DIRECT_STREAM_ENDPOINTS.chunked(2).forEach { rowEndpoints ->
+                SettingsManager.DIRECT_STREAM_ENDPOINT_OPTIONS.chunked(2).forEach { rowEndpoints ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        rowEndpoints.forEach { endpoint ->
+                        rowEndpoints.forEach { option ->
                             ProviderOptionItem(
-                                option = endpoint,
-                                isSelected = endpoint == directStreamEndpoint,
-                                onClick = { onDirectStreamEndpointSelect(endpoint) },
+                                option = option.name,
+                                isSelected = option.url == directStreamEndpoint,
+                                onClick = { onDirectStreamEndpointSelect(option.url) },
                                 modifier = Modifier.weight(1f)
                             )
                         }

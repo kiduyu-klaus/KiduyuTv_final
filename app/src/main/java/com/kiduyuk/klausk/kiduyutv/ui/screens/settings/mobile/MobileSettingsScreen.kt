@@ -739,7 +739,7 @@ fun MobileSettingsScreen(
                 SettingsItem(
                     icon = Icons.Default.Public,
                     title = "Endpoint URL",
-                    subtitle = uiState.directStreamEndpoint,
+                    subtitle = SettingsManager.endpointDisplayName(uiState.directStreamEndpoint),
                     onClick = { showDirectStreamEndpointPicker = true }
                 )
                 SettingsItem(
@@ -1005,14 +1005,14 @@ fun MobileSettingsScreen(
                         fontSize = 13.sp,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
-                    SettingsManager.DIRECT_STREAM_ENDPOINTS.forEach { endpoint ->
-                        val isSelected = endpoint == uiState.directStreamEndpoint
+                    SettingsManager.DIRECT_STREAM_ENDPOINT_OPTIONS.forEach { option ->
+                        val isSelected = option.url == uiState.directStreamEndpoint
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable {
-                                    viewModel.setDirectStreamEndpoint(context, endpoint)
+                                    viewModel.setDirectStreamEndpoint(context, option.url)
                                     showDirectStreamEndpointPicker = false
                                 }
                                 .padding(vertical = 8.dp),
@@ -1021,7 +1021,7 @@ fun MobileSettingsScreen(
                             RadioButton(
                                 selected = isSelected,
                                 onClick = {
-                                    viewModel.setDirectStreamEndpoint(context, endpoint)
+                                    viewModel.setDirectStreamEndpoint(context, option.url)
                                     showDirectStreamEndpointPicker = false
                                 },
                                 colors = RadioButtonDefaults.colors(
@@ -1031,7 +1031,7 @@ fun MobileSettingsScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = endpoint,
+                                text = option.name,
                                 color = if (isSelected) TextPrimary else TextSecondary,
                                 fontSize = 14.sp,
                                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
