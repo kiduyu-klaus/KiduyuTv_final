@@ -317,7 +317,11 @@ class DirectStreamActivity : AppCompatActivity() {
         availableStreams = availableStreams.map { candidate ->
             if (candidate.url == stream.url) retryStream else candidate
         }
-        streamDialog?.updateStreams(availableStreams, activeUrl = retryStream.url)
+        streamDialog?.updateStreams(
+            availableStreams,
+            activeUrl = retryStream.url,
+            activeName = retryStream.name
+        )
         activeStream = retryStream
         lastStreamPlaybackKey = null
         engine.player.stop()
@@ -1504,6 +1508,7 @@ class DirectStreamActivity : AppCompatActivity() {
             context = this,
             streams = availableStreams,
             activeUrl = activeStream?.url,
+            activeName = activeStream?.name,
             onStreamSelected = ::switchStream
         )
         streamDialog?.setOnDismissListener { streamDialog = null }
@@ -1657,7 +1662,11 @@ class DirectStreamActivity : AppCompatActivity() {
         }
         // Refresh an open selector immediately so the stream receives the
         // "with SRT" badge as soon as the downloaded track is attached.
-        streamDialog?.updateStreams(availableStreams, activeUrl = updatedStream.url)
+        streamDialog?.updateStreams(
+            availableStreams,
+            activeUrl = updatedStream.url,
+            activeName = updatedStream.name
+        )
         Log.i(
             TAG,
             "Loading external subtitle label=${subtitle.label.orEmpty()} " +
@@ -1668,7 +1677,10 @@ class DirectStreamActivity : AppCompatActivity() {
     }
 
     private fun switchStream(stream: StreamItem) {
-        if (stream.url == activeStream?.url) return
+        if (
+            stream.url == activeStream?.url &&
+            (stream.name.isBlank() || stream.name == activeStream?.name)
+        ) return
         val positionMs = engine.player.currentPosition.coerceAtLeast(0L)
         Log.i(
             PROVIDER_TAG,
@@ -1718,7 +1730,11 @@ class DirectStreamActivity : AppCompatActivity() {
                     candidate.quality.equals(stream.quality, ignoreCase = true)
                 ) refreshed else candidate
             }
-            streamDialog?.updateStreams(availableStreams, activeUrl = refreshed.url)
+            streamDialog?.updateStreams(
+                availableStreams,
+                activeUrl = refreshed.url,
+                activeName = refreshed.name
+            )
             activeStream = refreshed
             startStreamPlayback(refreshed, positionMs)
         }
@@ -1820,7 +1836,11 @@ class DirectStreamActivity : AppCompatActivity() {
                     availableStreams = availableStreams.filterNot { it.url == active.url }
                     playbackErrorDialog?.dismiss()
                     activeStream = null
-                    streamDialog?.updateStreams(availableStreams, activeUrl = null)
+                    streamDialog?.updateStreams(
+                        availableStreams,
+                        activeUrl = null,
+                        activeName = null
+                    )
                     if (availableStreams.size < 2) {
                         binding.btnPlayerStreams.visibility = View.GONE
                         updateBottomFocusChain()
@@ -2097,7 +2117,11 @@ class DirectStreamActivity : AppCompatActivity() {
                 }
                 // Update the stream picker regardless of current playback so
                 // CineSrc Mega rows receive their probe result immediately.
-                streamDialog?.updateStreams(availableStreams)
+                streamDialog?.updateStreams(
+                    availableStreams,
+                    activeUrl = activeStream?.url,
+                    activeName = activeStream?.name
+                )
                 val okCount = validated.count { it.isValid }
                 val blockedCount = validated.count { it.httpStatusCode == 403 }
                 Log.i(
@@ -2161,7 +2185,11 @@ class DirectStreamActivity : AppCompatActivity() {
                 candidate
             }
         }
-        streamDialog?.updateStreams(availableStreams)
+        streamDialog?.updateStreams(
+            availableStreams,
+            activeUrl = activeStream?.url,
+            activeName = activeStream?.name
+        )
         if (wasMarkedFailed) {
             Log.i(
                 PROVIDER_TAG,

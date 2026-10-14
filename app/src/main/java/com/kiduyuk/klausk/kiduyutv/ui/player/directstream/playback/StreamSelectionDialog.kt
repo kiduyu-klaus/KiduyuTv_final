@@ -70,11 +70,13 @@ class StreamSelectionDialog(
     context: Context,
     streams: List<StreamItem>,
     activeUrl: String?,
+    activeName: String? = null,
     private val onStreamSelected: (StreamItem) -> Unit
 ) : ComponentDialog(context) {
 
     private val streamsState = mutableStateOf(visibleStreams(streams))
     private val activeUrlState = mutableStateOf(activeUrl)
+    private val activeNameState = mutableStateOf(activeName)
 
     init {
         requestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -84,6 +86,7 @@ class StreamSelectionDialog(
                     StreamSelectionContent(
                         streams = streamsState.value,
                         activeUrl = activeUrlState.value,
+                        activeName = activeNameState.value,
                         onStreamSelected = ::selectStream,
                         onDismiss = ::dismiss
                     )
@@ -120,12 +123,17 @@ class StreamSelectionDialog(
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() = dismiss()
 
-    fun updateStreams(updated: List<StreamItem>, activeUrl: String? = activeUrlState.value) {
+    fun updateStreams(
+        updated: List<StreamItem>,
+        activeUrl: String? = activeUrlState.value,
+        activeName: String? = activeNameState.value
+    ) {
         if (!isShowing) return
         // Keep probe-rejected sources selectable when possible, but hide
         // streams that have been confirmed as HTTP 404 / file-not-found.
         streamsState.value = visibleStreams(updated)
         activeUrlState.value = activeUrl
+        activeNameState.value = activeName
     }
 
     private fun visibleStreams(streams: List<StreamItem>): List<StreamItem> =
@@ -133,6 +141,7 @@ class StreamSelectionDialog(
 
     private fun selectStream(stream: StreamItem) {
         activeUrlState.value = stream.url
+        activeNameState.value = stream.name
         onStreamSelected(stream)
         dismiss()
     }
@@ -141,6 +150,7 @@ class StreamSelectionDialog(
     private fun StreamSelectionContent(
         streams: List<StreamItem>,
         activeUrl: String?,
+        activeName: String?,
         onStreamSelected: (StreamItem) -> Unit,
         onDismiss: () -> Unit
     ) {
@@ -163,9 +173,13 @@ class StreamSelectionDialog(
         val streamFocusRequesters = remember(filteredStreams) {
             List(filteredStreams.size) { FocusRequester() }
         }
-        val playingIndex = filteredStreams.indexOfFirst { it.url == activeUrl }
+        val playingIndex = if (!activeName.isNullOrBlank()) {
+            filteredStreams.indexOfFirst { it.name == activeName }
+        } else {
+            filteredStreams.indexOfFirst { it.url == activeUrl }
+        }
 
-        LaunchedEffect(filteredStreams, activeUrl, isGridLayout) {
+        LaunchedEffect(filteredStreams, activeUrl, activeName, isGridLayout) {
             if (playingIndex >= 0) {
                 if (isGridLayout) {
                     gridState.scrollToItem(playingIndex)
