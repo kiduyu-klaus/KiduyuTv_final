@@ -95,6 +95,8 @@ class CloudflareBypassActivity : AppCompatActivity() {
 
     companion object {
         const val TAG = "CloudflareBypass"
+        private const val GOOGLE_DOWNLOADS_HOST = "video-downloads.googleusercontent.com"
+        private const val GOOGLE_UPLOAD_ID_HEADER = "X-Guploader-Uploadid"
 
         /** Legacy URL input, retained for callers that have not migrated to [EXTRA_HOST]. */
         const val EXTRA_URL = "url"
@@ -1024,27 +1026,40 @@ class CloudflareBypassActivity : AppCompatActivity() {
             CookieManager.getInstance().getCookie(url).orEmpty()
         }
         val headers = linkedMapOf<String, String>()
-        lastRequestHeaders.forEach { (name, value) ->
-            if (
-                name.isNotBlank() &&
-                value.isNotBlank() &&
-                (waitForDownload || shouldForwardToMediaRequest(name))
-            ) {
-                headers[name] = value
-            }
-        }
-        headers["User-Agent"] = resolvedUserAgent
-        if (referer.isNotBlank()) {
-            headers["Referer"] = referer
-            runCatching { Uri.parse(referer) }
-                .getOrNull()
-                ?.let { uri ->
-                    if (!uri.scheme.isNullOrBlank() && !uri.host.isNullOrBlank()) {
-                        headers["Origin"] = "${uri.scheme}://${uri.host}"
-                    }
+        if (host.equals(GOOGLE_DOWNLOADS_HOST, ignoreCase = true)) {
+            // Signed Google download URLs reject browser-only request context.
+            // The upload id and user agent are the only headers Media3 needs;
+            // do not leak Referer, Origin, cookies, or WebView fetch headers.
+            headers["User-Agent"] = resolvedUserAgent
+            lastRequestHeaders.entries
+                .firstOrNull { (name, value) ->
+                    name.equals(GOOGLE_UPLOAD_ID_HEADER, ignoreCase = true) && value.isNotBlank()
                 }
+                ?.value
+                ?.let { headers[GOOGLE_UPLOAD_ID_HEADER] = it }
+        } else {
+            lastRequestHeaders.forEach { (name, value) ->
+                if (
+                    name.isNotBlank() &&
+                    value.isNotBlank() &&
+                    (waitForDownload || shouldForwardToMediaRequest(name))
+                ) {
+                    headers[name] = value
+                }
+            }
+            headers["User-Agent"] = resolvedUserAgent
+            if (referer.isNotBlank()) {
+                headers["Referer"] = referer
+                runCatching { Uri.parse(referer) }
+                    .getOrNull()
+                    ?.let { uri ->
+                        if (!uri.scheme.isNullOrBlank() && !uri.host.isNullOrBlank()) {
+                            headers["Origin"] = "${uri.scheme}://${uri.host}"
+                        }
+                    }
+            }
+            if (cookies.isNotBlank()) headers["Cookie"] = cookies
         }
-        if (cookies.isNotBlank()) headers["Cookie"] = cookies
 
         Log.i(
             TAG,
@@ -1097,7 +1112,7 @@ class CloudflareBypassActivity : AppCompatActivity() {
         // pages rather than media downloads.
         if (
             host.equals(targetHost, ignoreCase = true) &&
-            !targetHost.equals("video-downloads.googleusercontent.com", ignoreCase = true) &&
+            !targetHost.equals(GOOGLE_DOWNLOADS_HOST, ignoreCase = true) &&
             !targetHost.endsWith(".workers.dev", ignoreCase = true)
         ) return false
         if (host.equals("challenges.cloudflare.com", ignoreCase = true)) return false
