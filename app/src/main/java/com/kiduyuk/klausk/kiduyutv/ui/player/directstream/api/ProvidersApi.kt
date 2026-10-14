@@ -59,10 +59,8 @@ object ProvidersApi {
     private const val ANIME_CATEGORY = "anime"
     private const val ANIME_STREAM_TYPE = "anime"
 
-    // Aggregate stream requests wait for several enabled providers on the
-    // backend. Some valid scrapers need well over 30 seconds, so keep the
-    // request bounded but do not fail while those providers are still working.
-    private const val STREAMS_READ_TIMEOUT_MS = 180_000
+    // A stalled provider must not block the stream picker indefinitely.
+    private const val STREAMS_READ_TIMEOUT_MS = 30_000
 
     /**
      * Resolve on every request so changing Settings takes effect immediately,
