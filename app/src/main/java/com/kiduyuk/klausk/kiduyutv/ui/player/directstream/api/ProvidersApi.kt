@@ -8,6 +8,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamItem
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamResponse
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.SubtitleItem
 import com.kiduyuk.klausk.kiduyutv.util.UrlUtils
+import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import okhttp3.CacheControl
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -61,8 +62,11 @@ object ProvidersApi {
     // request bounded but do not fail while those providers are still working.
     private const val STREAMS_READ_TIMEOUT_MS = 180_000
 
-    private const val baseUrl = "https://sflatransport.com/kiduyuTv_providers"
     private const val streamApiToken = BuildConfig.STREAM_API_TOKEN
+
+    private fun resolveBaseUrl(endpoint: String): String =
+        endpoint.trimEnd('/').takeIf { it in SettingsManager.DIRECT_STREAM_ENDPOINTS }
+            ?: SettingsManager.DEFAULT_DIRECT_STREAM_ENDPOINT
 
     /**
      * Current enabled-provider routing map. These categories are used only to
@@ -173,7 +177,8 @@ object ProvidersApi {
      *
      * Call from Dispatchers.IO.
      */
-    fun requireBackendAvailable() {
+    fun requireBackendAvailable(endpoint: String = SettingsManager.DEFAULT_DIRECT_STREAM_ENDPOINT) {
+        val baseUrl = resolveBaseUrl(endpoint)
         val urlString = "$baseUrl/api/health"
         Log.i(TAG, "Checking providers backend health")
         val request = Request.Builder()
@@ -220,7 +225,10 @@ object ProvidersApi {
      * Returns the server-side keys of providers currently enabled by
      * `/api/providers`. Disabled entries are deliberately omitted.
      */
-    fun enabledProviderNames(): List<String> {
+    fun enabledProviderNames(
+        endpoint: String = SettingsManager.DEFAULT_DIRECT_STREAM_ENDPOINT
+    ): List<String> {
+        val baseUrl = resolveBaseUrl(endpoint)
         val urlString = "$baseUrl/api/providers"
         Log.i(TAG, "GET $urlString")
         val connection = (URL(urlString).openConnection() as HttpURLConnection).apply {
@@ -267,11 +275,15 @@ object ProvidersApi {
      * A failed TMDB lookup keeps the base category so an incidental metadata failure
      * never blocks playback.
      */
-    suspend fun enabledProviderNamesForMedia(type: String, tmdbId: Int): List<String> {
+    suspend fun enabledProviderNamesForMedia(
+        type: String,
+        tmdbId: Int,
+        endpoint: String = SettingsManager.DEFAULT_DIRECT_STREAM_ENDPOINT
+    ): List<String> {
         require(type == "movie" || type == "series") { "invalid type: $type" }
         require(tmdbId > 0) { "invalid tmdbId: $tmdbId" }
 
-        val enabled = enabledProviderNames()
+        val enabled = enabledProviderNames(endpoint)
         val animation = hasAnimationGenre(type, tmdbId)
         val category = when {
             animation -> ANIME_CATEGORY
@@ -318,10 +330,13 @@ object ProvidersApi {
         tmdbId: Int,
         season: Int? = null,
         episode: Int? = null,
-        provider: String? = null
+        provider: String? = null,
+        endpoint: String = SettingsManager.DEFAULT_DIRECT_STREAM_ENDPOINT
     ): StreamResponse {
         require(type == "movie" || type == "series") { "invalid type: $type" }
         require(tmdbId > 0) { "invalid tmdbId: $tmdbId" }
+
+        val baseUrl = resolveBaseUrl(endpoint)
 
         val pathSegment = if (provider.isNullOrBlank()) {
             "api/streams/$type/$tmdbId"

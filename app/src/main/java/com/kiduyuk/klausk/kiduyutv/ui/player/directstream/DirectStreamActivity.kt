@@ -173,6 +173,7 @@ class DirectStreamActivity : AppCompatActivity() {
     // Remember which segment we've already auto-skipped to avoid repeats
     private var autoSkippedSegmentStartMs: Long? = null
     private lateinit var settingsManager: com.kiduyuk.klausk.kiduyutv.util.SettingsManager
+    private lateinit var directStreamEndpoint: String
     private val repository = TmdbRepository()
     private var pendingStartPositionMs = 0L
     private var pendingReadySeekPositionMs = 0L
@@ -396,6 +397,7 @@ class DirectStreamActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         settingsManager = com.kiduyuk.klausk.kiduyutv.util.SettingsManager(this)
+        directStreamEndpoint = settingsManager.getDirectStreamEndpoint()
         Log.i(TAG, "Player activity created")
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         binding = ActivityDirectStreamBinding.inflate(layoutInflater)
@@ -1706,7 +1708,8 @@ class DirectStreamActivity : AppCompatActivity() {
                         tmdbId = currentTmdbId,
                         season = currentSeason,
                         episode = currentEpisode,
-                        provider = stream.provider
+                        provider = stream.provider,
+                        endpoint = directStreamEndpoint
                     ).streams.firstOrNull { candidate ->
                         candidate.provider.equals("vidlink", ignoreCase = true) &&
                             candidate.quality.equals(stream.quality, ignoreCase = true)
@@ -1949,6 +1952,7 @@ class DirectStreamActivity : AppCompatActivity() {
                     season = season,
                     episode = episode,
                     provider = provider,
+                    endpoint = directStreamEndpoint,
                     onProviderProgress = { index, total, providerName ->
                         withContext(Dispatchers.Main) {
                             updateProviderFetchProgress(index, total)
