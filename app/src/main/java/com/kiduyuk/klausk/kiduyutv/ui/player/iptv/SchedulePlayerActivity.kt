@@ -423,6 +423,18 @@ class SchedulePlayerActivity : ComponentActivity() {
                     });
                 }).observe(document.documentElement, { childList: true, subtree: true });
 
+                function removePopupTargets() {
+                    document.querySelectorAll('a, form').forEach(function(node) {
+                        var target = (node.getAttribute('target') || '').toLowerCase();
+                        if (target === '_blank' || target === '_new' || target === '_popup') {
+                            node.setAttribute('data-kiduyu-popup-target', '1');
+                            node.removeAttribute('target');
+                        }
+                    });
+                }
+                removePopupTargets();
+                setInterval(removePopupTargets, 1000);
+
                 // Suppress click-triggered pop-under handlers before they can navigate the frame.
                 document.addEventListener('click', function(event) {
                     var node = event.target && event.target.closest && event.target.closest('a, button, div, iframe');
@@ -437,8 +449,19 @@ class SchedulePlayerActivity : ComponentActivity() {
                 // server pages from opening a tab/window even when a provider restores a
                 // window.open implementation after the generic guard has run.
                 document.addEventListener('click', function(event) {
-                    var link = event.target && event.target.closest && event.target.closest('a[target="_blank"]');
-                    if (link) {
+                    var link = event.target && event.target.closest && event.target.closest('a');
+                    var target = link && (link.getAttribute('target') || '').toLowerCase();
+                    if (link && (target === '_blank' || target === '_new' || target === '_popup' ||
+                        link.getAttribute('data-kiduyu-popup-target') === '1')) {
+                        event.preventDefault();
+                        event.stopImmediatePropagation();
+                    }
+                }, true);
+                document.addEventListener('submit', function(event) {
+                    var form = event.target;
+                    var target = form && (form.getAttribute('target') || '').toLowerCase();
+                    if (target === '_blank' || target === '_new' || target === '_popup' ||
+                        (form && form.getAttribute('data-kiduyu-popup-target') === '1')) {
                         event.preventDefault();
                         event.stopImmediatePropagation();
                     }
@@ -712,6 +735,22 @@ class SchedulePlayerActivity : ComponentActivity() {
                             });
                         } catch (_) { return false; }
                     }
+                    function blockNewWindows() {
+                        try {
+                            window.open = function() { return null; };
+                            window.showModalDialog = function() { return null; };
+                        } catch (_) {}
+                        try {
+                            document.querySelectorAll('a, form').forEach(function(node) {
+                                var target = (node.getAttribute('target') || '').toLowerCase();
+                                if (target === '_blank' || target === '_new' || target === '_popup') {
+                                    node.removeAttribute('target');
+                                }
+                            });
+                        } catch (_) {}
+                    }
+                    blockNewWindows();
+                    setInterval(blockNewWindows, 1000);
                     var appendChild = Node.prototype.appendChild;
                     Node.prototype.appendChild = function(node) {
                         if (node && node.tagName === 'SCRIPT' && isBlocked(node.src || '')) return node;
@@ -719,7 +758,19 @@ class SchedulePlayerActivity : ComponentActivity() {
                     };
                     document.addEventListener('click', function(event) {
                         var link = event.target && event.target.closest && event.target.closest('a');
-                        if (link && (link.target === '_blank' || isBlocked(link.href || ''))) {
+                        var target = link && (link.getAttribute('target') || '').toLowerCase();
+                        if (link && (target === '_blank' || target === '_new' ||
+                            target === '_popup' || link.getAttribute('data-kiduyu-popup-target') === '1' ||
+                            isBlocked(link.href || ''))) {
+                            event.preventDefault();
+                            event.stopImmediatePropagation();
+                        }
+                    }, true);
+                    document.addEventListener('submit', function(event) {
+                        var form = event.target;
+                        var target = form && (form.getAttribute('target') || '').toLowerCase();
+                        if (target === '_blank' || target === '_new' || target === '_popup' ||
+                            (form && form.getAttribute('data-kiduyu-popup-target') === '1')) {
                             event.preventDefault();
                             event.stopImmediatePropagation();
                         }
@@ -913,7 +964,8 @@ class SchedulePlayerActivity : ComponentActivity() {
                     // replace the wrapper itself, keep playback in the trusted dlive.sx
                     // document and discard that top-level navigation.
                     if (request?.isForMainFrame == true &&
-                        uri?.host?.equals(SCHEDULE_HOST, ignoreCase = true) == false
+                        (uri?.host?.equals(SCHEDULE_HOST, ignoreCase = true) != true ||
+                            (uri != null && AdvancedAdBlocker.shouldBlock(uri)))
                     ) {
                         android.util.Log.i(TAG, "[AdBlock] Blocked top-frame navigation: $uri")
                         return true
@@ -1013,6 +1065,40 @@ class SchedulePlayerActivity : ComponentActivity() {
                 ): Boolean {
                     android.util.Log.i(TAG, "[AdBlock] Blocked Schedule player popup window")
                     return false
+                }
+
+                override fun onJsAlert(
+                    view: android.webkit.WebView?,
+                    url: String?,
+                    message: String?,
+                    result: android.webkit.JsResult?
+                ): Boolean {
+                    android.util.Log.i(TAG, "[AdBlock] Blocked JavaScript alert from $url")
+                    result?.cancel()
+                    return true
+                }
+
+                override fun onJsConfirm(
+                    view: android.webkit.WebView?,
+                    url: String?,
+                    message: String?,
+                    result: android.webkit.JsResult?
+                ): Boolean {
+                    android.util.Log.i(TAG, "[AdBlock] Blocked JavaScript confirm from $url")
+                    result?.cancel()
+                    return true
+                }
+
+                override fun onJsPrompt(
+                    view: android.webkit.WebView?,
+                    url: String?,
+                    message: String?,
+                    defaultValue: String?,
+                    result: android.webkit.JsPromptResult?
+                ): Boolean {
+                    android.util.Log.i(TAG, "[AdBlock] Blocked JavaScript prompt from $url")
+                    result?.cancel()
+                    return true
                 }
 
                 override fun onProgressChanged(
