@@ -148,13 +148,16 @@ class SettingsManager(context: Context) {
         const val AUTO = "Auto"
 
         const val DEFAULT_DIRECT_STREAM_ENDPOINT =
+            "https://sflatransport.com/kiduyuTv_providers"
+        const val SECOND_BANKS_LABS_DIRECT_STREAM_ENDPOINT =
             "https://secondbanklabs.com/kiduyuTv_providers"
         const val WORKER_DIRECT_STREAM_ENDPOINT =
             "https://kiduyutv-providers.muigakiduyu1995.workers.dev/kiduyuTv_providers"
 
         /** User-selectable backends, in display order. The first is the default. */
         val DIRECT_STREAM_ENDPOINT_OPTIONS: List<DirectStreamEndpoint> = listOf(
-            DirectStreamEndpoint("SecondBanksLabs", DEFAULT_DIRECT_STREAM_ENDPOINT),
+            DirectStreamEndpoint("Main", DEFAULT_DIRECT_STREAM_ENDPOINT),
+            DirectStreamEndpoint("SecondBanksLabs", SECOND_BANKS_LABS_DIRECT_STREAM_ENDPOINT),
             DirectStreamEndpoint("CloudFlare", WORKER_DIRECT_STREAM_ENDPOINT)
         )
 
