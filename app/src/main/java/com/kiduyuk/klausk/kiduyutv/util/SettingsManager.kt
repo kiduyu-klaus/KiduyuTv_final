@@ -3,13 +3,14 @@ package com.kiduyuk.klausk.kiduyutv.util
 import android.content.Context
 import android.content.SharedPreferences
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import android.util.Log
+import androidx.annotation.RequiresApi
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager.Companion.AUTO
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -176,6 +177,18 @@ class SettingsManager(context: Context) {
         private const val ENDPOINT_DISCOVERY_URL = "https://sflatransport.com/api/getEndpoints"
 
         /**
+         * Secondary discovery source. The primary route answers a plain HTTP
+         * client with a bot-protection challenge rather than JSON, so Firebase
+         * mirrors the identical payload and is tried when the primary fails.
+         */
+        private const val ENDPOINT_FIREBASE_URL =
+            "https://kiduyutvfinal-default-rtdb.firebaseio.com/app_config/endpoints.json"
+
+        /** Tried in order; the first source to return a usable list wins. */
+        private val ENDPOINT_DISCOVERY_SOURCES =
+            listOf(ENDPOINT_DISCOVERY_URL, ENDPOINT_FIREBASE_URL)
+
+        /**
          * Compiled-in fallback used whenever discovery has not produced a usable
          * list. Callers must never receive an empty base URL, or every provider
          * request would silently degrade to a relative path.
@@ -233,35 +246,46 @@ class SettingsManager(context: Context) {
             return endpointOptionsCache
         }
 
+        /** Performs one discovery request and returns the validated endpoint list. */
+        private fun fetchEndpointOptionsFrom(sourceUrl: String): List<DirectStreamEndpoint> {
+            val request = Request.Builder()
+                .url(sourceUrl)
+                .header("Accept", "application/json")
+                .header("User-Agent", "KiduyuTVLite/1.0 (Android)")
+                .get()
+                .build()
+            return endpointClient.newCall(request).execute().use { response ->
+                check(response.isSuccessful) {
+                    "Endpoint discovery returned HTTP ${response.code}"
+                }
+                val options = parseEndpointOptions(response.body?.string().orEmpty())
+                check(options.isNotEmpty()) {
+                    "Endpoint discovery returned no valid endpoints"
+                }
+                options
+            }
+        }
+
         /** Fetches the authoritative named endpoint list and caches it locally. */
+        @RequiresApi(Build.VERSION_CODES.GINGERBREAD)
         suspend fun fetchDirectStreamEndpointOptions(context: Context): List<DirectStreamEndpoint> =
             withContext(Dispatchers.IO) {
                 val cached = getCachedDirectStreamEndpointOptions(context)
                 val fetched = runCatching {
                     var lastError: Throwable? = null
                     var discovered: List<DirectStreamEndpoint>? = null
-                    repeat(2) { attempt ->
-                        if (discovered != null) return@repeat
+                    // One attempt per source: two independent mirrors already
+                    // cover a transient failure, so a per-source retry would only
+                    // stretch the worst case on app start.
+                    for (sourceUrl in ENDPOINT_DISCOVERY_SOURCES) {
+                        if (discovered != null) break
                         try {
-                            val request = Request.Builder()
-                                .url(ENDPOINT_DISCOVERY_URL)
-                                .header("Accept", "application/json")
-                                .header("User-Agent", "KiduyuTVLite/1.0 (Android)")
-                                .get()
-                                .build()
-                            endpointClient.newCall(request).execute().use { response ->
-                                check(response.isSuccessful) {
-                                    "Endpoint discovery returned HTTP ${response.code}"
-                                }
-                                val options = parseEndpointOptions(response.body?.string().orEmpty())
-                                check(options.isNotEmpty()) {
-                                    "Endpoint discovery returned no valid endpoints"
-                                }
-                                discovered = options
-                            }
+                            val options = fetchEndpointOptionsFrom(sourceUrl)
+                            Log.i(TAG, "Loaded direct-stream endpoints from $sourceUrl")
+                            discovered = options
                         } catch (error: Throwable) {
                             lastError = error
-                            if (attempt == 0) delay(500)
+                            Log.w(TAG, "Endpoint discovery source failed: $sourceUrl", error)
                         }
                     }
                     discovered ?: throw (lastError
