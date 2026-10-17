@@ -201,7 +201,9 @@ class SettingsManager(context: Context) {
                 val cached = getCachedDirectStreamEndpointOptions(context)
                 val fetched = runCatching {
                     var lastError: Throwable? = null
+                    var discovered: List<DirectStreamEndpoint>? = null
                     repeat(2) { attempt ->
+                        if (discovered != null) return@repeat
                         try {
                             val request = Request.Builder()
                                 .url(ENDPOINT_DISCOVERY_URL)
@@ -217,14 +219,15 @@ class SettingsManager(context: Context) {
                                 check(options.isNotEmpty()) {
                                     "Endpoint discovery returned no valid endpoints"
                                 }
-                                return@runCatching options
+                                discovered = options
                             }
                         } catch (error: Throwable) {
                             lastError = error
                             if (attempt == 0) delay(500)
                         }
                     }
-                    throw lastError ?: IllegalStateException("Endpoint discovery failed")
+                    discovered ?: throw (lastError
+                        ?: IllegalStateException("Endpoint discovery failed"))
                 }.onFailure { error ->
                     Log.w(TAG, "Could not load direct-stream endpoints", error)
                 }.getOrElse { cached }
