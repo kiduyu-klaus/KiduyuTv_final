@@ -1300,6 +1300,7 @@ private fun PlaybackContent(
     var endpointOptions by remember {
         mutableStateOf(SettingsManager.getCachedDirectStreamEndpointOptions(context))
     }
+    var endpointLoading by remember { mutableStateOf(endpointOptions.isEmpty()) }
 
     LaunchedEffect(Unit) {
         runCatching {
@@ -1312,7 +1313,9 @@ private fun PlaybackContent(
         }
     }
     LaunchedEffect(Unit) {
+        endpointLoading = true
         endpointOptions = SettingsManager.fetchDirectStreamEndpointOptions(context)
+        endpointLoading = false
     }
     val settingsManager = remember(context) { SettingsManager(context) }
     var directStreamEnabled by remember {
@@ -1498,21 +1501,36 @@ private fun PlaybackContent(
                     lineHeight = 20.sp,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
-                endpointOptions.chunked(2).forEach { rowEndpoints ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        rowEndpoints.forEach { option ->
-                            ProviderOptionItem(
-                                option = option.name,
-                                isSelected = option.url == directStreamEndpoint,
-                                onClick = { onDirectStreamEndpointSelect(option.url) },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                        if (rowEndpoints.size == 1) {
-                            Spacer(modifier = Modifier.weight(1f))
+                if (endpointLoading) {
+                    Text(
+                        text = "Loading endpoint options…",
+                        color = TextSecondary,
+                        fontSize = 14.sp
+                    )
+                } else if (endpointOptions.isEmpty()) {
+                    Text(
+                        text = "Endpoint options are unavailable. Check your internet connection and reopen Settings.",
+                        color = TextSecondary,
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp
+                    )
+                } else {
+                    endpointOptions.chunked(2).forEach { rowEndpoints ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            rowEndpoints.forEach { option ->
+                                ProviderOptionItem(
+                                    option = option.name,
+                                    isSelected = option.url == directStreamEndpoint,
+                                    onClick = { onDirectStreamEndpointSelect(option.url) },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            if (rowEndpoints.size == 1) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
                         }
                     }
                 }

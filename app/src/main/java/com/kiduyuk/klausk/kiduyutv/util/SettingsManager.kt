@@ -3,9 +3,11 @@ package com.kiduyuk.klausk.kiduyutv.util
 import android.content.Context
 import android.content.SharedPreferences
 import android.provider.Settings
+import android.util.Log
 import com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager.Companion.AUTO
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -197,17 +199,34 @@ class SettingsManager(context: Context) {
         suspend fun fetchDirectStreamEndpointOptions(context: Context): List<DirectStreamEndpoint> =
             withContext(Dispatchers.IO) {
                 val cached = getCachedDirectStreamEndpointOptions(context)
-                runCatching {
-                    val request = Request.Builder()
-                        .url(ENDPOINT_DISCOVERY_URL)
-                        .header("Accept", "application/json")
-                        .header("User-Agent", "KiduyuTVLite/1.0 (Android)")
-                        .get()
-                        .build()
-                    endpointClient.newCall(request).execute().use { response ->
-                        check(response.isSuccessful) { "Endpoint discovery returned HTTP ${response.code}" }
-                        parseEndpointOptions(response.body?.string().orEmpty())
+                val fetched = runCatching {
+                    var lastError: Throwable? = null
+                    repeat(2) { attempt ->
+                        try {
+                            val request = Request.Builder()
+                                .url(ENDPOINT_DISCOVERY_URL)
+                                .header("Accept", "application/json")
+                                .header("User-Agent", "KiduyuTVLite/1.0 (Android)")
+                                .get()
+                                .build()
+                            endpointClient.newCall(request).execute().use { response ->
+                                check(response.isSuccessful) {
+                                    "Endpoint discovery returned HTTP ${response.code}"
+                                }
+                                val options = parseEndpointOptions(response.body?.string().orEmpty())
+                                check(options.isNotEmpty()) {
+                                    "Endpoint discovery returned no valid endpoints"
+                                }
+                                return@runCatching options
+                            }
+                        } catch (error: Throwable) {
+                            lastError = error
+                            if (attempt == 0) delay(500)
+                        }
                     }
+                    throw lastError ?: IllegalStateException("Endpoint discovery failed")
+                }.onFailure { error ->
+                    Log.w(TAG, "Could not load direct-stream endpoints", error)
                 }.getOrElse { cached }
                     .also { options ->
                         if (options.isNotEmpty()) {
@@ -232,7 +251,23 @@ class SettingsManager(context: Context) {
 
         private fun parseEndpointOptions(raw: String): List<DirectStreamEndpoint> =
             runCatching {
-                val array = JSONObject(raw).optJSONArray("endpoints") ?: JSONArray()
+                val json = JSONObject(raw)
+                val namedEndpoints = json.optJSONArray("endpoints") ?: JSONArray()
+                val array = if (namedEndpoints.length() > 0) {
+                    namedEndpoints
+                } else {
+                    JSONArray().apply {
+                        json.optJSONArray("urls")?.let { urls ->
+                            for (index in 0 until urls.length()) {
+                                put(
+                                    JSONObject()
+                                        .put("name", "Endpoint ${index + 1}")
+                                        .put("url", urls.optString(index))
+                                )
+                            }
+                        }
+                    }
+                }
                 buildList {
                     for (index in 0 until array.length()) {
                         val item = array.optJSONObject(index) ?: continue
@@ -249,6 +284,8 @@ class SettingsManager(context: Context) {
             value.trim().trimEnd('/').takeIf {
                 it.startsWith("https://") || it.startsWith("http://")
             }.orEmpty()
+
+        private const val TAG = "SettingsManager"
 
         /**
          * All active providers in display order.
