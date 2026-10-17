@@ -2,8 +2,10 @@ package com.kiduyuk.klausk.kiduyutv.util
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.net.Uri
 import android.provider.Settings
 import android.util.Log
+import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager.Companion.AUTO
 import kotlinx.coroutines.Dispatchers
@@ -45,25 +47,36 @@ class SettingsManager(context: Context) {
         return preferences.getString(KEY_DEFAULT_DIRECT_STREAM_PROVIDER, AUTO) ?: AUTO
     }
 
-    /** Stores the trusted backend used for direct-stream provider requests. */
+    /** Reads the endpoint options this manager already has a context for. */
+    private fun cachedEndpointOptions(): List<DirectStreamEndpoint> =
+        getCachedDirectStreamEndpointOptions(appContext)
+
+    /**
+     * Stores the selected direct-stream backend. Only an endpoint that
+     * discovery actually offered is persisted; anything else keeps the current
+     * selection rather than widening where the provider API token may be sent.
+     */
     fun saveDirectStreamEndpoint(endpoint: String) {
         val normalized = normalizeEndpointUrl(endpoint)
-        val discovered = getCachedDirectStreamEndpointOptions()
-        val safeEndpoint = normalized.takeIf {
-            it.isNotBlank() && (discovered.isEmpty() || it in discovered.map { option -> option.url })
-        } ?: getDirectStreamEndpoint()
+        val allowed = cachedEndpointOptions().map { it.url }
+        val safeEndpoint = normalized.takeIf { it.isNotBlank() && it in allowed }
+            ?: getDirectStreamEndpoint()
         if (safeEndpoint.isNotBlank()) {
             preferences.edit().putString(KEY_DIRECT_STREAM_ENDPOINT, safeEndpoint).apply()
         }
     }
 
     /**
-     * Returns a supported direct-stream backend. Invalid or legacy values are
-     * deliberately reset to the primary endpoint rather than being used as an
-     * arbitrary network URL.
+     * Returns the backend used for direct-stream requests. A stored value that
+     * discovery no longer allows, or that failed validation, falls back to the
+     * compiled-in endpoint, so this never returns an empty string.
      */
     fun getDirectStreamEndpoint(): String {
-        return normalizeEndpointUrl(preferences.getString(KEY_DIRECT_STREAM_ENDPOINT, null).orEmpty())
+        val stored = normalizeEndpointUrl(
+            preferences.getString(KEY_DIRECT_STREAM_ENDPOINT, null).orEmpty()
+        )
+        return stored.takeIf { it.isNotBlank() && isAllowedEndpoint(it) }
+            ?: FALLBACK_DIRECT_STREAM_ENDPOINT
     }
 
     fun setDirectStreamEnabled(enabled: Boolean) {
@@ -161,6 +174,31 @@ class SettingsManager(context: Context) {
         const val AUTO = "Auto"
 
         private const val ENDPOINT_DISCOVERY_URL = "https://sflatransport.com/api/getEndpoints"
+
+        /**
+         * Compiled-in fallback used whenever discovery has not produced a usable
+         * list. Callers must never receive an empty base URL, or every provider
+         * request would silently degrade to a relative path.
+         */
+        const val FALLBACK_DIRECT_STREAM_ENDPOINT =
+            "https://sflatransport.com/kiduyuTv_providers"
+
+        /**
+         * Discovery is a remote hint, not a trust anchor. The provider API token
+         * is sent to whichever endpoint is selected, so only these hosts are
+         * accepted no matter what the discovery response claims.
+         *
+         * The ngrok host is an ephemeral tunnel subdomain, so treat it as
+         * replaceable: remove it here if that tunnel is retired.
+         */
+        private val TRUSTED_ENDPOINT_HOSTS = setOf(
+            "sflatransport.com",
+            "wealthy-buzzard-divine.ngrok-free.app"
+        )
+
+        /** Bounds a server-supplied label before it reaches the picker UI. */
+        private const val MAX_ENDPOINT_NAME_LENGTH = 40
+
         private val endpointClient by lazy {
             OkHttpClient.Builder()
                 .connectTimeout(10, TimeUnit.SECONDS)
@@ -275,7 +313,10 @@ class SettingsManager(context: Context) {
                     for (index in 0 until array.length()) {
                         val item = array.optJSONObject(index) ?: continue
                         val name = item.optString("name").trim()
+                            .take(MAX_ENDPOINT_NAME_LENGTH)
                         val url = normalizeEndpointUrl(item.optString("url"))
+                            .takeIf { isAllowedEndpoint(it) }
+                            .orEmpty()
                         if (name.isNotBlank() && url.isNotBlank()) {
                             add(DirectStreamEndpoint(name, url))
                         }
@@ -283,10 +324,31 @@ class SettingsManager(context: Context) {
                 }.distinctBy { it.url }
             }.getOrDefault(emptyList())
 
+        /** Trims and de-slashes a candidate URL. Makes no trust decision. */
         private fun normalizeEndpointUrl(value: String): String =
-            value.trim().trimEnd('/').takeIf {
-                it.startsWith("https://") || it.startsWith("http://")
-            }.orEmpty()
+            value.trim().trimEnd('/')
+
+        /**
+         * True when the app is willing to send provider API calls to [value].
+         * HTTPS on a trusted host is always allowed. A plain-HTTP LAN backend is
+         * a debug-build-only convenience, because the provider API token would
+         * otherwise travel in cleartext to a host named by a remote server.
+         */
+        private fun isAllowedEndpoint(value: String): Boolean {
+            val uri = runCatching { Uri.parse(value) }.getOrNull() ?: return false
+            val scheme = uri.scheme?.lowercase().orEmpty()
+            val host = uri.host?.lowercase().orEmpty()
+            if (host.isEmpty()) return false
+            if (scheme == "https") return host in TRUSTED_ENDPOINT_HOSTS
+            if (!BuildConfig.DEBUG) return false
+            return scheme == "http" && isPrivateHost(host)
+        }
+
+        private fun isPrivateHost(host: String): Boolean =
+            host == "localhost" ||
+                host == "127.0.0.1" ||
+                host.startsWith("192.168.") ||
+                host.startsWith("10.")
 
         private const val TAG = "SettingsManager"
 

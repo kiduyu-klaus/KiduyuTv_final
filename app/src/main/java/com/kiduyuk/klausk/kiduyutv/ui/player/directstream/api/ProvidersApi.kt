@@ -70,7 +70,7 @@ object ProvidersApi {
     /** Resolve the selected endpoint on every request so Settings changes apply immediately. */
     private fun currentBaseUrl(): String = runCatching {
         SettingsManager(AndroidApp.instance).getDirectStreamEndpoint()
-    }.getOrDefault("")
+    }.getOrDefault(SettingsManager.FALLBACK_DIRECT_STREAM_ENDPOINT)
 
     private fun resolveBaseUrl(endpoint: String?): String =
         endpoint?.trimEnd('/')?.takeIf { it in SettingsManager.DIRECT_STREAM_ENDPOINTS }
