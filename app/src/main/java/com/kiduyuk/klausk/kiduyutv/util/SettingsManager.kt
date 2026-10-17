@@ -271,7 +271,7 @@ class SettingsManager(context: Context) {
         suspend fun fetchDirectStreamEndpointOptions(context: Context): List<DirectStreamEndpoint> =
             withContext(Dispatchers.IO) {
                 val cached = getCachedDirectStreamEndpointOptions(context)
-                val fetched = runCatching {
+                val fetched: List<DirectStreamEndpoint> = try {
                     var lastError: Throwable? = null
                     var discovered: List<DirectStreamEndpoint>? = null
                     // One attempt per source: two independent mirrors already
@@ -290,28 +290,28 @@ class SettingsManager(context: Context) {
                     }
                     discovered ?: throw (lastError
                         ?: IllegalStateException("Endpoint discovery failed"))
-                }.onFailure { error ->
+                } catch (error: Throwable) {
                     Log.w(TAG, "Could not load direct-stream endpoints", error)
-                }.getOrElse { cached }
-                    .also { options ->
-                        if (options.isNotEmpty()) {
-                            endpointOptionsCache = options
-                            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                                .edit()
-                                .putString(
-                                    KEY_DIRECT_STREAM_ENDPOINT_OPTIONS,
-                                    JSONObject().put(
-                                        "endpoints",
-                                        JSONArray().apply {
-                                            options.forEach { option ->
-                                                put(JSONObject().put("name", option.name).put("url", option.url))
-                                            }
-                                        }
-                                    ).toString()
-                                )
-                                .apply()
-                        }
+                    cached
+                }
+                if (fetched.isNotEmpty()) {
+                    endpointOptionsCache = fetched
+                    context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                        .edit()
+                        .putString(
+                            KEY_DIRECT_STREAM_ENDPOINT_OPTIONS,
+                            JSONObject().put(
+                                "endpoints",
+                                JSONArray().apply {
+                                    fetched.forEach { option ->
+                                        put(JSONObject().put("name", option.name).put("url", option.url))
+                                    }
+                                }
+                            ).toString()
+                        )
+                        .apply()
                     }
+                fetched
             }
 
         private fun parseEndpointOptions(raw: String): List<DirectStreamEndpoint> =
