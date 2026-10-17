@@ -26,6 +26,10 @@ import com.kiduyuk.klausk.kiduyutv.util.LogcatManager
 import com.kiduyuk.klausk.kiduyutv.util.NotificationHelper
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 /**
@@ -34,6 +38,8 @@ import java.util.concurrent.TimeUnit
  * configuration for the Coil image loader.
  */
 class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
+
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
         super.onCreate()
@@ -49,6 +55,12 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
 
         // Initialize notification channels
         NotificationHelper.createNotificationChannel(this)
+
+        // Keep the direct-stream backend list server-driven and warm its cache
+        // before a player or Settings screen needs to render the options.
+        appScope.launch {
+            SettingsManager.fetchDirectStreamEndpointOptions(this@KiduyuTvApp)
+        }
 
         // Clean up expired cache on app start
         DatabaseManager.cleanExpiredCache()

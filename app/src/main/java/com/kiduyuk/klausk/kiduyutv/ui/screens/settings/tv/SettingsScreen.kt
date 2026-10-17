@@ -1297,6 +1297,9 @@ private fun PlaybackContent(
     val context = LocalContext.current
     var directProviderOptions by remember { mutableStateOf<List<StreamProviderChoice>>(emptyList()) }
     var directProviderLoadError by remember { mutableStateOf<String?>(null) }
+    var endpointOptions by remember {
+        mutableStateOf(SettingsManager.getCachedDirectStreamEndpointOptions(context))
+    }
 
     LaunchedEffect(Unit) {
         runCatching {
@@ -1307,6 +1310,9 @@ private fun PlaybackContent(
         }.onFailure { error ->
             directProviderLoadError = error.message ?: "Unable to load direct-stream providers"
         }
+    }
+    LaunchedEffect(Unit) {
+        endpointOptions = SettingsManager.fetchDirectStreamEndpointOptions(context)
     }
     val settingsManager = remember(context) { SettingsManager(context) }
     var directStreamEnabled by remember {
@@ -1492,7 +1498,7 @@ private fun PlaybackContent(
                     lineHeight = 20.sp,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
-                SettingsManager.DIRECT_STREAM_ENDPOINT_OPTIONS.chunked(2).forEach { rowEndpoints ->
+                endpointOptions.chunked(2).forEach { rowEndpoints ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)

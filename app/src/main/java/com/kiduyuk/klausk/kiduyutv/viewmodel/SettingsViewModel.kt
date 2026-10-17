@@ -793,7 +793,7 @@ data class SettingsUiState(
     // Direct-stream default provider preference
     val defaultDirectStreamProvider: String = com.kiduyuk.klausk.kiduyutv.util.SettingsManager.AUTO,
     // Direct-stream backend preference
-    val directStreamEndpoint: String = com.kiduyuk.klausk.kiduyutv.util.SettingsManager.DEFAULT_DIRECT_STREAM_ENDPOINT,
+    val directStreamEndpoint: String = "",
     // Ads disabled setting
     val isAdsDisabled: Boolean = false,
     // Update check states

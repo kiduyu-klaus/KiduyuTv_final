@@ -5,6 +5,13 @@ import android.content.SharedPreferences
 import android.provider.Settings
 import com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager.Companion.AUTO
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.concurrent.TimeUnit
 import java.util.UUID
 
 /**
@@ -38,9 +45,14 @@ class SettingsManager(context: Context) {
 
     /** Stores the trusted backend used for direct-stream provider requests. */
     fun saveDirectStreamEndpoint(endpoint: String) {
-        val safeEndpoint = endpoint.takeIf { it in DIRECT_STREAM_ENDPOINTS }
-            ?: DEFAULT_DIRECT_STREAM_ENDPOINT
-        preferences.edit().putString(KEY_DIRECT_STREAM_ENDPOINT, safeEndpoint).apply()
+        val normalized = normalizeEndpointUrl(endpoint)
+        val discovered = getCachedDirectStreamEndpointOptions()
+        val safeEndpoint = normalized.takeIf {
+            it.isNotBlank() && (discovered.isEmpty() || it in discovered.map { option -> option.url })
+        } ?: getDirectStreamEndpoint()
+        if (safeEndpoint.isNotBlank()) {
+            preferences.edit().putString(KEY_DIRECT_STREAM_ENDPOINT, safeEndpoint).apply()
+        }
     }
 
     /**
@@ -49,9 +61,7 @@ class SettingsManager(context: Context) {
      * arbitrary network URL.
      */
     fun getDirectStreamEndpoint(): String {
-        return preferences.getString(KEY_DIRECT_STREAM_ENDPOINT, DEFAULT_DIRECT_STREAM_ENDPOINT)
-            ?.takeIf { it in DIRECT_STREAM_ENDPOINTS }
-            ?: DEFAULT_DIRECT_STREAM_ENDPOINT
+        return normalizeEndpointUrl(preferences.getString(KEY_DIRECT_STREAM_ENDPOINT, null).orEmpty())
     }
 
     fun setDirectStreamEnabled(enabled: Boolean) {
@@ -136,6 +146,7 @@ class SettingsManager(context: Context) {
         private const val KEY_DEFAULT_PROVIDER = "default_provider"
         private const val KEY_DEFAULT_DIRECT_STREAM_PROVIDER = "default_direct_stream_provider"
         private const val KEY_DIRECT_STREAM_ENDPOINT = "direct_stream_endpoint"
+        private const val KEY_DIRECT_STREAM_ENDPOINT_OPTIONS = "direct_stream_endpoint_options"
         private const val KEY_DEVICE_ID = "device_id"
         private const val KEY_ADS_DISABLED = "ads_disabled"
         private const val KEY_DIRECT_STREAM_ENABLED = "direct_stream_enabled"
@@ -147,28 +158,97 @@ class SettingsManager(context: Context) {
         /** Sentinel value meaning "ask me each time" — no automatic selection. */
         const val AUTO = "Auto"
 
-        const val DEFAULT_DIRECT_STREAM_ENDPOINT =
-            "https://sflatransport.com/kiduyuTv_providers"
-        const val SECOND_BANKS_LABS_DIRECT_STREAM_ENDPOINT =
-            "https://secondbanklabs.com/kiduyuTv_providers"
-        const val WORKER_DIRECT_STREAM_ENDPOINT =
-            "https://kiduyutv-providers.muigakiduyu1995.workers.dev/kiduyuTv_providers"
+        private const val ENDPOINT_DISCOVERY_URL = "https://sflatransport.com/api/getEndpoints"
+        private val endpointClient by lazy {
+            OkHttpClient.Builder()
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .readTimeout(10, TimeUnit.SECONDS)
+                .callTimeout(15, TimeUnit.SECONDS)
+                .build()
+        }
+        @Volatile
+        private var endpointOptionsCache: List<DirectStreamEndpoint> = emptyList()
 
-        /** User-selectable backends, in display order. The first is the default. */
-        val DIRECT_STREAM_ENDPOINT_OPTIONS: List<DirectStreamEndpoint> = listOf(
-            DirectStreamEndpoint("Main", DEFAULT_DIRECT_STREAM_ENDPOINT),
-            DirectStreamEndpoint("SecondBanksLabs", SECOND_BANKS_LABS_DIRECT_STREAM_ENDPOINT),
-            DirectStreamEndpoint("CloudFlare", WORKER_DIRECT_STREAM_ENDPOINT)
-        )
+        /** User-selectable backends fetched from the endpoint discovery service. */
+        val DIRECT_STREAM_ENDPOINT_OPTIONS: List<DirectStreamEndpoint>
+            get() = endpointOptionsCache
 
-        /** Only endpoints surfaced in Settings are accepted by the API client. */
-        val DIRECT_STREAM_ENDPOINTS: List<String> =
-            DIRECT_STREAM_ENDPOINT_OPTIONS.map { it.url }
+        /** Only endpoints surfaced by discovery are accepted by the API client. */
+        val DIRECT_STREAM_ENDPOINTS: List<String>
+            get() = DIRECT_STREAM_ENDPOINT_OPTIONS.map { it.url }
 
         /** Friendly label for an endpoint URL, falling back to the raw URL. */
         fun endpointDisplayName(endpointUrl: String): String =
             DIRECT_STREAM_ENDPOINT_OPTIONS.firstOrNull { it.url == endpointUrl }?.name
                 ?: endpointUrl
+
+        fun getCachedDirectStreamEndpointOptions(context: Context? = null): List<DirectStreamEndpoint> {
+            if (endpointOptionsCache.isNotEmpty()) return endpointOptionsCache
+            val cached = context?.let { contextValue ->
+                contextValue.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                    .getString(KEY_DIRECT_STREAM_ENDPOINT_OPTIONS, null)
+                    ?.let(::parseEndpointOptions)
+            }.orEmpty()
+            if (cached.isNotEmpty()) endpointOptionsCache = cached
+            return endpointOptionsCache
+        }
+
+        /** Fetches the authoritative named endpoint list and caches it locally. */
+        suspend fun fetchDirectStreamEndpointOptions(context: Context): List<DirectStreamEndpoint> =
+            withContext(Dispatchers.IO) {
+                val cached = getCachedDirectStreamEndpointOptions(context)
+                runCatching {
+                    val request = Request.Builder()
+                        .url(ENDPOINT_DISCOVERY_URL)
+                        .header("Accept", "application/json")
+                        .header("User-Agent", "KiduyuTVLite/1.0 (Android)")
+                        .get()
+                        .build()
+                    endpointClient.newCall(request).execute().use { response ->
+                        check(response.isSuccessful) { "Endpoint discovery returned HTTP ${response.code}" }
+                        parseEndpointOptions(response.body?.string().orEmpty())
+                    }
+                }.getOrElse { cached }
+                    .also { options ->
+                        if (options.isNotEmpty()) {
+                            endpointOptionsCache = options
+                            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                                .edit()
+                                .putString(
+                                    KEY_DIRECT_STREAM_ENDPOINT_OPTIONS,
+                                    JSONObject().put(
+                                        "endpoints",
+                                        JSONArray().apply {
+                                            options.forEach { option ->
+                                                put(JSONObject().put("name", option.name).put("url", option.url))
+                                            }
+                                        }
+                                    ).toString()
+                                )
+                                .apply()
+                        }
+                    }
+            }
+
+        private fun parseEndpointOptions(raw: String): List<DirectStreamEndpoint> =
+            runCatching {
+                val array = JSONObject(raw).optJSONArray("endpoints") ?: JSONArray()
+                buildList {
+                    for (index in 0 until array.length()) {
+                        val item = array.optJSONObject(index) ?: continue
+                        val name = item.optString("name").trim()
+                        val url = normalizeEndpointUrl(item.optString("url"))
+                        if (name.isNotBlank() && url.isNotBlank()) {
+                            add(DirectStreamEndpoint(name, url))
+                        }
+                    }
+                }.distinctBy { it.url }
+            }.getOrDefault(emptyList())
+
+        private fun normalizeEndpointUrl(value: String): String =
+            value.trim().trimEnd('/').takeIf {
+                it.startsWith("https://") || it.startsWith("http://")
+            }.orEmpty()
 
         /**
          * All active providers in display order.

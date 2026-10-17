@@ -156,12 +156,18 @@ fun MobileSettingsScreen(
     var showDirectProviderPicker by remember { mutableStateOf(false) }
     var showDirectStreamEndpointPicker by remember { mutableStateOf(false) }
     var directProviderOptions by remember { mutableStateOf<List<StreamProviderChoice>>(emptyList()) }
+    var endpointOptions by remember {
+        mutableStateOf(SettingsManager.getCachedDirectStreamEndpointOptions(context))
+    }
     val settingsManager = remember(context) { SettingsManager(context) }
 
     LaunchedEffect(Unit) {
         directProviderOptions = runCatching {
             withContext(Dispatchers.IO) { StreamCatalog.enabled() }
         }.getOrElse { emptyList() }
+    }
+    LaunchedEffect(Unit) {
+        endpointOptions = SettingsManager.fetchDirectStreamEndpointOptions(context)
     }
     var directStreamEnabled by remember {
         mutableStateOf(settingsManager.isDirectStreamEnabled())
@@ -1005,7 +1011,7 @@ fun MobileSettingsScreen(
                         fontSize = 13.sp,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
-                    SettingsManager.DIRECT_STREAM_ENDPOINT_OPTIONS.forEach { option ->
+                    endpointOptions.forEach { option ->
                         val isSelected = option.url == uiState.directStreamEndpoint
                         Row(
                             modifier = Modifier
