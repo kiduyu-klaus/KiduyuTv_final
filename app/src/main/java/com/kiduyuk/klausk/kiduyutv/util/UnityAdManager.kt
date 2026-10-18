@@ -7,7 +7,7 @@ import android.view.ViewGroup
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.unity3d.ads.AdExpiredListener
 import com.unity3d.ads.BannerAd
-import com.unity3d.ads.BannerLoadConfiguration
+import com.unity3d.ads.BannerConfiguration
 import com.unity3d.ads.BannerShowListener
 import com.unity3d.ads.BannerSize
 import com.unity3d.ads.InitializationConfiguration
@@ -92,7 +92,7 @@ object UnityAdManager {
     private fun applyPendingUserConsent() {
         pendingUserConsent?.let { consent ->
             try {
-                UnityAds.setUserConsent(consent)
+                UnityAds.userConsent = consent
                 Log.i(TAG, "Unity opt-in consent updated: $consent")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to update Unity opt-in consent", e)
@@ -251,11 +251,11 @@ object UnityAdManager {
                     onFailed()
                 }
             }
-            val config = BannerLoadConfiguration.Builder(
+            val config = BannerConfiguration.Builder(
                 bannerPlacementId,
-                BannerSize(320, 50)
+                BannerSize(320, 50),
+                showListener
             )
-                .withListener(showListener)
                 .build()
             BannerAd.load(config, object : LoadListener<BannerAd> {
                 override fun onAdLoaded(ad: BannerAd?, error: UnityAdsError?) {
