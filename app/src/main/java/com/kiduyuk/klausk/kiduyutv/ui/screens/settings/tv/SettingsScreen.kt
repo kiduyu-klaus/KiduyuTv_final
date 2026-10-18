@@ -3,6 +3,7 @@ package com.kiduyuk.klausk.kiduyutv.ui.screens.settings.tv
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -37,6 +38,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Download
@@ -119,6 +121,7 @@ import com.kiduyuk.klausk.kiduyutv.util.AdManager
 import com.kiduyuk.klausk.kiduyutv.util.AuthManager
 import com.kiduyuk.klausk.kiduyutv.util.ConsentManager
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
+import com.kiduyuk.klausk.kiduyutv.util.RewardedFallbackDispatcher
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.viewmodel.LiveTvViewModel
 import com.kiduyuk.klausk.kiduyutv.viewmodel.SettingsViewModel
@@ -390,6 +393,21 @@ fun SettingsScreen(
                                 lottieAnimRes = R.raw.exit,
                                 onYes = { liveTvViewModel.clearAllLocalFavorites() }
                             ).show()
+                        },
+                        onSupportKiduyuTvClick = {
+                            (context as? Activity)?.let { activity ->
+                                RewardedFallbackDispatcher.showInterstitial(
+                                    activity = activity,
+                                    onRewarded = {
+                                        Toast.makeText(
+                                            context,
+                                            "Thank you for your support!",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    },
+                                    onDismissed = {}
+                                )
+                            }
                         }
                     )
                 }
@@ -704,7 +722,9 @@ private fun AppSettingsContent(
     firebaseItemsSynced: Int? = null,
     onSyncWithFirebaseClick: () -> Unit = {},
     // Local Favorites
-    onClearLocalFavoritesClick: () -> Unit = {}
+    onClearLocalFavoritesClick: () -> Unit = {},
+    // Support KiduyuTV
+    onSupportKiduyuTvClick: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -719,6 +739,21 @@ private fun AppSettingsContent(
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 24.dp)
         )
+
+        SettingsSectionLabel(text = "Support KiduyuTV")
+
+        SettingsActionCard(
+            description = "Support KiduyuTV by watching a short ad.",
+            buttonLabel = "Watch an Ad",
+            isLoading = false,
+            loadingLabel = "Loading ad...",
+            successMessage = "",
+            showSuccess = false,
+            icon = Icons.Default.CardGiftcard,
+            onClick = onSupportKiduyuTvClick
+        )
+
+        Spacer(modifier = Modifier.height(28.dp))
 
         if (isSignedIn) {
             SettingsSectionLabel(text = "Firebase Sync")

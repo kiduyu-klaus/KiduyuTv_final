@@ -40,6 +40,30 @@ object RewardedFallbackDispatcher {
             return
         }
 
+        fun fallBackToStandardInterstitial() {
+            Log.i(TAG, "$format fallback: no rewarded ad ready; trying standard interstitial")
+            AdEventReporter.report(
+                "reward_unlock",
+                format,
+                "none",
+                "rewarded_not_ready_fallback_interstitial"
+            )
+
+            // Keep the rewarded inventory warm for the next voluntary support request.
+            if (format == "rewarded") AdManager.preloadRewarded(activity)
+            else AdManager.preloadRewardedInterstitial(activity)
+            UnityAdManager.preloadAds(activity)
+            WortiseAdManager.preloadAds(activity)
+
+            // A standard interstitial has no reward callback. It is only an optional
+            // monetisation fallback, so completion simply returns control to the UI.
+            InterstitialFallbackDispatcher.show(
+                activity = activity,
+                placement = InterstitialFallbackDispatcher.Placement.CONTENT_TRANSITION,
+                onDismissed = onDismissed
+            )
+        }
+
         fun showAdMobOrWortise() {
             when {
                 isAdMobReady() && format == "rewarded" -> {
@@ -55,13 +79,7 @@ object RewardedFallbackDispatcher {
                     WortiseAdManager.showRewarded(activity, onRewarded, onDismissed)
                 }
                 else -> {
-                    Log.i(TAG, "$format fallback: no ad ready")
-                    AdEventReporter.report("reward_unlock", format, "none", "not_ready")
-                    onDismissed()
-                    if (format == "rewarded") AdManager.preloadRewarded(activity)
-                    else AdManager.preloadRewardedInterstitial(activity)
-                    UnityAdManager.preloadAds(activity)
-                    WortiseAdManager.preloadAds(activity)
+                    fallBackToStandardInterstitial()
                 }
             }
         }
