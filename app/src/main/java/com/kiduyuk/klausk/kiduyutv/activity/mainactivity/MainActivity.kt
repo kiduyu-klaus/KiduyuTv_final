@@ -38,6 +38,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
+import com.kiduyuk.klausk.kiduyutv.util.InterstitialFallbackDispatcher
 
 class MainActivity : ComponentActivity() {
 
@@ -83,11 +84,30 @@ class MainActivity : ComponentActivity() {
             KiduyuTvTheme {
                 val navController = rememberNavController()
                 var currentRoute by remember { mutableStateOf(startDestination) }
+                var hasReceivedInitialDestination by remember { mutableStateOf(false) }
+                var suppressNextDestinationInterstitial by remember { mutableStateOf(false) }
 
-                // Track navigation changes
+                // Every in-app destination change is a standard interstitial
+                // opportunity. The initial route is excluded, and the shared
+                // policy enforces the two-minute cross-network cooldown.
                 LaunchedEffect(navController) {
                     navController.currentBackStackEntryFlow.collect { entry ->
                         currentRoute = entry.destination.route ?: Screen.Home.route
+                        when {
+                            !hasReceivedInitialDestination -> {
+                                hasReceivedInitialDestination = true
+                            }
+                            suppressNextDestinationInterstitial -> {
+                                suppressNextDestinationInterstitial = false
+                            }
+                            else -> {
+                                InterstitialFallbackDispatcher.show(
+                                    activity = this@MainActivity,
+                                    placement = InterstitialFallbackDispatcher.Placement.CONTENT_TRANSITION,
+                                    onDismissed = {}
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -100,16 +120,31 @@ class MainActivity : ComponentActivity() {
                 DisposableEffect(navController) {
                     val callback = object : OnBackPressedCallback(true) {
                         override fun handleOnBackPressed() {
-                            // If we can pop back stack, do it. Otherwise, show exit dialog.
+                            // Show before a system-level Back transition. Compose
+                            // BackHandlers that pop directly are covered by the
+                            // destination observer above.
                             if (navController.previousBackStackEntry != null) {
-                                navController.popBackStack()
+                                suppressNextDestinationInterstitial = true
+                                InterstitialFallbackDispatcher.show(
+                                    activity = this@MainActivity,
+                                    placement = InterstitialFallbackDispatcher.Placement.CONTENT_TRANSITION,
+                                    onDismissed = { navController.popBackStack() }
+                                )
                             } else if (finishWhenRootIsPopped) {
                                 // DirectStreamActivity opens Settings in a separate task entry so
                                 // leaving Settings returns to the still-open player instead of
                                 // presenting an exit prompt from this transient MainActivity.
-                                finish()
+                                InterstitialFallbackDispatcher.show(
+                                    activity = this@MainActivity,
+                                    placement = InterstitialFallbackDispatcher.Placement.CONTENT_TRANSITION,
+                                    onDismissed = { finish() }
+                                )
                             } else {
-                                showExitConfirmationDialog()
+                                InterstitialFallbackDispatcher.show(
+                                    activity = this@MainActivity,
+                                    placement = InterstitialFallbackDispatcher.Placement.CONTENT_TRANSITION,
+                                    onDismissed = { showExitConfirmationDialog() }
+                                )
                             }
                         }
                     }
@@ -133,7 +168,14 @@ class MainActivity : ComponentActivity() {
                             navController = navController,
                             startDestination = startDestination,
                             onRootBack = {
-                                if (finishWhenRootIsPopped) finish() else showExitConfirmationDialog()
+                                InterstitialFallbackDispatcher.show(
+                                    activity = this@MainActivity,
+                                    placement = InterstitialFallbackDispatcher.Placement.CONTENT_TRANSITION,
+                                    onDismissed = {
+                                        if (finishWhenRootIsPopped) finish()
+                                        else showExitConfirmationDialog()
+                                    }
+                                )
                             }
                         )
                     } else {
@@ -141,7 +183,14 @@ class MainActivity : ComponentActivity() {
                             navController = navController,
                             startDestination = startDestination,
                             onRootBack = {
-                                if (finishWhenRootIsPopped) finish() else showExitConfirmationDialog()
+                                InterstitialFallbackDispatcher.show(
+                                    activity = this@MainActivity,
+                                    placement = InterstitialFallbackDispatcher.Placement.CONTENT_TRANSITION,
+                                    onDismissed = {
+                                        if (finishWhenRootIsPopped) finish()
+                                        else showExitConfirmationDialog()
+                                    }
+                                )
                             }
                         )
                     }

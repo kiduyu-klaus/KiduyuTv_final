@@ -7,7 +7,8 @@ import android.os.SystemClock
 object FullscreenAdPolicy {
     private const val PREFS = "ad_policy"
     private const val KEY_LAST_INTERSTITIAL = "last_interstitial_elapsed_ms"
-    private const val INTERSTITIAL_COOLDOWN_MS = 3 * 60 * 1000L
+    /** A single cross-network cap for navigation interstitials. */
+    private const val INTERSTITIAL_COOLDOWN_MS = 2 * 60 * 1000L
 
     fun canShowInterstitial(context: Context): Boolean {
         val lastShown = context.applicationContext
