@@ -2015,7 +2015,7 @@ class DirectStreamActivity : AppCompatActivity() {
 
         val dialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.providers_backend_down_title)
-            .setMessage(R.string.providers_backend_down_message)
+            .setMessage(getString(R.string.providers_backend_down_message, directStreamEndpoint))
             .setCancelable(false)
             .setPositiveButton(R.string.disable_direct_stream) { currentDialog, _ ->
                 currentDialog.dismiss()

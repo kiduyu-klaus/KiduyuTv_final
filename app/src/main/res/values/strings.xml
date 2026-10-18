@@ -30,7 +30,7 @@
     <string name="streams_failed">Could not load streams. Select to retry.</string>
     <string name="providers_backend_down_status">The providers backend is unavailable.</string>
     <string name="providers_backend_down_title">Backend site is down</string>
-    <string name="providers_backend_down_message">The KiduyuTV providers backend did not respond within 10 seconds or cannot be reached. Disable Direct Stream to choose a WebView provider, or exit the player.</string>
+    <string name="providers_backend_down_message">The KiduyuTV providers backend did not respond within 10 seconds or cannot be reached.\n\nEndpoint: %1$s\n\nDisable Direct Stream to choose a WebView provider, or exit the player.</string>
     <string name="disable_direct_stream">Disable Direct Stream</string>
     <string name="exit_player">Exit Player</string>
     <string name="buffering">Buffering…</string>
