@@ -31,7 +31,8 @@ import java.util.concurrent.atomic.AtomicReference
 @Composable
 fun WortiseNativeAdView(
     modifier: Modifier = Modifier,
-    fallbackToAdMob: Boolean = true
+    fallbackToAdMob: Boolean = true,
+    onLoadFailed: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
@@ -93,7 +94,10 @@ fun WortiseNativeAdView(
 
                         override fun onNativeFailedToLoad(error: AdError) {
                             Log.w("WortiseNativeAdView", "Native ad failed to load: ${error.message}")
-                            if (!disposed.get()) loadFailed = true
+                            if (!disposed.get()) {
+                                loadFailed = true
+                                onLoadFailed()
+                            }
                         }
 
                         override fun onNativeImpression(ad: NativeAd) {
@@ -108,6 +112,7 @@ fun WortiseNativeAdView(
                                 if (!loaderRef.get().let { it?.renderAd(adView, ad) == true }) {
                                     Log.w("WortiseNativeAdView", "Wortise native ad could not be rendered")
                                     loadFailed = true
+                                    onLoadFailed()
                                     return@post
                                 }
                                 removeAllViews()

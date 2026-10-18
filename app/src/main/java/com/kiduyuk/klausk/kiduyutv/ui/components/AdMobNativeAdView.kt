@@ -28,7 +28,8 @@ import com.kiduyuk.klausk.kiduyutv.util.AdEligibility
 @Composable
 fun AdMobNativeAdView(
     modifier: Modifier = Modifier,
-    startMuted: Boolean = true
+    startMuted: Boolean = true,
+    onLoadFailed: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val isPreviewMode = LocalInspectionMode.current
@@ -54,7 +55,8 @@ fun AdMobNativeAdView(
                     nativeAd?.destroy()
                     nativeAd = ad
                 }
-            }
+            },
+            onFailed = { onLoadFailed() }
         )
 
         onDispose {

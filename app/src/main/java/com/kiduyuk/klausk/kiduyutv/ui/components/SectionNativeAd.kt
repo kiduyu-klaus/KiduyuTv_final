@@ -42,7 +42,7 @@ fun SectionNativeAd(
         Modifier
     }
 
-    WortiseNativeAdView(
+    NativeAdFallbackDispatcher.Render(
         modifier = modifier
             .then(focusModifier)
             .fillMaxWidth()

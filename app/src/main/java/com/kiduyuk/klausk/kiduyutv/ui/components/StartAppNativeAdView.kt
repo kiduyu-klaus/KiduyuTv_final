@@ -47,7 +47,8 @@ private const val TAG = "StartAppNativeAdView"
 @Composable
 fun StartAppNativeAdView(
     modifier: Modifier = Modifier,
-    fallbackToAdMob: Boolean = true
+    fallbackToAdMob: Boolean = true,
+    onLoadFailed: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
@@ -94,6 +95,7 @@ fun StartAppNativeAdView(
                     } else if (details == null) {
                         Log.w(TAG, "Start.io native request returned no ad")
                         loadFailed = true
+                        onLoadFailed()
                     } else {
                         loadedAdRef.set(details)
                         nativeAd = details
@@ -104,7 +106,10 @@ fun StartAppNativeAdView(
             override fun onFailedToReceiveAd(ad: Ad?) {
                 Log.w(TAG, "Start.io native ad failed to load: ${ad?.errorMessage}")
                 activity.runOnUiThread {
-                    if (!disposed) loadFailed = true
+                    if (!disposed) {
+                        loadFailed = true
+                        onLoadFailed()
+                    }
                 }
             }
         })
