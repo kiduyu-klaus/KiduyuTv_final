@@ -111,9 +111,9 @@ fun WortiseNativeAdView(
                                 removeAllViews()
                                 addView(
                                     adView,
-                                    LayoutParams(
-                                        LayoutParams.MATCH_PARENT,
-                                        LayoutParams.WRAP_CONTENT
+                                    FrameLayout.LayoutParams(
+                                        FrameLayout.LayoutParams.MATCH_PARENT,
+                                        FrameLayout.LayoutParams.WRAP_CONTENT
                                     )
                                 )
                                 nativeViewRef.set(adView)
