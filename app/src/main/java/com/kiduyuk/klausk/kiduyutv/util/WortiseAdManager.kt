@@ -79,6 +79,9 @@ object WortiseAdManager {
 
     private fun shouldShowAds(context: Context): Boolean = AdEligibility.canRequestAds(context)
 
+    /** Wortise interstitials are disabled on TV devices; other formats remain available. */
+    private fun isTvDevice(context: Context): Boolean = UpdateUtil.isTvDevice(context)
+
     /**
      * Reads the Wortise App ID from the manifest <meta-data> tag.
      * Returns null if the manifest does not contain the entry.
@@ -173,7 +176,11 @@ object WortiseAdManager {
 
     private fun loadAds(context: Context) {
         if (!shouldShowAds(context) || !WortiseSdk.isInitialized) return
-        loadInterstitialAd(context)
+        if (!isTvDevice(context)) {
+            loadInterstitialAd(context)
+        } else {
+            Log.i(TAG, "TV device detected - skipping Wortise interstitial preload")
+        }
         loadRewardedAd(context)
         loadAppOpenAd(context)
         val pending = pendingBannerRequest
@@ -288,6 +295,11 @@ object WortiseAdManager {
      * Always calls [onDismissed] when done.
      */
     fun showInterstitial(activity: Activity, onDismissed: () -> Unit = {}) {
+        if (isTvDevice(activity)) {
+            Log.i(TAG, "TV device detected - skipping Wortise interstitial")
+            onDismissed()
+            return
+        }
         if (!shouldShowAds(activity)) {
             onDismissed()
             return
@@ -322,6 +334,10 @@ object WortiseAdManager {
     }
 
     private fun loadInterstitialAd(context: Context) {
+        if (isTvDevice(context)) {
+            Log.i(TAG, "TV device detected - skipping Wortise interstitial load")
+            return
+        }
         if (!isInitialised || !WortiseSdk.isInitialized ||
             interstitialAd?.isAvailable == true ||
             !interstitialLoadInProgress.compareAndSet(false, true)
