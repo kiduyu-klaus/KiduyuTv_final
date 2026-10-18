@@ -1036,12 +1036,21 @@ fun MobileSettingsScreen(
                                 )
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = option.name,
-                                color = if (isSelected) TextPrimary else TextSecondary,
-                                fontSize = 14.sp,
-                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
-                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = option.name,
+                                    color = if (isSelected) TextPrimary else TextSecondary,
+                                    fontSize = 14.sp,
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                )
+                                Text(
+                                    text = option.url,
+                                    color = TextTertiary,
+                                    fontSize = 11.sp,
+                                    lineHeight = 14.sp,
+                                    softWrap = true
+                                )
+                            }
                         }
                     }
                 }

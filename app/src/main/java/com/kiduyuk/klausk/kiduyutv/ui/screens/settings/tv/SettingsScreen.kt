@@ -1523,6 +1523,7 @@ private fun PlaybackContent(
                             rowEndpoints.forEach { option ->
                                 ProviderOptionItem(
                                     option = option.name,
+                                    subtitle = option.url,
                                     isSelected = option.url == directStreamEndpoint,
                                     onClick = { onDirectStreamEndpointSelect(option.url) },
                                     modifier = Modifier.weight(1f)
@@ -1646,6 +1647,7 @@ private fun PlaybackContent(
 @Composable
 private fun ProviderOptionItem(
     option: String,
+    subtitle: String? = null,
     isSelected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -1696,6 +1698,16 @@ private fun ProviderOptionItem(
             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
             textAlign = TextAlign.Center
         )
+        subtitle?.let { endpointUrl ->
+            Text(
+                text = endpointUrl,
+                color = TextTertiary,
+                fontSize = 10.sp,
+                lineHeight = 13.sp,
+                textAlign = TextAlign.Center,
+                softWrap = true
+            )
+        }
     }
 }
 

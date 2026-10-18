@@ -64,6 +64,33 @@ object ProvidersApi {
 
     private const val streamApiToken = BuildConfig.STREAM_API_TOKEN
 
+    private const val PROVIDERS_USER_AGENT =
+        "Mozilla/5.0 (Linux; Android 16; Pixel 10) " +
+            "AppleWebKit/537.36 (KHTML, like Gecko) " +
+            "Chrome/155.0.0.0 Mobile Safari/537.36"
+
+    /**
+     * Browser-like headers used for the health, provider-catalogue, and stream
+     * requests. Cookies are deliberately not stored here: HttpCookieStore
+     * adds the matching Cookie header after the health response sets cookies.
+     */
+    private val providerRequestHeaders = linkedMapOf(
+        "Accept-Encoding" to "gzip, deflate",
+        "Accept-Language" to "en-US,en;q=0.9,fr-FR;q=0.8,fr;q=0.7",
+        "Cache-Control" to "no-cache",
+        "Dnt" to "1",
+        "Pragma" to "no-cache",
+        "Priority" to "u=0, i",
+        "Sec-Ch-Ua" to "\"Google Chrome\";v=\"155\", \"Chromium\";v=\"155\", \"Not(A:Brand\";v=\"24\"",
+        "Sec-Ch-Ua-Mobile" to "?1",
+        "Sec-Ch-Ua-Platform" to "\"Android\"",
+        "Sec-Fetch-Dest" to "document",
+        "Sec-Fetch-Mode" to "navigate",
+        "Sec-Fetch-Site" to "same-origin",
+        "Upgrade-Insecure-Requests" to "1",
+        "User-Agent" to PROVIDERS_USER_AGENT
+    )
+
     /** Resolve the selected endpoint on every request so Settings changes apply immediately. */
     private fun currentBaseUrl(): String = runCatching {
         SettingsManager(AndroidApp.instance).getDirectStreamEndpoint()
@@ -72,6 +99,33 @@ object ProvidersApi {
     private fun resolveBaseUrl(endpoint: String?): String =
         endpoint?.trimEnd('/')?.takeIf { it in SettingsManager.DIRECT_STREAM_ENDPOINTS }
             ?: currentBaseUrl()
+
+    /**
+     * Applies the same session and request headers to every providers-backend
+     * request. HttpCookieStore captures Set-Cookie from the response and adds
+     * the matching Cookie header to subsequent requests for the same host/path.
+     */
+    private fun prepareBackendConnection(
+        connection: HttpURLConnection,
+        url: String,
+        connectTimeoutMs: Int,
+        readTimeoutMs: Int,
+        accept: String,
+        referer: String
+    ) {
+        connection.connectTimeout = connectTimeoutMs
+        connection.readTimeout = readTimeoutMs
+        connection.useCaches = false
+        connection.setRequestProperty("Accept", accept)
+        providerRequestHeaders.forEach { (name, value) ->
+            connection.setRequestProperty(name, value)
+        }
+        connection.setRequestProperty("Referer", referer)
+
+        // This reads cookies captured from earlier responses, including the
+        // /api/health response, and emits the Cookie request header.
+        HttpCookieStore.applyTo(connection, url)
+    }
 
     data class ProviderRoute(
         val providerNames: List<String>,
@@ -126,14 +180,17 @@ object ProvidersApi {
         try {
             repeat(2) { attempt ->
                 val connection = (URL(urlString).openConnection() as HttpURLConnection).apply {
-                    connectTimeout = (BACKEND_HEALTH_TIMEOUT_SECONDS * 1_000).toInt()
-                    readTimeout = (BACKEND_HEALTH_TIMEOUT_SECONDS * 1_000).toInt()
                     requestMethod = "GET"
-                    useCaches = false
-                    setRequestProperty("Accept", "application/json")
-                    setRequestProperty("User-Agent", "KiduyuTVLite/1.0 (Android)")
                 }
-                HttpCookieStore.applyTo(connection, urlString)
+                prepareBackendConnection(
+                    connection = connection,
+                    url = urlString,
+                    connectTimeoutMs = (BACKEND_HEALTH_TIMEOUT_SECONDS * 1_000).toInt(),
+                    readTimeoutMs = (BACKEND_HEALTH_TIMEOUT_SECONDS * 1_000).toInt(),
+                    accept = "text/html,application/xhtml+xml,application/xml;q=0.9," +
+                        "image/avif,image/webp,image/apng,*/*;q=0.8",
+                    referer = urlString
+                )
 
                 val status = connection.responseCode
                 HttpCookieStore.captureFrom(connection, urlString)
@@ -200,13 +257,16 @@ object ProvidersApi {
         val urlString = "$baseUrl/api/providers"
         Log.i(TAG, "GET $urlString")
         val connection = (URL(urlString).openConnection() as HttpURLConnection).apply {
-            connectTimeout = CONNECT_TIMEOUT_MS
-            readTimeout = PROVIDERS_READ_TIMEOUT_MS
             requestMethod = "GET"
-            setRequestProperty("Accept", "application/json")
-            setRequestProperty("User-Agent", "KiduyuTVLite/1.0 (Android)")
         }
-        HttpCookieStore.applyTo(connection, urlString)
+        prepareBackendConnection(
+            connection = connection,
+            url = urlString,
+            connectTimeoutMs = CONNECT_TIMEOUT_MS,
+            readTimeoutMs = PROVIDERS_READ_TIMEOUT_MS,
+            accept = "application/json",
+            referer = "$baseUrl/api/health"
+        )
         return try {
             val status = connection.responseCode
             HttpCookieStore.captureFrom(connection, urlString)
@@ -336,13 +396,16 @@ object ProvidersApi {
         Log.i(TAG, "GET $baseUrl/$pathSegment (authenticated)")
 
         val connection = (URL(urlString).openConnection() as HttpURLConnection).apply {
-            connectTimeout = CONNECT_TIMEOUT_MS
-            readTimeout = STREAMS_READ_TIMEOUT_MS
             requestMethod = "GET"
-            setRequestProperty("Accept", "application/json")
-            setRequestProperty("User-Agent", "KiduyuTVLite/1.0 (Android)")
         }
-        HttpCookieStore.applyTo(connection, urlString)
+        prepareBackendConnection(
+            connection = connection,
+            url = urlString,
+            connectTimeoutMs = CONNECT_TIMEOUT_MS,
+            readTimeoutMs = STREAMS_READ_TIMEOUT_MS,
+            accept = "application/json",
+            referer = "$baseUrl/api/providers"
+        )
 
         return try {
             val status = connection.responseCode
