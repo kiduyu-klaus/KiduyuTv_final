@@ -9,13 +9,12 @@ import androidx.compose.ui.unit.dp
 /**
  * Native in-feed placement shared by TV and mobile catalog screens.
  *
- * This is placed after two normal content sections. [AdMobNativeAdView]
- * handles consent and the user's ads-disabled preference, and remains empty
- * until a native ad is available.
+ * This is placed after two normal content sections. Wortise is preferred;
+ * AdMob is used if the Wortise native request fails.
  */
 @Composable
 fun SectionNativeAd(modifier: Modifier = Modifier) {
-    AdMobNativeAdView(
+    WortiseNativeAdView(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 16.dp)

@@ -418,6 +418,8 @@ object AdManager {
     val isRewardedReady: Boolean get() = rewardedAd != null
     val isRewardedInterstitialReady: Boolean get() = rewardedInterstitialAd != null
     val isAppOpenShowing: Boolean get() = appOpenShowing
+    val isAppOpenReady: Boolean
+        get() = appOpenAd != null && wasAppOpenLoadTimeLessThanNHoursAgo(4)
 
     // ── Rewarded Interstitial ─────────────────────────────────────────────
 

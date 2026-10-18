@@ -104,8 +104,8 @@ object ConsentManager {
      * Note on SDK API compatibility:
      * - StartApp receives consent during SDK initialization in StartAppAdManager.
      * - Unity Ads receives the applicable GDPR opt-in signal through its Privacy API.
-     * - Wortise SDK 1.7.2 uses the UMP integration implicitly — no manual
-     *   call required. We log only.
+     * - Wortise's SDK consent flow is requested after SDK initialization and
+     *   before its ad units are loaded.
      */
     private fun propagateConsentToAllNetworks(context: Context) {
         val unityOptInConsent = unityGdprOptInConsent(context)
@@ -120,9 +120,8 @@ object ConsentManager {
         UnityAdManager.updateUserConsent(unityOptInConsent)
 
         // ── Wortise ───────────────────────────────────────────────────────
-        // Wortise SDK 1.7.2 reads Google UMP consent automatically once UMP
-        // is initialised. No manual setUserConsent() call is required.
-        Log.i(TAG, "Wortise: consent handled automatically via UMP integration.")
+        // Wortise runs its own consent CMP after SDK initialization.
+        Log.i(TAG, "Wortise consent is requested after SDK initialization.")
     }
 
     /**
@@ -170,7 +169,7 @@ object ConsentManager {
             StartAppAdManager.retryInitIfEligible(activity)
             if (canRequestAds(activity)) {
                 UnityAdManager.preloadAds(activity)
-                WortiseAdManager.preloadAds(activity)
+                WortiseAdManager.retryInitIfEligible(activity)
             }
             onConsentFormDismissedListener?.onConsentFormDismissed(formError)
         }

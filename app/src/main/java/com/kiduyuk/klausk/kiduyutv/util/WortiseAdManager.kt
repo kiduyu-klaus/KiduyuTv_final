@@ -1,6 +1,5 @@
 ﻿package com.kiduyuk.klausk.kiduyutv.util
 
-// import com.wortise.ads.Reward
 import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
@@ -15,6 +14,11 @@ import com.wortise.ads.banner.BannerAd
 import com.wortise.ads.interstitial.InterstitialAd
 import com.wortise.ads.rewarded.RewardedAd
 import com.wortise.ads.rewarded.models.Reward
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import java.lang.ref.WeakReference
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Wortise Ad Manager — singleton.
@@ -25,30 +29,16 @@ import com.wortise.ads.rewarded.models.Reward
  *
  * Interstitial frequency is guarded by [FullscreenAdPolicy] (3 min globally).
  *
- * **IMPORTANT:** Replace the placeholder [AD_UNIT_…] constants with your
- * actual Wortise dashboard ad unit IDs before release.
- *
- * NOTE: this targets the current Wortise Android SDK, where the ad classes
- * are BannerAd, InterstitialAd, RewardedAd, and AppOpenAd, each with
- * a nested Listener abstract class. Errors are reported via AdError and
- * revenue events via RevenueData. Double-check the import package paths
- * for AdError, AdSize, RevenueData, and Reward against the SDK
- * version you have installed (use Android Studio's auto-import if any of
- * these don't resolve).
+ * Uses the app's configured Wortise placements for both phone and TV variants.
  */
 object WortiseAdManager {
 
     private const val TAG = "WortiseAdManager"
-    // TODO: Replace these placeholders with your real Wortise ad unit IDs
-    private const val AD_UNIT_BANNER = "90713170-a74f-4ccd-becd-324bb010b89a"
-    private const val AD_UNIT_INTERSTITIAL = "2c5fbdcc-a843-4540-90cf-e6f2ccbfb4e8"
-    private const val AD_UNIT_REWARDED = "f598ac5c-7b3a-4f83-93b5-60f84b07571b"
-    private const val AD_UNIT_APP_OPEN = "a4e27bae-7b6a-4281-8648-c7ff875c33a4"
-
-    private const val AD_UNIT_BANNER_TV = "90713170-a74f-4ccd-becd-324bb010b89a"
-    private const val AD_UNIT_INTERSTITIAL_TV = "2c5fbdcc-a843-4540-90cf-e6f2ccbfb4e8"
-    private const val AD_UNIT_REWARDED_TV = "f598ac5c-7b3a-4f83-93b5-60f84b07571b"
-    private const val AD_UNIT_APP_OPEN_TV = "2a6f017f-7585-4ddd-8443-79d9bbb9ec0c"
+    private const val AD_UNIT_APP_OPEN = "5845bc27-cc4f-4a4d-b765-92a0ce8e8322"
+    private const val AD_UNIT_BANNER = "47c5c956-d872-4246-aee5-78f87d4a94f4"
+    private const val AD_UNIT_INTERSTITIAL = "6fae5513-bc81-4186-b0a1-69204056b6de"
+    private const val AD_UNIT_NATIVE = "2a0f156a-57eb-47d5-a258-94023037c4e0"
+    private const val AD_UNIT_REWARDED = "d07aa9c3-77af-46f5-a22e-61a8f923bb2e"
     /**
      * Manifest meta-data key holding the Wortise App ID. Mirrors the entry in
      * AndroidManifest.xml:
@@ -59,7 +49,18 @@ object WortiseAdManager {
     @Volatile
     var isInitialised = false
         private set
+    @Volatile private var sdkInitialized = false
+    private val _isInitialisedState = MutableStateFlow(false)
+    val isInitialisedState: StateFlow<Boolean> = _isInitialisedState.asStateFlow()
 
+    private val initializationInProgress = AtomicBoolean(false)
+    private val consentRequestInProgress = AtomicBoolean(false)
+    private val interstitialLoadInProgress = AtomicBoolean(false)
+    private val rewardedLoadInProgress = AtomicBoolean(false)
+    private val appOpenLoadInProgress = AtomicBoolean(false)
+    @Volatile private var wortiseConsentHandled = false
+    @Volatile var isAppOpenShowing = false
+        private set
     @Volatile
     private var interstitialAd: InterstitialAd? = null
 
@@ -71,6 +72,7 @@ object WortiseAdManager {
 
     @Volatile
     private var currentBannerAd: BannerAd? = null
+    @Volatile private var pendingBannerRequest: Pair<WeakReference<Activity>, WeakReference<ViewGroup>>? = null
 
     @Volatile
     private var appContext: Context? = null
@@ -94,7 +96,7 @@ object WortiseAdManager {
 
     /**
      * Initialises the Wortise SDK and pre-loads ad units. Call once from
-     * [KiduyuTvApp.onCreate].
+     * after the app's primary UMP flow has completed.
      *
      * The Wortise SDK requires WortiseSdk.initialize(...) to be called
      * BEFORE any ad class (BannerAd, InterstitialAd, ...) is constructed,
@@ -108,59 +110,91 @@ object WortiseAdManager {
         }
         appContext = context.applicationContext
         try {
-            // 1. Initialize the SDK FIRST — required by every Wortise ad class.
-            if (!WortiseSdk.isInitialized) {
-                val appId = readWortiseAppId(context)
-                if (appId.isNullOrBlank() || appId == "DEFAULT") {
-                    Log.w(
-                        TAG,
-                        "Wortise App ID missing or placeholder ('') — " +
-                            "set 'wortiseAppId' in build.gradle. Skipping preload."
-                    )
-                    return
-                }
-                Log.i(TAG, "Initializing Wortise SDK with appId=")
-                WortiseSdk.initialize(context, appId)
-                if (!WortiseSdk.isInitialized) {
-                    Log.w(TAG, "Wortise initialization requested; SDK not ready yet")
-                    isInitialised = true
-                    return
-                }
-                Log.i(TAG, "Wortise SDK initialised")
+            if (WortiseSdk.isInitialized) {
+                onSdkInitialized(context)
+                return
             }
 
-            // 2. Now safe to construct ad classes.
-            try {
-                interstitialAd = InterstitialAd(context, AD_UNIT_INTERSTITIAL).apply {
-                    listener = createInterstitialListener(context as? Activity, null)
-                    loadAd()
-                }
-            } catch (e: com.wortise.ads.SdkNotInitializedException) {
-                Log.w(TAG, "InterstitialAd skipped — SDK init race: ${e.message}")
+            val appId = readWortiseAppId(context)
+            if (appId.isNullOrBlank()) {
+                Log.e(TAG, "Wortise App ID is missing; ad initialization aborted")
+                return
             }
-            try {
-                rewardedAd = RewardedAd(context, AD_UNIT_REWARDED).apply {
-                    listener = createRewardedListener(null, null)
-                    loadAd()
-                }
-            } catch (e: com.wortise.ads.SdkNotInitializedException) {
-                Log.w(TAG, "RewardedAd skipped — SDK init race: ${e.message}")
+            if (!initializationInProgress.compareAndSet(false, true)) return
+
+            Log.i(TAG, "Initializing Wortise SDK")
+            WortiseSdk.initialize(context.applicationContext, appId) {
+                initializationInProgress.set(false)
+                onSdkInitialized(context)
             }
-            try {
-                appOpenAd = AppOpenAd(context, AD_UNIT_APP_OPEN).apply {
-                    autoReload = true
-                    listener = createAppOpenListener(null)
-                    loadAd()
-                }
-            } catch (e: com.wortise.ads.SdkNotInitializedException) {
-                Log.w(TAG, "AppOpenAd skipped — SDK init race: ${e.message}")
-            }
-            isInitialised = true
-            Log.i(TAG, "Wortise ads pre-loaded")
         } catch (e: Exception) {
+            initializationInProgress.set(false)
             Log.e(TAG, "Wortise preload failed", e)
         }
     }
+
+    private fun onSdkInitialized(context: Context) {
+        sdkInitialized = true
+        Log.i(TAG, "Wortise SDK initialized")
+        requestWortiseConsentAndLoad(context)
+    }
+
+    private fun requestWortiseConsentAndLoad(context: Context) {
+        if (wortiseConsentHandled) {
+            activateAndLoadAds(context)
+            return
+        }
+        val activity = context as? Activity
+        if (activity == null) {
+            Log.i(TAG, "Waiting for a foreground Activity to complete Wortise consent")
+            return
+        }
+        if (activity.isFinishing || activity.isDestroyed) {
+            Log.i(TAG, "Deferring Wortise consent until an Activity is active")
+            return
+        }
+        if (!consentRequestInProgress.compareAndSet(false, true)) return
+
+        com.wortise.ads.consent.ConsentManager.requestIfRequired(activity) { shown ->
+            consentRequestInProgress.set(false)
+            wortiseConsentHandled = true
+            Log.i(TAG, "Wortise consent flow completed: shown=$shown")
+            if (shouldShowAds(activity)) {
+                activateAndLoadAds(activity.applicationContext)
+            }
+        }
+    }
+
+    private fun activateAndLoadAds(context: Context) {
+        isInitialised = true
+        _isInitialisedState.value = true
+        loadAds(context)
+    }
+
+    private fun loadAds(context: Context) {
+        if (!shouldShowAds(context) || !WortiseSdk.isInitialized) return
+        loadInterstitialAd(context)
+        loadRewardedAd(context)
+        loadAppOpenAd(context)
+        val pending = pendingBannerRequest
+        val activity = pending?.first?.get()
+        val container = pending?.second?.get()
+        if (activity != null && container != null && container.isAttachedToWindow) {
+            pendingBannerRequest = null
+            loadBanner(activity, container)
+        }
+        Log.i(TAG, "Wortise ad loads requested")
+    }
+
+    fun retryInitIfEligible(context: Context) {
+        if (!sdkInitialized || !WortiseSdk.isInitialized) {
+            preloadAds(context)
+        } else {
+            requestWortiseConsentAndLoad(context)
+        }
+    }
+
+    fun nativeAdUnitId(): String = AD_UNIT_NATIVE
 
     // ── Banner ────────────────────────────────────────────────────────────
 
@@ -172,6 +206,8 @@ object WortiseAdManager {
         if (!shouldShowAds(activity)) return
         if (!isInitialised || !WortiseSdk.isInitialized) {
             Log.w(TAG, "loadBanner skipped — Wortise SDK not initialised")
+            pendingBannerRequest = Pair(WeakReference(activity), WeakReference(container))
+            retryInitIfEligible(activity)
             return
         }
         try {
@@ -238,6 +274,7 @@ object WortiseAdManager {
     fun destroyBanner() {
         currentBannerAd?.destroy()
         currentBannerAd = null
+        pendingBannerRequest = null
     }
 
     // ── Interstitial ──────────────────────────────────────────────────────
@@ -281,15 +318,20 @@ object WortiseAdManager {
     }
 
     private fun loadInterstitialAd(context: Context) {
-        if (!isInitialised || !WortiseSdk.isInitialized) return
+        if (!isInitialised || !WortiseSdk.isInitialized ||
+            interstitialAd?.isAvailable == true ||
+            !interstitialLoadInProgress.compareAndSet(false, true)
+        ) return
         try {
             interstitialAd = InterstitialAd(context, AD_UNIT_INTERSTITIAL).apply {
                 listener = createInterstitialListener(context as? Activity, null)
                 loadAd()
             }
         } catch (e: com.wortise.ads.SdkNotInitializedException) {
+            interstitialLoadInProgress.set(false)
             Log.w(TAG, "InterstitialAd reload skipped — SDK init race: ${e.message}")
         } catch (e: Exception) {
+            interstitialLoadInProgress.set(false)
             Log.e(TAG, "Failed to load Wortise interstitial", e)
         }
     }
@@ -300,11 +342,13 @@ object WortiseAdManager {
     ): InterstitialAd.Listener {
         return object : InterstitialAd.Listener {
             override fun onInterstitialLoaded(ad: InterstitialAd) {
+                interstitialLoadInProgress.set(false)
                 Log.i(TAG, "Wortise interstitial loaded")
             }
 
             override fun onInterstitialFailedToLoad(ad: InterstitialAd, error: AdError) {
-                Log.w(TAG, "Wortise interstitial failed: ")
+                interstitialLoadInProgress.set(false)
+                Log.w(TAG, "Wortise interstitial failed: ${error.message}")
             }
 
             override fun onInterstitialShown(ad: InterstitialAd) {
@@ -322,7 +366,9 @@ object WortiseAdManager {
 
 
             override fun onInterstitialFailedToShow(ad: InterstitialAd, error: AdError) {
-                Log.w(TAG, "Wortise interstitial failed to show: ")
+                Log.w(TAG, "Wortise interstitial failed to show: ${error.message}")
+                interstitialAd = null
+                activity?.let { loadInterstitialAd(it) }
                 onDismissed?.invoke()
             }
 
@@ -382,15 +428,20 @@ object WortiseAdManager {
 
     private fun loadRewardedAd(context: Context) {
         appContext = context.applicationContext
-        if (!isInitialised || !WortiseSdk.isInitialized) return
+        if (!isInitialised || !WortiseSdk.isInitialized ||
+            rewardedAd?.isAvailable == true ||
+            !rewardedLoadInProgress.compareAndSet(false, true)
+        ) return
         try {
             rewardedAd = RewardedAd(context, AD_UNIT_REWARDED).apply {
                 listener = createRewardedListener(null, null)
                 loadAd()
             }
         } catch (e: com.wortise.ads.SdkNotInitializedException) {
+            rewardedLoadInProgress.set(false)
             Log.w(TAG, "RewardedAd reload skipped — SDK init race: ${e.message}")
         } catch (e: Exception) {
+            rewardedLoadInProgress.set(false)
             Log.e(TAG, "Failed to load Wortise rewarded", e)
         }
     }
@@ -401,11 +452,13 @@ object WortiseAdManager {
     ): RewardedAd.Listener {
         return object : RewardedAd.Listener {
             override fun onRewardedLoaded(ad: RewardedAd) {
+                rewardedLoadInProgress.set(false)
                 Log.i(TAG, "Wortise rewarded loaded")
             }
 
             override fun onRewardedFailedToLoad(ad: RewardedAd, error: AdError) {
-                Log.w(TAG, "Wortise rewarded failed: ")
+                rewardedLoadInProgress.set(false)
+                Log.w(TAG, "Wortise rewarded failed: ${error.message}")
             }
 
             override fun onRewardedImpression(ad: RewardedAd) {
@@ -417,7 +470,7 @@ object WortiseAdManager {
             }
 
             override fun onRewardedFailedToShow(ad: RewardedAd, error: AdError) {
-                Log.w(TAG, "Wortise rewarded failed to show: ")
+                Log.w(TAG, "Wortise rewarded failed to show: ${error.message}")
                 rewardedAd = null
                 appContext?.let { loadRewardedAd(it) }
                 onDismissed?.invoke()
@@ -441,28 +494,6 @@ object WortiseAdManager {
                  onRewarded?.invoke()
              }
 
-            // Depending on SDK version, the signature might be different or Reward might be in a different package.
-            // Based on error log, the expected signature is:
-            // fun onRewardedCompleted(ad: RewardedAd, reward: Reward): Unit
-            // But Reward is unresolved. Let's try to use the fully qualified name if possible or comment out if not critical.
-            // Since we don't know the exact package for Reward in 1.7.2, we'll use a more generic approach or comment it.
-
-            // The error says 'onRewardedCompleted' overrides nothing when using (RewardedAd, Reward).
-            // It also says 'Reward' is an unresolved reference.
-            // This suggests Reward is not in com.wortise.ads.
-            // Let's try to remove the override keyword and use the signature that doesn't cause a conflict.
-
-            // If both (RewardedAd, Reward) and (RewardedAd) fail to override,
-            // it's possible the method name is different or the listener doesn't have it.
-            // Let's comment it out to fix the build, as the error log explicitly said:
-            // 'onRewardedCompleted' overrides nothing.
-
-            /*
-            override fun onRewardedCompleted(ad: RewardedAd) {
-                Log.i(TAG, "Wortise rewarded completed")
-                onRewarded?.invoke()
-            }
-            */
         }
     }
 
@@ -494,7 +525,10 @@ object WortiseAdManager {
     }
 
     private fun loadAppOpenAd(context: Context) {
-        if (!isInitialised || !WortiseSdk.isInitialized) return
+        if (!isInitialised || !WortiseSdk.isInitialized ||
+            appOpenAd?.isAvailable == true ||
+            !appOpenLoadInProgress.compareAndSet(false, true)
+        ) return
         try {
             appOpenAd = AppOpenAd(context, AD_UNIT_APP_OPEN).apply {
                 autoReload = true
@@ -503,6 +537,7 @@ object WortiseAdManager {
             }
 
         } catch (e: Exception) {
+            appOpenLoadInProgress.set(false)
 
             Log.e(TAG, "Failed to load Wortise app open", e)
 
@@ -514,15 +549,18 @@ object WortiseAdManager {
     private fun createAppOpenListener(onDismissed: (() -> Unit)?): AppOpenAd.Listener {
         return object : AppOpenAd.Listener {
             override fun onAppOpenLoaded(ad: AppOpenAd) {
+                appOpenLoadInProgress.set(false)
 
                 Log.i(TAG, "Wortise app open loaded")
             }
 
             override fun onAppOpenFailedToLoad(ad: AppOpenAd, error: AdError) {
-                Log.w(TAG, "Wortise app open failed: ")
+                appOpenLoadInProgress.set(false)
+                Log.w(TAG, "Wortise app open failed: ${error.message}")
             }
 
             override fun onAppOpenShown(ad: AppOpenAd) {
+                isAppOpenShowing = true
                 Log.i(TAG, "Wortise app open shown")
             }
 
@@ -535,7 +573,8 @@ object WortiseAdManager {
             }
 
             override fun onAppOpenFailedToShow(ad: AppOpenAd, error: AdError) {
-                Log.w(TAG, "Wortise app open failed to show: ")
+                isAppOpenShowing = false
+                Log.w(TAG, "Wortise app open failed to show: ${error.message}")
                 onDismissed?.invoke()
             }
 
@@ -545,6 +584,7 @@ object WortiseAdManager {
             }
 
             override fun onAppOpenDismissed(ad: AppOpenAd) {
+                isAppOpenShowing = false
                 Log.i(TAG, "Wortise app open dismissed")
                 onDismissed?.invoke()
             }

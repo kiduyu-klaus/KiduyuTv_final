@@ -39,11 +39,12 @@ def unityBannerPlacementId = providers.gradleProperty("UNITY_ADS_BANNER_ID")
 def escapedUnityInterstitialPlacementId = unityInterstitialPlacementId.replace("\\", "\\\\").replace("\"", "\\\"")
 def escapedUnityRewardedPlacementId = unityRewardedPlacementId.replace("\\", "\\\\").replace("\"", "\\\"")
 def escapedUnityBannerPlacementId = unityBannerPlacementId.replace("\\", "\\\\").replace("\"", "\\\"")
+def wortiseAppId = "e3b208f6-4b47-45d1-8842-5eb647581cb5"
 
 android {
     namespace 'com.kiduyuk.klausk.kiduyutv'
 
-    compileSdk 35
+    compileSdk 36
 
     defaultConfig {
         applicationId "com.kiduyuk.klausk.kiduyutv"
@@ -67,7 +68,7 @@ android {
         buildConfigField "String", "UNITY_ADS_REWARDED_ID", "\"${escapedUnityRewardedPlacementId}\""
         buildConfigField "String", "UNITY_ADS_BANNER_ID", "\"${escapedUnityBannerPlacementId}\""
         manifestPlaceholders = [
-            wortiseAppId: "DEFAULT"
+            wortiseAppId: wortiseAppId
         ]
     }
 
@@ -88,7 +89,7 @@ android {
             versionNameSuffix "-phone"
             resValue "string", "app_name", "KiduyuTV"
             manifestPlaceholders = [
-                wortiseAppId: "844b2438-d532-423c-9ac1-523ca3bbc8c4",
+                wortiseAppId: wortiseAppId,
                 admobAppId: "ca-app-pub-3803477439180910~6736398964"
             ]
         }
@@ -98,7 +99,7 @@ android {
             versionNameSuffix "-tv"
             resValue "string", "app_name", "KiduyuTV"
             manifestPlaceholders = [
-                wortiseAppId: "11140b29-5f3f-4bf9-b5a8-c02d86409023",
+                wortiseAppId: wortiseAppId,
                 admobAppId: "ca-app-pub-3803477439180910~6736398964"
             ]
         }
@@ -138,9 +139,6 @@ android {
         compose true
         buildConfig true
         viewBinding true
-    }
-    composeOptions {
-        kotlinCompilerExtensionVersion '1.5.14'
     }
     kotlin {
         jvmToolchain(17)
@@ -293,7 +291,7 @@ dependencies {
     // Direct Unity Ads integration. Do not also include mediation adapters:
     // the app performs its own network fallback in AdFallbackDispatcher.
     implementation 'com.unity3d.ads:unity-ads:4.21.0'
-    implementation 'com.wortise:android-sdk:1.7.2'
+    implementation 'com.wortise:android-sdk:1.8.0'
 
 
     // ─────────────────────────────────────────────
