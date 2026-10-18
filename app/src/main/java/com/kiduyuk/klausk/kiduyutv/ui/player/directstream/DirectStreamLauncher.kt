@@ -4,7 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
-import com.kiduyuk.klausk.kiduyutv.util.AdFallbackDispatcher
+import com.kiduyuk.klausk.kiduyutv.util.InterstitialFallbackDispatcher
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -41,9 +41,9 @@ object DirectStreamLauncher {
         if (activity == null || activity.isFinishing || activity.isDestroyed) {
             openPlayer()
         } else {
-            AdFallbackDispatcher.showInterstitial(
+            InterstitialFallbackDispatcher.show(
                 activity = activity,
-                placement = AdFallbackDispatcher.AdPlacement.PLAYER_LAUNCH,
+                placement = InterstitialFallbackDispatcher.Placement.PLAYER_LAUNCH,
                 onDismissed = openPlayer
             )
         }

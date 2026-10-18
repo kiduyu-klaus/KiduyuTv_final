@@ -118,7 +118,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.SurfaceDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextSecondary
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextTertiary
-import com.kiduyuk.klausk.kiduyutv.util.AdFallbackDispatcher
+import com.kiduyuk.klausk.kiduyutv.util.RewardedFallbackDispatcher
 import com.kiduyuk.klausk.kiduyutv.util.AdManager
 import com.kiduyuk.klausk.kiduyutv.util.AuthManager
 import com.kiduyuk.klausk.kiduyutv.util.ConsentManager
@@ -850,7 +850,7 @@ fun MobileSettingsScreen(
                         subtitle = "Support us by watching a short ad",
                         onClick = {
                             if (activity != null) {
-                                AdFallbackDispatcher.showRewardedInterstitial(
+                                RewardedFallbackDispatcher.showInterstitial(
                                     activity = activity,
                                     onRewarded = {
                                         Toast.makeText(context, "Thank you for your support!", Toast.LENGTH_SHORT).show()

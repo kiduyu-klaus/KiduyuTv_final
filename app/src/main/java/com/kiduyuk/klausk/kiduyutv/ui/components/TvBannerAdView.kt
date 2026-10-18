@@ -26,16 +26,12 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LifecycleResumeEffect
-import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
-import com.google.android.gms.ads.LoadAdError
-import com.kiduyuk.klausk.kiduyutv.util.AdManager
 import com.kiduyuk.klausk.kiduyutv.util.AdUnitIds
 import com.kiduyuk.klausk.kiduyutv.util.AdEligibility
-import com.kiduyuk.klausk.kiduyutv.util.StartAppAdManager
+import com.kiduyuk.klausk.kiduyutv.util.BannerFallbackDispatcher
 import com.kiduyuk.klausk.kiduyutv.util.UnityAdManager
-import com.kiduyuk.klausk.kiduyutv.util.WortiseAdManager
 
 @Composable
 fun TvBannerAdView(modifier: Modifier = Modifier) {
@@ -67,29 +63,6 @@ fun TvBannerAdView(modifier: Modifier = Modifier) {
         AdView(context).apply {
             adUnitId = AdUnitIds.TV_BANNER
             setAdSize(AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(context, screenWidthDp))
-            adListener = object : AdListener() {
-                override fun onAdLoaded() {
-                    Log.i(TAG, "TV banner ad loaded after Start.io no-fill")
-                }
-
-                override fun onAdFailedToLoad(error: LoadAdError) {
-                    Log.w(TAG, "TV banner ad failed to load: ${error.message}")
-                    AdManager.logMetaMediationFailure("TV banner", error)
-                    val container = containerRef.value
-                    if (activity != null && container != null) {
-                        Log.i(TAG, "Loading Wortise TV banner after Unity, Start.io, and AdMob no-fill")
-                        WortiseAdManager.loadBanner(activity, container)
-                    }
-                }
-
-                override fun onAdImpression() {
-                    Log.i(TAG, "TV banner ad impression")
-                }
-
-                override fun onAdClicked() {
-                    Log.i(TAG, "TV banner ad clicked")
-                }
-            }
         }
     }
 
@@ -118,28 +91,10 @@ fun TvBannerAdView(modifier: Modifier = Modifier) {
                 if (activity == null) {
                     Log.w(TAG, "No Activity available for the banner request")
                 } else {
-                    // Unity is primary. Continue only after a real no-fill/failure.
-                    UnityAdManager.loadBanner(
+                    BannerFallbackDispatcher.load(
                         activity = activity,
                         container = bannerContainer,
-                        onFailed = {
-                            if (containerRef.value === bannerContainer) {
-                                Log.i(TAG, "Unity TV banner unavailable; loading Start.io fallback")
-                                StartAppAdManager.loadBanner(
-                                    activity = activity,
-                                    container = bannerContainer,
-                                    onLoaded = { Log.i(TAG, "TV banner served by Start.io") },
-                                    onFailed = {
-                                        if (containerRef.value === bannerContainer) {
-                                            Log.i(TAG, "Start.io TV banner unavailable; loading AdMob fallback")
-                                            removeAllViews()
-                                            addView(adView)
-                                            AdManager.loadBannerAdView(adView)
-                                        }
-                                    }
-                                )
-                            }
-                        }
+                        adMobView = adView
                     )
                 }
             }

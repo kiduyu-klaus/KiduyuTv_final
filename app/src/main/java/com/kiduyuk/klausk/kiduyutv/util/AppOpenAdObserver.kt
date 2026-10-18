@@ -54,11 +54,7 @@ class AppOpenAdObserver private constructor(private val application: Application
         if (!initialLaunchComplete) return
         currentActivity?.let { activity ->
             Log.i(TAG, "App moved to foreground, checking app open ad")
-            if (AdManager.isAppOpenReady) {
-                AdManager.showAppOpenIfAvailable(activity)
-            } else {
-                WortiseAdManager.showAppOpenIfAvailable(activity)
-            }
+            AppOpenFallbackDispatcher.show(activity)
         }
     }
 

@@ -4,8 +4,7 @@ import android.app.Activity
 import android.util.Log
 
 /**
- * TV interstitial facade — delegates to [AdFallbackDispatcher] which handles
- * the active AdMob-only ad path and enforces the 3-minute cooldown.
+ * TV interstitial facade — delegates to [InterstitialFallbackDispatcher].
  */
 object TvInterstitialManager {
 
@@ -16,10 +15,10 @@ object TvInterstitialManager {
      * Used before PlayerActivity launches on TV.
      */
     fun showAndThenLaunch(activity: Activity, onDismissed: () -> Unit) {
-        Log.i(TAG, "Requesting interstitial via AdFallbackDispatcher")
-        AdFallbackDispatcher.showInterstitial(
+        Log.i(TAG, "Requesting interstitial via InterstitialFallbackDispatcher")
+        InterstitialFallbackDispatcher.show(
             activity,
-            AdFallbackDispatcher.AdPlacement.TV_PLAYER_LAUNCH,
+            InterstitialFallbackDispatcher.Placement.TV_PLAYER_LAUNCH,
             onDismissed
         )
     }
