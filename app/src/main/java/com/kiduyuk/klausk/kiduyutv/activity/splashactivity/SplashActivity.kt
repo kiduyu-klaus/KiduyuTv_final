@@ -857,6 +857,7 @@ class SplashActivity : ComponentActivity() {
 
         val installIntent = UpdateUtil.getInstallIntent(this, apkFile)
         if (installIntent != null) {
+            AppOpenAdObserver.suppressForExternalActivity()
             installLauncher.launch(installIntent)
         } else {
             // Fallback to direct installation if intent creation fails

@@ -25,6 +25,13 @@ class AppOpenAdObserver private constructor(private val application: Application
         @Volatile
         private var initialLaunchComplete = false
 
+        /**
+         * True while the app has handed control to a system-owned screen, such as
+         * the APK installer or the "install unknown apps" permission settings.
+         */
+        @Volatile
+        private var externalActivityInProgress = false
+
         fun install(application: Application) {
             if (installed) return
             installed = true
@@ -34,6 +41,12 @@ class AppOpenAdObserver private constructor(private val application: Application
         /** Splash owns the initial route; this observer owns later foregrounds. */
         fun markInitialLaunchComplete() {
             initialLaunchComplete = true
+        }
+
+        /** Prevent app-open ads from covering a system installation flow. */
+        fun suppressForExternalActivity() {
+            externalActivityInProgress = true
+            Log.i(TAG, "App-open ads suppressed for external system activity")
         }
     }
 
@@ -51,6 +64,10 @@ class AppOpenAdObserver private constructor(private val application: Application
         AdManager.retryInitIfEligible(application)
         StartAppAdManager.retryInitIfEligible(application)
         // Wortise retry is temporarily disabled.
+        if (externalActivityInProgress) {
+            Log.i(TAG, "Skipping app-open ad while returning from system activity")
+            return
+        }
         if (!initialLaunchComplete) return
         currentActivity?.let { activity ->
             Log.i(TAG, "App moved to foreground, checking app open ad")
@@ -71,7 +88,15 @@ class AppOpenAdObserver private constructor(private val application: Application
     }
 
     override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
-    override fun onActivityResumed(activity: Activity) {}
+    override fun onActivityResumed(activity: Activity) {
+        if (externalActivityInProgress) {
+            // ProcessLifecycleOwner.onStart runs before this return activity is
+            // interactive, so clearing here keeps the return uninterrupted while
+            // allowing future ordinary foregrounds to use app-open ads again.
+            externalActivityInProgress = false
+            Log.i(TAG, "App-open ad suppression cleared after system activity")
+        }
+    }
     override fun onActivityPaused(activity: Activity) {}
     override fun onActivityStopped(activity: Activity) {}
     override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}

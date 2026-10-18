@@ -629,6 +629,7 @@ object UpdateUtil {
      */
     fun installApk(context: Context, apkFile: File) {
         try {
+            AppOpenAdObserver.suppressForExternalActivity()
             val uri = FileProvider.getUriForFile(
                 context,
                 "${context.packageName}.provider",
@@ -701,6 +702,7 @@ object UpdateUtil {
      */
     fun openInstallPermissionSettings(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            AppOpenAdObserver.suppressForExternalActivity()
             val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
                 data = Uri.parse("package:${context.packageName}")
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
