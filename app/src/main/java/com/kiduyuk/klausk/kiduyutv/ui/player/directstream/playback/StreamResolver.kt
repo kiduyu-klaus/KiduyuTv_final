@@ -46,14 +46,21 @@ class StreamResolver {
         episode: Int? = null,
         provider: StreamProviderChoice = StreamCatalog.default,
         endpoint: String? = null,
+        onHealthCheckStart: suspend () -> Unit = {},
+        onHealthCheckPassed: suspend () -> Unit = {},
+        onProviderDiscoveryStart: suspend () -> Unit = {},
+        onProviderStreamsStart: suspend (totalProviders: Int) -> Unit = {},
         onProviderProgress: suspend (index: Int, total: Int, providerName: String) -> Unit = { _, _, _ -> },
         onProviderRetry: suspend (index: Int, total: Int, providerName: String) -> Unit = { _, _, _ -> },
         onStreamProgress: suspend (fetchedCount: Int) -> Unit = {}
     ): List<StreamItem> = withContext(Dispatchers.IO) {
+        onHealthCheckStart()
         ProvidersApi.requireBackendAvailable(endpoint)
+        onHealthCheckPassed()
 
         // Use the backend's category assignments and anime route. This keeps
         // provider compatibility authoritative on the server.
+        onProviderDiscoveryStart()
         val providerRoute = ProvidersApi.providerRouteForMedia(type, tmdbId, endpoint)
         val enabledProviderNames = providerRoute.providerNames
         val requestType = providerRoute.streamType
@@ -77,6 +84,7 @@ class StreamResolver {
         }
 
         val totalProviders = providerNames.size
+        onProviderStreamsStart(totalProviders)
         val completedProviders = AtomicInteger(0)
         val fetchedStreamCount = AtomicInteger(0)
         val requestLimiter = Semaphore(MAX_CONCURRENT_PROVIDER_REQUESTS)

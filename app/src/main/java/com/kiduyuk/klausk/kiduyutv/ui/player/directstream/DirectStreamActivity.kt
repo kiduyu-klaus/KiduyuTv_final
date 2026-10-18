@@ -1941,9 +1941,7 @@ class DirectStreamActivity : AppCompatActivity() {
         handlingPlaybackError = false
         binding.btnPlayerStreams.visibility = View.GONE
         updateBottomFocusChain()
-        showProviderFetchProgress()
-        showStreamFetchCount()
-        showStatus("Fetching enabled providers", retry = false)
+        showStatus("Checking providers backend health", retry = false)
         streamJob = lifecycleScope.launch {
             val result = runCatching {
                 resolver.load(
@@ -1953,11 +1951,34 @@ class DirectStreamActivity : AppCompatActivity() {
                     episode = episode,
                     provider = provider,
                     endpoint = directStreamEndpoint,
+                    onHealthCheckStart = {
+                        withContext(Dispatchers.Main) {
+                            showStatus("Checking providers backend health", retry = false)
+                        }
+                    },
+                    onHealthCheckPassed = {
+                        withContext(Dispatchers.Main) {
+                            showStatus("Backend health check passed", retry = false)
+                        }
+                    },
+                    onProviderDiscoveryStart = {
+                        withContext(Dispatchers.Main) {
+                            showStatus("Fetching providers", retry = false)
+                        }
+                    },
+                    onProviderStreamsStart = { totalProviders ->
+                        withContext(Dispatchers.Main) {
+                            showProviderFetchProgress()
+                            showStreamFetchCount()
+                            updateProviderFetchProgress(0, totalProviders)
+                            showStatus("Fetching streams from $totalProviders providers", retry = false)
+                        }
+                    },
                     onProviderProgress = { index, total, providerName ->
                         withContext(Dispatchers.Main) {
                             updateProviderFetchProgress(index, total)
                             showStatus(
-                                "Provider $index/$total completed: $providerName\nstreams fetched",
+                                "Fetching streams · provider $index/$total completed: $providerName",
                                 retry = false
                             )
                         }
