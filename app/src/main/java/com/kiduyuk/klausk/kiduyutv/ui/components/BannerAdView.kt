@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -21,9 +23,10 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
-import com.kiduyuk.klausk.kiduyutv.util.AdUnitIds
 import com.kiduyuk.klausk.kiduyutv.util.AdEligibility
+import com.kiduyuk.klausk.kiduyutv.util.AdManager
 import com.kiduyuk.klausk.kiduyutv.util.BannerFallbackDispatcher
+import com.kiduyuk.klausk.kiduyutv.util.AdUnitIds
 import com.kiduyuk.klausk.kiduyutv.util.UnityAdManager
 import com.kiduyuk.klausk.kiduyutv.util.WortiseAdManager
 
@@ -35,8 +38,10 @@ fun BannerAdView(modifier: Modifier = Modifier) {
     val screenWidthPx = LocalWindowInfo.current.containerSize.width
     val density = LocalResources.current.displayMetrics.density
     val screenWidthDp = (screenWidthPx / density).toInt().takeIf { it > 0 } ?: 360
+    val adManagerInitialized = AdManager.isInitialisedState.collectAsState().value
+    val canRequestAds = AdEligibility.canRequestAds(context)
 
-    if (!AdEligibility.canRequestAds(context)) {
+    if (!canRequestAds && !adManagerInitialized) {
         Box(modifier = modifier)
         return
     }
@@ -67,16 +72,21 @@ fun BannerAdView(modifier: Modifier = Modifier) {
                 containerRef.value = bannerContainer
                 if (activity == null) {
                     Log.w(TAG, "No Activity available for the banner request")
-                } else {
-                    BannerFallbackDispatcher.load(
-                        activity = activity,
-                        container = bannerContainer,
-                        adMobView = adView
-                    )
                 }
             }
         }
     )
+
+    val bannerContainer = containerRef.value
+    LaunchedEffect(bannerContainer, canRequestAds, adManagerInitialized) {
+        if (activity != null && bannerContainer != null && canRequestAds) {
+            BannerFallbackDispatcher.load(
+                activity = activity,
+                container = bannerContainer,
+                adMobView = adView
+            )
+        }
+    }
 
     LifecycleResumeEffect(adView) {
         adView.resume()
