@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
@@ -67,6 +68,7 @@ import com.kiduyuk.klausk.kiduyutv.data.model.ProfileImage
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
+import com.kiduyuk.klausk.kiduyutv.ui.components.SectionNativeAd
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.rememberPhoneInterstitialBackClick
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.CardDark
@@ -461,6 +463,10 @@ val horizontalPadding = 16.dp
                 )
             }
         } else {
+            val visualRowCount = (mediaItems.size + columns - 1) / columns
+            val nativeAdCount = if (visualRowCount < 10) 1 else visualRowCount / 10
+            val itemsPerAdBlock = columns * 10
+
             // Grid layout using LazyVerticalGrid
             LazyVerticalGrid(
                 columns = GridCells.Fixed(columns),
@@ -469,16 +475,29 @@ val horizontalPadding = 16.dp
                 verticalArrangement = Arrangement.spacedBy(cardSpacing),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height((cardHeight + cardSpacing) * ((mediaItems.size + columns - 1) / columns) + 80.dp)
-            ) {
-                items(mediaItems) { mediaItem ->
-                    MobileCastMediaCard(
-                        mediaItem = mediaItem,
-                        cardWidth = cardWidth,
-                        cardHeight = cardHeight,
-                        onMovieClick = onMovieClick,
-                        onTvShowClick = onTvShowClick
+                    .height(
+                        (cardHeight + cardSpacing) * visualRowCount +
+                            220.dp * nativeAdCount + 80.dp
                     )
+            ) {
+                mediaItems.chunked(itemsPerAdBlock).forEach { mediaChunk ->
+                    items(mediaChunk) { mediaItem ->
+                        MobileCastMediaCard(
+                            mediaItem = mediaItem,
+                            cardWidth = cardWidth,
+                            cardHeight = cardHeight,
+                            onMovieClick = onMovieClick,
+                            onTvShowClick = onTvShowClick
+                        )
+                    }
+
+                    // An ad follows each full ten-row block. A shorter filmography
+                    // gets its single placement at the end instead.
+                    if (mediaChunk.size == itemsPerAdBlock || visualRowCount < 10) {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            SectionNativeAd()
+                        }
+                    }
                 }
             }
         }

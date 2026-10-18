@@ -64,6 +64,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.components.CastRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.ContentRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.CrewRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.MovieCard
+import com.kiduyuk.klausk.kiduyutv.ui.components.SectionNativeAd
 import com.kiduyuk.klausk.kiduyutv.ui.components.shimmer.TvMovieDetailSkeleton
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
@@ -511,6 +512,10 @@ fun MovieDetailScreen(
                             MovieCard(movie = movie, isSelected = isSelected, onClick = onClick)
                         }
                     }
+                }
+
+                item {
+                    SectionNativeAd(tvFocusable = true)
                 }
 
                 // Bottom spacing

@@ -56,6 +56,7 @@ import com.kiduyuk.klausk.kiduyutv.data.api.TmdbApiService
 import com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager
 import com.kiduyuk.klausk.kiduyutv.ui.components.CastRow
 import com.kiduyuk.klausk.kiduyutv.ui.components.CrewRow
+import com.kiduyuk.klausk.kiduyutv.ui.components.SectionNativeAd
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.rememberPhoneInterstitialBackClick
 import com.kiduyuk.klausk.kiduyutv.ui.components.shimmer.MobileMovieDetailSkeleton
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
@@ -440,6 +441,8 @@ fun MobileTvShowDetailScreen(
                             onItemClick = { onTvShowClick(it.id) }
                         )
                     }
+
+                    SectionNativeAd()
 
                     Spacer(modifier = Modifier.height(32.dp))
                 }

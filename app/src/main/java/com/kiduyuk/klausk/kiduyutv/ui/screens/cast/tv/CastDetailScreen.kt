@@ -79,6 +79,7 @@ import com.kiduyuk.klausk.kiduyutv.data.model.ProfileImage
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
 import com.kiduyuk.klausk.kiduyutv.ui.components.LottieLoadingView
+import com.kiduyuk.klausk.kiduyutv.ui.components.SectionNativeAd
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.CardDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.FocusBorder
@@ -553,7 +554,7 @@ private fun CastDetailContent(
                 Column(
                     verticalArrangement = Arrangement.spacedBy(spacing)
                 ) {
-                    rows.forEach { rowItems ->
+                    rows.forEachIndexed { rowIndex, rowItems ->
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(spacing),
                             modifier = Modifier.fillMaxWidth()
@@ -582,6 +583,12 @@ private fun CastDetailContent(
                             repeat(actualColumns - rowItems.size) {
                                 Spacer(modifier = Modifier.width(calculatedCardWidth))
                             }
+                        }
+
+                        // Keep ads predictable: one after every ten visual rows, or
+                        // at the bottom when the entire filmography is shorter.
+                        if ((rowIndex + 1) % 10 == 0 || (rows.size < 10 && rowIndex == rows.lastIndex)) {
+                            SectionNativeAd(tvFocusable = true)
                         }
                     }
                 }
