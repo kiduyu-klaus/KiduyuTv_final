@@ -2,6 +2,7 @@ package com.kiduyuk.klausk.kiduyutv.ui.components
 
 import android.app.Activity
 import android.util.Log
+import android.view.KeyEvent
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.compose.foundation.layout.Box
@@ -123,6 +124,21 @@ fun WortiseNativeAdView(
                                         FrameLayout.LayoutParams.WRAP_CONTENT
                                     )
                                 )
+                                // The Wortise view owns the advertiser URL;
+                                // forward a focused TV click to its SDK view.
+                                setOnClickListener { adView.performClick() }
+                                setOnKeyListener { _, keyCode, event ->
+                                    if (event.action == KeyEvent.ACTION_UP &&
+                                        (keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
+                                            keyCode == KeyEvent.KEYCODE_ENTER ||
+                                            keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER)
+                                    ) {
+                                        performClick()
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                }
                                 nativeViewRef.set(adView)
                             }
                         }

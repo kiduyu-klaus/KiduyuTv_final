@@ -2,6 +2,7 @@ package com.kiduyuk.klausk.kiduyutv.ui.components
 
 import android.view.LayoutInflater
 import android.view.View
+import android.view.KeyEvent
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.RatingBar
@@ -74,6 +75,19 @@ fun AdMobNativeAdView(
                     .inflate(R.layout.ad_native, null) as NativeAdView).apply {
                     isFocusable = true
                     isFocusableInTouchMode = true
+                    isClickable = true
+                    setOnKeyListener { _, keyCode, event ->
+                        if (event.action == KeyEvent.ACTION_UP &&
+                            (keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
+                                keyCode == KeyEvent.KEYCODE_ENTER ||
+                                keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER)
+                        ) {
+                            performClick()
+                            true
+                        } else {
+                            false
+                        }
+                    }
                 }
             },
             update = { adView ->
@@ -143,6 +157,11 @@ private fun populateNativeAdView(nativeAd: NativeAd, nativeAdView: NativeAdView)
         }
 
     nativeAdView.setNativeAd(nativeAd)
+    // NativeAdView owns the advertiser URL. Forwarding a focused TV click to
+    // the SDK CTA lets the SDK open that URL without reconstructing it here.
+    nativeAdView.setOnClickListener {
+        callToActionView.performClick()
+    }
 }
 
 private fun setTextAsset(view: TextView, value: String?) {

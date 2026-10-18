@@ -46,6 +46,6 @@ fun SectionNativeAd(
         modifier = modifier
             .then(focusModifier)
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 16.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
     )
 }

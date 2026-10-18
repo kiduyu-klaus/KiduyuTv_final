@@ -2,6 +2,7 @@ package com.kiduyuk.klausk.kiduyutv.ui.components
 
 import android.app.Activity
 import android.util.Log
+import android.view.KeyEvent
 import android.view.View
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -189,7 +190,25 @@ fun StartAppNativeAdView(
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { viewContext ->
-                    View(viewContext).also(ad::registerViewForInteraction)
+                    View(viewContext).apply {
+                        isFocusable = true
+                        isClickable = true
+                        setOnKeyListener { _, keyCode, event ->
+                            if (event.action == KeyEvent.ACTION_UP &&
+                                (keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
+                                    keyCode == KeyEvent.KEYCODE_ENTER ||
+                                    keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER)
+                            ) {
+                                performClick()
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                        // Start.io opens the advertiser URL from the
+                        // registered interaction view through its SDK handler.
+                        ad.registerViewForInteraction(this)
+                    }
                 }
             )
         }
