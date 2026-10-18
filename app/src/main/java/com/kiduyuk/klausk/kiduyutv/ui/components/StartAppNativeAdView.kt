@@ -15,7 +15,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.Text
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -142,20 +143,20 @@ fun StartAppNativeAdView(
                     Text(
                         text = ad.title,
                         color = Color.White,
-                        style = androidx.compose.material.MaterialTheme.typography.subtitle1
+                        style = MaterialTheme.typography.titleSmall
                     )
                     if (ad.category.isNotBlank()) {
                         Text(
                             text = ad.category,
                             color = Color.LightGray,
-                            style = androidx.compose.material.MaterialTheme.typography.caption
+                            style = MaterialTheme.typography.labelSmall
                         )
                     }
                     if (ad.description.isNotBlank()) {
                         Text(
                             text = ad.description,
                             color = Color.LightGray,
-                            style = androidx.compose.material.MaterialTheme.typography.body2
+                            style = MaterialTheme.typography.bodySmall
                         )
                     }
                     if (ad.callToAction.isNotBlank()) {
