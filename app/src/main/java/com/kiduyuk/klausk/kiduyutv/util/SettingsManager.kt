@@ -288,6 +288,7 @@ class SettingsManager(context: Context) {
                                 .apply()
                         }
                     }
+                fetched
             }
 
         private fun parseEndpointOptions(raw: String): List<DirectStreamEndpoint> =

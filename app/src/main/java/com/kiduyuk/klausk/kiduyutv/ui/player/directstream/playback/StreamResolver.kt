@@ -50,14 +50,7 @@ class StreamResolver {
         onProviderRetry: suspend (index: Int, total: Int, providerName: String) -> Unit = { _, _, _ -> },
         onStreamProgress: suspend (fetchedCount: Int) -> Unit = {}
     ): List<StreamItem> = withContext(Dispatchers.IO) {
-        // Health is only a preflight. Some hosts protect this lightweight
-        // endpoint more aggressively than their authenticated API routes, so
-        // a failed health check must not prevent provider discovery and stream
-        // extraction from being attempted.
-        runCatching { ProvidersApi.requireBackendAvailable(endpoint) }
-            .onFailure { error ->
-                Log.w(tag, "Providers health check failed; continuing with provider discovery", error)
-            }
+        ProvidersApi.requireBackendAvailable(endpoint)
 
         // Use the backend's category assignments and anime route. This keeps
         // provider compatibility authoritative on the server.
