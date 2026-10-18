@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -22,6 +23,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.navArgument
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.data.model.CastMember
@@ -68,6 +70,12 @@ fun NavGraph(
     startDestination: String = Screen.Home.route,
     onRootBack: () -> Unit = {}
 ) {
+    val activeRoute = navController.currentBackStackEntryAsState()
+        .value
+        ?.destination
+        ?.route
+        ?: startDestination
+
     Box(modifier = Modifier.fillMaxSize()) {
         NavHost(
             navController = navController,
@@ -698,12 +706,15 @@ fun NavGraph(
 
         }
 
-        // Overlay a non-intrusive banner at the bottom of every TV destination.
-        // TvBannerAdView uses AdMob with Unity Ads and Start.io fallbacks.
+        // Scope each banner to its destination. Keying it to the current route
+        // disposes the previous network view and starts a new request through
+        // BannerFallbackDispatcher for the screen that is now visible.
         if (BuildConfig.FLAVOR == "tv") {
-            TvBannerAdView(
-                modifier = Modifier.align(Alignment.BottomCenter)
-            )
+            key(activeRoute) {
+                TvBannerAdView(
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                )
+            }
         }
     }
 }

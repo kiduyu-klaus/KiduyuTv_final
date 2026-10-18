@@ -16,6 +16,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -89,21 +90,21 @@ fun MobileBottomNavigation(
             }
         }
 
-        // Show banner ad only on phone flavour, and only if the user has not
-        // disabled ads in settings. We host BannerAdView directly inside the
-        // Compose hierarchy (no intermediate FrameLayout / ComposeView) and
-        // let it measure to its natural adaptive height — previous code
-        // clamped the container to 60.dp which clipped wider adaptive banners.
+        // The banner is owned by the active phone destination rather than
+        // surviving navigation between bottom-nav screens. BannerAdView uses
+        // BannerFallbackDispatcher (Unity → Start.io → AdMob → Wortise).
         val context = LocalContext.current
         if (BuildConfig.FLAVOR == "phone" &&
             !SettingsManager(context).isAdsDisabled()
         ) {
-            BannerAdView(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .wrapContentHeight()
-                    .background(Color(0xFF141414))
-            )
+            key(currentRoute) {
+                BannerAdView(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .wrapContentHeight()
+                        .background(Color(0xFF141414))
+                )
+            }
         }
     }
 }

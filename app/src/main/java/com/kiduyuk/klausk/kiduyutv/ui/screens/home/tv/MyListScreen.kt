@@ -821,7 +821,10 @@ fun MyListScreen(
                     }
                 }
             } else {
-                val adChunks = currentList.chunked((actualColumns * 10).coerceAtLeast(1))
+                // Keep the in-feed cadence independent of the number of grid
+                // columns. Using `actualColumns * 10` delayed the first
+                // placement by as many as 80 cards on wide TV layouts.
+                val adChunks = currentList.chunked(10)
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(actualColumns),
                     state = gridState,
@@ -830,7 +833,7 @@ fun MyListScreen(
                     horizontalArrangement = Arrangement.spacedBy(spacing),
                     verticalArrangement = Arrangement.spacedBy(spacing)
                 ) {
-                    adChunks.forEachIndexed { chunkIndex, chunk ->
+                    adChunks.forEach { chunk ->
                         items(
                             items = chunk,
                             key = { item -> "${item.type}:${item.id}" }
@@ -983,10 +986,12 @@ fun MyListScreen(
                             }
                         }
                     }
-                    if (chunkIndex < adChunks.lastIndex) {
-                            item(span = { GridItemSpan(maxLineSpan) }) {
-                                SectionNativeAd(tvFocusable = true)
-                            }
+                    // Insert after each complete group of ten cards. A shorter
+                    // list still receives one unobtrusive placement at its end.
+                    if (chunk.size == 10 || currentList.size < 10) {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            SectionNativeAd(tvFocusable = true)
+                        }
                     }
                     }
 
