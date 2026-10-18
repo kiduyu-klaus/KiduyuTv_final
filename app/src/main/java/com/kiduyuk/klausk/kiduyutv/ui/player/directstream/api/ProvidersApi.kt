@@ -12,16 +12,12 @@ import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.SubtitleItem
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.normalizeStreamLanguage
 import com.kiduyuk.klausk.kiduyutv.util.UrlUtils
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
-import okhttp3.CacheControl
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
 import java.net.URL
 import java.util.Locale
-import java.util.concurrent.TimeUnit
 
 class ProvidersApiHttpException(val statusCode: Int) : IOException("Providers API HTTP $statusCode")
 
@@ -55,6 +51,7 @@ object ProvidersApi {
     private const val CONNECT_TIMEOUT_MS = 30_000
     private const val PROVIDERS_READ_TIMEOUT_MS = 30_000
     private const val BACKEND_HEALTH_TIMEOUT_SECONDS = 10L
+    private const val BACKEND_VERIFICATION_WAIT_MS = 5_000L
     private const val ANIMATION_GENRE_ID = 16
     private const val MOVIES_TV_CATEGORY = "moviestv"
     private const val ANIME_CATEGORY = "anime"
@@ -97,16 +94,22 @@ object ProvidersApi {
         val originalLanguage: String?
     )
 
-    private val backendHealthClient by lazy {
-        OkHttpClient.Builder()
-            // callTimeout bounds DNS, connection, TLS, request and response as
-            // one operation. A pair of HttpURLConnection timeouts could take
-            // up to twice the requested health-check limit.
-            .callTimeout(BACKEND_HEALTH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .connectTimeout(BACKEND_HEALTH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .readTimeout(BACKEND_HEALTH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-            .build()
-    }
+    /**
+     * Last-resort catalog used when a WAF prevents `/api/providers` from being
+     * read. Keep this to enabled providers only; the server catalog remains
+     * authoritative whenever it can be reached.
+     */
+    private val fallbackEnabledProviders = listOf(
+        "4khdhub", "barbarian", "bower", "byse", "castletv", "cinejoy", "cinejoytv",
+        "cinesrc", "cinestream", "dahmermovies", "desiflix", "framextv", "hdmovie2",
+        "meowtv", "miner", "moviesdrive1", "netmirror", "onetouchtv", "playimdb",
+        "showbox", "titan", "valkyrie", "vaplayer", "vidbox", "videasy", "vidfast",
+        "vidlink", "vidrock"
+    ).map { EnabledProvider(it, listOf(MOVIES_TV_CATEGORY)) } + listOf(
+        "allwish", "anikoto", "animekai", "animekhor", "animeonsen", "animesalt",
+        "anizone", "flixcloud", "hianime", "kickassanime", "reanime"
+    ).map { EnabledProvider(it, listOf(ANIME_CATEGORY)) } +
+        EnabledProvider("moviebox", listOf(MOVIES_TV_CATEGORY, ANIME_CATEGORY))
 
     /**
      * Verifies that the configured providers backend is reachable and is the
@@ -120,22 +123,36 @@ object ProvidersApi {
         val baseUrl = resolveBaseUrl(endpoint)
         val urlString = "$baseUrl/api/health"
         Log.i(TAG, "Checking providers backend health")
-        val request = Request.Builder()
-            .url(urlString)
-            .get()
-            .cacheControl(CacheControl.FORCE_NETWORK)
-            .header("Accept", "application/json")
-            .header("User-Agent", "KiduyuTVLite/1.0 (Android)")
-            .build()
         try {
-            backendHealthClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
+            repeat(2) { attempt ->
+                val connection = (URL(urlString).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = (BACKEND_HEALTH_TIMEOUT_SECONDS * 1_000).toInt()
+                    readTimeout = (BACKEND_HEALTH_TIMEOUT_SECONDS * 1_000).toInt()
+                    requestMethod = "GET"
+                    useCaches = false
+                    setRequestProperty("Accept", "application/json")
+                    setRequestProperty("User-Agent", "KiduyuTVLite/1.0 (Android)")
+                }
+                HttpCookieStore.applyTo(connection, urlString)
+
+                val status = connection.responseCode
+                HttpCookieStore.captureFrom(connection, urlString)
+                val body = (if (status in 200..299) connection.inputStream else connection.errorStream)
+                    ?.bufferedReader()?.use { it.readText() }.orEmpty()
+                connection.disconnect()
+
+                if (isVerificationInterstitial(status, body) && attempt == 0) {
+                    Log.i(TAG, "Providers backend verification page received; retrying in 5 seconds")
+                    Thread.sleep(BACKEND_VERIFICATION_WAIT_MS)
+                    return@repeat
+                }
+
+                if (status !in 200..299) {
                     throw ProvidersBackendUnavailableException(
-                        "Providers backend health check returned HTTP ${response.code}"
+                        "Providers backend health check returned HTTP $status"
                     )
                 }
 
-                val body = response.body?.string().orEmpty()
                 val isHealthy = runCatching { JSONObject(body).optBoolean("ok", false) }
                     .getOrDefault(false)
                 if (!isHealthy) {
@@ -143,6 +160,7 @@ object ProvidersApi {
                         "Providers backend returned an invalid health response"
                     )
                 }
+                return
             }
             Log.i(TAG, "Providers backend health check passed")
         } catch (error: ProvidersBackendUnavailableException) {
@@ -158,6 +176,18 @@ object ProvidersApi {
                 error
             )
         }
+    }
+
+    /** Identifies the short-lived WAF page returned before the real API response. */
+    private fun isVerificationInterstitial(status: Int, body: String): Boolean {
+        val normalizedBody = body.lowercase(Locale.ROOT)
+        return (status == HttpURLConnection.HTTP_FORBIDDEN ||
+            status == HttpURLConnection.HTTP_UNAVAILABLE ||
+            status in 200..299) &&
+            ("please wait while your request is being verified" in normalizedBody ||
+                "just a moment" in normalizedBody ||
+                "challenge-platform" in normalizedBody ||
+                "cf-chl-" in normalizedBody)
     }
 
     /**
@@ -223,6 +253,13 @@ object ProvidersApi {
             Log.i(TAG, "Enabled providers (${catalog.size}): " +
                 catalog.joinToString { "${it.name}:${it.categories.joinToString("/")}" })
             catalog
+        } catch (error: Exception) {
+            Log.w(
+                TAG,
+                "Could not retrieve /api/providers; using bundled enabled-provider fallback (${fallbackEnabledProviders.size})",
+                error
+            )
+            fallbackEnabledProviders
         } finally {
             connection.disconnect()
         }
