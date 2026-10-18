@@ -283,6 +283,7 @@ class CloudflareBypassActivity : AppCompatActivity() {
                 if (isFinishing || isDestroyed) return@post
                 isDownloadLocked = true
                 if (isDahmerMoviesDownloadFlow()) {
+                    setDownloadLockBottomBarVisible(false)
                     scrollDownloadLockPageToFortyPercent()
                 }
                 // The lock page is authoritative. It may be reached after
@@ -302,6 +303,7 @@ class CloudflareBypassActivity : AppCompatActivity() {
             mainHandler.post {
                 if (isFinishing || isDestroyed) return@post
                 isDownloadLocked = false
+                setDownloadLockBottomBarVisible(true)
                 setStatus(
                     if (completeOnUnlock) {
                         "✓ Unlocked! Returning to player…"
@@ -1219,6 +1221,19 @@ class CloudflareBypassActivity : AppCompatActivity() {
     /** Returns true for the DahmerMovies interactive download-lock flow. */
     private fun isDahmerMoviesDownloadFlow(): Boolean =
         waitForDownload && targetHost.equals("p.111477.xyz", ignoreCase = true)
+
+    /** Removes the footer from the CAPTCHA viewport while the lock is active. */
+    private fun setDownloadLockBottomBarVisible(visible: Boolean) {
+        if (::statusView.isInitialized) {
+            statusView.visibility = if (visible) View.VISIBLE else View.GONE
+        }
+        if (::webView.isInitialized) {
+            (webView.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
+                params.bottomMargin = if (visible) dp(12) else 0
+                webView.layoutParams = params
+            }
+        }
+    }
 
     /** Scrolls the DahmerMovies lock page until its CAPTCHA answers are visible. */
     private fun scrollDownloadLockPageToFortyPercent() {
