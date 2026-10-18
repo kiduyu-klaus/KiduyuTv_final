@@ -1220,29 +1220,53 @@ class CloudflareBypassActivity : AppCompatActivity() {
     private fun isDahmerMoviesDownloadFlow(): Boolean =
         waitForDownload && targetHost.equals("p.111477.xyz", ignoreCase = true)
 
-    /** Scrolls the DahmerMovies lock page far enough to expose its CAPTCHA. */
+    /** Scrolls the DahmerMovies lock page until its CAPTCHA answers are visible. */
     private fun scrollDownloadLockPageToFortyPercent() {
         if (downloadLockPageScrolled || !::webView.isInitialized) return
         downloadLockPageScrolled = true
-        webView.postDelayed({
-            if (isFinishing || isDestroyed || !::webView.isInitialized) return@postDelayed
-            webView.evaluateJavascript(
-                """
-                (function() {
-                    var documentHeight = Math.max(
-                        document.body ? document.body.scrollHeight : 0,
-                        document.documentElement ? document.documentElement.scrollHeight : 0
-                    );
-                    var viewportHeight = window.innerHeight || 0;
-                    var maxScroll = Math.max(0, documentHeight - viewportHeight);
-                    window.scrollTo({ top: maxScroll * 0.40, left: 0, behavior: 'smooth' });
-                    return maxScroll * 0.40;
-                })();
-                """.trimIndent()
-            ) { result ->
-                Log.i(TAG, "DahmerMovies download-lock page scrolled to 40%: $result")
-            }
-        }, 250L)
+        val scrollScript = """
+            (function() {
+                var choices = document.querySelector('.choices');
+                if (choices) {
+                    choices.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' });
+                    return 'choices';
+                }
+
+                var controls = Array.from(document.querySelectorAll(
+                    'button, input[type="button"], input[type="submit"], [role="button"]'
+                )).filter(function(element) {
+                    var style = window.getComputedStyle(element);
+                    var rect = element.getBoundingClientRect();
+                    return style.display !== 'none' && style.visibility !== 'hidden' &&
+                        rect.width > 0 && rect.height > 0;
+                });
+                var target = controls.length ? controls[0] : null;
+                if (target) {
+                    target.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' });
+                    return 'control:' + target.tagName;
+                }
+
+                var documentHeight = Math.max(
+                    document.body ? document.body.scrollHeight : 0,
+                    document.documentElement ? document.documentElement.scrollHeight : 0
+                );
+                var viewportHeight = window.innerHeight || 0;
+                var maxScroll = Math.max(0, documentHeight - viewportHeight);
+                window.scrollTo({ top: maxScroll * 0.45, left: 0, behavior: 'auto' });
+                return 'fallback:' + (maxScroll * 0.45);
+            })();
+        """.trimIndent()
+
+        // The CAPTCHA controls can be inserted after the lock heading. Repeat
+        // after the initial render and after the page's scripts settle.
+        listOf(250L, 700L, 1_300L).forEach { delayMs ->
+            webView.postDelayed({
+                if (isFinishing || isDestroyed || !::webView.isInitialized) return@postDelayed
+                webView.evaluateJavascript(scrollScript) { result ->
+                    Log.i(TAG, "DahmerMovies download-lock CAPTCHA autoscroll: $result")
+                }
+            }, delayMs)
+        }
     }
 
     /**
