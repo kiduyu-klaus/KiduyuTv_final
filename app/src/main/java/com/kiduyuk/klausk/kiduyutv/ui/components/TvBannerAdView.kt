@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -38,23 +36,19 @@ import com.kiduyuk.klausk.kiduyutv.util.AdUnitIds
 import com.kiduyuk.klausk.kiduyutv.util.AdEligibility
 import com.kiduyuk.klausk.kiduyutv.util.StartAppAdManager
 import com.kiduyuk.klausk.kiduyutv.util.UnityAdManager
+import com.kiduyuk.klausk.kiduyutv.util.WortiseAdManager
 
 @Composable
 fun TvBannerAdView(modifier: Modifier = Modifier) {
     val isPreviewMode = LocalInspectionMode.current
     val focusManager = LocalFocusManager.current
     val context: Context = LocalContext.current
-    // Start.io is the first leg here, so mounting must not depend on AdMob: an
-    // AdMob init failure would otherwise remove the network we try first.
-    // Either SDK coming up re-runs this composable and the load starts.
-    val isAdMobReady by AdManager.isInitialisedState.collectAsState()
-    val isStartAppReady by StartAppAdManager.isInitialisedState.collectAsState()
     val activity = context as? Activity
     val screenWidthPx = LocalWindowInfo.current.containerSize.width
     val density = LocalResources.current.displayMetrics.density
     val screenWidthDp = (screenWidthPx / density).toInt().takeIf { it > 0 } ?: 360
 
-    if (!AdEligibility.canRequestAds(context) || (!isAdMobReady && !isStartAppReady)) {
+    if (!AdEligibility.canRequestAds(context)) {
         Box(modifier = modifier)
         return
     }
@@ -84,8 +78,8 @@ fun TvBannerAdView(modifier: Modifier = Modifier) {
                     AdManager.logMetaMediationFailure("TV banner", error)
                     val container = containerRef.value
                     if (activity != null && container != null) {
-                        Log.i(TAG, "Loading Unity TV banner after Start.io and AdMob no-fill")
-                        UnityAdManager.loadBanner(activity, container)
+                        Log.i(TAG, "Loading Wortise TV banner after Unity, Start.io, and AdMob no-fill")
+                        WortiseAdManager.loadBanner(activity, container)
                     }
                 }
 
@@ -125,17 +119,26 @@ fun TvBannerAdView(modifier: Modifier = Modifier) {
                 if (activity == null) {
                     Log.w(TAG, "No Activity available for the banner request")
                 } else {
-                    // Keep the persistent TV placement Start.io-first as well.
-                    StartAppAdManager.loadBanner(
+                    // Unity is primary. Continue only after a real no-fill/failure.
+                    UnityAdManager.loadBanner(
                         activity = activity,
                         container = bannerContainer,
-                        onLoaded = { Log.i(TAG, "TV banner served by Start.io") },
                         onFailed = {
                             if (containerRef.value === bannerContainer) {
-                                Log.i(TAG, "Start.io TV banner unavailable; loading AdMob fallback")
-                                removeAllViews()
-                                addView(adView)
-                                adView.loadAd(AdRequest.Builder().build())
+                                Log.i(TAG, "Unity TV banner unavailable; loading Start.io fallback")
+                                StartAppAdManager.loadBanner(
+                                    activity = activity,
+                                    container = bannerContainer,
+                                    onLoaded = { Log.i(TAG, "TV banner served by Start.io") },
+                                    onFailed = {
+                                        if (containerRef.value === bannerContainer) {
+                                            Log.i(TAG, "Start.io TV banner unavailable; loading AdMob fallback")
+                                            removeAllViews()
+                                            addView(adView)
+                                            adView.loadAd(AdRequest.Builder().build())
+                                        }
+                                    }
+                                )
                             }
                         }
                     )

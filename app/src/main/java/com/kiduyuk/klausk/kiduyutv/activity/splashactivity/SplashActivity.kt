@@ -75,6 +75,7 @@ import com.kiduyuk.klausk.kiduyutv.util.StartAppAdManager
 import com.kiduyuk.klausk.kiduyutv.util.AdManager
 import com.kiduyuk.klausk.kiduyutv.util.AppOpenAdObserver
 import com.kiduyuk.klausk.kiduyutv.util.UnityAdManager
+import com.kiduyuk.klausk.kiduyutv.util.WortiseAdManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -308,6 +309,7 @@ class SplashActivity : ComponentActivity() {
         ConsentManager.requestConsent(this) {
             StartAppAdManager.preloadAds(this@SplashActivity)
             UnityAdManager.preloadAds(this@SplashActivity)
+            WortiseAdManager.preloadAds(this@SplashActivity)
             // AdManager.init schedules MobileAds.initialize and returns
             // immediately — the actual SDK-ready callback fires later.
             // We must wait for that callback before allowing the splash

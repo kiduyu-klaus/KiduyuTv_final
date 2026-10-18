@@ -305,14 +305,18 @@ object UnityAdManager {
      * Shows a Unity interstitial if one is ready and the cooldown has elapsed.
      * Always calls [onDismissed] when done.
      */
-    fun showInterstitial(activity: Activity, onDismissed: () -> Unit = {}) {
+    fun showInterstitial(
+        activity: Activity,
+        onDismissed: () -> Unit = {},
+        onUnavailable: (() -> Unit)? = null
+    ) {
         if (!shouldShowAds(activity)) {
             onDismissed()
             return
         }
         if (!isInitialised || !UnityAds.isInitialized) {
             Log.i(TAG, "Unity interstitial skipped - SDK not initialized")
-            onDismissed()
+            onUnavailable?.invoke() ?: onDismissed()
             preloadAds(activity)
             return
         }
@@ -322,7 +326,7 @@ object UnityAdManager {
         }
         if (!isInterstitialReady) {
             Log.i(TAG, "Unity interstitial not ready")
-            onDismissed()
+            onUnavailable?.invoke() ?: onDismissed()
             requestInterstitial()
             return
         }
@@ -340,7 +344,7 @@ object UnityAdManager {
                     ) {
                         Log.w(TAG, "Unity interstitial show failed: $message")
                         requestInterstitial()
-                        onDismissed()
+                        onUnavailable?.invoke() ?: onDismissed()
                     }
 
                     override fun onUnityAdsShowStart(placementId: String) {
@@ -365,7 +369,7 @@ object UnityAdManager {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to show Unity interstitial", e)
             requestInterstitial()
-            onDismissed()
+            onUnavailable?.invoke() ?: onDismissed()
         }
     }
 
@@ -379,7 +383,8 @@ object UnityAdManager {
     fun showRewarded(
         activity: Activity,
         onRewarded: () -> Unit = {},
-        onDismissed: () -> Unit = {}
+        onDismissed: () -> Unit = {},
+        onUnavailable: (() -> Unit)? = null
     ) {
         if (!shouldShowAds(activity)) {
             onDismissed()
@@ -387,13 +392,13 @@ object UnityAdManager {
         }
         if (!isInitialised || !UnityAds.isInitialized) {
             Log.i(TAG, "Unity rewarded skipped - SDK not initialized")
-            onDismissed()
+            onUnavailable?.invoke() ?: onDismissed()
             preloadAds(activity)
             return
         }
         if (!isRewardedReady) {
             Log.i(TAG, "Unity rewarded not ready")
-            onDismissed()
+            onUnavailable?.invoke() ?: onDismissed()
             requestRewarded()
             return
         }
@@ -411,7 +416,7 @@ object UnityAdManager {
                     ) {
                         Log.w(TAG, "Unity rewarded show failed: $message")
                         requestRewarded()
-                        onDismissed()
+                        onUnavailable?.invoke() ?: onDismissed()
                     }
 
                     override fun onUnityAdsShowStart(placementId: String) {
@@ -438,7 +443,7 @@ object UnityAdManager {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to show Unity rewarded", e)
             requestRewarded()
-            onDismissed()
+            onUnavailable?.invoke() ?: onDismissed()
         }
     }
 }

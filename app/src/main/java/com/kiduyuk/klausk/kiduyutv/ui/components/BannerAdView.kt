@@ -29,6 +29,7 @@ import com.kiduyuk.klausk.kiduyutv.util.AdUnitIds
 import com.kiduyuk.klausk.kiduyutv.util.AdEligibility
 import com.kiduyuk.klausk.kiduyutv.util.StartAppAdManager
 import com.kiduyuk.klausk.kiduyutv.util.UnityAdManager
+import com.kiduyuk.klausk.kiduyutv.util.WortiseAdManager
 
 @Composable
 fun BannerAdView(modifier: Modifier = Modifier) {
@@ -69,8 +70,8 @@ fun BannerAdView(modifier: Modifier = Modifier) {
                     AdManager.logMetaMediationFailure("phone banner", error)
                     val container = containerRef.value
                     if (activity != null && container != null) {
-                        Log.i(TAG, "Loading Unity phone banner after Start.io and AdMob no-fill")
-                        UnityAdManager.loadBanner(activity, container)
+                        Log.i(TAG, "Loading Wortise phone banner after Unity, Start.io, and AdMob no-fill")
+                        WortiseAdManager.loadBanner(activity, container)
                     }
                 }
 
@@ -94,18 +95,26 @@ fun BannerAdView(modifier: Modifier = Modifier) {
                 if (activity == null) {
                     Log.w(TAG, "No Activity available for the banner request")
                 } else {
-                    // Start.io is the primary banner network. Only add AdMob after
-                    // Start.io reports a failure, keeping exactly one banner visible.
-                    StartAppAdManager.loadBanner(
+                    // Unity is primary. Continue only after a real no-fill/failure.
+                    UnityAdManager.loadBanner(
                         activity = activity,
                         container = bannerContainer,
-                        onLoaded = { Log.i(TAG, "Phone banner served by Start.io") },
                         onFailed = {
                             if (containerRef.value === bannerContainer) {
-                                Log.i(TAG, "Start.io phone banner unavailable; loading AdMob fallback")
-                                removeAllViews()
-                                addView(adView)
-                                adView.loadAd(AdRequest.Builder().build())
+                                Log.i(TAG, "Unity phone banner unavailable; loading Start.io fallback")
+                                StartAppAdManager.loadBanner(
+                                    activity = activity,
+                                    container = bannerContainer,
+                                    onLoaded = { Log.i(TAG, "Phone banner served by Start.io") },
+                                    onFailed = {
+                                        if (containerRef.value === bannerContainer) {
+                                            Log.i(TAG, "Start.io phone banner unavailable; loading AdMob fallback")
+                                            removeAllViews()
+                                            addView(adView)
+                                            adView.loadAd(AdRequest.Builder().build())
+                                        }
+                                    }
+                                )
                             }
                         }
                     )

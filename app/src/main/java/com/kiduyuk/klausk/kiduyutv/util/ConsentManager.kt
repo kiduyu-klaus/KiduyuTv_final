@@ -177,6 +177,9 @@ object ConsentManager {
             // now rather than waiting for the next process foreground.
             AdManager.retryInitIfEligible(activity)
             StartAppAdManager.retryInitIfEligible(activity)
+            if (canRequestAds(activity)) {
+                WortiseAdManager.preloadAds(activity)
+            }
             onConsentFormDismissedListener?.onConsentFormDismissed(formError)
         }
     }

@@ -8,7 +8,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * Unified ad dispatcher.
  *
- * Provides a single entry-point for Start.io, AdMob, and Unity Ads. Only one
+ * Provides a single entry-point for Unity Ads, Start.io, AdMob, and Wortise. Only one
  * network is shown for each request, so enabling both SDKs never produces
  * stacked interstitials or banners.
  *
@@ -21,7 +21,7 @@ object AdFallbackDispatcher {
 
     // ── Interstitial ──────────────────────────────────────────────────────
 
-    /** Shows Start.io first, then ready AdMob and Unity fallback inventory. */
+    /** Shows Unity first, then Start.io, AdMob, and Wortise fallback inventory. */
     fun showInterstitial(activity: Activity, onDismissed: () -> Unit) {
         showInterstitial(activity, AdPlacement.CONTENT_TRANSITION, onDismissed)
     }
@@ -48,34 +48,47 @@ object AdFallbackDispatcher {
             complete()
             return
         }
-        fun showReadyFallback() {
+        fun showAdMobOrWortise() {
             if (!fallbackStarted.compareAndSet(false, true)) return
             if (AdManager.isInterstitialReady) {
                 Log.i(TAG, "Interstitial flow: AdMob fallback")
                 AdEventReporter.report(placement.name, "interstitial", "admob", "show_requested")
                 AdManager.showInterstitial(activity, complete)
-            } else if (UnityAdManager.isInterstitialReady) {
-                Log.i(TAG, "Interstitial flow: Unity Ads fallback")
-                AdEventReporter.report(placement.name, "interstitial", "unity", "show_requested")
-                UnityAdManager.showInterstitial(activity, complete)
+            } else if (WortiseAdManager.isInterstitialReady) {
+                Log.i(TAG, "Interstitial flow: Wortise fallback")
+                AdEventReporter.report(placement.name, "interstitial", "wortise", "show_requested")
+                WortiseAdManager.showInterstitial(activity, complete)
             } else {
                 Log.i(TAG, "Interstitial flow: no ad ready; continuing immediately")
                 AdEventReporter.report(placement.name, "interstitial", "none", "not_ready")
                 complete()
                 AdManager.preloadInterstitial(activity)
                 UnityAdManager.preloadAds(activity)
+                WortiseAdManager.preloadAds(activity)
             }
         }
 
-        // Start.io is the primary full-screen network. Unlike the other SDKs it
-        // loads on demand, so only advance to a fallback after it reports no fill.
-        Log.i(TAG, "Interstitial flow: Start.io primary")
-        AdEventReporter.report(placement.name, "interstitial", "startio", "show_requested")
-        StartAppAdManager.showInterstitial(
-            activity = activity,
-            onDismissed = complete,
-            onUnavailable = ::showReadyFallback
-        )
+        fun showStartIoOrFallback() {
+            Log.i(TAG, "Interstitial flow: Start.io fallback")
+            AdEventReporter.report(placement.name, "interstitial", "startio", "show_requested")
+            StartAppAdManager.showInterstitial(
+                activity = activity,
+                onDismissed = complete,
+                onUnavailable = ::showAdMobOrWortise
+            )
+        }
+
+        if (UnityAdManager.isInterstitialReady) {
+            Log.i(TAG, "Interstitial flow: Unity primary")
+            AdEventReporter.report(placement.name, "interstitial", "unity", "show_requested")
+            UnityAdManager.showInterstitial(
+                activity = activity,
+                onDismissed = complete,
+                onUnavailable = ::showStartIoOrFallback
+            )
+        } else {
+            showStartIoOrFallback()
+        }
     }
 
     // ── Rewarded ──────────────────────────────────────────────────────────
@@ -95,19 +108,43 @@ object AdFallbackDispatcher {
         if (!AdEligibility.canRequestAds(activity)) {
             AdEventReporter.report("reward_unlock", "rewarded", "none", "suppressed_ineligible")
             complete()
-        } else if (AdManager.isRewardedReady) {
-            Log.i(TAG, "Rewarded flow: AdMob")
-            AdManager.showRewarded(activity, onRewarded, complete)
-        } else if (UnityAdManager.isRewardedReady) {
-            Log.i(TAG, "Rewarded flow: Unity Ads fallback")
-            UnityAdManager.showRewarded(activity, onRewarded, complete)
         } else {
-            // Do not make a user wait while Start.io fetches an on-demand ad.
-            Log.i(TAG, "Rewarded flow: no ready ad")
-            AdEventReporter.report("reward_unlock", "rewarded", "none", "not_ready")
-            complete()
-            AdManager.preloadRewarded(activity)
-            UnityAdManager.preloadAds(activity)
+            fun showAdMobOrWortise() {
+                if (AdManager.isRewardedReady) {
+                    Log.i(TAG, "Rewarded flow: AdMob fallback")
+                    AdManager.showRewarded(activity, onRewarded, complete)
+                } else if (WortiseAdManager.isRewardedReady) {
+                    Log.i(TAG, "Rewarded flow: Wortise fallback")
+                    WortiseAdManager.showRewarded(activity, onRewarded, complete)
+                } else {
+                    Log.i(TAG, "Rewarded flow: no ad ready")
+                    AdEventReporter.report("reward_unlock", "rewarded", "none", "not_ready")
+                    complete()
+                    AdManager.preloadRewarded(activity)
+                    UnityAdManager.preloadAds(activity)
+                    WortiseAdManager.preloadAds(activity)
+                }
+            }
+            fun showStartIoOrFallback() {
+                Log.i(TAG, "Rewarded flow: Start.io fallback")
+                StartAppAdManager.showRewarded(
+                    activity = activity,
+                    onRewarded = onRewarded,
+                    onDismissed = complete,
+                    onUnavailable = ::showAdMobOrWortise
+                )
+            }
+            if (UnityAdManager.isRewardedReady) {
+                Log.i(TAG, "Rewarded flow: Unity primary")
+                UnityAdManager.showRewarded(
+                    activity = activity,
+                    onRewarded = onRewarded,
+                    onDismissed = complete,
+                    onUnavailable = ::showStartIoOrFallback
+                )
+            } else {
+                showStartIoOrFallback()
+            }
         }
     }
 
@@ -123,18 +160,43 @@ object AdFallbackDispatcher {
         if (!AdEligibility.canRequestAds(activity)) {
             AdEventReporter.report("reward_unlock", "rewarded_interstitial", "none", "suppressed_ineligible")
             complete()
-        } else if (AdManager.isRewardedInterstitialReady) {
-            Log.i(TAG, "Rewarded interstitial flow: AdMob")
-            AdManager.showRewardedInterstitial(activity, onRewarded, complete)
-        } else if (UnityAdManager.isRewardedReady) {
-            Log.i(TAG, "Rewarded interstitial flow: Unity rewarded fallback")
-            UnityAdManager.showRewarded(activity, onRewarded, complete)
         } else {
-            Log.i(TAG, "Rewarded interstitial flow: no ready ad")
-            AdEventReporter.report("reward_unlock", "rewarded_interstitial", "none", "not_ready")
-            complete()
-            AdManager.preloadRewardedInterstitial(activity)
-            UnityAdManager.preloadAds(activity)
+            fun showAdMobOrWortise() {
+                if (AdManager.isRewardedInterstitialReady) {
+                    Log.i(TAG, "Rewarded interstitial flow: AdMob fallback")
+                    AdManager.showRewardedInterstitial(activity, onRewarded, complete)
+                } else if (WortiseAdManager.isRewardedReady) {
+                    Log.i(TAG, "Rewarded interstitial flow: Wortise fallback")
+                    WortiseAdManager.showRewarded(activity, onRewarded, complete)
+                } else {
+                    Log.i(TAG, "Rewarded interstitial flow: no ad ready")
+                    AdEventReporter.report("reward_unlock", "rewarded_interstitial", "none", "not_ready")
+                    complete()
+                    AdManager.preloadRewardedInterstitial(activity)
+                    UnityAdManager.preloadAds(activity)
+                    WortiseAdManager.preloadAds(activity)
+                }
+            }
+            fun showStartIoOrFallback() {
+                Log.i(TAG, "Rewarded interstitial flow: Start.io fallback")
+                StartAppAdManager.showRewarded(
+                    activity = activity,
+                    onRewarded = onRewarded,
+                    onDismissed = complete,
+                    onUnavailable = ::showAdMobOrWortise
+                )
+            }
+            if (UnityAdManager.isRewardedReady) {
+                Log.i(TAG, "Rewarded interstitial flow: Unity primary")
+                UnityAdManager.showRewarded(
+                    activity = activity,
+                    onRewarded = onRewarded,
+                    onDismissed = complete,
+                    onUnavailable = ::showStartIoOrFallback
+                )
+            } else {
+                showStartIoOrFallback()
+            }
         }
     }
 

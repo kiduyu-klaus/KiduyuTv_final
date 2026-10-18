@@ -243,7 +243,8 @@ object StartAppAdManager {
     fun showRewarded(
         activity: Activity,
         onRewarded: () -> Unit = {},
-        onDismissed: () -> Unit = {}
+        onDismissed: () -> Unit = {},
+        onUnavailable: (() -> Unit)? = null
     ) {
         if (!shouldShowAds(activity)) {
             onDismissed()
@@ -251,7 +252,7 @@ object StartAppAdManager {
         }
         if (!isInitialised) preloadAds(activity)
         if (!isInitialised) {
-            onDismissed()
+            onUnavailable?.invoke() ?: onDismissed()
             return
         }
         try {
@@ -282,19 +283,19 @@ object StartAppAdManager {
 
                         override fun adNotDisplayed(ad: Ad?) {
                             Log.w(TAG, "StartApp rewarded not displayed")
-                            onDismissed()
+                            onUnavailable?.invoke() ?: onDismissed()
                         }
                     })
                 }
 
                 override fun onFailedToReceiveAd(ad: Ad?) {
                     Log.w(TAG, "StartApp rewarded failed")
-                    onDismissed()
+                    onUnavailable?.invoke() ?: onDismissed()
                 }
             })
         } catch (e: Exception) {
             Log.e(TAG, "Failed to show StartApp rewarded", e)
-            onDismissed()
+            onUnavailable?.invoke() ?: onDismissed()
         }
     }
 
