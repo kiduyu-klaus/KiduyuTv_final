@@ -211,7 +211,11 @@ object WortiseAdManager {
             return
         }
         try {
-            currentBannerAd?.destroy()
+            // Always release the previous SDK view before replacing it. Wortise
+            // registers an Activity receiver for each BannerAd, so retaining a
+            // stale instance causes an IntentReceiver leak when that Activity
+            // is destroyed during navigation.
+            destroyBanner()
             container.removeAllViews()
 
             val bannerAd = BannerAd(activity).apply {

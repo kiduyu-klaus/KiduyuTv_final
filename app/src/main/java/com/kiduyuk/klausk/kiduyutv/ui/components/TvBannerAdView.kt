@@ -32,6 +32,7 @@ import com.kiduyuk.klausk.kiduyutv.util.AdUnitIds
 import com.kiduyuk.klausk.kiduyutv.util.AdEligibility
 import com.kiduyuk.klausk.kiduyutv.util.BannerFallbackDispatcher
 import com.kiduyuk.klausk.kiduyutv.util.UnityAdManager
+import com.kiduyuk.klausk.kiduyutv.util.WortiseAdManager
 
 @Composable
 fun TvBannerAdView(modifier: Modifier = Modifier) {
@@ -109,6 +110,7 @@ fun TvBannerAdView(modifier: Modifier = Modifier) {
     DisposableEffect(adView) {
         onDispose {
             UnityAdManager.destroyBanner()
+            WortiseAdManager.destroyBanner()
             containerRef.value?.removeAllViews()
             containerRef.value = null
             adView.destroy()
