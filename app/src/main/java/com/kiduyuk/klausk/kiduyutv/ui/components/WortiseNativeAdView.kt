@@ -21,10 +21,10 @@ import com.kiduyuk.klausk.kiduyutv.util.AdEligibility
 import com.kiduyuk.klausk.kiduyutv.util.WortiseAdManager
 import com.wortise.ads.AdError
 import com.wortise.ads.RevenueData
-import com.wortise.ads.nativead.NativeAd
-import com.wortise.ads.nativead.NativeAdLoader
-import com.wortise.ads.nativead.NativeAdView
-import com.wortise.ads.nativead.NativeAdViewBinder
+import com.wortise.ads.natives.NativeAd
+import com.wortise.ads.natives.NativeAdLoader
+import com.wortise.ads.natives.NativeAdView
+import com.wortise.ads.natives.NativeAdViewBinder
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
