@@ -8,7 +8,6 @@ import com.google.android.ump.ConsentInformation
 import com.google.android.ump.ConsentRequestParameters
 import com.google.android.ump.FormError
 import com.google.android.ump.UserMessagingPlatform
-import com.unity3d.ads.metadata.MetaData
 
 /**
  * Manages GDPR consent using Google's User Messaging Platform (UMP).
@@ -104,13 +103,13 @@ object ConsentManager {
      *
      * Note on SDK API compatibility:
      * - StartApp receives consent during SDK initialization in StartAppAdManager.
-     * - Unity Ads uses the `MetaData` "gdpr.consent" / "privacy.consent" keys.
+     * - Unity Ads receives the applicable GDPR opt-in signal through its Privacy API.
      * - Wortise SDK 1.7.2 uses the UMP integration implicitly — no manual
      *   call required. We log only.
      */
     private fun propagateConsentToAllNetworks(context: Context) {
-        val canPersonalize = canShowPersonalizedAds(context)
-        Log.i(TAG, "Propagating consent to all networks: personalize=$canPersonalize")
+        val unityOptInConsent = unityGdprOptInConsent(context)
+        Log.i(TAG, "Propagating consent to all networks: unityGdprOptIn=$unityOptInConsent")
 
         // ── StartApp ──────────────────────────────────────────────────────
         // Applied explicitly rather than left to SDK initialisation, so a consent
@@ -118,15 +117,7 @@ object ConsentManager {
         StartAppAdManager.applyConsent(context)
 
         // ── Unity Ads ─────────────────────────────────────────────────────
-        try {
-            MetaData(context).apply {
-                set("gdpr.consent", if (canPersonalize) "true" else "false")
-                set("privacy.consent", if (canPersonalize) "true" else "false")
-                commit()
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to forward consent to Unity: ${e.message}")
-        }
+        UnityAdManager.updateUserConsent(unityOptInConsent)
 
         // ── Wortise ───────────────────────────────────────────────────────
         // Wortise SDK 1.7.2 reads Google UMP consent automatically once UMP
@@ -178,6 +169,7 @@ object ConsentManager {
             AdManager.retryInitIfEligible(activity)
             StartAppAdManager.retryInitIfEligible(activity)
             if (canRequestAds(activity)) {
+                UnityAdManager.preloadAds(activity)
                 WortiseAdManager.preloadAds(activity)
             }
             onConsentFormDismissedListener?.onConsentFormDismissed(formError)
@@ -187,18 +179,30 @@ object ConsentManager {
     /**
      * Checks if personalized ads are allowed based on UMP consent.
      */
-    fun canShowPersonalizedAds(context: Context): Boolean {
+    fun canShowPersonalizedAds(context: Context): Boolean =
+        unityGdprOptInConsent(context) == true
+
+    private fun unityGdprOptInConsent(context: Context): Boolean? {
         return try {
-            val info = UserMessagingPlatform.getConsentInformation(context)
-            // canRequestAds returns true when either:
-            // 1. User consented to personalized ads
-            // 2. User is not in EEA (no consent required)
-            // 3. User consented to non-personalized ads
-            // For a stricter check, inspect the consent string directly.
-            info.canRequestAds()
+            val preferences = context.getSharedPreferences(
+                "${context.packageName}_preferences",
+                Context.MODE_PRIVATE
+            )
+            if (preferences.all["IABTCF_gdprApplies"]?.toString() != "1") {
+                return null
+            }
+            val purposeConsents = preferences.all["IABTCF_PurposeConsents"]?.toString()
+            // Purposes 1, 3, and 4 cover storage/access and personalized ad creation/selection.
+            val consentGranted = purposeConsents?.let {
+                it.getOrNull(0) == '1' && it.getOrNull(2) == '1' && it.getOrNull(3) == '1'
+            } ?: false
+            if (!consentGranted) {
+                Log.i(TAG, "Unity GDPR opt-in not present in UMP TCF purpose consents")
+            }
+            consentGranted
         } catch (e: Exception) {
-            Log.w(TAG, "Error checking personalized consent: ${e.message}")
-            true
+            Log.w(TAG, "Unable to read Unity GDPR opt-in from UMP consent state", e)
+            false
         }
     }
 

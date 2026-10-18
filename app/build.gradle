@@ -26,6 +26,7 @@ def unityAdsGameId = providers.gradleProperty("UNITY_ADS_GAME_ID")
 def unityAdsTestMode = providers.gradleProperty("UNITY_ADS_TEST_MODE")
         .orElse(providers.environmentVariable("UNITY_ADS_TEST_MODE"))
         .getOrElse("false")
+def escapedUnityAdsGameId = unityAdsGameId.replace("\\", "\\\\").replace("\"", "\\\"")
 def unityInterstitialPlacementId = providers.gradleProperty("UNITY_ADS_INTERSTITIAL_ID")
         .orElse(providers.environmentVariable("UNITY_ADS_INTERSTITIAL_ID"))
         .getOrElse("Interstitial_Android")
@@ -60,12 +61,12 @@ android {
         buildConfigField "String", "OPENSUBTITLES_API_KEY", "\"${escapedOpenSubtitlesApiKey}\""
         buildConfigField "String", "STREAM_API_TOKEN", "\"${escapedStreamApiToken}\""
         buildConfigField "String", "START_IO_APP_ID", "\"${startIoAppId}\""
+        buildConfigField "String", "UNITY_ADS_GAME_ID", "\"${escapedUnityAdsGameId}\""
+        buildConfigField "boolean", "UNITY_ADS_TEST_MODE", "${unityAdsTestMode.toBoolean()}"
         buildConfigField "String", "UNITY_ADS_INTERSTITIAL_ID", "\"${escapedUnityInterstitialPlacementId}\""
         buildConfigField "String", "UNITY_ADS_REWARDED_ID", "\"${escapedUnityRewardedPlacementId}\""
         buildConfigField "String", "UNITY_ADS_BANNER_ID", "\"${escapedUnityBannerPlacementId}\""
         manifestPlaceholders = [
-            unityAdsGameId: unityAdsGameId,
-            unityAdsTestMode: unityAdsTestMode,
             wortiseAppId: "DEFAULT"
         ]
     }
@@ -87,8 +88,6 @@ android {
             versionNameSuffix "-phone"
             resValue "string", "app_name", "KiduyuTV"
             manifestPlaceholders = [
-                unityAdsGameId: unityAdsGameId,
-                unityAdsTestMode: unityAdsTestMode,
                 wortiseAppId: "844b2438-d532-423c-9ac1-523ca3bbc8c4",
                 admobAppId: "ca-app-pub-3803477439180910~6736398964"
             ]
@@ -99,8 +98,6 @@ android {
             versionNameSuffix "-tv"
             resValue "string", "app_name", "KiduyuTV"
             manifestPlaceholders = [
-                unityAdsGameId: unityAdsGameId,
-                unityAdsTestMode: unityAdsTestMode,
                 wortiseAppId: "11140b29-5f3f-4bf9-b5a8-c02d86409023",
                 admobAppId: "ca-app-pub-3803477439180910~6736398964"
             ]
@@ -295,7 +292,7 @@ dependencies {
     implementation 'com.startapp:inapp-sdk:5.3.1'
     // Direct Unity Ads integration. Do not also include mediation adapters:
     // the app performs its own network fallback in AdFallbackDispatcher.
-    implementation 'com.unity3d.ads:unity-ads:4.19.0'
+    implementation 'com.unity3d.ads:unity-ads:4.21.0'
     implementation 'com.wortise:android-sdk:1.7.2'
 
 

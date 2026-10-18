@@ -2,19 +2,29 @@ package com.kiduyuk.klausk.kiduyutv.util
 
 import android.app.Activity
 import android.content.Context
-import android.content.pm.PackageManager
 import android.util.Log
 import android.view.ViewGroup
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
-import com.unity3d.ads.IUnityAdsInitializationListener
-import com.unity3d.ads.IUnityAdsLoadListener
-import com.unity3d.ads.IUnityAdsShowListener
+import com.unity3d.ads.AdExpiredListener
+import com.unity3d.ads.BannerAd
+import com.unity3d.ads.BannerLoadConfiguration
+import com.unity3d.ads.BannerShowListener
+import com.unity3d.ads.BannerSize
+import com.unity3d.ads.InitializationConfiguration
+import com.unity3d.ads.InitializationListener
+import com.unity3d.ads.InterstitialAd
+import com.unity3d.ads.InterstitialShowListener
+import com.unity3d.ads.LoadConfiguration
+import com.unity3d.ads.LoadListener
+import com.unity3d.ads.RewardedAd
+import com.unity3d.ads.RewardedShowListener
+import com.unity3d.ads.ShowConfiguration
+import com.unity3d.ads.ShowFinishState
+import com.unity3d.ads.UnityAdsError
+import com.unity3d.ads.UnityAdsExperimental
 import com.unity3d.ads.UnityAds
-import com.unity3d.ads.UnityAdsShowOptions
-import com.unity3d.services.banners.BannerErrorInfo
-import com.unity3d.services.banners.BannerView
-import com.unity3d.services.banners.UnityBannerSize
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Unity Ads Manager — singleton.
@@ -25,12 +35,15 @@ import java.util.concurrent.atomic.AtomicBoolean
  *
  * Interstitial frequency is guarded by [FullscreenAdPolicy] (3 min globally).
  */
+@OptIn(UnityAdsExperimental::class)
 object UnityAdManager {
 
     private const val TAG = "UnityAdManager"
-    private const val UNITY_GAME_ID_META = "com.unity3d.ads.UNITY_ADS_GAME_ID"
-    private const val UNITY_TEST_MODE_META = "com.unity3d.ads.UNITY_ADS_TEST_MODE"
 
+    private val gameId: String
+        get() = BuildConfig.UNITY_ADS_GAME_ID
+    private val testMode: Boolean
+        get() = BuildConfig.UNITY_ADS_TEST_MODE
     private val rewardedPlacementId: String
         get() = BuildConfig.UNITY_ADS_REWARDED_ID
     private val interstitialPlacementId: String
@@ -41,93 +54,50 @@ object UnityAdManager {
     private val initializationInProgress = AtomicBoolean(false)
     private val interstitialLoadInProgress = AtomicBoolean(false)
     private val rewardedLoadInProgress = AtomicBoolean(false)
+    private val interstitialShowing = AtomicBoolean(false)
+    private val rewardedShowing = AtomicBoolean(false)
+    private val bannerGeneration = AtomicInteger(0)
+    @Volatile private var pendingUserConsent: Boolean? = null
 
     @Volatile
     var isInitialised = false
         private set
 
     @Volatile
-    private var currentBannerView: BannerView? = null
-
-    // Tracking states manually since UnityAds.isReady() was removed
-    @Volatile
-    private var _isInterstitialReady = false
+    private var currentBannerAd: BannerAd? = null
 
     @Volatile
-    private var _isRewardedReady = false
+    private var interstitialAd: InterstitialAd? = null
+
+    @Volatile
+    private var rewardedAd: RewardedAd? = null
 
     val isInterstitialReady: Boolean
-        get() = _isInterstitialReady
+        get() = interstitialAd != null
 
     val isRewardedReady: Boolean
-        get() = _isRewardedReady
-
-    // Central listener implementation for handling ad load events
-    private val loadListener = object : IUnityAdsLoadListener {
-        override fun onUnityAdsAdLoaded(placementId: String) {
-            Log.i(TAG, "Unity ad successfully loaded: $placementId")
-            when (placementId) {
-                interstitialPlacementId -> {
-                    interstitialLoadInProgress.set(false)
-                    _isInterstitialReady = true
-                }
-                rewardedPlacementId -> {
-                    rewardedLoadInProgress.set(false)
-                    _isRewardedReady = true
-                }
-            }
-        }
-
-        override fun onUnityAdsFailedToLoad(
-            placementId: String,
-            error: UnityAds.UnityAdsLoadError,
-            message: String
-        ) {
-            Log.w(TAG, "Unity ad failed to load: $placementId, error: $error, message: $message")
-            when (placementId) {
-                interstitialPlacementId -> {
-                    interstitialLoadInProgress.set(false)
-                    _isInterstitialReady = false
-                }
-                rewardedPlacementId -> {
-                    rewardedLoadInProgress.set(false)
-                    _isRewardedReady = false
-                }
-            }
-        }
-    }
+        get() = rewardedAd != null
 
     private fun shouldShowAds(context: Context): Boolean = AdEligibility.canRequestAds(context)
 
-    private fun readUnityGameId(context: Context): String? = try {
-        val ai = context.packageManager.getApplicationInfo(
-            context.packageName,
-            PackageManager.GET_META_DATA
-        )
-        // Android stores a numeric manifest placeholder as an Integer. Unity's
-        // game id is logically a string, so accept either manifest representation.
-        ai.metaData?.get(UNITY_GAME_ID_META)
-            ?.toString()
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
-    } catch (e: Exception) {
-        Log.w(TAG, "Failed to read Unity game id from manifest", e)
-        null
+    /**
+     * Applies UMP's opt-in signal once Unity is initialized, or retains it until initialization.
+     * A null value means no opt-in framework applies and no Unity signal should be sent.
+     */
+    fun updateUserConsent(userConsent: Boolean?) {
+        pendingUserConsent = userConsent
+        if (isInitialised) applyPendingUserConsent()
     }
 
-    private fun readUnityTestMode(context: Context): Boolean = try {
-        val ai = context.packageManager.getApplicationInfo(
-            context.packageName,
-            PackageManager.GET_META_DATA
-        )
-        when (val value = ai.metaData?.get(UNITY_TEST_MODE_META)) {
-            is Boolean -> value
-            is String -> value.equals("true", ignoreCase = true)
-            else -> false
+    private fun applyPendingUserConsent() {
+        pendingUserConsent?.let { consent ->
+            try {
+                UnityAds.setUserConsent(consent)
+                Log.i(TAG, "Unity opt-in consent updated: $consent")
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to update Unity opt-in consent", e)
+            }
         }
-    } catch (e: Exception) {
-        Log.w(TAG, "Failed to read Unity test mode from manifest", e)
-        false
     }
 
     /**
@@ -139,15 +109,13 @@ object UnityAdManager {
             return
         }
         try {
-            if (UnityAds.isInitialized) {
+            if (isInitialised) {
                 initializationInProgress.set(false)
-                isInitialised = true
                 loadFullscreenPlacements()
                 return
             }
 
-            val gameId = readUnityGameId(context)
-            if (gameId.isNullOrBlank()) {
+            if (gameId.isBlank()) {
                 Log.w(TAG, "Unity game id missing - skipping preload")
                 return
             }
@@ -157,30 +125,24 @@ object UnityAdManager {
                 return
             }
 
-            UnityAds.initialize(
-                context.applicationContext,
-                gameId,
-                readUnityTestMode(context),
-                object : IUnityAdsInitializationListener {
-                    override fun onInitializationComplete() {
-                        initializationInProgress.set(false)
-                        isInitialised = true
-                        Log.i(TAG, "Unity Ads initialized")
-                        loadFullscreenPlacements()
-                    }
-
-                    override fun onInitializationFailed(
-                        error: UnityAds.UnityAdsInitializationError,
-                        message: String
-                    ) {
-                        initializationInProgress.set(false)
-                        isInitialised = false
-                        _isInterstitialReady = false
-                        _isRewardedReady = false
-                        Log.w(TAG, "Unity initialization failed: $error, message: $message")
-                    }
+            val configuration = InitializationConfiguration.Builder(gameId)
+                .withTestMode(testMode)
+                .build()
+            UnityAds.initialize(configuration, InitializationListener { error ->
+                if (error == null) {
+                    initializationInProgress.set(false)
+                    isInitialised = true
+                    Log.i(TAG, "Unity Ads initialized")
+                    applyPendingUserConsent()
+                    loadFullscreenPlacements()
+                } else {
+                    initializationInProgress.set(false)
+                    isInitialised = false
+                    interstitialAd = null
+                    rewardedAd = null
+                    Log.w(TAG, "Unity initialization failed: $error")
                 }
-            )
+            })
             Log.i(TAG, "Unity Ads initialization requested")
         } catch (e: Exception) {
             initializationInProgress.set(false)
@@ -195,9 +157,29 @@ object UnityAdManager {
     }
 
     private fun requestInterstitial() {
-        if (_isInterstitialReady || !interstitialLoadInProgress.compareAndSet(false, true)) return
+        if (!isInitialised || interstitialShowing.get() || interstitialAd != null ||
+            !interstitialLoadInProgress.compareAndSet(false, true)
+        ) return
         try {
-            UnityAds.load(interstitialPlacementId, loadListener)
+            val config = LoadConfiguration.Builder(interstitialPlacementId).build()
+            InterstitialAd.load(config, object : LoadListener<InterstitialAd> {
+                override fun onAdLoaded(ad: InterstitialAd?, error: UnityAdsError?) {
+                    interstitialLoadInProgress.set(false)
+                    if (ad == null) {
+                        Log.w(TAG, "Unity interstitial failed to load: $error")
+                        return
+                    }
+                    interstitialAd = ad
+                    ad.onAdExpired = AdExpiredListener {
+                        if (interstitialAd === ad) {
+                            interstitialAd = null
+                            Log.i(TAG, "Unity interstitial expired; reloading")
+                            requestInterstitial()
+                        }
+                    }
+                    Log.i(TAG, "Unity interstitial loaded")
+                }
+            })
         } catch (e: Exception) {
             interstitialLoadInProgress.set(false)
             Log.w(TAG, "Unable to request Unity interstitial", e)
@@ -205,9 +187,29 @@ object UnityAdManager {
     }
 
     private fun requestRewarded() {
-        if (_isRewardedReady || !rewardedLoadInProgress.compareAndSet(false, true)) return
+        if (!isInitialised || rewardedShowing.get() || rewardedAd != null ||
+            !rewardedLoadInProgress.compareAndSet(false, true)
+        ) return
         try {
-            UnityAds.load(rewardedPlacementId, loadListener)
+            val config = LoadConfiguration.Builder(rewardedPlacementId).build()
+            RewardedAd.load(config, object : LoadListener<RewardedAd> {
+                override fun onAdLoaded(ad: RewardedAd?, error: UnityAdsError?) {
+                    rewardedLoadInProgress.set(false)
+                    if (ad == null) {
+                        Log.w(TAG, "Unity rewarded ad failed to load: $error")
+                        return
+                    }
+                    rewardedAd = ad
+                    ad.onAdExpired = AdExpiredListener {
+                        if (rewardedAd === ad) {
+                            rewardedAd = null
+                            Log.i(TAG, "Unity rewarded ad expired; reloading")
+                            requestRewarded()
+                        }
+                    }
+                    Log.i(TAG, "Unity rewarded ad loaded")
+                }
+            })
         } catch (e: Exception) {
             rewardedLoadInProgress.set(false)
             Log.w(TAG, "Unable to request Unity rewarded ad", e)
@@ -225,7 +227,7 @@ object UnityAdManager {
         onFailed: () -> Unit = {}
     ) {
         if (!shouldShowAds(activity)) return
-        if (!isInitialised || !UnityAds.isInitialized) {
+        if (!isInitialised) {
             Log.w(TAG, "Unity banner skipped - SDK not initialized")
             preloadAds(activity)
             onFailed()
@@ -234,50 +236,56 @@ object UnityAdManager {
         try {
             destroyBanner()
             container.removeAllViews()
-            val bannerView = BannerView(
-                activity,
-                bannerPlacementId,
-                UnityBannerSize(320, 50)
-            )
-            bannerView.listener = object : BannerView.IListener {
-                override fun onBannerLoaded(bannerAdView: BannerView) {
-                    Log.i(TAG, "Unity banner loaded")
+            val generation = bannerGeneration.get()
+            val showListener = object : BannerShowListener {
+                override fun onImpression(ad: BannerAd) {
+                    Log.i(TAG, "Unity banner impression")
                 }
 
-                override fun onBannerFailedToLoad(
-                    bannerAdView: BannerView,
-                    errorInfo: BannerErrorInfo
-                ) {
-                    Log.w(TAG, "Unity banner failed: ${errorInfo.errorMessage}")
-                    if (currentBannerView === bannerAdView) {
-                        currentBannerView = null
-                    }
-                    (bannerAdView.parent as? ViewGroup)?.removeView(bannerAdView)
-                    bannerAdView.destroy()
-                    onFailed()
-                }
-
-                override fun onBannerClick(bannerAdView: BannerView) {
+                override fun onClicked(ad: BannerAd) {
                     Log.i(TAG, "Unity banner clicked")
                 }
 
-                override fun onBannerLeftApplication(bannerAdView: BannerView) {
-                    Log.i(TAG, "Unity banner left app")
-                }
-
-                override fun onBannerShown(bannerAdView: BannerView) {
-                    Log.i(TAG, "Unity banner shown")
+                override fun onFailedToShow(ad: BannerAd, error: UnityAdsError) {
+                    Log.w(TAG, "Unity banner failed to show: $error")
+                    onFailed()
                 }
             }
-            currentBannerView = bannerView
-            container.addView(
-                bannerView,
-                ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
+            val config = BannerLoadConfiguration.Builder(
+                bannerPlacementId,
+                BannerSize(320, 50)
             )
-            bannerView.load()
+                .withListener(showListener)
+                .build()
+            BannerAd.load(config, object : LoadListener<BannerAd> {
+                override fun onAdLoaded(ad: BannerAd?, error: UnityAdsError?) {
+                    if (ad == null) {
+                        Log.w(TAG, "Unity banner failed to load: $error")
+                        onFailed()
+                        return
+                    }
+                    val adView = ad.view
+                    if (adView == null) {
+                        Log.w(TAG, "Unity banner loaded without a view")
+                        onFailed()
+                        return
+                    }
+                    container.post {
+                        if (generation != bannerGeneration.get()) return@post
+                        currentBannerAd = ad
+                        (adView.parent as? ViewGroup)?.removeView(adView)
+                        container.removeAllViews()
+                        container.addView(
+                            adView,
+                            ViewGroup.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.WRAP_CONTENT
+                            )
+                        )
+                        Log.i(TAG, "Unity banner loaded")
+                    }
+                }
+            })
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load Unity banner", e)
             onFailed()
@@ -289,14 +297,11 @@ object UnityAdManager {
      * Call when the banner is no longer needed (e.g. Composable disposal).
      */
     fun destroyBanner() {
-        currentBannerView?.let { banner ->
-            try {
-                (banner.parent as? ViewGroup)?.removeView(banner)
-                banner.destroy()
-            } catch (_: Exception) {
-            }
+        bannerGeneration.incrementAndGet()
+        currentBannerAd?.view?.let { bannerView ->
+            (bannerView.parent as? ViewGroup)?.removeView(bannerView)
         }
-        currentBannerView = null
+        currentBannerAd = null
     }
 
     // ── Interstitial ──────────────────────────────────────────────────────
@@ -314,7 +319,7 @@ object UnityAdManager {
             onDismissed()
             return
         }
-        if (!isInitialised || !UnityAds.isInitialized) {
+        if (!isInitialised) {
             Log.i(TAG, "Unity interstitial skipped - SDK not initialized")
             onUnavailable?.invoke() ?: onDismissed()
             preloadAds(activity)
@@ -324,50 +329,54 @@ object UnityAdManager {
             onDismissed()
             return
         }
-        if (!isInterstitialReady) {
+        val ad = synchronized(this) {
+            interstitialAd.also { interstitialAd = null }
+        }
+        if (ad == null) {
             Log.i(TAG, "Unity interstitial not ready")
             onUnavailable?.invoke() ?: onDismissed()
             requestInterstitial()
             return
         }
+        if (!interstitialShowing.compareAndSet(false, true)) {
+            synchronized(this) {
+                if (interstitialAd == null) interstitialAd = ad
+            }
+            onUnavailable?.invoke() ?: onDismissed()
+            return
+        }
         try {
-            _isInterstitialReady = false // Mark consumed immediately before showing
-            UnityAds.show(
+            ad.show(
                 activity,
-                interstitialPlacementId,
-                UnityAdsShowOptions(),
-                object : IUnityAdsShowListener {
-                    override fun onUnityAdsShowFailure(
-                        placementId: String,
-                        error: UnityAds.UnityAdsShowError,
-                        message: String
-                    ) {
-                        Log.w(TAG, "Unity interstitial show failed: $message")
-                        requestInterstitial()
-                        onUnavailable?.invoke() ?: onDismissed()
-                    }
-
-                    override fun onUnityAdsShowStart(placementId: String) {
+                ShowConfiguration.Builder().build(),
+                object : InterstitialShowListener {
+                    override fun onStarted(ad: InterstitialAd) {
                         Log.i(TAG, "Unity interstitial started")
                     }
 
-                    override fun onUnityAdsShowClick(placementId: String) {
+                    override fun onClicked(ad: InterstitialAd) {
                         Log.i(TAG, "Unity interstitial clicked")
                     }
 
-                    override fun onUnityAdsShowComplete(
-                        placementId: String,
-                        state: UnityAds.UnityAdsShowCompletionState
-                    ) {
+                    override fun onCompleted(ad: InterstitialAd, state: ShowFinishState) {
                         Log.i(TAG, "Unity interstitial complete: $state")
                         FullscreenAdPolicy.recordInterstitialShown(activity)
+                        interstitialShowing.set(false)
                         requestInterstitial()
                         onDismissed()
+                    }
+
+                    override fun onFailed(ad: InterstitialAd, error: UnityAdsError) {
+                        Log.w(TAG, "Unity interstitial show failed: $error")
+                        interstitialShowing.set(false)
+                        requestInterstitial()
+                        onUnavailable?.invoke() ?: onDismissed()
                     }
                 }
             )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to show Unity interstitial", e)
+            interstitialShowing.set(false)
             requestInterstitial()
             onUnavailable?.invoke() ?: onDismissed()
         }
@@ -390,58 +399,66 @@ object UnityAdManager {
             onDismissed()
             return
         }
-        if (!isInitialised || !UnityAds.isInitialized) {
+        if (!isInitialised) {
             Log.i(TAG, "Unity rewarded skipped - SDK not initialized")
             onUnavailable?.invoke() ?: onDismissed()
             preloadAds(activity)
             return
         }
-        if (!isRewardedReady) {
+        val ad = synchronized(this) {
+            rewardedAd.also { rewardedAd = null }
+        }
+        if (ad == null) {
             Log.i(TAG, "Unity rewarded not ready")
             onUnavailable?.invoke() ?: onDismissed()
             requestRewarded()
             return
         }
+        if (!rewardedShowing.compareAndSet(false, true)) {
+            synchronized(this) {
+                if (rewardedAd == null) rewardedAd = ad
+            }
+            onUnavailable?.invoke() ?: onDismissed()
+            return
+        }
         try {
-            _isRewardedReady = false // Mark consumed immediately before showing
-            UnityAds.show(
+            val rewardDelivered = AtomicBoolean(false)
+            ad.show(
                 activity,
-                rewardedPlacementId,
-                UnityAdsShowOptions(),
-                object : IUnityAdsShowListener {
-                    override fun onUnityAdsShowFailure(
-                        placementId: String,
-                        error: UnityAds.UnityAdsShowError,
-                        message: String
-                    ) {
-                        Log.w(TAG, "Unity rewarded show failed: $message")
-                        requestRewarded()
-                        onUnavailable?.invoke() ?: onDismissed()
+                ShowConfiguration.Builder().build(),
+                object : RewardedShowListener {
+                    override fun onStarted(ad: RewardedAd) {
+                        Log.i(TAG, "Unity rewarded ad started")
                     }
 
-                    override fun onUnityAdsShowStart(placementId: String) {
-                        Log.i(TAG, "Unity rewarded started")
+                    override fun onClicked(ad: RewardedAd) {
+                        Log.i(TAG, "Unity rewarded ad clicked")
                     }
 
-                    override fun onUnityAdsShowClick(placementId: String) {
-                        Log.i(TAG, "Unity rewarded clicked")
-                    }
-
-                    override fun onUnityAdsShowComplete(
-                        placementId: String,
-                        state: UnityAds.UnityAdsShowCompletionState
-                    ) {
-                        Log.i(TAG, "Unity rewarded complete: $state")
-                        requestRewarded()
-                        if (state == UnityAds.UnityAdsShowCompletionState.COMPLETED) {
+                    override fun onRewarded(ad: RewardedAd) {
+                        if (rewardDelivered.compareAndSet(false, true)) {
                             onRewarded()
                         }
+                    }
+
+                    override fun onCompleted(ad: RewardedAd, state: ShowFinishState) {
+                        Log.i(TAG, "Unity rewarded ad complete: $state")
+                        rewardedShowing.set(false)
+                        requestRewarded()
                         onDismissed()
+                    }
+
+                    override fun onFailed(ad: RewardedAd, error: UnityAdsError) {
+                        Log.w(TAG, "Unity rewarded ad show failed: $error")
+                        rewardedShowing.set(false)
+                        requestRewarded()
+                        onUnavailable?.invoke() ?: onDismissed()
                     }
                 }
             )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to show Unity rewarded", e)
+            rewardedShowing.set(false)
             requestRewarded()
             onUnavailable?.invoke() ?: onDismissed()
         }
