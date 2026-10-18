@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.OptIn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.media3.common.util.UnstableApi
@@ -758,6 +759,11 @@ fun MobileNavGraph(
                     navController.popBackStack()
                 }
             }
+            var isDirectStreamLauncherActive = remember { mutableStateOf(false) }
+            DisposableEffect(Unit) {
+                isDirectStreamLauncherActive.value = true
+                onDispose { isDirectStreamLauncherActive.value = false }
+            }
 
             if (
                 SettingsManager(navController.context).isDirectStreamEnabled() &&
@@ -779,7 +785,19 @@ fun MobileNavGraph(
                             voteAverage = voteAverage,
                             releaseDate = releaseDate
                         ),
-                        launchIntent = directStreamResultLauncher::launch
+                        launchIntent = { playerIntent ->
+                            if (isDirectStreamLauncherActive.value) {
+                                try {
+                                    directStreamResultLauncher.launch(playerIntent)
+                                } catch (_: IllegalStateException) {
+                                    showStreamLinks.value = true
+                                    navController.context.startActivity(playerIntent)
+                                }
+                            } else {
+                                showStreamLinks.value = true
+                                navController.context.startActivity(playerIntent)
+                            }
+                        }
                     )
                 }
             } else MobileStreamLinksScreen(
@@ -856,6 +874,11 @@ fun MobileNavGraph(
                     navController.popBackStack()
                 }
             }
+            var isDirectStreamLauncherActive = remember { mutableStateOf(false) }
+            DisposableEffect(Unit) {
+                isDirectStreamLauncherActive.value = true
+                onDispose { isDirectStreamLauncherActive.value = false }
+            }
 
             if (
                 SettingsManager(navController.context).isDirectStreamEnabled() &&
@@ -877,7 +900,19 @@ fun MobileNavGraph(
                             voteAverage = voteAverage,
                             releaseDate = releaseDate
                         ),
-                        launchIntent = directStreamResultLauncher::launch
+                        launchIntent = { playerIntent ->
+                            if (isDirectStreamLauncherActive.value) {
+                                try {
+                                    directStreamResultLauncher.launch(playerIntent)
+                                } catch (_: IllegalStateException) {
+                                    showStreamLinks.value = true
+                                    navController.context.startActivity(playerIntent)
+                                }
+                            } else {
+                                showStreamLinks.value = true
+                                navController.context.startActivity(playerIntent)
+                            }
+                        }
                     )
                 }
             } else StreamLinksScreen(

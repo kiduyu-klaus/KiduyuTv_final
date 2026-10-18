@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -371,6 +372,11 @@ fun NavGraph(
                     navController.popBackStack()
                 }
             }
+            var isDirectStreamLauncherActive = remember { mutableStateOf(false) }
+            DisposableEffect(Unit) {
+                isDirectStreamLauncherActive.value = true
+                onDispose { isDirectStreamLauncherActive.value = false }
+            }
 
             if (
                 SettingsManager(navController.context).isDirectStreamEnabled() &&
@@ -392,7 +398,23 @@ fun NavGraph(
                             voteAverage = voteAverage,
                             releaseDate = releaseDate
                         ),
-                        launchIntent = directStreamResultLauncher::launch
+                        launchIntent = { playerIntent ->
+                            if (isDirectStreamLauncherActive.value) {
+                                try {
+                                    directStreamResultLauncher.launch(playerIntent)
+                                } catch (_: IllegalStateException) {
+                                    // The registry may unregister during an ad
+                                    // dismissal in the same frame.
+                                    showStreamLinks.value = true
+                                    navController.context.startActivity(playerIntent)
+                                }
+                            } else {
+                                // An interstitial can outlive this NavHost entry. Do
+                                // not invoke its disposed result launcher in that case.
+                                showStreamLinks.value = true
+                                navController.context.startActivity(playerIntent)
+                            }
+                        }
                     )
                 }
             } else StreamLinksScreen(
