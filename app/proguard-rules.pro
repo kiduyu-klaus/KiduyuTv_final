@@ -138,6 +138,7 @@
 ##############################################
 
 -keep class com.startapp.** { *; }
+-keep class com.truenet.** { *; }
 -keep class com.startapp.sdk.adsbase.** { *; }
 -keep class com.startapp.sdk.ads.banner.** { *; }
 -keep class com.startapp.sdk.ads.nativead.** { *; }

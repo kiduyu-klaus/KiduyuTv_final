@@ -31,6 +31,9 @@ import kotlinx.coroutines.flow.asStateFlow
 object StartAppAdManager {
 
     private const val TAG = "StartAppAdManager"
+    private const val CONSENT_PREFERENCES = "startapp_consent"
+    private const val CONSENT_TIMESTAMP_KEY = "consent_timestamp"
+    private const val IAB_US_PRIVACY_KEY = "IABUSPrivacy_String"
     @Volatile
     var isInitialised = false
         private set
@@ -83,15 +86,51 @@ object StartAppAdManager {
      */
     fun applyConsent(context: Context) {
         try {
+            val preferences = context.getSharedPreferences(CONSENT_PREFERENCES, Context.MODE_PRIVATE)
+            val consentTimestamp = preferences.getLong(
+                CONSENT_TIMESTAMP_KEY,
+                System.currentTimeMillis()
+            ).also { timestamp ->
+                if (!preferences.contains(CONSENT_TIMESTAMP_KEY)) {
+                    preferences.edit().putLong(CONSENT_TIMESTAMP_KEY, timestamp).apply()
+                }
+            }
             StartAppSDK.setUserConsent(
                 context,
                 "pas",
-                System.currentTimeMillis(),
+                consentTimestamp,
                 ConsentManager.canShowPersonalizedAds(context)
             )
+            applyUsPrivacyString(context)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to apply consent to StartApp", e)
         }
+    }
+
+    /**
+     * Records the time UMP consent choices were last resolved or changed.
+     * Subsequent SDK initialization/foreground refreshes reuse this timestamp.
+     */
+    fun recordConsentUpdate(context: Context) {
+        context.getSharedPreferences(CONSENT_PREFERENCES, Context.MODE_PRIVATE)
+            .edit()
+            .putLong(CONSENT_TIMESTAMP_KEY, System.currentTimeMillis())
+            .apply()
+    }
+
+    private fun applyUsPrivacyString(context: Context) {
+        val umpPreferences = context.getSharedPreferences(
+            "${context.packageName}_preferences",
+            Context.MODE_PRIVATE
+        )
+        val privacyString = umpPreferences.getString(IAB_US_PRIVACY_KEY, null)
+        val extras = StartAppSDK.getExtras(context).edit()
+        if (privacyString.isNullOrBlank()) {
+            extras.remove(IAB_US_PRIVACY_KEY)
+        } else {
+            extras.putString(IAB_US_PRIVACY_KEY, privacyString)
+        }
+        extras.apply()
     }
 
     /**

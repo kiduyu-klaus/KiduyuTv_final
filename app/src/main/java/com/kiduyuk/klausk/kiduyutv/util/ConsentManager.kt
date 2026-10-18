@@ -65,6 +65,7 @@ object ConsentManager {
             activity,
             params,
             {
+                val consentStatusBeforeForm = consentInfo.consentStatus
                 UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity) { formError ->
                     // A completed UMP flow may permit personalized or
                     // non-personalized requests. A form/load error is not
@@ -75,6 +76,11 @@ object ConsentManager {
                         "Consent form flow completed: resolved=$consentResolved " +
                             "canRequestAds=${canRequestAds(activity)}"
                     )
+                    if (formError == null &&
+                        consentStatusBeforeForm == ConsentInformation.ConsentStatus.REQUIRED
+                    ) {
+                        StartAppAdManager.recordConsentUpdate(activity)
+                    }
                     onConsentGatheringCompleteListener.consentGatheringComplete(formError)
                 }
             },
@@ -161,6 +167,8 @@ object ConsentManager {
         UserMessagingPlatform.showPrivacyOptionsForm(activity) { formError ->
             if (formError != null) {
                 Log.w(TAG, "Privacy options form error: ${formError.message}")
+            } else {
+                StartAppAdManager.recordConsentUpdate(activity)
             }
             propagateConsentToAllNetworks(activity)
             // The viewer just resolved consent in-app, so initialise the ad SDKs

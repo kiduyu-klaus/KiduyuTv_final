@@ -107,7 +107,7 @@ import com.kiduyuk.klausk.kiduyutv.data.model.StreamProviderManager
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamCatalog
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamProviderChoice
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
-import com.kiduyuk.klausk.kiduyutv.ui.components.AdMobNativeAdView
+import com.kiduyuk.klausk.kiduyutv.ui.components.StartAppNativeAdView
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.findActivity
 import com.kiduyuk.klausk.kiduyutv.ui.components.mobile.rememberPhoneInterstitialBackClick
 import com.kiduyuk.klausk.kiduyutv.ui.screens.trakt.TraktAuthActivity
@@ -502,7 +502,7 @@ fun MobileSettingsScreen(
 
                 if (!uiState.isAdsDisabled) {
                     Spacer(modifier = Modifier.height(12.dp))
-                    AdMobNativeAdView(
+                    StartAppNativeAdView(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 8.dp)

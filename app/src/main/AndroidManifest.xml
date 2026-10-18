@@ -41,6 +41,12 @@
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="${admobAppId}" />
         <meta-data
+            android:name="com.startapp.sdk.MIXED_AUDIENCE"
+            android:value="false" />
+        <meta-data
+            android:name="com.startapp.sdk.CHILD_DIRECTED"
+            android:value="false" />
+        <meta-data
             android:name="com.startapp.sdk.DISABLE_APP_WALL"
             android:value="true"/>
         <meta-data
