@@ -32,6 +32,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import java.util.concurrent.ConcurrentHashMap
@@ -253,7 +254,6 @@ class CloudflareBypassActivity : AppCompatActivity() {
     private lateinit var headerStatusView: TextView
     private lateinit var headerDescriptionView: TextView
     private lateinit var timeoutProgress: ProgressBar
-    private lateinit var statusView: TextView
     private lateinit var webView: WebView
     private lateinit var loadingDialog: ProgressDialog
     private lateinit var cursorView: MouseCursorView
@@ -283,7 +283,6 @@ class CloudflareBypassActivity : AppCompatActivity() {
                 if (isFinishing || isDestroyed) return@post
                 isDownloadLocked = true
                 if (isDahmerMoviesDownloadFlow()) {
-                    setDownloadLockBottomBarVisible(false)
                     scrollDownloadLockPageToFortyPercent()
                 }
                 // The lock page is authoritative. It may be reached after
@@ -303,7 +302,6 @@ class CloudflareBypassActivity : AppCompatActivity() {
             mainHandler.post {
                 if (isFinishing || isDestroyed) return@post
                 isDownloadLocked = false
-                setDownloadLockBottomBarVisible(true)
                 setStatus(
                     if (completeOnUnlock) {
                         "✓ Unlocked! Returning to player…"
@@ -507,7 +505,7 @@ class CloudflareBypassActivity : AppCompatActivity() {
     // Layout
     // ════════════════════════════════════════════════════════════════════════
 
-    /** Programmatically builds the top-bar + WebView + status-bar layout. */
+    /** Programmatically builds the top-bar + full-height WebView layout. */
     private fun buildLayout(): View {
         val density = resources.displayMetrics.density
         fun dp(v: Int): Int = (v * density).toInt()
@@ -521,9 +519,8 @@ class CloudflareBypassActivity : AppCompatActivity() {
         }
 
         // ── Material-inspired header ───────────────────────────────────────
-        // Keep the WebView visually central: the header is compact, the
-        // challenge occupies the large middle card, and status is separated
-        // into a quiet footer like the reference design.
+        // Keep the WebView below the compact header; transient status messages
+        // are delivered as Toasts instead of occupying a footer.
         val shield = ImageView(this).apply {
             setImageResource(R.drawable.ic_shield_gold)
             contentDescription = "Cloudflare security"
@@ -609,25 +606,8 @@ class CloudflareBypassActivity : AppCompatActivity() {
             LinearLayout.LayoutParams.MATCH_PARENT, dp(4)
         ).apply { topMargin = dp(10) })
 
-        // ── Status bar (below WebView) ────────────────────────────────────
-        statusView = TextView(this).apply {
-            text = "Connecting to $targetHost…"
-            setTextColor(0xFFB8B6C8.toInt())
-            textSize = 12f
-            maxLines = 2
-            ellipsize = android.text.TextUtils.TruncateAt.END
-            setPadding(dp(16), dp(12), dp(16), dp(12))
-            setBackgroundColor(0xFF19182E.toInt())
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.BOTTOM
-            )
-        }
-
         rootLayout.addView(topBar)
-        rootLayout.addView(statusView)
-        // WebView added later in configureWebView() so it sits between the bars.
+        // WebView is added below the top bar and fills the remaining height.
         return rootLayout
     }
 
@@ -853,13 +833,13 @@ class CloudflareBypassActivity : AppCompatActivity() {
             }
         }
 
-        // Insert between the top bar and the status bar.
+        // Insert below the top bar and extend to the bottom edge.
         rootLayout.addView(webView, 1)
         rootLayout.post {
             if (isFinishing || isDestroyed) return@post
             (webView.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
                 params.topMargin = topBar.height + dp(12)
-                params.bottomMargin = statusView.height + dp(12)
+                params.bottomMargin = 0
                 webView.layoutParams = params
             }
         }
@@ -1222,19 +1202,6 @@ class CloudflareBypassActivity : AppCompatActivity() {
     private fun isDahmerMoviesDownloadFlow(): Boolean =
         waitForDownload && targetHost.equals("p.111477.xyz", ignoreCase = true)
 
-    /** Removes the footer from the CAPTCHA viewport while the lock is active. */
-    private fun setDownloadLockBottomBarVisible(visible: Boolean) {
-        if (::statusView.isInitialized) {
-            statusView.visibility = if (visible) View.VISIBLE else View.GONE
-        }
-        if (::webView.isInitialized) {
-            (webView.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
-                params.bottomMargin = if (visible) dp(12) else 0
-                webView.layoutParams = params
-            }
-        }
-    }
-
     /** Scrolls the DahmerMovies lock page until its CAPTCHA answers are visible. */
     private fun scrollDownloadLockPageToFortyPercent() {
         if (downloadLockPageScrolled || !::webView.isInitialized) return
@@ -1383,18 +1350,19 @@ class CloudflareBypassActivity : AppCompatActivity() {
     private fun setStatus(message: String, isError: Boolean = false) {
         runOnUiThread {
             if (isFinishing || isDestroyed) return@runOnUiThread
-            statusView.text = message
             if (::headerStatusView.isInitialized) {
                 headerStatusView.text = message
             }
-            statusView.setTextColor(
-                if (isError) 0xFFFF6B6B.toInt() else 0xFFCCCCCC.toInt()
-            )
             if (::headerStatusView.isInitialized) {
                 headerStatusView.setTextColor(
                     if (isError) 0xFFFF8A8A.toInt() else 0xFFB8B6C8.toInt()
                 )
             }
+            Toast.makeText(
+                this,
+                message,
+                if (isError) Toast.LENGTH_LONG else Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
