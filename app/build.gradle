@@ -40,6 +40,7 @@ def escapedUnityInterstitialPlacementId = unityInterstitialPlacementId.replace("
 def escapedUnityRewardedPlacementId = unityRewardedPlacementId.replace("\\", "\\\\").replace("\"", "\\\"")
 def escapedUnityBannerPlacementId = unityBannerPlacementId.replace("\\", "\\\\").replace("\"", "\\\"")
 def wortiseAppId = "e3b208f6-4b47-45d1-8842-5eb647581cb5"
+def roomVersion = '2.8.5'
 
 android {
     namespace 'com.kiduyuk.klausk.kiduyutv'
@@ -246,9 +247,9 @@ dependencies {
     // ─────────────────────────────────────────────
     // Database (Room)
     // ─────────────────────────────────────────────
-    implementation 'androidx.room:room-runtime:2.6.1'
-    implementation 'androidx.room:room-ktx:2.6.1'    // Coroutine support for Room
-    ksp 'androidx.room:room-compiler:2.6.1'           // Code generation (use KSP over kapt)
+    implementation "androidx.room:room-runtime:${roomVersion}"
+    implementation "androidx.room:room-ktx:${roomVersion}"    // Coroutine support for Room
+    ksp "androidx.room:room-compiler:${roomVersion}"           // Keep compiler aligned with runtime
 
     // ─────────────────────────────────────────────
     // Coroutines

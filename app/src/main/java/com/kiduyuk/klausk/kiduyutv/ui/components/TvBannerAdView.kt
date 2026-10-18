@@ -27,7 +27,6 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.google.android.gms.ads.AdListener
-import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
 import com.google.android.gms.ads.LoadAdError
@@ -135,7 +134,7 @@ fun TvBannerAdView(modifier: Modifier = Modifier) {
                                             Log.i(TAG, "Start.io TV banner unavailable; loading AdMob fallback")
                                             removeAllViews()
                                             addView(adView)
-                                            adView.loadAd(AdRequest.Builder().build())
+                                            AdManager.loadBannerAdView(adView)
                                         }
                                     }
                                 )

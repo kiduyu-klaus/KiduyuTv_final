@@ -11,6 +11,7 @@ import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdLoader
 import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.AdView
 import com.google.android.gms.ads.FullScreenContentCallback
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
@@ -51,11 +52,9 @@ object AdManager {
 
     /**
      * Banner load requests that arrived before MobileAds finished initialising.
-     * The first queued request is fired from inside the [MobileAds.initialize]
-     * callback so the bottom-nav banner still appears even when the splash
-     * navigates away before the SDK is ready.
+     * They are replayed from the [MobileAds.initialize] callback.
      */
-    @Volatile private var pendingBannerLoad: (() -> Unit)? = null
+    private val pendingBannerLoads = mutableListOf<() -> Unit>()
 
     /**
      * MobileAds.initialize is not guaranteed to call back. On some TV images and on
@@ -172,10 +171,12 @@ object AdManager {
             // Drain any banner load that was requested before init completed.
             // The bottom-nav AndroidView factory may have already run while
             // we were still initialising — replay it now so the banner appears.
-            pendingBannerLoad?.let { queued ->
-                pendingBannerLoad = null
-                Log.i(TAG, "Replaying queued banner load after init")
-                queued.invoke()
+            val queuedBannerLoads = synchronized(this) {
+                pendingBannerLoads.toList().also { pendingBannerLoads.clear() }
+            }
+            if (queuedBannerLoads.isNotEmpty()) {
+                Log.i(TAG, "Replaying ${queuedBannerLoads.size} queued banner load(s) after init")
+                queuedBannerLoads.forEach { it.invoke() }
             }
             callbacks.forEach { it.invoke() }
         }
@@ -716,11 +717,38 @@ object AdManager {
             }
             Unit  // Explicitly return Unit
         }
-        if (!isInitialised) {
-            Log.w(TAG, "AdMob not initialised yet - queuing banner load")
-            pendingBannerLoad = doLoad
+        runWhenInitialized(doLoad)
+    }
+
+    /**
+     * Loads a prepared AdView only after Mobile Ads and mediation adapters are
+     * initialized. A disposed banner is ignored when a queued request is replayed.
+     */
+    fun loadBannerAdView(adView: AdView) {
+        if (!shouldShowAds(adView.context)) {
+            Log.i(TAG, "Ads disabled - skipping AdMob banner request")
             return
         }
-        doLoad()
+        runWhenInitialized {
+            if (adView.parent != null && shouldShowAds(adView.context)) {
+                adView.loadAd(AdRequest.Builder().build())
+            }
+        }
+    }
+
+    private fun runWhenInitialized(action: () -> Unit) {
+        val runNow = synchronized(this) {
+            if (isInitialised) {
+                true
+            } else {
+                pendingBannerLoads.add(action)
+                false
+            }
+        }
+        if (runNow) {
+            action()
+        } else {
+            Log.i(TAG, "AdMob not initialised yet - queuing banner load")
+        }
     }
 }

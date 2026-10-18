@@ -14,7 +14,7 @@ object AdUnitIds {
 
     // ── Phone Production ───────────────────────────────────────────────────
 
-    private const val DEFAULT_PHONE_ADAPTIVE_BANNER = "ca-app-pub-3803477439180910/7183108212"
+    private const val DEFAULT_PHONE_ADAPTIVE_BANNER = "ca-app-pub-3803477439180910/9170990617"
     private const val DEFAULT_PHONE_INTERSTITIAL_UNIT = "ca-app-pub-3803477439180910/5295324788"
     private const val DEFAULT_PHONE_REWARDED_UNIT = "ca-app-pub-3803477439180910/3982243116"
     private const val DEFAULT_PHONE_REWARDED_INTERSTITIAL_UNIT = "ca-app-pub-3803477439180910/1751398697"
@@ -38,6 +38,7 @@ object AdUnitIds {
         appOpen = DEFAULT_PHONE_APP_OPEN_UNIT,
         native = DEFAULT_PHONE_NATIVE_UNIT
     )
+    private val defaultTvProduction = defaultPhoneProduction
 
     private val defaultTest = DeviceAdUnitIds(
         banner = DEFAULT_TEST_ADAPTIVE_BANNER,
@@ -49,10 +50,10 @@ object AdUnitIds {
     )
 
     private val defaultConfig = GoogleAdsConfig(
-        useTestAds = false,
+        useTestAds = BuildConfig.DEBUG,
         phoneProduction = defaultPhoneProduction,
         phoneTest = defaultTest,
-        tvProduction = defaultTest,
+        tvProduction = defaultTvProduction,
         tvTest = defaultTest
     )
 
@@ -116,7 +117,7 @@ object AdUnitIds {
             snapshot.boolean("enable_test_ads") || snapshot.boolean("use_test_ads")
         // A live database value must never route release users to sample
         // inventory. Release testing belongs in a dedicated internal build.
-        val useTestAds = BuildConfig.DEBUG && remoteRequestedTestAds
+        val useTestAds = BuildConfig.DEBUG
         if (remoteRequestedTestAds && !BuildConfig.DEBUG) {
             Log.w(TAG, "Ignoring remote test-ad flag in a release build")
         }
