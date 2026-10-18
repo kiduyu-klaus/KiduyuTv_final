@@ -67,9 +67,12 @@ fun AdMobNativeAdView(
     nativeAd?.let { ad ->
         AndroidView(
             modifier = modifier,
-            factory = { viewContext ->
-                LayoutInflater.from(viewContext)
-                    .inflate(R.layout.ad_native, null) as NativeAdView
+                factory = { viewContext ->
+                (LayoutInflater.from(viewContext)
+                    .inflate(R.layout.ad_native, null) as NativeAdView).apply {
+                    isFocusable = true
+                    isFocusableInTouchMode = true
+                }
             },
             update = { adView ->
                 populateNativeAdView(ad, adView)

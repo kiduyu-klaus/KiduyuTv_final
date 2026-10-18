@@ -423,7 +423,7 @@ private fun HomeContent(
                         )
                     }
                     // Several catalog rows precede this native in-feed placement.
-                    SectionNativeAd()
+                    SectionNativeAd(tvFocusable = true)
 
                     // Content Row for Movies Trending This Week.
                     if (uiState.trendingMoviesThisWeek.isNotEmpty()) {
@@ -498,7 +498,7 @@ private fun HomeContent(
                         )
                     }
 
-                    SectionNativeAd()
+                    SectionNativeAd(tvFocusable = true)
 
                     if (uiState.oscarWinners2026.isNotEmpty()) {
                         ContentRow(
@@ -572,7 +572,7 @@ private fun HomeContent(
                         }
                     }
 
-                    SectionNativeAd()
+                    SectionNativeAd(tvFocusable = true)
 
                     if (uiState.popularHorror.isNotEmpty()) {
                         ContentRow(

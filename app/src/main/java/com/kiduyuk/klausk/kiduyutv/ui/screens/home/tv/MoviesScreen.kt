@@ -206,8 +206,8 @@ fun MoviesScreen(
                         }
                     }
 
-                    // Skip two catalog rows before showing an in-feed ad.
-                    SectionNativeAd()
+                    // Keep the first in-feed ad after three catalog sections.
+                    SectionNativeAd(tvFocusable = true)
 
                     // Content Row for Top Rated Movies
                     if (uiState.latestMovies.isNotEmpty()) {
@@ -257,6 +257,8 @@ fun MoviesScreen(
                         }
                     }
 
+                    SectionNativeAd(tvFocusable = true)
+
                     // Content Row for Movies Based on True Stories
                     if (uiState.trueStoryMovies.isNotEmpty()) {
                         ContentRow(
@@ -272,8 +274,6 @@ fun MoviesScreen(
                             )
                         }
                     }
-
-                    SectionNativeAd()
 
                     // Content Row for Best movie classics
                     if (uiState.bestClassics.isNotEmpty()) {
@@ -323,6 +323,8 @@ fun MoviesScreen(
                         }
                     }
 
+                    SectionNativeAd(tvFocusable = true)
+
                     // Content Row for Time Travel Movies
                     if (uiState.timeTravelMovies.isNotEmpty()) {
                         ContentRow(
@@ -339,7 +341,7 @@ fun MoviesScreen(
                         }
                     }
 
-                    SectionNativeAd()
+                    SectionNativeAd(tvFocusable = true)
 
                     // Content Row for Christian Movies
                     if (uiState.christianMovies.isNotEmpty()) {

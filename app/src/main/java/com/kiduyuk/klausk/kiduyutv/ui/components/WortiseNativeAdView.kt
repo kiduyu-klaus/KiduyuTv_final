@@ -75,6 +75,8 @@ fun WortiseNativeAdView(
         modifier = modifier,
         factory = { viewContext ->
             FrameLayout(viewContext).apply {
+                isFocusable = true
+                isFocusableInTouchMode = true
                 val binder = NativeAdViewBinder.Builder(R.layout.wortise_native_ad)
                     .setHeadlineTextViewId(R.id.wortise_native_headline)
                     .setBodyTextViewId(R.id.wortise_native_body)

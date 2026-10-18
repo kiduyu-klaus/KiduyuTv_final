@@ -70,6 +70,7 @@ import com.kiduyuk.klausk.kiduyutv.data.remote.TraktApiClient
 import com.kiduyuk.klausk.kiduyutv.data.repository.MyListManager
 import com.kiduyuk.klausk.kiduyutv.data.repository.TraktRepository
 import com.kiduyuk.klausk.kiduyutv.ui.components.MovieCard
+import com.kiduyuk.klausk.kiduyutv.ui.components.SectionNativeAd
 import com.kiduyuk.klausk.kiduyutv.ui.components.TopBar
 import com.kiduyuk.klausk.kiduyutv.ui.components.TvShowCard
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
@@ -820,6 +821,7 @@ fun MyListScreen(
                     }
                 }
             } else {
+                val adChunks = currentList.chunked((actualColumns * 10).coerceAtLeast(1))
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(actualColumns),
                     state = gridState,
@@ -828,7 +830,11 @@ fun MyListScreen(
                     horizontalArrangement = Arrangement.spacedBy(spacing),
                     verticalArrangement = Arrangement.spacedBy(spacing)
                 ) {
-                    items(currentList) { item ->
+                    adChunks.forEachIndexed { chunkIndex, chunk ->
+                        items(
+                            items = chunk,
+                            key = { item -> "${item.type}:${item.id}" }
+                        ) { item ->
                         val interactionSource = remember { MutableInteractionSource() }
                         val isFocused by interactionSource.collectIsFocusedAsState()
 
@@ -976,6 +982,12 @@ fun MyListScreen(
                                 }
                             }
                         }
+                    }
+                    if (chunkIndex < adChunks.lastIndex) {
+                            item(span = { GridItemSpan(maxLineSpan) }) {
+                                SectionNativeAd(tvFocusable = true)
+                            }
+                    }
                     }
 
                     // ── Footer: "load more" spinner / status row ────────────
