@@ -53,7 +53,6 @@ object RewardedFallbackDispatcher {
             if (format == "rewarded") AdManager.preloadRewarded(activity)
             else AdManager.preloadRewardedInterstitial(activity)
             UnityAdManager.preloadAds(activity)
-            WortiseAdManager.preloadAds(activity)
 
             // A standard interstitial has no reward callback. It is only an optional
             // monetisation fallback, so completion simply returns control to the UI.
@@ -64,7 +63,7 @@ object RewardedFallbackDispatcher {
             )
         }
 
-        fun showAdMobOrWortise() {
+        fun showAdMobOrInterstitialFallback() {
             when {
                 isAdMobReady() && format == "rewarded" -> {
                     Log.i(TAG, "$format fallback: AdMob")
@@ -73,10 +72,6 @@ object RewardedFallbackDispatcher {
                 isAdMobReady() && format == "rewarded_interstitial" -> {
                     Log.i(TAG, "$format fallback: AdMob")
                     AdManager.showRewardedInterstitial(activity, onRewarded, onDismissed)
-                }
-                WortiseAdManager.isRewardedReady -> {
-                    Log.i(TAG, "$format fallback: Wortise")
-                    WortiseAdManager.showRewarded(activity, onRewarded, onDismissed)
                 }
                 else -> {
                     fallBackToStandardInterstitial()
@@ -90,7 +85,7 @@ object RewardedFallbackDispatcher {
                 activity = activity,
                 onRewarded = onRewarded,
                 onDismissed = onDismissed,
-                onUnavailable = ::showAdMobOrWortise
+                onUnavailable = ::showAdMobOrInterstitialFallback
             )
         }
 

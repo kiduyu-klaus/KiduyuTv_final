@@ -18,15 +18,9 @@ object AppOpenFallbackDispatcher {
                 Log.i(TAG, "App-open fallback: AdMob")
                 AdManager.showAppOpenIfAvailable(activity, onComplete)
             }
-            WortiseAdManager.isAppOpenReady -> {
-                Log.i(TAG, "App-open fallback: Wortise")
-                WortiseAdManager.showAppOpenIfAvailable(activity)
-                onComplete()
-            }
             else -> {
                 Log.i(TAG, "App-open fallback: no ad ready")
                 AdManager.preloadAppOpen(activity)
-                WortiseAdManager.retryInitIfEligible(activity)
                 onComplete()
             }
         }

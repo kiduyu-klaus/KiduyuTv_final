@@ -30,13 +30,6 @@ object BannerFallbackDispatcher {
             if (completed.compareAndSet(false, true)) onFinished()
         }
 
-        fun loadWortise() {
-            Log.i(TAG, "Banner fallback: Wortise")
-            container.removeAllViews()
-            WortiseAdManager.loadBanner(activity, container)
-            finish()
-        }
-
         fun loadAdMob() {
             Log.i(TAG, "Banner fallback: AdMob")
             container.removeAllViews()
@@ -50,7 +43,7 @@ object BannerFallbackDispatcher {
                 override fun onAdFailedToLoad(error: LoadAdError) {
                     Log.w(TAG, "AdMob banner unavailable: ${error.message}")
                     AdManager.logMetaMediationFailure("banner", error)
-                    loadWortise()
+                    finish()
                 }
 
                 override fun onAdImpression() {

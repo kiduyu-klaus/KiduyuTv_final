@@ -25,7 +25,7 @@ object AdFallbackDispatcher {
         when (preferred) {
             BannerNetwork.STARTAPP -> StartAppAdManager.loadBanner(activity, container)
             BannerNetwork.UNITY -> UnityAdManager.loadBanner(activity, container)
-            BannerNetwork.WORTISE -> WortiseAdManager.loadBanner(activity, container)
+            BannerNetwork.WORTISE -> AdManager.loadBanner(activity, container)
             BannerNetwork.ADMOB, null -> AdManager.loadBanner(activity, container)
         }
         Log.i(TAG, "Legacy banner request routed through ${preferred ?: BannerNetwork.ADMOB}")

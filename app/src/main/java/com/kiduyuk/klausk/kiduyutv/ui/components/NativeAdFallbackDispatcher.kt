@@ -23,7 +23,6 @@ object NativeAdFallbackDispatcher {
     private const val TAG = "NativeAdFallbackDispatcher"
     private val nextNetwork = AtomicInteger(0)
     private val networks = listOf(
-        NativeAdNetwork.WORTISE,
         NativeAdNetwork.START_IO,
         NativeAdNetwork.ADMOB
     )
@@ -51,12 +50,6 @@ object NativeAdFallbackDispatcher {
         // force the selected component to restart its request cleanly.
         key(network) {
             when (network) {
-                NativeAdNetwork.WORTISE -> WortiseNativeAdView(
-                    modifier = modifier,
-                    fallbackToAdMob = false,
-                    onLoadFailed = ::onLoadFailed
-                )
-
                 NativeAdNetwork.START_IO -> StartAppNativeAdView(
                     modifier = modifier,
                     fallbackToAdMob = false,
@@ -78,7 +71,6 @@ object NativeAdFallbackDispatcher {
     private fun Int.floorMod(divisor: Int): Int = Math.floorMod(this, divisor)
 
     private enum class NativeAdNetwork(val displayName: String) {
-        WORTISE("Wortise"),
         START_IO("Start.io"),
         ADMOB("AdMob")
     }

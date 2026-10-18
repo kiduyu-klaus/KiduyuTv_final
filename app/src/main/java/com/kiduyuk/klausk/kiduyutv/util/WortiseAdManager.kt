@@ -34,6 +34,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 object WortiseAdManager {
 
     private const val TAG = "WortiseAdManager"
+    // Wortise is temporarily disabled. Keep the integration code and placement
+    // values intact so it can be re-enabled without reintroducing SDK setup.
+    private const val WORTISE_ENABLED = false
     private const val AD_UNIT_APP_OPEN = "5845bc27-cc4f-4a4d-b765-92a0ce8e8322"
     private const val AD_UNIT_BANNER = "47c5c956-d872-4246-aee5-78f87d4a94f4"
     private const val AD_UNIT_INTERSTITIAL = "6fae5513-bc81-4186-b0a1-69204056b6de"
@@ -107,6 +110,10 @@ object WortiseAdManager {
      * internal coroutines. That call is performed first here.
      */
     fun preloadAds(context: Context) {
+        if (!WORTISE_ENABLED) {
+            Log.i(TAG, "Wortise is disabled; skipping SDK initialization")
+            return
+        }
         if (!shouldShowAds(context)) {
             Log.i(TAG, "Ads disabled - skipping Wortise preload")
             return

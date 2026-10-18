@@ -309,7 +309,7 @@ class SplashActivity : ComponentActivity() {
         ConsentManager.requestConsent(this) {
             StartAppAdManager.preloadAds(this@SplashActivity)
             UnityAdManager.preloadAds(this@SplashActivity)
-            WortiseAdManager.preloadAds(this@SplashActivity)
+            // WortiseAdManager.preloadAds(this@SplashActivity) // Temporarily disabled.
             // AdManager.init schedules MobileAds.initialize and returns
             // immediately — the actual SDK-ready callback fires later.
             // We must wait for that callback before allowing the splash

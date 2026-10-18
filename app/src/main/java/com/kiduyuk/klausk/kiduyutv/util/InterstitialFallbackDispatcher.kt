@@ -32,7 +32,7 @@ object InterstitialFallbackDispatcher {
             return
         }
 
-        fun showAdMobOrWortise() {
+        fun showAdMobOrFinish() {
             if (!fallbackStarted.compareAndSet(false, true)) return
             when {
                 AdManager.isInterstitialReady -> {
@@ -40,18 +40,12 @@ object InterstitialFallbackDispatcher {
                     AdEventReporter.report(placement.name, "interstitial", "admob", "show_requested")
                     AdManager.showInterstitial(activity, complete)
                 }
-                WortiseAdManager.isInterstitialReady -> {
-                    Log.i(TAG, "Interstitial fallback: Wortise")
-                    AdEventReporter.report(placement.name, "interstitial", "wortise", "show_requested")
-                    WortiseAdManager.showInterstitial(activity, complete)
-                }
                 else -> {
                     Log.i(TAG, "Interstitial fallback: no ad ready")
                     AdEventReporter.report(placement.name, "interstitial", "none", "not_ready")
                     complete()
                     AdManager.preloadInterstitial(activity)
                     UnityAdManager.preloadAds(activity)
-                    WortiseAdManager.preloadAds(activity)
                 }
             }
         }
@@ -62,7 +56,7 @@ object InterstitialFallbackDispatcher {
             StartAppAdManager.showInterstitial(
                 activity = activity,
                 onDismissed = complete,
-                onUnavailable = ::showAdMobOrWortise
+                onUnavailable = ::showAdMobOrFinish
             )
         }
 

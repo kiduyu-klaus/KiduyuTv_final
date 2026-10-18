@@ -177,7 +177,7 @@ object ConsentManager {
             StartAppAdManager.retryInitIfEligible(activity)
             if (canRequestAds(activity)) {
                 UnityAdManager.preloadAds(activity)
-                WortiseAdManager.retryInitIfEligible(activity)
+                // Wortise retry is temporarily disabled.
             }
             onConsentFormDismissedListener?.onConsentFormDismissed(formError)
         }

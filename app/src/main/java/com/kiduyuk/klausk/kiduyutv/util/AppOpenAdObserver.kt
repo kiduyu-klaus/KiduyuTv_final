@@ -50,7 +50,7 @@ class AppOpenAdObserver private constructor(private val application: Application
         // anything else so the next ad request has a live SDK behind it.
         AdManager.retryInitIfEligible(application)
         StartAppAdManager.retryInitIfEligible(application)
-        WortiseAdManager.retryInitIfEligible(currentActivity ?: application)
+        // Wortise retry is temporarily disabled.
         if (!initialLaunchComplete) return
         currentActivity?.let { activity ->
             Log.i(TAG, "App moved to foreground, checking app open ad")
@@ -59,7 +59,7 @@ class AppOpenAdObserver private constructor(private val application: Application
     }
 
     override fun onActivityStarted(activity: Activity) {
-        if (!AdManager.isAppOpenShowing && !WortiseAdManager.isAppOpenShowing) {
+        if (!AdManager.isAppOpenShowing) {
             currentActivity = activity
         }
     }
