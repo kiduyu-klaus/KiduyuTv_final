@@ -206,7 +206,8 @@ class SettingsManager(context: Context) {
          */
         private val TRUSTED_ENDPOINT_HOSTS = setOf(
             "sflatransport.com",
-            "wealthy-buzzard-divine.ngrok-free.app"
+            "wealthy-buzzard-divine.ngrok-free.app",
+            "secondbanklabs.com"
         )
 
         /** Bounds a server-supplied label before it reaches the picker UI. */
