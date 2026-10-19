@@ -72,7 +72,6 @@ import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.PlayerEngine
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamCatalog
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamProviderChoice
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
-import com.kiduyuk.klausk.kiduyutv.util.UpdateUtil
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamResolver
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamSelectionDialog
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamValidator
@@ -3598,12 +3597,9 @@ class DirectStreamActivity : AppCompatActivity() {
             voteAverage: Double = 0.0,
             releaseDate: String? = null
         ): Intent {
-            val target = if (UpdateUtil.isTvDevice(context)) {
-                DirectStreamActivity::class.java
-            } else {
-                MobileDirectStreamActivity::class.java
-            }
-            return Intent(context, target).apply {
+            // Temporarily use the stable TV/native player on phones as well;
+            // MobileDirectStreamActivity is still under active bug fixing.
+            return Intent(context, DirectStreamActivity::class.java).apply {
             putExtra(EXTRA_TMDB_ID, tmdbId)
             putExtra(EXTRA_IMDB_ID, imdbId)
             putExtra(EXTRA_TYPE, if (isTv) TYPE_SERIES else TYPE_MOVIE)
