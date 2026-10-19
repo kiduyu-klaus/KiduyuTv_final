@@ -85,7 +85,6 @@ import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.Player
-import androidx.media3.common.TrackGroup
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
@@ -935,7 +934,7 @@ private fun MobileStreamSelectionDialog(
 }
 
 private data class MobileTrackChoice(
-    val group: TrackGroup,
+    val group: Tracks.Group,
     val trackIndex: Int
 )
 
@@ -943,7 +942,7 @@ private data class MobileTrackOption(
     val type: Int,
     val label: String,
     val detail: String,
-    val group: TrackGroup? = null,
+    val group: Tracks.Group? = null,
     val trackIndex: Int = -1,
     val isAuto: Boolean = false
 )
