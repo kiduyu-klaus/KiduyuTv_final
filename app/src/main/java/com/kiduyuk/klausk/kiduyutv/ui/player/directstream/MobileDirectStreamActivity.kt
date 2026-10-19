@@ -2,6 +2,7 @@ package com.kiduyuk.klausk.kiduyutv.ui.player.directstream
 
 import android.content.pm.ActivityInfo
 import android.os.Bundle
+import android.util.Log
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -136,6 +137,7 @@ class MobileDirectStreamActivity : ComponentActivity() {
     private var title = ""
     private var streams: List<StreamItem> = emptyList()
     private var activeStream: StreamItem? = null
+    private var videoDecoderRecoveryAttempted = false
     private var screenState by mutableStateOf(MobilePlayerState())
 
     private fun providerStarted(index: Int, name: String) {
@@ -216,10 +218,12 @@ class MobileDirectStreamActivity : ComponentActivity() {
 
         engine = PlayerEngine(this).apply {
             onError = { error ->
-                screenState = screenState.copy(
-                    isBuffering = false,
-                    error = error.ifBlank { getString(R.string.playback_link_unavailable) }
-                )
+                if (!tryRecoverFromUnsupportedVideo(error)) {
+                    screenState = screenState.copy(
+                        isBuffering = false,
+                        error = error.ifBlank { getString(R.string.playback_link_unavailable) }
+                    )
+                }
             }
             onPlaybackStateChanged = { state ->
                 screenState = screenState.copy(
@@ -352,6 +356,14 @@ class MobileDirectStreamActivity : ComponentActivity() {
     }
 
     private fun play(stream: StreamItem) {
+        // A manually selected stream starts a new recovery cycle. Automatic
+        // recovery below deliberately bypasses this method so it cannot retry
+        // the same failing source indefinitely.
+        videoDecoderRecoveryAttempted = false
+        startPlayback(stream)
+    }
+
+    private fun startPlayback(stream: StreamItem) {
         val resumePosition = if (activeStream == null) 0L else engine.player.currentPosition.coerceAtLeast(0L)
         activeStream = stream
         screenState = screenState.copy(
@@ -360,6 +372,65 @@ class MobileDirectStreamActivity : ComponentActivity() {
             isBuffering = true
         )
         engine.play(stream, resumePosition, stream.subtitles)
+    }
+
+    /**
+     * The bundled FFmpeg extension supplies audio decoding, but this build does
+     * not contain an FFmpeg video renderer. When MediaCodec rejects Dolby
+     * Vision/HEVC, retry with another or lower-quality source before showing an
+     * error. This follows the alternate-stream recovery used by the TV player.
+     */
+    private fun tryRecoverFromUnsupportedVideo(error: String): Boolean {
+        val details = error.lowercase()
+        val unsupportedVideo = details.contains("video/dolby-vision") ||
+            details.contains("dolby vision") ||
+            details.contains("c2.mtk.hevc.decoder") ||
+            details.contains("mediacodecvideorenderer") ||
+            details.contains("hevc")
+        if (!unsupportedVideo || videoDecoderRecoveryAttempted) return false
+
+        val failedUrl = activeStream?.url
+        val fallback = streams
+            .asSequence()
+            .filter { it.url != failedUrl && it.httpStatusCode != 404 && !it.isFailed }
+            .sortedWith(
+                compareBy<StreamItem> { mobileQualityRank(it.quality) }
+                    .thenBy { it.provider }
+            )
+            .firstOrNull()
+            ?: return false
+
+        videoDecoderRecoveryAttempted = true
+        val resumePosition = engine.player.currentPosition.coerceAtLeast(0L)
+        activeStream = fallback
+        screenState = screenState.copy(
+            activeStreamName = fallback.name.ifBlank { fallback.title },
+            error = null,
+            isBuffering = true
+        )
+        Toast.makeText(
+            this,
+            "Video format unavailable; trying a compatible stream",
+            Toast.LENGTH_LONG
+        ).show()
+        Log.w(
+            "MobileDirectStream",
+            "Unsupported video decoder; retrying provider=${fallback.provider} " +
+                "quality=${fallback.quality} positionMs=$resumePosition"
+        )
+        engine.play(fallback, resumePosition, fallback.subtitles)
+        return true
+    }
+
+    private fun mobileQualityRank(quality: String): Int {
+        val normalized = quality.lowercase()
+        if (normalized.contains("auto") || normalized.contains("adaptive")) return 720
+        return Regex("(\\d{3,4})")
+            .find(normalized)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.toIntOrNull()
+            ?: 0
     }
 
     private fun showStreamSelection() {

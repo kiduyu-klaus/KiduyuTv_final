@@ -346,6 +346,10 @@ class PlayerEngine(context: Context) {
     }
 
     private val renderersFactory: DefaultRenderersFactory = DefaultRenderersFactory(appContext)
+        // Use the bundled Media3 FFmpeg extension where it provides a renderer
+        // (currently audio codecs), then allow Media3 to try another compatible
+        // decoder when a device codec cannot initialize a track.
+        .setEnableDecoderFallback(true)
         .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
 
     val player: ExoPlayer = ExoPlayer.Builder(appContext)
