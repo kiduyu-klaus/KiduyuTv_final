@@ -1,6 +1,7 @@
 package com.kiduyuk.klausk.kiduyutv.ui.player.directstream
 
 import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.os.Bundle
 import android.util.Log
 import android.view.ViewGroup
@@ -74,6 +75,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -137,6 +139,7 @@ class MobileDirectStreamActivity : ComponentActivity() {
     private var streams: List<StreamItem> = emptyList()
     private var activeStream: StreamItem? = null
     private var videoDecoderRecoveryAttempted = false
+    private var wasPlayingBeforePause = false
     private var screenState by mutableStateOf(MobilePlayerState())
 
     private fun providerStarted(index: Int, name: String) {
@@ -284,6 +287,22 @@ class MobileDirectStreamActivity : ComponentActivity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) enterImmersiveFullscreen()
+    }
+
+    override fun onPause() {
+        if (::engine.isInitialized) {
+            wasPlayingBeforePause = engine.player.isPlaying
+            if (wasPlayingBeforePause) engine.pause()
+        }
+        super.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::engine.isInitialized && wasPlayingBeforePause) {
+            wasPlayingBeforePause = false
+            engine.resume()
+        }
     }
 
     private fun enterImmersiveFullscreen() {
@@ -597,32 +616,35 @@ private fun MobileDirectStreamPlayer(
     onDismissError: () -> Unit
 ) {
     val context = LocalContext.current
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     Scaffold(
         containerColor = BackgroundDark,
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(title, maxLines = 1, fontSize = 18.sp)
-                        if (isEpisode) Text("Direct stream", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = onRetry,
-                        enabled = !state.isLoading,
-                        colors = IconButtonDefaults.iconButtonColors(contentColor = TextPrimary)
-                    ) {
-                        Icon(Icons.Default.Refresh, "Reload streams")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
-            )
+            if (!isLandscape) {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text(title, maxLines = 1, fontSize = 18.sp)
+                            if (isEpisode) Text("Direct stream", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+                        }
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                        }
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = onRetry,
+                            enabled = !state.isLoading,
+                            colors = IconButtonDefaults.iconButtonColors(contentColor = TextPrimary)
+                        ) {
+                            Icon(Icons.Default.Refresh, "Reload streams")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = BackgroundDark)
+                )
+            }
         }
     ) { padding ->
         Column(
