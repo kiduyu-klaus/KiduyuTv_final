@@ -237,6 +237,23 @@ object UnityAdManager {
             destroyBanner()
             container.removeAllViews()
             val generation = bannerGeneration.get()
+            val fallbackStarted = AtomicBoolean(false)
+            fun failBanner(stage: String, error: UnityAdsError? = null) {
+                // Banner callbacks can arrive after navigation or after a new
+                // request has replaced this one. Never remove the newer banner
+                // or start a stale fallback chain in that case.
+                if (generation != bannerGeneration.get() ||
+                    !fallbackStarted.compareAndSet(false, true)
+                ) {
+                    return
+                }
+                Log.w(TAG, "Unity banner $stage: $error")
+                // The Unity guide expects the host to own the loaded View. Once
+                // it cannot be shown, release that view before the fallback
+                // network places its own banner in the same container.
+                destroyBanner()
+                onFailed()
+            }
             val showListener = object : BannerShowListener {
                 override fun onImpression(ad: BannerAd) {
                     Log.i(TAG, "Unity banner impression")
@@ -247,8 +264,7 @@ object UnityAdManager {
                 }
 
                 override fun onFailedToShow(ad: BannerAd, error: UnityAdsError) {
-                    Log.w(TAG, "Unity banner failed to show: $error")
-                    onFailed()
+                    failBanner("failed to show", error)
                 }
             }
             val config = BannerConfiguration.Builder(
@@ -259,15 +275,16 @@ object UnityAdManager {
                 .build()
             BannerAd.load(config, object : LoadListener<BannerAd> {
                 override fun onAdLoaded(ad: BannerAd?, error: UnityAdsError?) {
-                    if (ad == null) {
-                        Log.w(TAG, "Unity banner failed to load: $error")
-                        onFailed()
+                    // Unity reports the result through both arguments. Follow
+                    // the SDK contract: a load only succeeds when error is null
+                    // and an ad instance is supplied.
+                    if (error != null || ad == null) {
+                        failBanner("failed to load", error)
                         return
                     }
                     val adView = ad.view
                     if (adView == null) {
-                        Log.w(TAG, "Unity banner loaded without a view")
-                        onFailed()
+                        failBanner("loaded without a view")
                         return
                     }
                     container.post {
