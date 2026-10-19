@@ -559,7 +559,7 @@ private fun MobileDirectStreamPlayer(
                     },
                     update = { it.player = engine.player }
                 )
-                if (state.isLoading || state.isBuffering) {
+                if (state.isBuffering && !state.isLoading) {
                     CircularProgressIndicator(color = PrimaryRed)
                 }
                 if (state.isLoading && state.providers.isNotEmpty()) {
@@ -641,7 +641,7 @@ private fun MobileDirectStreamPlayer(
                 )
             },
             confirmButton = {
-                Button(onClick = onRetry) { Text("Retry") }
+                Button(onClick = onDismissError) { Text("Close") }
             },
             dismissButton = {
                 if (state.isBackendDown) {
