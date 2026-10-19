@@ -17,13 +17,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -31,6 +31,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Replay30
@@ -39,12 +40,16 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -62,6 +67,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -524,7 +531,11 @@ private fun MobileDirectStreamPlayer(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onRetry) {
+                    IconButton(
+                        onClick = onRetry,
+                        enabled = !state.isLoading,
+                        colors = IconButtonDefaults.iconButtonColors(contentColor = TextPrimary)
+                    ) {
                         Icon(Icons.Default.Refresh, "Reload streams")
                     }
                 },
@@ -542,6 +553,7 @@ private fun MobileDirectStreamPlayer(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(16f / 9f)
+                    .clip(RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp))
                     .background(Color.Black),
                 contentAlignment = Alignment.Center
             ) {
@@ -560,14 +572,45 @@ private fun MobileDirectStreamPlayer(
                     update = { it.player = engine.player }
                 )
                 if (state.isBuffering && !state.isLoading) {
-                    CircularProgressIndicator(color = PrimaryRed)
+                    Surface(
+                        shape = MaterialTheme.shapes.large,
+                        color = Color.Black.copy(alpha = .72f),
+                        tonalElevation = 4.dp
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.width(22.dp),
+                                color = PrimaryRed,
+                                strokeWidth = 2.5.dp
+                            )
+                            Text("Buffering…", color = TextPrimary, style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
                 }
                 if (state.isLoading && state.providers.isNotEmpty()) {
-                    ProviderWheel(
-                        providers = state.providers,
-                        activeIndex = state.activeProviderIndex,
-                        modifier = Modifier.align(Alignment.Center)
-                    )
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(16.dp),
+                        shape = MaterialTheme.shapes.large,
+                        color = Color.Black.copy(alpha = .78f),
+                        tonalElevation = 6.dp
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text("Finding the best stream", style = MaterialTheme.typography.labelLarge, color = TextPrimary)
+                            ProviderWheel(
+                                providers = state.providers,
+                                activeIndex = state.activeProviderIndex
+                            )
+                        }
+                    }
                 }
             }
 
@@ -579,22 +622,52 @@ private fun MobileDirectStreamPlayer(
                 )
             }
             Column(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                if (state.activeStreamName.isNotBlank()) {
-                    Text(state.activeStreamName, style = MaterialTheme.typography.titleSmall, color = TextPrimary)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (state.activeStreamName.isBlank()) "Ready to play" else state.activeStreamName,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = TextPrimary,
+                            maxLines = 1
+                        )
+                        if (state.providerProgress.isNotBlank()) {
+                            Text(
+                                state.providerProgress,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                    if (state.isBuffering) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.width(18.dp),
+                            color = PrimaryRed,
+                            strokeWidth = 2.dp
+                        )
+                    }
                 }
-                if (state.providerProgress.isNotBlank()) {
-                    Text(state.providerProgress, style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(end = 4.dp)
+                ) {
+                    item {
                     AssistChip(
                         onClick = onSelectStream,
+                        enabled = state.availableStreamCount > 0,
                         label = { Text("${state.availableStreamCount} sources") },
                         leadingIcon = { Icon(Icons.Default.MoreHoriz, null) },
                         colors = AssistChipDefaults.assistChipColors(containerColor = CardDark)
                     )
+                    }
+                    item {
                     AssistChip(
                         onClick = onTracks,
                         enabled = state.hasTracks,
@@ -602,27 +675,48 @@ private fun MobileDirectStreamPlayer(
                         leadingIcon = { Icon(Icons.Default.GraphicEq, null) },
                         colors = AssistChipDefaults.assistChipColors(containerColor = CardDark)
                     )
+                    }
                 }
-                Surface(color = CardDark, shape = MaterialTheme.shapes.large) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CardDark),
+                    shape = MaterialTheme.shapes.extraLarge,
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(8.dp),
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(onClick = onSeekBack) { Icon(Icons.Default.Replay30, "Back 30 seconds") }
-                        Button(
+                        IconButton(
+                            onClick = onSeekBack,
+                            colors = IconButtonDefaults.iconButtonColors(contentColor = TextPrimary)
+                        ) { Icon(Icons.Default.Replay30, "Back 30 seconds") }
+                        FilledIconButton(
                             onClick = onTogglePlayback,
-                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryRed)
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = PrimaryRed,
+                                contentColor = TextPrimary
+                            )
                         ) {
-                            Icon(Icons.Default.PlayArrow, null)
-                            Spacer(Modifier.width(6.dp))
-                            Text(if (state.isPlaying) "Pause" else "Play")
+                            Icon(
+                                if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                if (state.isPlaying) "Pause" else "Play"
+                            )
                         }
-                        IconButton(onClick = onSeekForward) { Icon(Icons.Default.Forward30, "Forward 30 seconds") }
+                        IconButton(
+                            onClick = onSeekForward,
+                            colors = IconButtonDefaults.iconButtonColors(contentColor = TextPrimary)
+                        ) { Icon(Icons.Default.Forward30, "Forward 30 seconds") }
                     }
                 }
+                HorizontalDivider(color = CardDark.copy(alpha = .7f))
+                Text(
+                    text = "Tap the video to open the full player controls.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
             }
         }
     }
