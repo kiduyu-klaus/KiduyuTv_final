@@ -70,14 +70,12 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.TextSecondary
 class StreamSelectionDialog(
     context: Context,
     streams: List<StreamItem>,
-    activeUrl: String?,
-    activeName: String? = null,
+    activeIndex: Int? = null,
     private val onStreamSelected: (StreamItem) -> Unit
 ) : ComponentDialog(context) {
 
     private val streamsState = mutableStateOf(visibleStreams(streams))
-    private val activeUrlState = mutableStateOf(activeUrl)
-    private val activeNameState = mutableStateOf(activeName)
+    private val activeIndexState = mutableStateOf(activeIndex)
 
     init {
         requestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -86,8 +84,7 @@ class StreamSelectionDialog(
                 setContent {
                     StreamSelectionContent(
                         streams = streamsState.value,
-                        activeUrl = activeUrlState.value,
-                        activeName = activeNameState.value,
+                        activeIndex = activeIndexState.value,
                         onStreamSelected = ::selectStream,
                         onDismiss = ::dismiss
                     )
@@ -126,23 +123,21 @@ class StreamSelectionDialog(
 
     fun updateStreams(
         updated: List<StreamItem>,
-        activeUrl: String? = activeUrlState.value,
-        activeName: String? = activeNameState.value
+        activeIndex: Int? = activeIndexState.value
     ) {
         if (!isShowing) return
         // Keep probe-rejected sources selectable when possible, but hide
         // streams that have been confirmed as HTTP 404 / file-not-found.
         streamsState.value = visibleStreams(updated)
-        activeUrlState.value = activeUrl
-        activeNameState.value = activeName
+        activeIndexState.value = activeIndex
     }
 
     private fun visibleStreams(streams: List<StreamItem>): List<StreamItem> =
         streams.filterNot { it.httpStatusCode == HTTP_NOT_FOUND }
 
     private fun selectStream(stream: StreamItem) {
-        activeUrlState.value = stream.url
-        activeNameState.value = stream.name
+        activeIndexState.value = streamsState.value.indexOfFirst { it === stream }
+            .takeIf { it >= 0 }
         onStreamSelected(stream)
         dismiss()
     }
@@ -150,15 +145,14 @@ class StreamSelectionDialog(
     @Composable
     private fun StreamSelectionContent(
         streams: List<StreamItem>,
-        activeUrl: String?,
-        activeName: String?,
+        activeIndex: Int?,
         onStreamSelected: (StreamItem) -> Unit,
         onDismiss: () -> Unit
     ) {
         var selectedLanguage by remember { mutableStateOf(LanguageFilter.ALL) }
         var isGridLayout by remember { mutableStateOf(false) }
         val filteredStreams = remember(streams, selectedLanguage) {
-                streams.filter { stream ->
+                streams.withIndex().filter { (_, stream) ->
                     val language = stream.displayLanguage()
                     when (selectedLanguage) {
                         LanguageFilter.ALL -> true
@@ -175,13 +169,9 @@ class StreamSelectionDialog(
         val streamFocusRequesters = remember(filteredStreams) {
             List(filteredStreams.size) { FocusRequester() }
         }
-        val playingIndex = if (!activeName.isNullOrBlank()) {
-            filteredStreams.indexOfFirst { it.name == activeName }
-        } else {
-            filteredStreams.indexOfFirst { it.url == activeUrl }
-        }
+        val playingIndex = filteredStreams.indexOfFirst { it.index == activeIndex }
 
-        LaunchedEffect(filteredStreams, activeUrl, activeName, isGridLayout) {
+        LaunchedEffect(filteredStreams, activeIndex, isGridLayout) {
             if (playingIndex >= 0) {
                 if (isGridLayout) {
                     gridState.scrollToItem(playingIndex)
@@ -276,14 +266,14 @@ class StreamSelectionDialog(
                         ) {
                             itemsIndexed(
                                 items = filteredStreams,
-                                key = { index, stream -> streamKey(index, stream) }
-                            ) { index, stream ->
+                                key = { index, entry -> streamKey(index, entry.value) }
+                            ) { index, entry ->
                                 StreamCard(
-                                    stream = stream,
-                                    active = index == playingIndex,
+                                    stream = entry.value,
+                                    active = entry.index == activeIndex,
                                     focusRequester = streamFocusRequesters[index],
                                     firstFocusRequester = if (index == 0) firstStreamFocusRequester else null,
-                                    onClick = { onStreamSelected(stream) }
+                                    onClick = { onStreamSelected(entry.value) }
                                 )
                             }
                         }
@@ -295,14 +285,14 @@ class StreamSelectionDialog(
                         ) {
                             itemsIndexed(
                                 items = filteredStreams,
-                                key = { index, stream -> streamKey(index, stream) }
-                            ) { index, stream ->
+                                key = { index, entry -> streamKey(index, entry.value) }
+                            ) { index, entry ->
                                 StreamCard(
-                                    stream = stream,
-                                    active = index == playingIndex,
+                                    stream = entry.value,
+                                    active = entry.index == activeIndex,
                                     focusRequester = streamFocusRequesters[index],
                                     firstFocusRequester = if (index == 0) firstStreamFocusRequester else null,
-                                    onClick = { onStreamSelected(stream) }
+                                    onClick = { onStreamSelected(entry.value) }
                                 )
                             }
                         }

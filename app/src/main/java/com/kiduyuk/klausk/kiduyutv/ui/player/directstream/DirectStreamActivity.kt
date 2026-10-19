@@ -72,6 +72,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.PlayerEngine
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamCatalog
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamProviderChoice
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
+import com.kiduyuk.klausk.kiduyutv.util.UpdateUtil
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamResolver
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamSelectionDialog
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamValidator
@@ -320,8 +321,8 @@ class DirectStreamActivity : AppCompatActivity() {
         }
         streamDialog?.updateStreams(
             availableStreams,
-            activeUrl = retryStream.url,
-            activeName = retryStream.name
+            activeIndex = availableStreams.filterNot { it.httpStatusCode == 404 }.indexOfFirst { it === retryStream }
+                .takeIf { it >= 0 }
         )
         activeStream = retryStream
         lastStreamPlaybackKey = null
@@ -1509,8 +1510,9 @@ class DirectStreamActivity : AppCompatActivity() {
         streamDialog = StreamSelectionDialog(
             context = this,
             streams = availableStreams,
-            activeUrl = activeStream?.url,
-            activeName = activeStream?.name,
+            activeIndex = activeStream?.let { active ->
+                availableStreams.filterNot { it.httpStatusCode == 404 }.indexOfFirst { it === active }.takeIf { it >= 0 }
+            },
             onStreamSelected = ::switchStream
         )
         streamDialog?.setOnDismissListener { streamDialog = null }
@@ -1666,8 +1668,8 @@ class DirectStreamActivity : AppCompatActivity() {
         // "with SRT" badge as soon as the downloaded track is attached.
         streamDialog?.updateStreams(
             availableStreams,
-            activeUrl = updatedStream.url,
-            activeName = updatedStream.name
+            activeIndex = availableStreams.filterNot { it.httpStatusCode == 404 }.indexOfFirst { it === updatedStream }
+                .takeIf { it >= 0 }
         )
         Log.i(
             TAG,
@@ -1735,8 +1737,8 @@ class DirectStreamActivity : AppCompatActivity() {
             }
             streamDialog?.updateStreams(
                 availableStreams,
-                activeUrl = refreshed.url,
-                activeName = refreshed.name
+                activeIndex = availableStreams.filterNot { it.httpStatusCode == 404 }.indexOfFirst { it === refreshed }
+                    .takeIf { it >= 0 }
             )
             activeStream = refreshed
             startStreamPlayback(refreshed, positionMs)
@@ -1841,8 +1843,7 @@ class DirectStreamActivity : AppCompatActivity() {
                     activeStream = null
                     streamDialog?.updateStreams(
                         availableStreams,
-                        activeUrl = null,
-                        activeName = null
+                        activeIndex = null
                     )
                     if (availableStreams.size < 2) {
                         binding.btnPlayerStreams.visibility = View.GONE
@@ -2144,8 +2145,9 @@ class DirectStreamActivity : AppCompatActivity() {
                 // CineSrc Mega rows receive their probe result immediately.
                 streamDialog?.updateStreams(
                     availableStreams,
-                    activeUrl = activeStream?.url,
-                    activeName = activeStream?.name
+                    activeIndex = activeStream?.let { active ->
+                        availableStreams.filterNot { it.httpStatusCode == 404 }.indexOfFirst { it === active }.takeIf { it >= 0 }
+                    }
                 )
                 val okCount = validated.count { it.isValid }
                 val blockedCount = validated.count { it.httpStatusCode == 403 }
@@ -2212,8 +2214,9 @@ class DirectStreamActivity : AppCompatActivity() {
         }
         streamDialog?.updateStreams(
             availableStreams,
-            activeUrl = activeStream?.url,
-            activeName = activeStream?.name
+            activeIndex = activeStream?.let { active ->
+                availableStreams.filterNot { it.httpStatusCode == 404 }.indexOfFirst { it === active }.takeIf { it >= 0 }
+            }
         )
         if (wasMarkedFailed) {
             Log.i(
@@ -3594,7 +3597,13 @@ class DirectStreamActivity : AppCompatActivity() {
             overview: String? = null,
             voteAverage: Double = 0.0,
             releaseDate: String? = null
-        ): Intent = Intent(context, DirectStreamActivity::class.java).apply {
+        ): Intent {
+            val target = if (UpdateUtil.isTvDevice(context)) {
+                DirectStreamActivity::class.java
+            } else {
+                MobileDirectStreamActivity::class.java
+            }
+            return Intent(context, target).apply {
             putExtra(EXTRA_TMDB_ID, tmdbId)
             putExtra(EXTRA_IMDB_ID, imdbId)
             putExtra(EXTRA_TYPE, if (isTv) TYPE_SERIES else TYPE_MOVIE)
@@ -3607,6 +3616,7 @@ class DirectStreamActivity : AppCompatActivity() {
             putExtra(EXTRA_OVERVIEW, overview)
             putExtra(EXTRA_VOTE_AVERAGE, voteAverage)
             putExtra(EXTRA_RELEASE_DATE, releaseDate)
+            }
         }
 
         fun createSniffedIntent(

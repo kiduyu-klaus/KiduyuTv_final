@@ -50,6 +50,8 @@ class StreamResolver {
         onHealthCheckPassed: suspend () -> Unit = {},
         onProviderDiscoveryStart: suspend () -> Unit = {},
         onProviderStreamsStart: suspend (totalProviders: Int) -> Unit = {},
+        onProviderStarted: suspend (index: Int, total: Int, providerName: String) -> Unit = { _, _, _ -> },
+        onProviderFinished: suspend (index: Int, total: Int, providerName: String, streamCount: Int, failed: Boolean) -> Unit = { _, _, _, _, _ -> },
         onProviderProgress: suspend (index: Int, total: Int, providerName: String) -> Unit = { _, _, _ -> },
         onProviderRetry: suspend (index: Int, total: Int, providerName: String) -> Unit = { _, _, _ -> },
         onStreamProgress: suspend (fetchedCount: Int) -> Unit = {}
@@ -93,6 +95,7 @@ class StreamResolver {
             providerNames.mapIndexed { index, providerName ->
                 async {
                     requestLimiter.withPermit {
+                        onProviderStarted(index + 1, totalProviders, providerName)
                         Log.i(
                             tag,
                             "Resolver.load provider=$providerName type=$requestType category=${providerRoute.category} " +
@@ -144,6 +147,13 @@ class StreamResolver {
                         }
 
                         val completed = completedProviders.incrementAndGet()
+                        onProviderFinished(
+                            index + 1,
+                            totalProviders,
+                            providerName,
+                            streams.size,
+                            response == null
+                        )
                         onProviderProgress(completed, totalProviders, providerName)
                         onStreamProgress(fetchedStreamCount.addAndGet(streams.size))
                         streams

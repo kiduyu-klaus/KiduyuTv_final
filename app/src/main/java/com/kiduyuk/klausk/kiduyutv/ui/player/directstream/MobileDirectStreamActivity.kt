@@ -1,5 +1,6 @@
 package com.kiduyuk.klausk.kiduyutv.ui.player.directstream
 
+import android.content.pm.ActivityInfo
 import android.os.Build
 import android.os.Bundle
 import android.view.ViewGroup
@@ -7,17 +8,25 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.annotation.RequiresApi
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.GraphicEq
@@ -44,16 +53,19 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.Player
 import androidx.media3.ui.PlayerView
@@ -85,6 +97,14 @@ import org.json.JSONObject
  */
 class MobileDirectStreamActivity : ComponentActivity() {
 
+    enum class ProviderStatus { PENDING, CHECKING, RETRYING, FOUND, EMPTY, FAILED }
+
+    data class ProviderUiState(
+        val name: String = "Provider",
+        val status: ProviderStatus = ProviderStatus.PENDING,
+        val streamCount: Int = 0
+    )
+
     private lateinit var settingsManager: SettingsManager
     private lateinit var engine: PlayerEngine
     private val resolver = StreamResolver()
@@ -103,8 +123,65 @@ class MobileDirectStreamActivity : ComponentActivity() {
 
     private var screenState by mutableStateOf(MobilePlayerState())
 
+    private fun providerStarted(index: Int, name: String) {
+        val position = index - 1
+        if (position !in screenState.providers.indices) return
+        val providers = screenState.providers.toMutableList()
+        providers[position] = providers[position].copy(
+            name = name,
+            status = ProviderStatus.CHECKING
+        )
+        screenState = screenState.copy(
+            providers = providers,
+            activeProviderIndex = position,
+            providerProgress = "Checking $name…"
+        )
+    }
+
+    private fun providerRetrying(index: Int, name: String) {
+        val position = index - 1
+        if (position !in screenState.providers.indices) return
+        val providers = screenState.providers.toMutableList()
+        providers[position] = providers[position].copy(
+            name = name,
+            status = ProviderStatus.RETRYING
+        )
+        screenState = screenState.copy(
+            providers = providers,
+            activeProviderIndex = position,
+            providerProgress = "Retrying $name…"
+        )
+    }
+
+    private fun providerFinished(index: Int, name: String, streamCount: Int, failed: Boolean) {
+        val position = index - 1
+        if (position !in screenState.providers.indices) return
+        val providers = screenState.providers.toMutableList()
+        providers[position] = providers[position].copy(
+            name = name,
+            status = when {
+                failed -> ProviderStatus.FAILED
+                streamCount > 0 -> ProviderStatus.FOUND
+                else -> ProviderStatus.EMPTY
+            },
+            streamCount = streamCount
+        )
+        val next = providers.indices.firstOrNull { candidate ->
+            providers[candidate].status == ProviderStatus.CHECKING ||
+                providers[candidate].status == ProviderStatus.RETRYING ||
+                providers[candidate].status == ProviderStatus.PENDING
+        } ?: position
+        screenState = screenState.copy(
+            providers = providers,
+            activeProviderIndex = next,
+            providerProgress = "${index}/${providers.size} providers checked"
+        )
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR
+        enterImmersiveFullscreen()
         settingsManager = SettingsManager(this)
         endpoint = settingsManager.getDirectStreamEndpoint()
         mediaType = intent.getStringExtra(DirectStreamActivity.EXTRA_TYPE)
@@ -159,7 +236,8 @@ class MobileDirectStreamActivity : ComponentActivity() {
                     onSeekForward = { engine.seekBy(30_000L) },
                     onSelectStream = ::showStreamSelection,
                     onTracks = ::showTrackSelection,
-                    onRetry = ::loadStreams
+                    onRetry = ::loadStreams,
+                    onDismissError = { screenState = screenState.copy(error = null) }
                 )
             }
         }
@@ -174,6 +252,19 @@ class MobileDirectStreamActivity : ComponentActivity() {
         }
     }
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) enterImmersiveFullscreen()
+    }
+
+    private fun enterImmersiveFullscreen() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            hide(WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+    }
+
     private fun loadStreams() {
         if (tmdbId <= 0) return
         lifecycleScope.launch {
@@ -181,7 +272,9 @@ class MobileDirectStreamActivity : ComponentActivity() {
                 isLoading = true,
                 isBackendDown = false,
                 error = null,
-                providerProgress = "Finding streams…"
+                providerProgress = "Finding streams…",
+                providers = emptyList(),
+                activeProviderIndex = 0
             )
             runCatching {
                 resolver.load(
@@ -191,10 +284,21 @@ class MobileDirectStreamActivity : ComponentActivity() {
                     episode = episode,
                     provider = provider,
                     endpoint = endpoint,
+                    onProviderStreamsStart = { total ->
+                        screenState = screenState.copy(
+                            providers = List(total) { ProviderUiState() },
+                            activeProviderIndex = 0
+                        )
+                    },
+                    onProviderStarted = { index, _, name -> providerStarted(index, name) },
+                    onProviderFinished = { index, _, name, streamCount, failed ->
+                        providerFinished(index, name, streamCount, failed)
+                    },
                     onProviderProgress = { index, total, name ->
                         screenState = screenState.copy(providerProgress = "$index/$total · $name")
                     },
                     onProviderRetry = { index, total, name ->
+                        providerRetrying(index, name)
                         screenState = screenState.copy(providerProgress = "Retrying $index/$total · $name")
                     }
                 )
@@ -204,6 +308,7 @@ class MobileDirectStreamActivity : ComponentActivity() {
                 screenState = screenState.copy(
                     isLoading = false,
                     providerProgress = "",
+                    providers = emptyList(),
                     availableStreamCount = loaded.size,
                     error = if (first == null) getString(R.string.no_streams_dialog_message) else null
                 )
@@ -212,6 +317,7 @@ class MobileDirectStreamActivity : ComponentActivity() {
                 screenState = screenState.copy(
                     isLoading = false,
                     providerProgress = "",
+                    providers = emptyList(),
                     isBackendDown = error is ProvidersBackendUnavailableException,
                     error = error.message ?: getString(R.string.streams_failed)
                 )
@@ -228,7 +334,10 @@ class MobileDirectStreamActivity : ComponentActivity() {
             isBuffering = true
         )
         engine.play(stream, resumePosition, stream.subtitles)
-        selectionDialog?.updateStreams(streams, stream.url, stream.name)
+        selectionDialog?.updateStreams(
+            streams,
+            activeIndex = streams.filterNot { it.httpStatusCode == 404 }.indexOfFirst { it === stream }.takeIf { it >= 0 }
+        )
     }
 
     private fun showStreamSelection() {
@@ -237,8 +346,9 @@ class MobileDirectStreamActivity : ComponentActivity() {
         selectionDialog = StreamSelectionDialog(
             context = this,
             streams = streams,
-            activeUrl = activeStream?.url,
-            activeName = activeStream?.name,
+            activeIndex = activeStream?.let { active ->
+                streams.filterNot { it.httpStatusCode == 404 }.indexOfFirst { it === active }.takeIf { it >= 0 }
+            },
             onStreamSelected = ::play
         ).also { it.show() }
     }
@@ -296,8 +406,89 @@ class MobileDirectStreamActivity : ComponentActivity() {
         val availableStreamCount: Int = 0,
         val activeStreamName: String = "",
         val providerProgress: String = "",
+        val providers: List<ProviderUiState> = emptyList(),
+        val activeProviderIndex: Int = 0,
         val error: String? = null
     )
+}
+
+@Composable
+private fun ProviderWheel(
+    providers: List<MobileDirectStreamActivity.ProviderUiState>,
+    activeIndex: Int,
+    modifier: Modifier = Modifier
+) {
+    val listState = rememberLazyListState()
+    val centeredIndex = activeIndex.coerceIn(0, (providers.size - 1).coerceAtLeast(0))
+
+    LaunchedEffect(providers.size, centeredIndex) {
+        if (providers.isNotEmpty()) listState.animateScrollToItem(centeredIndex)
+    }
+
+    LazyColumn(
+        state = listState,
+        modifier = modifier
+            .fillMaxWidth()
+            .height(132.dp),
+        contentPadding = PaddingValues(vertical = 48.dp),
+        userScrollEnabled = false
+    ) {
+        itemsIndexed(providers) { index, provider ->
+            val distance = kotlin.math.abs(index - centeredIndex)
+            val rowAlpha = when (distance) {
+                0 -> 1f
+                1 -> 0.58f
+                2 -> 0.28f
+                else -> 0.12f
+            }
+            val isActive = distance == 0
+            val isFailure = provider.status == MobileDirectStreamActivity.ProviderStatus.EMPTY ||
+                provider.status == MobileDirectStreamActivity.ProviderStatus.FAILED
+            val labelColor = when {
+                isFailure -> Color(0xFFE53935)
+                isActive -> TextPrimary
+                else -> TextSecondary
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .alpha(rowAlpha)
+                    .padding(horizontal = 24.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                if (isActive && (provider.status == MobileDirectStreamActivity.ProviderStatus.CHECKING ||
+                        provider.status == MobileDirectStreamActivity.ProviderStatus.RETRYING)) {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .padding(end = 5.dp)
+                            .width(10.dp),
+                        color = PrimaryRed,
+                        strokeWidth = 1.5.dp
+                    )
+                }
+                Text(
+                    text = provider.name,
+                    color = labelColor,
+                    fontSize = if (isActive) 11.sp else 9.sp,
+                    maxLines = 1
+                )
+                if (isActive && isFailure) {
+                    Text(
+                        text = if (provider.status == MobileDirectStreamActivity.ProviderStatus.EMPTY) {
+                            "  No streams"
+                        } else {
+                            "  Failed"
+                        },
+                        color = labelColor,
+                        fontSize = 9.sp,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -313,7 +504,8 @@ private fun MobileDirectStreamPlayer(
     onSeekForward: () -> Unit,
     onSelectStream: () -> Unit,
     onTracks: () -> Unit,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    onDismissError: () -> Unit
 ) {
     val context = LocalContext.current
     Scaffold(
@@ -370,6 +562,13 @@ private fun MobileDirectStreamPlayer(
                 if (state.isLoading || state.isBuffering) {
                     CircularProgressIndicator(color = PrimaryRed)
                 }
+                if (state.isLoading && state.providers.isNotEmpty()) {
+                    ProviderWheel(
+                        providers = state.providers,
+                        activeIndex = state.activeProviderIndex,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
             }
 
             if (state.isLoading) {
@@ -379,7 +578,6 @@ private fun MobileDirectStreamPlayer(
                     trackColor = CardDark
                 )
             }
-
             Column(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -431,7 +629,11 @@ private fun MobileDirectStreamPlayer(
 
     state.error?.let { message ->
         AlertDialog(
-            onDismissRequest = { },
+            onDismissRequest = onDismissError,
+            properties = DialogProperties(
+                dismissOnBackPress = true,
+                dismissOnClickOutside = true
+            ),
             title = { Text(if (state.isBackendDown) "Backend site is down" else "Playback unavailable") },
             text = {
                 Text(
