@@ -178,6 +178,7 @@ class DirectStreamActivity : AppCompatActivity() {
     private var pendingStartPositionMs = 0L
     private var pendingReadySeekPositionMs = 0L
     private var handlingPlaybackError = false
+    private var lastPlaybackHttpError: Int? = null
     private var isPlaybackBuffering = false
     private var watchHistoryReady = false
     private val controlsClock = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
@@ -320,8 +321,7 @@ class DirectStreamActivity : AppCompatActivity() {
         }
         streamDialog?.updateStreams(
             availableStreams,
-            activeIndex = availableStreams.filterNot { it.httpStatusCode == 404 }.indexOfFirst { it === retryStream }
-                .takeIf { it >= 0 }
+            activeIndex = streamSelectionIndex(retryStream)
         )
         activeStream = retryStream
         lastStreamPlaybackKey = null
@@ -462,7 +462,8 @@ class DirectStreamActivity : AppCompatActivity() {
 
         resolver = StreamResolver()
         engine = PlayerEngine(this).apply {
-            onError = { code -> handlePlaybackError(code) }
+            onHttpError = { statusCode -> lastPlaybackHttpError = statusCode }
+            onError = { code -> handlePlaybackError(code, lastPlaybackHttpError) }
             onPlaybackStateChanged = { state ->
                 when (state) {
                     Player.STATE_BUFFERING -> {
@@ -1504,14 +1505,71 @@ class DirectStreamActivity : AppCompatActivity() {
         startActivity(MainActivity.createSettingsIntent(this))
     }
 
+    /**
+     * Finds the active item in the selector by stream identity rather than
+     * object identity. Stream validation and subtitle/token refreshes create
+     * copied [StreamItem] instances, so `===` loses the active row. Prefer the
+     * URL, then use presentation metadata when a refreshed URL has a new token.
+     */
+    private fun streamSelectionIndex(active: StreamItem?): Int? {
+        val activeUrl = active?.url ?: return null
+        val selectableStreams = availableStreams.filterNot { it.httpStatusCode == HTTP_NOT_FOUND }
+        return selectableStreams
+            .indexOfFirst { it.url == activeUrl }
+            .takeIf { it >= 0 }
+            ?: selectableStreams.indexOfFirst { candidate ->
+                candidate.provider.equals(active.provider, ignoreCase = true) &&
+                    candidate.name == active.name &&
+                    candidate.title == active.title &&
+                    candidate.quality.equals(active.quality, ignoreCase = true) &&
+                    candidate.type.equals(active.type, ignoreCase = true) &&
+                    candidate.language.equals(active.language, ignoreCase = true)
+            }
+            .takeIf { it >= 0 }
+    }
+
+    /**
+     * Playback is stronger evidence than a lightweight preflight probe. Keep a
+     * source visible for retry and diagnostics, but replace an optimistic
+     * validation result when Media3 receives an HTTP failure such as 502.
+     */
+    private fun markStreamPlaybackFailed(stream: StreamItem, statusCode: Int) {
+        val failed = stream.copy(
+            isValid = false,
+            isChecking = false,
+            isFailed = true,
+            httpStatusCode = statusCode
+        )
+        if (streamSelectionIndex(stream) != null) activeStream = failed
+        availableStreams = availableStreams.map { candidate ->
+            if (candidate.url == stream.url) {
+                candidate.copy(
+                    isValid = false,
+                    isChecking = false,
+                    isFailed = true,
+                    httpStatusCode = statusCode
+                )
+            } else {
+                candidate
+            }
+        }
+        streamDialog?.updateStreams(
+            availableStreams,
+            activeIndex = streamSelectionIndex(failed)
+        )
+        Log.w(
+            PROVIDER_TAG,
+            "Playback HTTP $statusCode; marked stream failed " +
+                "provider=${stream.provider} quality=${stream.quality}"
+        )
+    }
+
     private fun showStreamDialog() {
         if (streamDialog?.isShowing == true || availableStreams.size < 2) return
         streamDialog = StreamSelectionDialog(
             context = this,
             streams = availableStreams,
-            activeIndex = activeStream?.let { active ->
-                availableStreams.filterNot { it.httpStatusCode == 404 }.indexOfFirst { it === active }.takeIf { it >= 0 }
-            },
+            activeIndex = streamSelectionIndex(activeStream),
             onStreamSelected = ::switchStream
         )
         streamDialog?.setOnDismissListener { streamDialog = null }
@@ -1667,8 +1725,7 @@ class DirectStreamActivity : AppCompatActivity() {
         // "with SRT" badge as soon as the downloaded track is attached.
         streamDialog?.updateStreams(
             availableStreams,
-            activeIndex = availableStreams.filterNot { it.httpStatusCode == 404 }.indexOfFirst { it === updatedStream }
-                .takeIf { it >= 0 }
+            activeIndex = streamSelectionIndex(updatedStream)
         )
         Log.i(
             TAG,
@@ -1736,8 +1793,7 @@ class DirectStreamActivity : AppCompatActivity() {
             }
             streamDialog?.updateStreams(
                 availableStreams,
-                activeIndex = availableStreams.filterNot { it.httpStatusCode == 404 }.indexOfFirst { it === refreshed }
-                    .takeIf { it >= 0 }
+                activeIndex = streamSelectionIndex(refreshed)
             )
             activeStream = refreshed
             startStreamPlayback(refreshed, positionMs)
@@ -1772,7 +1828,7 @@ class DirectStreamActivity : AppCompatActivity() {
         dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.requestFocus()
     }
 
-    private fun handlePlaybackError(code: String) {
+    private fun handlePlaybackError(code: String, playbackHttpStatus: Int? = null) {
         if (handlingPlaybackError || isFinishing || isDestroyed) return
         handlingPlaybackError = true
         Log.e(
@@ -1832,10 +1888,13 @@ class DirectStreamActivity : AppCompatActivity() {
             cloudflareProbeJob?.cancel()
             cloudflareProbeJob = lifecycleScope.launch {
                 Log.w(TAG, "Playback error for active stream; url=${active.url} provider=${active.provider} quality=${active.quality}")
-                val statusCode = withContext(Dispatchers.IO) {
+                val statusCode = playbackHttpStatus ?: withContext(Dispatchers.IO) {
                     StreamValidator.probeStatus(active)
                 }
                 if (isFinishing || isDestroyed) return@launch
+                if (statusCode != null && statusCode >= 400) {
+                    markStreamPlaybackFailed(active, statusCode)
+                }
                 if (statusCode == HTTP_NOT_FOUND && isFileNotFoundPlaybackError(code)) {
                     availableStreams = availableStreams.filterNot { it.url == active.url }
                     playbackErrorDialog?.dismiss()
@@ -2144,9 +2203,7 @@ class DirectStreamActivity : AppCompatActivity() {
                 // CineSrc Mega rows receive their probe result immediately.
                 streamDialog?.updateStreams(
                     availableStreams,
-                    activeIndex = activeStream?.let { active ->
-                        availableStreams.filterNot { it.httpStatusCode == 404 }.indexOfFirst { it === active }.takeIf { it >= 0 }
-                    }
+                    activeIndex = streamSelectionIndex(activeStream)
                 )
                 val okCount = validated.count { it.isValid }
                 val blockedCount = validated.count { it.httpStatusCode == 403 }
@@ -2213,9 +2270,7 @@ class DirectStreamActivity : AppCompatActivity() {
         }
         streamDialog?.updateStreams(
             availableStreams,
-            activeIndex = activeStream?.let { active ->
-                availableStreams.filterNot { it.httpStatusCode == 404 }.indexOfFirst { it === active }.takeIf { it >= 0 }
-            }
+            activeIndex = streamSelectionIndex(activeStream)
         )
         if (wasMarkedFailed) {
             Log.i(
@@ -2496,6 +2551,7 @@ class DirectStreamActivity : AppCompatActivity() {
             return
         }
         handlingPlaybackError = false
+        lastPlaybackHttpError = null
         activeStream = stream
         applyProviderSkipSegments(stream)
         providerSubtitles = stream.subtitles

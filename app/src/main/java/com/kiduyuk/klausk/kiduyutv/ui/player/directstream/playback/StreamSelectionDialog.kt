@@ -166,21 +166,30 @@ class StreamSelectionDialog(
         val filterFocusRequester = remember { FocusRequester() }
         val listState = rememberLazyListState()
         val gridState = rememberLazyGridState()
-        val streamFocusRequesters = remember(filteredStreams) {
+        // Validation updates create fresh StreamItem lists while this dialog is
+        // visible. Keep requesters stable for the same rows so an update does
+        // not detach focus from the currently playing stream.
+        val streamKeys = remember(filteredStreams) {
+            filteredStreams.map { entry -> streamKey(entry.index, entry.value) }
+        }
+        val streamFocusRequesters = remember(streamKeys) {
             List(filteredStreams.size) { FocusRequester() }
         }
         val playingIndex = filteredStreams.indexOfFirst { it.index == activeIndex }
 
-        LaunchedEffect(filteredStreams, activeIndex, isGridLayout) {
+        LaunchedEffect(playingIndex, isGridLayout, streamFocusRequesters) {
             if (playingIndex >= 0) {
                 if (isGridLayout) {
                     gridState.scrollToItem(playingIndex)
                 } else {
                     listState.scrollToItem(playingIndex)
                 }
-                // Let the lazy container compose the target item before requesting focus.
+                // Let the lazy container compose the target item before
+                // requesting focus. A second frame is needed on TV where the
+                // focus system runs after the lazy layout pass.
                 withFrameNanos { }
-                streamFocusRequesters[playingIndex].requestFocus()
+                withFrameNanos { }
+                streamFocusRequesters.getOrNull(playingIndex)?.requestFocus()
             } else if (filteredStreams.isNotEmpty()) {
                 firstStreamFocusRequester.requestFocus()
             } else {
@@ -362,7 +371,8 @@ class StreamSelectionDialog(
             stream.isValid && !stream.isFailed -> context.getString(R.string.stream_ok)
             stream.isChecking -> context.getString(R.string.stream_checking)
             !stream.isFailed -> context.getString(R.string.stream_unverified)
-            else -> context.getString(R.string.stream_failed)
+            else -> stream.httpStatusCode?.let { "HTTP $it" }
+                ?: context.getString(R.string.stream_failed)
         }
         val statusColor = when {
             stream.isValid && !stream.isFailed -> ComposeColor(0xFF2E7D32)

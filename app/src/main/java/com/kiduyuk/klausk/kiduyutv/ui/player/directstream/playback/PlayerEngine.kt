@@ -16,6 +16,7 @@ import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -438,6 +439,9 @@ class PlayerEngine(context: Context) {
     /** Invoked on fatal playback errors. The argument is a stable error code name. */
     var onError: ((String) -> Unit)? = null
 
+    /** Invoked just before [onError] when Media3 exposes an HTTP response code. */
+    var onHttpError: ((Int) -> Unit)? = null
+
     /** Invoked with the new [Player.STATE_*] constant. */
     var onPlaybackStateChanged: ((Int) -> Unit)? = null
 
@@ -477,6 +481,7 @@ class PlayerEngine(context: Context) {
                 if (isAudioDecodingError(error) && tryRecoverWithAlternateAudioTrack()) {
                     return
                 }
+                findHttpResponseCode(error)?.let { onHttpError?.invoke(it) }
                 onError?.invoke(completeErrorMessage)
             }
 
@@ -607,6 +612,17 @@ class PlayerEngine(context: Context) {
         return details.contains("audio", ignoreCase = true) ||
             details.contains("FfmpegAudioRenderer", ignoreCase = true) ||
             details.contains("mp4a", ignoreCase = true)
+    }
+
+    private fun findHttpResponseCode(error: Throwable): Int? {
+        var current: Throwable? = error
+        while (current != null) {
+            if (current is HttpDataSource.InvalidResponseCodeException) {
+                return current.responseCode
+            }
+            current = current.cause
+        }
+        return null
     }
 
     private fun tryRecoverWithAlternateAudioTrack(): Boolean {
