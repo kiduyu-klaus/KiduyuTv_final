@@ -1,17 +1,16 @@
 package com.kiduyuk.klausk.kiduyutv.ui.player.directstream
 
 import android.content.pm.ActivityInfo
-import android.os.Build
 import android.os.Bundle
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.annotation.RequiresApi
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,10 +20,12 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
@@ -51,9 +52,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -61,6 +67,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,7 +81,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.lifecycleScope
+import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.Player
+import androidx.media3.common.TrackGroup
+import androidx.media3.common.TrackSelectionOverride
+import androidx.media3.common.TrackSelectionParameters
+import androidx.media3.common.Tracks
 import androidx.media3.ui.PlayerView
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.ProvidersBackendUnavailableException
@@ -83,8 +96,6 @@ import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.PlayerEngine
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamCatalog
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamProviderChoice
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamResolver
-import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamSelectionDialog
-import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.TrackSelectionDialog
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.CardDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.KiduyuTvTheme
@@ -125,9 +136,6 @@ class MobileDirectStreamActivity : ComponentActivity() {
     private var title = ""
     private var streams: List<StreamItem> = emptyList()
     private var activeStream: StreamItem? = null
-    private var selectionDialog: StreamSelectionDialog? = null
-    private var tracksDialog: TrackSelectionDialog? = null
-
     private var screenState by mutableStateOf(MobilePlayerState())
 
     private fun providerStarted(index: Int, name: String) {
@@ -224,7 +232,6 @@ class MobileDirectStreamActivity : ComponentActivity() {
             }
             onTracksChanged = { tracks ->
                 screenState = screenState.copy(hasTracks = tracks.groups.isNotEmpty())
-                tracksDialog?.updateCurrentTracks(tracks)
             }
         }
 
@@ -241,8 +248,20 @@ class MobileDirectStreamActivity : ComponentActivity() {
                     },
                     onSeekBack = { engine.seekBy(-30_000L) },
                     onSeekForward = { engine.seekBy(30_000L) },
+                    streams = streams,
+                    activeStream = activeStream,
+                    tracks = engine.currentTracks(),
+                    trackParameters = engine.currentTrackSelectionParameters(),
                     onSelectStream = ::showStreamSelection,
+                    onStreamSelected = ::play,
                     onTracks = ::showTrackSelection,
+                    onApplyTracks = engine::applyTrackSelectionParameters,
+                    onDismissStreamDialog = {
+                        screenState = screenState.copy(isStreamDialogVisible = false)
+                    },
+                    onDismissTrackDialog = {
+                        screenState = screenState.copy(isTrackDialogVisible = false)
+                    },
                     onRetry = ::loadStreams,
                     onDismissError = { screenState = screenState.copy(error = null) }
                 )
@@ -341,38 +360,23 @@ class MobileDirectStreamActivity : ComponentActivity() {
             isBuffering = true
         )
         engine.play(stream, resumePosition, stream.subtitles)
-        selectionDialog?.updateStreams(
-            streams,
-            activeIndex = streams.filterNot { it.httpStatusCode == 404 }.indexOfFirst { it === stream }.takeIf { it >= 0 }
-        )
     }
 
     private fun showStreamSelection() {
         if (streams.isEmpty()) return
-        selectionDialog?.dismiss()
-        selectionDialog = StreamSelectionDialog(
-            context = this,
-            streams = streams,
-            activeIndex = activeStream?.let { active ->
-                streams.filterNot { it.httpStatusCode == 404 }.indexOfFirst { it === active }.takeIf { it >= 0 }
-            },
-            onStreamSelected = ::play
-        ).also { it.show() }
+        screenState = screenState.copy(isStreamDialogVisible = true)
     }
 
-    @RequiresApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH)
     private fun showTrackSelection() {
-        if (engine.currentTracks().groups.isEmpty()) {
+        if (engine.currentTracks().groups.none {
+                it.type == C.TRACK_TYPE_VIDEO ||
+                    it.type == C.TRACK_TYPE_AUDIO ||
+                    it.type == C.TRACK_TYPE_TEXT
+            }) {
             Toast.makeText(this, "Tracks are not available yet", Toast.LENGTH_SHORT).show()
             return
         }
-        tracksDialog?.dismiss()
-        tracksDialog = TrackSelectionDialog(
-            context = this,
-            tracks = engine.currentTracks(),
-            initialParameters = engine.currentTrackSelectionParameters(),
-            onApply = engine::applyTrackSelectionParameters
-        ).also { it.show() }
+        screenState = screenState.copy(isTrackDialogVisible = true)
     }
 
     private fun parseSniffedStream(): StreamItem? {
@@ -398,8 +402,6 @@ class MobileDirectStreamActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        selectionDialog?.dismiss()
-        tracksDialog?.dismiss()
         if (::engine.isInitialized) engine.release()
         super.onDestroy()
     }
@@ -415,7 +417,9 @@ class MobileDirectStreamActivity : ComponentActivity() {
         val providerProgress: String = "",
         val providers: List<ProviderUiState> = emptyList(),
         val activeProviderIndex: Int = 0,
-        val error: String? = null
+        val error: String? = null,
+        val isStreamDialogVisible: Boolean = false,
+        val isTrackDialogVisible: Boolean = false
     )
 }
 
@@ -505,12 +509,20 @@ private fun MobileDirectStreamPlayer(
     engine: PlayerEngine,
     title: String,
     isEpisode: Boolean,
+    streams: List<StreamItem>,
+    activeStream: StreamItem?,
+    tracks: Tracks,
+    trackParameters: TrackSelectionParameters,
     onBack: () -> Unit,
     onTogglePlayback: () -> Unit,
     onSeekBack: () -> Unit,
     onSeekForward: () -> Unit,
     onSelectStream: () -> Unit,
+    onStreamSelected: (StreamItem) -> Unit,
     onTracks: () -> Unit,
+    onApplyTracks: (TrackSelectionParameters) -> Unit,
+    onDismissStreamDialog: () -> Unit,
+    onDismissTrackDialog: () -> Unit,
     onRetry: () -> Unit,
     onDismissError: () -> Unit
 ) {
@@ -721,6 +733,23 @@ private fun MobileDirectStreamPlayer(
         }
     }
 
+    if (state.isStreamDialogVisible) {
+        MobileStreamSelectionDialog(
+            streams = streams.filterNot { it.httpStatusCode == 404 },
+            activeStream = activeStream,
+            onSelect = onStreamSelected,
+            onDismiss = onDismissStreamDialog
+        )
+    }
+    if (state.isTrackDialogVisible) {
+        MobileTrackSelectionDialog(
+            tracks = tracks,
+            initialParameters = trackParameters,
+            onApply = onApplyTracks,
+            onDismiss = onDismissTrackDialog
+        )
+    }
+
     state.error?.let { message ->
         AlertDialog(
             onDismissRequest = onDismissError,
@@ -749,3 +778,260 @@ private fun MobileDirectStreamPlayer(
         )
     }
 }
+
+@Composable
+private fun MobileStreamSelectionDialog(
+    streams: List<StreamItem>,
+    activeStream: StreamItem?,
+    onSelect: (StreamItem) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Choose a stream", style = MaterialTheme.typography.headlineSmall)
+                Text(
+                    "${streams.size} available sources",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
+                )
+            }
+        },
+        text = {
+            if (streams.isEmpty()) {
+                Text("No playable sources are available.", color = TextSecondary)
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 460.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(streams, key = { it.url }) { stream ->
+                        val selected = stream === activeStream
+                        val title = stream.name.ifBlank { stream.title.ifBlank { "Stream" } }
+                        val details = listOfNotNull(
+                            stream.quality.takeIf { it.isNotBlank() && !it.equals("Auto", true) },
+                            stream.provider.takeIf { it.isNotBlank() },
+                            stream.mimeType.takeIf { it.isNotBlank() }
+                        ).joinToString(" · ")
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelect(stream); onDismiss() },
+                            shape = MaterialTheme.shapes.large,
+                            color = if (selected) PrimaryRed.copy(alpha = .18f) else CardDark,
+                            tonalElevation = if (selected) 4.dp else 0.dp
+                        ) {
+                            ListItem(
+                                headlineContent = {
+                                    Text(title, color = TextPrimary, maxLines = 1)
+                                },
+                                supportingContent = {
+                                    Column {
+                                        if (details.isNotBlank()) {
+                                            Text(details, color = TextSecondary, maxLines = 1)
+                                        }
+                                        Text(
+                                            text = when {
+                                                stream.isChecking -> "Checking source…"
+                                                stream.isValid -> "Ready to play"
+                                                stream.isFailed -> "Source unavailable"
+                                                else -> "Tap to play"
+                                            },
+                                            color = if (stream.isFailed) MaterialTheme.colorScheme.error else TextSecondary,
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                    }
+                                },
+                                leadingContent = {
+                                    RadioButton(selected = selected, onClick = null)
+                                },
+                                colors = androidx.compose.material3.ListItemDefaults.colors(
+                                    containerColor = Color.Transparent
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        }
+    )
+}
+
+private data class MobileTrackChoice(
+    val group: TrackGroup,
+    val trackIndex: Int
+)
+
+private data class MobileTrackOption(
+    val type: Int,
+    val label: String,
+    val detail: String,
+    val group: TrackGroup? = null,
+    val trackIndex: Int = -1,
+    val isAuto: Boolean = false
+)
+
+@Composable
+private fun MobileTrackSelectionDialog(
+    tracks: Tracks,
+    initialParameters: TrackSelectionParameters,
+    onApply: (TrackSelectionParameters) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val availableTypes = listOf(C.TRACK_TYPE_VIDEO, C.TRACK_TYPE_AUDIO, C.TRACK_TYPE_TEXT)
+    val initialChoices = tracks.groups.mapNotNull { group ->
+        if (group.type !in availableTypes) return@mapNotNull null
+        val selectedIndex = (0 until group.length).firstOrNull { group.isTrackSelected(it) }
+            ?: return@mapNotNull null
+        group.type to MobileTrackChoice(group, selectedIndex)
+    }.toMap()
+    var selectedTab by remember(tracks) {
+        mutableStateOf(
+            availableTypes.firstOrNull { type -> tracks.groups.any { it.type == type } }
+                ?: C.TRACK_TYPE_VIDEO
+        )
+    }
+    var choices by remember(tracks, initialParameters) { mutableStateOf(initialChoices) }
+    var disabledTypes by remember(tracks, initialParameters) {
+        mutableStateOf(initialParameters.disabledTrackTypes.toSet())
+    }
+    val tabs = availableTypes.filter { type -> tracks.groups.any { it.type == type } }
+    val options = mobileTrackOptions(tracks, selectedTab)
+
+    fun applyOption(option: MobileTrackOption) {
+        val nextChoices = if (option.isAuto) {
+            choices - option.type
+        } else if (option.group != null) {
+            choices + (option.type to MobileTrackChoice(option.group, option.trackIndex))
+        } else {
+            choices
+        }
+        val nextDisabled = if (option.isAuto && option.type == C.TRACK_TYPE_TEXT) {
+            disabledTypes + option.type
+        } else if (option.isAuto) {
+            disabledTypes - option.type
+        } else {
+            disabledTypes - option.type
+        }
+        val builder = initialParameters.buildUpon().clearOverrides()
+        availableTypes.forEach { type ->
+            builder.setTrackTypeDisabled(type, nextDisabled.contains(type))
+        }
+        nextChoices.values.forEach { choice ->
+            builder.setOverrideForType(TrackSelectionOverride(choice.group.mediaTrackGroup, choice.trackIndex))
+        }
+        val nextParameters = builder.build()
+        choices = nextChoices
+        disabledTypes = nextDisabled
+        onApply(nextParameters)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Playback tracks", style = MaterialTheme.typography.headlineSmall) },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                TabRow(selectedTabIndex = tabs.indexOf(selectedTab).coerceAtLeast(0)) {
+                    tabs.forEach { type ->
+                        Tab(
+                            selected = selectedTab == type,
+                            onClick = { selectedTab = type },
+                            text = { Text(mobileTrackTypeLabel(type)) }
+                        )
+                    }
+                }
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 420.dp),
+                    contentPadding = PaddingValues(vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(options, key = { "${it.type}:${it.trackIndex}:${it.label}" }) { option ->
+                        val selected = when {
+                            option.isAuto -> choices[option.type] == null &&
+                                (option.type != C.TRACK_TYPE_TEXT || disabledTypes.contains(option.type))
+                            else -> choices[option.type]?.trackIndex == option.trackIndex &&
+                                choices[option.type]?.group == option.group
+                            }
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { applyOption(option) },
+                            shape = MaterialTheme.shapes.medium,
+                            color = if (selected) PrimaryRed.copy(alpha = .14f) else Color.Transparent
+                        ) {
+                            ListItem(
+                                headlineContent = { Text(option.label, color = TextPrimary) },
+                                supportingContent = option.detail.takeIf { it.isNotBlank() }?.let { detail ->
+                                    { Text(detail, color = TextSecondary, style = MaterialTheme.typography.bodySmall) }
+                                },
+                                leadingContent = { RadioButton(selected = selected, onClick = null) },
+                                colors = androidx.compose.material3.ListItemDefaults.colors(
+                                    containerColor = Color.Transparent
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } }
+    )
+}
+
+private fun mobileTrackOptions(tracks: Tracks, type: Int): List<MobileTrackOption> {
+    val options = mutableListOf(
+        MobileTrackOption(
+            type = type,
+            label = if (type == C.TRACK_TYPE_TEXT) "Off" else "Auto",
+            detail = if (type == C.TRACK_TYPE_TEXT) "Disable subtitles" else "Let the player choose",
+            isAuto = true
+        )
+    )
+    tracks.groups.filter { it.type == type }.forEach { group ->
+        for (index in 0 until group.length) {
+            val format = group.getTrackFormat(index)
+            options += MobileTrackOption(
+                type = type,
+                label = mobileTrackTitle(format, type),
+                detail = mobileTrackDetail(format),
+                group = group,
+                trackIndex = index
+            )
+        }
+    }
+    return options
+}
+
+private fun mobileTrackTypeLabel(type: Int): String = when (type) {
+    C.TRACK_TYPE_VIDEO -> "Video"
+    C.TRACK_TYPE_AUDIO -> "Audio"
+    C.TRACK_TYPE_TEXT -> "Subtitles"
+    else -> "Tracks"
+}
+
+private fun mobileTrackTitle(format: Format, type: Int): String {
+    val label = format.label?.trim().orEmpty()
+    val language = format.language?.takeIf { it.isNotBlank() && !it.equals("und", true) }
+    return when {
+        label.isNotBlank() -> label
+        language != null -> language.uppercase()
+        type == C.TRACK_TYPE_VIDEO -> "Video track"
+        type == C.TRACK_TYPE_AUDIO -> "Audio track"
+        else -> "Subtitle track"
+    }
+}
+
+private fun mobileTrackDetail(format: Format): String = listOfNotNull(
+    format.language?.takeIf { it.isNotBlank() && !it.equals("und", true) },
+    format.width.takeIf { it > 0 }?.let { width -> "${width}p" },
+    format.sampleMimeType,
+    format.channelCount.takeIf { it > 0 }?.let { channels -> "${channels}ch" }
+).joinToString(" · ")
