@@ -727,7 +727,9 @@ class PlayerEngine(context: Context) {
         subtitles: List<SubtitleItem> = emptyList()
     ) {
         preparationJob?.cancel()
-        if (!MegaPlaybackToken.needsRefresh(stream)) {
+        val needsMegaRefresh = MegaPlaybackToken.needsRefresh(stream)
+        val needsVidsrcRefresh = VidsrcPlaybackToken.needsRefresh(stream)
+        if (!needsMegaRefresh && !needsVidsrcRefresh) {
             playPrepared(stream, startPositionMs, subtitles)
             return
         }
@@ -735,13 +737,25 @@ class PlayerEngine(context: Context) {
         val headers = playbackHeaders(stream)
         preparationJob = preparationScope.launch {
             try {
-                val refreshed = withContext(Dispatchers.IO) { MegaPlaybackToken.refresh(stream, headers) }
+                val refreshed = withContext(Dispatchers.IO) {
+                    when {
+                        needsMegaRefresh -> MegaPlaybackToken.refresh(stream, headers)
+                        needsVidsrcRefresh -> VidsrcPlaybackToken.refresh(stream, headers)
+                        else -> stream
+                    }
+                }
                 ensureActive()
                 playPrepared(refreshed, startPositionMs, subtitles)
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
-                onError?.invoke("Could not prepare Mega playback. Retry to request a fresh device token.")
+            } catch (error: Exception) {
+                val message = if (needsVidsrcRefresh) {
+                    "Could not prepare Vidsrc playback. Retry to request a fresh device token."
+                } else {
+                    "Could not prepare Mega playback. Retry to request a fresh device token."
+                }
+                Log.w(TAG, message, error)
+                onError?.invoke(message)
             }
         }
     }
