@@ -68,10 +68,10 @@ fun KiduyuTvTermsDialog(
 ) {
     val context = LocalContext.current
     var accepted by remember { mutableStateOf(false) }
-    val policyFocusRequester = remember { FocusRequester() }
+    val agreementFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) {
-        policyFocusRequester.requestFocus()
+        agreementFocusRequester.requestFocus()
     }
 
     fun openPolicyAndTerms() {
@@ -168,8 +168,7 @@ fun KiduyuTvTermsDialog(
                 ) {
                     PolicyButton(
                         modifier = Modifier
-                            .weight(1f)
-                            .focusRequester(policyFocusRequester),
+                            .weight(1f),
                         icon = Icons.Outlined.Shield,
                         text = "Read Full Privacy Policy",
                         onClick = ::openPolicyAndTerms
@@ -187,6 +186,7 @@ fun KiduyuTvTermsDialog(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
                         .clickable { accepted = !accepted }
+                        .focusRequester(agreementFocusRequester)
                         .focusable(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
