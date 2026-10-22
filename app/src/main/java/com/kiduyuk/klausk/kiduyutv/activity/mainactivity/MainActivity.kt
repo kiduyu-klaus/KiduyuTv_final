@@ -32,6 +32,7 @@ import com.kiduyuk.klausk.kiduyutv.network.NetworkConnectivityObserver
 import com.kiduyuk.klausk.kiduyutv.network.NetworkState
 import com.kiduyuk.klausk.kiduyutv.network.NetworkStateDialog
 import com.kiduyuk.klausk.kiduyutv.ui.components.KiduyuTvTermsDialog
+import com.kiduyuk.klausk.kiduyutv.ui.components.MobileKiduyuTvTermsDialog
 import com.kiduyuk.klausk.kiduyutv.ui.components.TraktAnnouncementDialog
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.MobileNavGraph
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.NavGraph
@@ -210,14 +211,17 @@ class MainActivity : ComponentActivity() {
                             onFinished = { homeDialogFinished = true }
                         )
                         if (homeDialogFinished && !termsAccepted) {
-                            KiduyuTvTermsDialog(
-                                onAccepted = {
-                                    appPrefs.edit()
-                                        .putBoolean("kiduyutv_terms_accepted", true)
-                                        .apply()
-                                    termsAccepted = true
-                                }
-                            )
+                            val onTermsAccepted = {
+                                appPrefs.edit()
+                                    .putBoolean("kiduyutv_terms_accepted", true)
+                                    .apply()
+                                termsAccepted = true
+                            }
+                            if (isTv) {
+                                KiduyuTvTermsDialog(onAccepted = onTermsAccepted)
+                            } else {
+                                MobileKiduyuTvTermsDialog(onAccepted = onTermsAccepted)
+                            }
                         }
                     }
                 }
