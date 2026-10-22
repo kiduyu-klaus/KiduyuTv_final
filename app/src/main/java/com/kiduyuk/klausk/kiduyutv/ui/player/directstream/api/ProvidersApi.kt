@@ -76,6 +76,12 @@ object ProvidersApi {
         endpoint?.trimEnd('/')?.takeIf { it in SettingsManager.DIRECT_STREAM_ENDPOINTS }
             ?: currentBaseUrl()
 
+    /** The Cloudflare worker has a compatible payload but a different route layout. */
+    private fun isCloudflareStreamWorker(endpoint: String): Boolean =
+        runCatching {
+            Uri.parse(endpoint).host.equals(CLOUDFLARE_STREAM_WORKER_HOST, ignoreCase = true)
+        }.getOrDefault(false)
+
     data class ProviderRoute(
         val providerNames: List<String>,
         /** The backend path type: movie, series, or anime. */
@@ -118,7 +124,8 @@ object ProvidersApi {
      */
     fun requireBackendAvailable(endpoint: String? = null) {
         val baseUrl = resolveBaseUrl(endpoint)
-        val urlString = "$baseUrl/api/health"
+        val healthPath = if (isCloudflareStreamWorker(baseUrl)) "health" else "api/health"
+        val urlString = "$baseUrl/$healthPath"
         Log.i(TAG, "Checking providers backend health")
         val request = Request.Builder()
             .url(urlString)
@@ -233,7 +240,12 @@ object ProvidersApi {
     suspend fun providerRouteForMedia(type: String, tmdbId: Int, endpoint: String? = null): ProviderRoute {
         require(type == "movie" || type == "series") { "invalid type: $type" }
         require(tmdbId > 0) { "invalid tmdbId: $tmdbId" }
+        val baseUrl = resolveBaseUrl(endpoint)
         val classification = classifyMedia(type, tmdbId)
+        if (classification.isAnime && isCloudflareStreamWorker(baseUrl)) {
+            Log.i(TAG, "Cloudflare Stream Worker does not expose an anime route; skipping anime provider requests")
+            return ProviderRoute(emptyList(), ANIME_STREAM_TYPE, ANIME_CATEGORY)
+        }
         val category = if (classification.isAnime) ANIME_CATEGORY else MOVIES_TV_CATEGORY
         val selected = enabledProviderCatalog(endpoint)
             .filter { provider -> provider.categories.any { normalizeCategory(it) == normalizeCategory(category) } }
@@ -276,11 +288,20 @@ object ProvidersApi {
         require(tmdbId > 0) { "invalid tmdbId: $tmdbId" }
 
         val baseUrl = resolveBaseUrl(endpoint)
+        val cloudflareWorker = isCloudflareStreamWorker(baseUrl)
 
         val pathSegment = if (provider.isNullOrBlank()) {
-            "api/streams/$type/$tmdbId"
+            if (cloudflareWorker) {
+                "api/streams/all/$type/$tmdbId"
+            } else {
+                "api/streams/$type/$tmdbId"
+            }
         } else {
-            "api/streams/${provider.lowercase()}/$type/$tmdbId"
+            if (cloudflareWorker) {
+                "api/streams/provider/${provider.lowercase()}/$type/$tmdbId"
+            } else {
+                "api/streams/${provider.lowercase()}/$type/$tmdbId"
+            }
         }
         val urlBuilder = Uri.parse("$baseUrl/$pathSegment").buildUpon()
             .appendQueryParameter("token", streamApiToken)
@@ -355,7 +376,9 @@ object ProvidersApi {
     ): StreamResponse {
         val tmdbId = json.optString("tmdbId")
             .toIntOrNull()
-            ?: json.optInt("tmdbId", 0)
+            ?: json.optInt("tmdbId", 0).takeIf { it > 0 }
+            ?: json.optString("id").toIntOrNull()
+            ?: json.optInt("id", 0)
         val imdbId = json.optString("imdbId")
             .takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
         val arr = json.optJSONArray("streams") ?: return StreamResponse(tmdbId, imdbId, emptyList())
@@ -651,6 +674,8 @@ object ProvidersApi {
     private const val HLS_MIME_TYPE = "application/vnd.apple.mpegurl"
     private const val MATROSKA_MIME_TYPE = "video/x-matroska"
     private const val GOOGLE_DOWNLOADS_HOST = "video-downloads.googleusercontent.com"
+    private const val CLOUDFLARE_STREAM_WORKER_HOST =
+        "cloudflare-stream-worker.muigakiduyu1995.workers.dev"
     private val ANIME_ORIGINAL_LANGUAGES = setOf("ja", "zh", "ko")
 
     private val PROVIDERS_WITHOUT_SOURCE_HEADERS = setOf(
