@@ -142,6 +142,9 @@ object StreamValidator {
         }
         val isFebboxFid = stream.provider.trim().equals("Febbox FID", ignoreCase = true) ||
             stream.name.trim().equals("Febbox FID", ignoreCase = true)
+        val isVidsrc = stream.provider.trim().equals("Vidsrc", ignoreCase = true) ||
+            stream.name.trim().equals("Vidsrc", ignoreCase = true)
+        val acceptsAnyHttp200 = isFebboxFid || isVidsrc
         val requiresDashManifest = isDashCandidate(stream)
         val baseBuilder = Request.Builder().url(stream.url)
         stream.headers.forEach { (key, value) ->
@@ -152,9 +155,13 @@ object StreamValidator {
             head.use { response ->
                 stream.httpStatusCode = response.code
                 when {
-                    isFebboxFid && response.code == 200 -> {
+                    acceptsAnyHttp200 && response.code == 200 -> {
                         stream.isFailed = false
-                        Log.i(TAG, "Febbox FID URL returned HTTP 200; marking stream valid")
+                        Log.i(
+                            TAG,
+                            "${stream.provider.ifBlank { stream.name }} URL returned HTTP 200; " +
+                                "marking stream valid"
+                        )
                         return true
                     }
                     response.isSuccessful -> {
@@ -195,9 +202,13 @@ object StreamValidator {
                     )
                     return@use false
                 }
-                if (isFebboxFid && response.code == 200) {
+                if (acceptsAnyHttp200 && response.code == 200) {
                     stream.isFailed = false
-                    Log.i(TAG, "Febbox FID URL returned HTTP 200; marking stream valid")
+                    Log.i(
+                        TAG,
+                        "${stream.provider.ifBlank { stream.name }} URL returned HTTP 200; " +
+                            "marking stream valid"
+                    )
                     return@use true
                 }
 
