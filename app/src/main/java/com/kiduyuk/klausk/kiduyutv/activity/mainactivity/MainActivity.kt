@@ -31,6 +31,7 @@ import com.kiduyuk.klausk.kiduyutv.network.NetworkConnectivityChecker
 import com.kiduyuk.klausk.kiduyutv.network.NetworkConnectivityObserver
 import com.kiduyuk.klausk.kiduyutv.network.NetworkState
 import com.kiduyuk.klausk.kiduyutv.network.NetworkStateDialog
+import com.kiduyuk.klausk.kiduyutv.ui.components.KiduyuTvTermsDialog
 import com.kiduyuk.klausk.kiduyutv.ui.components.TraktAnnouncementDialog
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.MobileNavGraph
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.NavGraph
@@ -86,6 +87,13 @@ class MainActivity : ComponentActivity() {
                 var currentRoute by remember { mutableStateOf(startDestination) }
                 var hasReceivedInitialDestination by remember { mutableStateOf(false) }
                 var suppressNextDestinationInterstitial by remember { mutableStateOf(false) }
+                val appPrefs = remember {
+                    getSharedPreferences("app_prefs", MODE_PRIVATE)
+                }
+                var homeDialogFinished by remember { mutableStateOf(false) }
+                var termsAccepted by remember {
+                    mutableStateOf(appPrefs.getBoolean("kiduyutv_terms_accepted", false))
+                }
 
                 // Every in-app destination change is a standard interstitial
                 // opportunity. The initial route is excluded, and the shared
@@ -196,7 +204,21 @@ class MainActivity : ComponentActivity() {
                     }
 
                     if (currentRoute == Screen.Home.route) {
-                        TraktAnnouncementDialog()
+                        // Keep startup modals serialized: the terms dialog is
+                        // composed only after the home announcement finishes.
+                        TraktAnnouncementDialog(
+                            onFinished = { homeDialogFinished = true }
+                        )
+                        if (homeDialogFinished && !termsAccepted) {
+                            KiduyuTvTermsDialog(
+                                onAccepted = {
+                                    appPrefs.edit()
+                                        .putBoolean("kiduyutv_terms_accepted", true)
+                                        .apply()
+                                    termsAccepted = true
+                                }
+                            )
+                        }
                     }
                 }
             }

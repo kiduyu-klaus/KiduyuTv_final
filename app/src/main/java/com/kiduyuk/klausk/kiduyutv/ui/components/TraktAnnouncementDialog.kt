@@ -20,14 +20,25 @@ import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
 import kotlinx.coroutines.tasks.await
 
 @Composable
-fun TraktAnnouncementDialog() {
+fun TraktAnnouncementDialog(
+    onFinished: () -> Unit = {}
+) {
     val context = LocalContext.current
     val dialogPrefs = remember { context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE) }
     var dialogMessage by remember { mutableStateOf<String?>(null) }
     var showDialog by remember { mutableStateOf(false) }
+    var finishedNotified by remember { mutableStateOf(false) }
+
+    fun notifyFinished() {
+        if (!finishedNotified) {
+            finishedNotified = true
+            onFinished()
+        }
+    }
 
     LaunchedEffect(Unit) {
         if (dialogPrefs.getBoolean("trakt_announcement_shown", false)) {
+            notifyFinished()
             return@LaunchedEffect
         }
 
@@ -42,15 +53,19 @@ fun TraktAnnouncementDialog() {
             if (!message.isNullOrBlank()) {
                 dialogMessage = message
                 showDialog = true
+            } else {
+                notifyFinished()
             }
         }.onFailure { throwable ->
             Log.w("TraktAnnouncementDialog", "Failed to fetch home dialog message", throwable)
+            notifyFinished()
         }
     }
 
     fun dismissDialog() {
         showDialog = false
         dialogPrefs.edit { putBoolean("trakt_announcement_shown", true) }
+        notifyFinished()
     }
 
     if (showDialog && !dialogMessage.isNullOrBlank()) {
