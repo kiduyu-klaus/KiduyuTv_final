@@ -516,6 +516,7 @@ class SchedulePlayerActivity : ComponentActivity() {
 
     /** Generates the embedded player document used by direct sports streams. */
     private fun generateIframeHtml(streamUrl: String): String {
+        val autoplayUrl = withAutoplayParameter(streamUrl)
         return """
             <!DOCTYPE html>
             <html>
@@ -528,30 +529,32 @@ class SchedulePlayerActivity : ComponentActivity() {
                 </style>
             </head>
             <body>
-                <iframe src="$streamUrl"
+                <iframe src="$autoplayUrl"
                     width="100%"
                     height="100%"
                     frameborder="0"
                     scrolling="no"
                     allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-                    allowfullscreen>
+                    allowfullscreen="true"
+                    loading="eager">
                 </iframe>
             </body>
             </html>
         """.trimIndent()
     }
 
-    /** Requests autoplay from providers that support an autoplay query parameter. */
+    /** Requests autoplay from providers that support autoplay query parameters. */
     private fun withAutoplayParameter(streamUrl: String): String = runCatching {
         val uri = Uri.parse(streamUrl)
-        if (uri.getQueryParameter("autoplay") != null) {
-            streamUrl
-        } else {
-            uri.buildUpon()
-                .appendQueryParameter("autoplay", "1")
-                .build()
-                .toString()
+        val autoplayValues = uri.getQueryParameters("autoplay")
+        val builder = uri.buildUpon()
+        if (autoplayValues.none { it == "1" }) {
+            builder.appendQueryParameter("autoplay", "1")
         }
+        if (autoplayValues.none { it.equals("true", ignoreCase = true) }) {
+            builder.appendQueryParameter("autoplay", "true")
+        }
+        builder.build().toString()
     }.getOrDefault(streamUrl)
 
     private fun updateTopBar() {
