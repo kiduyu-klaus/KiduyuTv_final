@@ -180,6 +180,7 @@ class DirectStreamActivity : AppCompatActivity() {
     private var handlingPlaybackError = false
     private var lastPlaybackHttpError: Int? = null
     private var isPlaybackBuffering = false
+    private var restartingForReload = false
     private var watchHistoryReady = false
     private val controlsClock = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
     private val controlsTime = SimpleDateFormat("h:mm a", Locale.getDefault())
@@ -1351,28 +1352,56 @@ class DirectStreamActivity : AppCompatActivity() {
     }
 
     private fun reloadCurrentMediaStreams() {
-        if (streamJob?.isActive == true) return
+        if (isFinishing || isDestroyed) return
 
-        pendingStartPositionMs = if (::engine.isInitialized) {
+        val resumePositionMs = if (::engine.isInitialized) {
             engine.player.currentPosition.coerceAtLeast(0L)
         } else {
             0L
         }
-        lastLoadSignature = null
+
+        // Save before stopping the player. The new activity also receives the
+        // position explicitly so it can resume even if the asynchronous history
+        // write is cancelled as the old activity is destroyed.
+        persistWatchProgress(resumePositionMs)
+        restartingForReload = true
+        stopWatchProgressUpdates()
+        streamJob?.cancel()
+        streamJob = null
+        engine.player.stop()
+        pendingStartPositionMs = 0L
+
         Log.i(
             PROVIDER_TAG,
-            "Reloading streams for current media type=$currentMediaType " +
+            "Restarting activity to reload streams for current media type=$currentMediaType " +
                 "tmdbId=$currentTmdbId season=${currentSeason ?: "-"} " +
-                "episode=${currentEpisode ?: "-"} position=${pendingStartPositionMs}ms"
+                "episode=${currentEpisode ?: "-"} position=${resumePositionMs}ms"
         )
-        loadAndPlay(
-            currentMediaType,
-            currentTmdbId,
-            currentSeason,
-            currentEpisode,
-            currentProvider
-        )
-        showControls()
+
+        val reloadIntent = createIntent(
+            context = this,
+            tmdbId = currentTmdbId,
+            isTv = currentMediaType == TYPE_SERIES,
+            season = currentSeason,
+            episode = currentEpisode,
+            imdbId = currentImdbId,
+            title = currentTitle.substringBefore(" • "),
+            posterPath = currentPosterPath,
+            backdropPath = currentBackdropPath,
+            overview = currentOverview,
+            voteAverage = currentVoteAverage,
+            releaseDate = currentReleaseDate
+        ).apply {
+            currentProvider.key.takeIf { it.isNotBlank() }?.let {
+                putExtra(EXTRA_PROVIDER, it)
+            }
+            putExtra(EXTRA_RESUME_POSITION_MS, resumePositionMs)
+        }
+
+        // Deliberately do not copy sniffed-stream extras: reload must fetch a
+        // fresh provider response rather than replaying the old stream.
+        startActivity(reloadIntent)
+        finish()
     }
 
     /**
@@ -3359,7 +3388,12 @@ class DirectStreamActivity : AppCompatActivity() {
                         compareBy<ResumeHistory> { it.updatedAt }
                             .thenBy { it.positionMs }
                     )
-                val resumePosition = selectedResume?.positionMs?.coerceAtLeast(0L) ?: 0L
+                val requestedResumePosition = intent
+                    .getLongExtra(EXTRA_RESUME_POSITION_MS, -1L)
+                    .takeIf { it >= 0L }
+                val resumePosition = requestedResumePosition
+                    ?: selectedResume?.positionMs?.coerceAtLeast(0L)
+                    ?: 0L
 
                 pendingStartPositionMs = resumePosition
                 Log.i(
@@ -3470,7 +3504,7 @@ class DirectStreamActivity : AppCompatActivity() {
         uiHandler.removeCallbacks(watchProgressTick)
     }
 
-    private fun persistWatchProgress() {
+    private fun persistWatchProgress(positionOverrideMs: Long? = null) {
         if (
             !watchHistoryReady ||
             !::engine.isInitialized ||
@@ -3480,7 +3514,7 @@ class DirectStreamActivity : AppCompatActivity() {
 
         val isTv = currentMediaType == TYPE_SERIES
         val mediaType = if (isTv) "tv" else "movie"
-        val position = engine.player.currentPosition.coerceAtLeast(0L)
+        val position = (positionOverrideMs ?: engine.player.currentPosition).coerceAtLeast(0L)
         val duration = engine.player.duration.takeIf { it > 0 } ?: 0L
         val season = currentSeason
         val episode = currentEpisode
@@ -3564,7 +3598,7 @@ class DirectStreamActivity : AppCompatActivity() {
 
     override fun onStop() {
         stopWatchProgressUpdates()
-        if (::engine.isInitialized) {
+        if (::engine.isInitialized && !restartingForReload) {
             persistWatchProgress()
             engine.pause()
         }
@@ -3636,6 +3670,7 @@ class DirectStreamActivity : AppCompatActivity() {
         const val EXTRA_SNIFFED_TYPE = "SNIFFED_STREAM_TYPE"
         const val EXTRA_SNIFFED_MIME_TYPE = "SNIFFED_STREAM_MIME_TYPE"
         const val EXTRA_SNIFFED_SUBTITLES = "SNIFFED_SUBTITLES"
+        const val EXTRA_RESUME_POSITION_MS = "RESUME_POSITION_MS"
 
         const val RESULT_SHOW_STREAM_LINKS = android.app.Activity.RESULT_FIRST_USER + 2801
 
