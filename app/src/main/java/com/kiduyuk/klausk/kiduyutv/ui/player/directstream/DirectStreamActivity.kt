@@ -212,12 +212,20 @@ class DirectStreamActivity : AppCompatActivity() {
     private var skipSegmentsFetchJob: Job? = null
     private var autoSkipCountdownJob: Job? = null
     private var currentAutoSkipSegment: SkipSegment? = null
+    private var nextEpisodePreloadJob: Job? = null
+    private var preloadedNextEpisode: PreloadedEpisode? = null
 
     // --- Episodes side panel ------------------------------------------
     private lateinit var episodeAdapter: EpisodeAdapter
     private var isEpisodesPanelOpen = false
     private var episodeFetchJob: Job? = null
     private var autoAdvanceJob: Job? = null
+
+    private data class PreloadedEpisode(
+        val season: Int,
+        val episode: Int,
+        val streams: List<StreamItem>
+    )
     private var cachedSeasonDetail: SeasonDetail? = null
     private var cachedSeasonFor: Int? = null   // which season is in the cache
 
@@ -367,6 +375,7 @@ class DirectStreamActivity : AppCompatActivity() {
                     } else {
                         0
                     }
+                maybePreloadNextEpisode(duration, currentPosition)
                 binding.btnPlayPause.setIconResource(
                     if (engine.player.isPlaying) R.drawable.ic_pause else R.drawable.ic_play
                 )
@@ -375,6 +384,60 @@ class DirectStreamActivity : AppCompatActivity() {
             binding.tvDate.text = controlsClock.format(now)
             binding.tvTime.text = controlsTime.format(now)
             uiHandler.postDelayed(this, 1_000)
+        }
+    }
+
+    /**
+     * Starts fetching the next episode's provider streams once the current
+     * episode enters its final five minutes. The player is not touched while
+     * this runs; only the provider response is cached for the end transition.
+     */
+    private fun maybePreloadNextEpisode(durationMs: Long, positionMs: Long) {
+        if (currentMediaType != TYPE_SERIES || currentTmdbId <= 0) return
+        val season = currentSeason ?: return
+        val episode = currentEpisode ?: return
+        val effectiveDuration = durationMs.takeIf { it > 0L } ?: cachedEpisodeDurationMs ?: return
+        val remainingMs = effectiveDuration - positionMs
+        if (remainingMs !in 1L..NEXT_EPISODE_PRELOAD_WINDOW_MS) return
+
+        val nextEpisode = episode + 1
+        val cached = preloadedNextEpisode
+        if (cached?.season == season && cached.episode == nextEpisode) return
+        if (nextEpisodePreloadJob?.isActive == true) return
+
+        Log.i(
+            PROVIDER_TAG,
+            "Preloading next episode streams for S${season}E$nextEpisode " +
+                "remainingMs=$remainingMs"
+        )
+        nextEpisodePreloadJob = lifecycleScope.launch {
+            val result = runCatching {
+                resolver.load(
+                    type = TYPE_SERIES,
+                    tmdbId = currentTmdbId,
+                    season = season,
+                    episode = nextEpisode,
+                    provider = currentProvider,
+                    endpoint = directStreamEndpoint
+                )
+            }
+            if (season != currentSeason || episode != currentEpisode) return@launch
+            result.onSuccess { streams ->
+                if (streams.isNotEmpty()) {
+                    preloadedNextEpisode = PreloadedEpisode(season, nextEpisode, streams)
+                    Log.i(
+                        PROVIDER_TAG,
+                        "Preloaded ${streams.size} streams for S${season}E$nextEpisode"
+                    )
+                } else {
+                    Log.w(PROVIDER_TAG, "Next episode S${season}E$nextEpisode returned no streams")
+                }
+            }.onFailure { error ->
+                Log.w(
+                    PROVIDER_TAG,
+                    "Could not preload next episode S${season}E$nextEpisode: ${error.message}"
+                )
+            }
         }
     }
 
@@ -832,6 +895,11 @@ class DirectStreamActivity : AppCompatActivity() {
     private fun loadNextEpisodeOrSeason() {
         val season = currentSeason ?: return
         val episode = currentEpisode ?: return
+        if (preloadedNextEpisode?.let { it.season == season && it.episode == episode + 1 } == true) {
+            Log.i(PROVIDER_TAG, "Using preloaded streams for S${season}E${episode + 1}")
+            loadEpisodeInPlace(season, episode + 1, 1)
+            return
+        }
         // Media3 can report STATE_ENDED again while the replacement source is
         // being resolved. Do not cancel the first lookup and start over.
         if (autoAdvanceJob?.isActive == true) {
@@ -922,6 +990,14 @@ class DirectStreamActivity : AppCompatActivity() {
         // Save the episode being left before changing the identity fields used
         // by persistence. The old reset helper erased its resume position.
         persistWatchProgress()
+        val keepsPreloadedTarget = preloadedNextEpisode?.let {
+            it.season == season && it.episode == episode
+        } == true
+        if (!keepsPreloadedTarget) {
+            nextEpisodePreloadJob?.cancel()
+            nextEpisodePreloadJob = null
+            preloadedNextEpisode = null
+        }
         currentSeason = season
         currentEpisode = episode
         pendingStartPositionMs = 0L
@@ -1342,13 +1418,22 @@ class DirectStreamActivity : AppCompatActivity() {
         )
         if (lastLoadSignature == signature && streamJob?.isActive == true) return
         lastLoadSignature = signature
-        loadAndPlay(
-            currentMediaType,
-            currentTmdbId,
-            currentSeason,
-            currentEpisode,
-            currentProvider
-        )
+        val preloaded = preloadedNextEpisode?.takeIf {
+            it.season == currentSeason && it.episode == currentEpisode
+        }
+        if (preloaded != null) {
+            preloadedNextEpisode = null
+            nextEpisodePreloadJob = null
+            loadAndPlayPreloaded(preloaded.streams, currentProvider)
+        } else {
+            loadAndPlay(
+                currentMediaType,
+                currentTmdbId,
+                currentSeason,
+                currentEpisode,
+                currentProvider
+            )
+        }
     }
 
     private fun reloadCurrentMediaStreams() {
@@ -2006,6 +2091,36 @@ class DirectStreamActivity : AppCompatActivity() {
 
     private fun isFileNotFoundPlaybackError(error: String): Boolean =
         error.contains("Error code: 2004", ignoreCase = true)
+
+    private fun loadAndPlayPreloaded(
+        items: List<StreamItem>,
+        provider: StreamProviderChoice
+    ) {
+        streamJob?.cancel()
+        skipSegmentsFetchJob?.cancel()
+        noStreamsDialog?.takeIf { it.isShowing }?.dismiss()
+        noStreamsDialog = null
+        backendDownDialog?.takeIf { it.isShowing }?.dismiss()
+        backendDownDialog = null
+        availableStreams = items
+        activeStream = null
+        providerSkipSegments = null
+        providerSubtitles = emptyList()
+        supplementalSubtitles = emptyList()
+        pendingReadySeekPositionMs = 0L
+        handlingPlaybackError = false
+        hideProviderFetchProgress()
+        hideStreamFetchCount()
+        binding.btnPlayerStreams.visibility = if (items.size > 1) View.VISIBLE else View.GONE
+        updateBottomFocusChain()
+        binding.playerStatus.visibility = View.GONE
+        Log.i(
+            PROVIDER_TAG,
+            "Playing ${items.size} preloaded streams for provider=${provider.displayName}"
+        )
+        playBest(items)
+        validateStreamsInBackground(items)
+    }
 
     private fun loadAndPlay(
         type: String,
@@ -3608,6 +3723,9 @@ class DirectStreamActivity : AppCompatActivity() {
     override fun onDestroy() {
         cancelAutoSkipCountdown()
         streamJob?.cancel()
+        nextEpisodePreloadJob?.cancel()
+        nextEpisodePreloadJob = null
+        preloadedNextEpisode = null
         subtitleJob?.cancel()
         cloudflareProbeJob?.cancel()
         cloudflareProbeJob = null
@@ -3650,6 +3768,7 @@ class DirectStreamActivity : AppCompatActivity() {
         private const val PROVIDER_TAG = "KiduyuLiteProvider"
         private const val HTTP_NOT_FOUND = 404
         private const val SKIP_DURATION_POLL_INTERVAL_MS = 100L
+        private const val NEXT_EPISODE_PRELOAD_WINDOW_MS = 5 * 60 * 1000L
 
         const val EXTRA_TYPE = "MEDIA_TYPE"
         const val EXTRA_IS_TV = "IS_TV"
