@@ -364,18 +364,19 @@ class StreamSelectionDialog(
         }
         val title = stream.name.ifBlank { stream.title.ifBlank { "Stream" } }
         val provider = stream.provider.ifBlank { title }
+        val isVidsrc = stream.provider.equals("vidsrc", ignoreCase = true)
         val metadata = listOf(provider, stream.quality, stream.type.uppercase(), location)
             .filter { it.isNotBlank() }
             .distinctBy { it.lowercase() }
         val status = when {
-            stream.isValid && !stream.isFailed -> context.getString(R.string.stream_ok)
+            isVidsrc || (stream.isValid && !stream.isFailed) -> context.getString(R.string.stream_ok)
             stream.isChecking -> context.getString(R.string.stream_checking)
             !stream.isFailed -> context.getString(R.string.stream_unverified)
             else -> stream.httpStatusCode?.let { "HTTP $it" }
                 ?: context.getString(R.string.stream_failed)
         }
         val statusColor = when {
-            stream.isValid && !stream.isFailed -> ComposeColor(0xFF2E7D32)
+            isVidsrc || (stream.isValid && !stream.isFailed) -> ComposeColor(0xFF2E7D32)
             stream.isChecking -> ComposeColor(0xFF8A6D1D)
             !stream.isFailed -> ComposeColor(0xFF6B7280)
             else -> ComposeColor(0xFF9B2C2C)

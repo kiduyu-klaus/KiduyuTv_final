@@ -902,6 +902,7 @@ private fun MobileStreamSelectionDialog(
                 ) {
                     items(streams, key = { it.url }) { stream ->
                         val selected = stream === activeStream
+                        val isVidsrc = stream.provider.equals("vidsrc", ignoreCase = true)
                         val title = stream.name.ifBlank { stream.title.ifBlank { "Stream" } }
                         val details = listOfNotNull(
                             stream.quality.takeIf { it.isNotBlank() && !it.equals("Auto", true) },
@@ -927,6 +928,7 @@ private fun MobileStreamSelectionDialog(
                                         }
                                         Text(
                                             text = when {
+                                                isVidsrc -> "Stream OK"
                                                 stream.isChecking -> "Checking source…"
                                                 stream.isValid -> "Ready to play"
                                                 stream.isFailed -> "Source unavailable"

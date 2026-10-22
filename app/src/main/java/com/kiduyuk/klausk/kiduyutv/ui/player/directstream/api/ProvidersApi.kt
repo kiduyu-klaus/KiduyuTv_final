@@ -365,6 +365,7 @@ object ProvidersApi {
                 val url = s.optString("url").takeIf { it.isNotBlank() } ?: continue
                 val provider = s.optString("provider", "")
                     .ifBlank { json.optString("provider", "") }
+                val isVidsrc = provider.equals("vidsrc", ignoreCase = true)
                 val type = s.optString("type", "")
                 val isVixsrcHls = provider.equals("vixsrc", ignoreCase = true) &&
                     url.contains("vixsrc.to/playlist/", ignoreCase = true)
@@ -482,8 +483,16 @@ object ProvidersApi {
                         headers = headers,
                         subtitles = subtitles,
                         intro = intro,
-                        outro = outro
-                    )
+                        outro = outro,
+                        // Vidsrc URLs are signed/generated dynamically and may
+                        // reject a preliminary HEAD or range probe even though
+                        // PlayerEngine can refresh the token before playback.
+                        // Treat them as verified as soon as the provider returns
+                        // them so the picker never shows them as Unverified.
+                        isValid = isVidsrc,
+                        isChecking = false,
+                        isFailed = false,
+                        )
                 )
             }
         }

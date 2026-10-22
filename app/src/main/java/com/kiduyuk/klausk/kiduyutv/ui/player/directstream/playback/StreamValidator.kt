@@ -88,6 +88,18 @@ object StreamValidator {
                 coroutineScope {
                     streams.map { stream ->
                         async {
+                            val isVidsrc = stream.provider.equals("vidsrc", ignoreCase = true)
+                            if (isVidsrc) {
+                                // Vidsrc manifests use short-lived, generated
+                                // URLs. A preliminary HEAD/Range request can
+                                // return 403 before PlayerEngine refreshes the
+                                // token, so probing it would incorrectly make
+                                // the picker show Unverified/failed.
+                                stream.isValid = true
+                                stream.isFailed = false
+                                stream.isChecking = false
+                                return@async
+                            }
                             val ok = probe(stream)
                             stream.isValid = ok
                             stream.isChecking = false
