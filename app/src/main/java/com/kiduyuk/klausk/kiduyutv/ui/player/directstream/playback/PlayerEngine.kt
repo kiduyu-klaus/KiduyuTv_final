@@ -347,11 +347,11 @@ class PlayerEngine(context: Context) {
     }
 
     private val renderersFactory: DefaultRenderersFactory = DefaultRenderersFactory(appContext)
-        // Use the bundled Media3 FFmpeg extension where it provides a renderer
-        // (currently audio codecs), then allow Media3 to try another compatible
-        // decoder when a device codec cannot initialize a track.
+        // Prefer Android's native MediaCodec AAC renderer for ordinary AAC
+        // streams. The bundled FFmpeg extension remains available after the
+        // platform renderers for codecs that the device does not support.
         .setEnableDecoderFallback(true)
-        .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+        .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
 
     val player: ExoPlayer = ExoPlayer.Builder(appContext)
         .setRenderersFactory(renderersFactory)
@@ -435,6 +435,7 @@ class PlayerEngine(context: Context) {
     private var highestVideoTrackApplied = false
     private var autoAudioTrackApplied = false
     private var audioRecoveryAttempted = false
+    private var audioDisableRecoveryAttempted = false
 
     /** Invoked on fatal playback errors. The argument is a stable error code name. */
     var onError: ((String) -> Unit)? = null
@@ -478,8 +479,18 @@ class PlayerEngine(context: Context) {
                     }
                 }
                 Log.w(TAG, completeErrorMessage, error)
-                if (isAudioDecodingError(error) && tryRecoverWithAlternateAudioTrack()) {
-                    return
+                if (isAudioDecodingError(error)) {
+                    if (tryRecoverWithAlternateAudioTrack()) {
+                        return
+                    }
+                    // Some direct MP4 files expose only one AAC track, and
+                    // some devices cannot decode that track's 5.1 layout even
+                    // though Media3 reports the format as supported. Keep the
+                    // video playable rather than surfacing a fatal playback
+                    // dialog after the native/FFmpeg decoder path fails.
+                    if (tryRecoverWithoutAudio()) {
+                        return
+                    }
                 }
                 findHttpResponseCode(error)?.let { onHttpError?.invoke(it) }
                 onError?.invoke(completeErrorMessage)
@@ -662,6 +673,28 @@ class PlayerEngine(context: Context) {
         return true
     }
 
+    /**
+     * Last-resort recovery for devices that cannot decode a stream's only
+     * audio track, commonly a 5.1 AAC-LC track in a progressive MP4. This is
+     * intentionally one-shot per media source: if video-only playback also
+     * fails, the normal error path remains available.
+     */
+    private fun tryRecoverWithoutAudio(): Boolean {
+        if (audioDisableRecoveryAttempted) return false
+
+        audioDisableRecoveryAttempted = true
+        val resumePosition = player.currentPosition.coerceAtLeast(0L)
+        player.trackSelectionParameters = player.trackSelectionParameters
+            .buildUpon()
+            .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true)
+            .build()
+        player.seekTo(resumePosition)
+        player.prepare()
+        player.playWhenReady = true
+        Log.w(TAG, "Audio decoding failed; retrying playback with audio disabled")
+        return true
+    }
+
     private data class AudioCandidate(
         val trackGroup: androidx.media3.common.TrackGroup,
         val trackIndex: Int,
@@ -770,6 +803,7 @@ class PlayerEngine(context: Context) {
         highestVideoTrackApplied = false
         autoAudioTrackApplied = false
         audioRecoveryAttempted = false
+        audioDisableRecoveryAttempted = false
         val sourceType = when {
             isHlsStream -> "HlsMediaSource"
             isDash(playbackStream) -> "DashMediaSource"
