@@ -140,6 +140,8 @@ object StreamValidator {
             stream.httpStatusCode = -1
             return false
         }
+        val isFebboxFid = stream.provider.trim().equals("Febbox FID", ignoreCase = true) ||
+            stream.name.trim().equals("Febbox FID", ignoreCase = true)
         val requiresDashManifest = isDashCandidate(stream)
         val baseBuilder = Request.Builder().url(stream.url)
         stream.headers.forEach { (key, value) ->
@@ -150,6 +152,11 @@ object StreamValidator {
             head.use { response ->
                 stream.httpStatusCode = response.code
                 when {
+                    isFebboxFid && response.code == 200 -> {
+                        stream.isFailed = false
+                        Log.i(TAG, "Febbox FID URL returned HTTP 200; marking stream valid")
+                        return true
+                    }
                     response.isSuccessful -> {
                         // HEAD cannot prove that a DASH endpoint returned an
                         // MPD. Always follow it with a small GET for DASH.
@@ -187,6 +194,11 @@ object StreamValidator {
                         "Range-GET ${stream.url} -> HTTP ${response.code}"
                     )
                     return@use false
+                }
+                if (isFebboxFid && response.code == 200) {
+                    stream.isFailed = false
+                    Log.i(TAG, "Febbox FID URL returned HTTP 200; marking stream valid")
+                    return@use true
                 }
 
                 val hasHeaders = hasVideoStreamHeaders(response)
