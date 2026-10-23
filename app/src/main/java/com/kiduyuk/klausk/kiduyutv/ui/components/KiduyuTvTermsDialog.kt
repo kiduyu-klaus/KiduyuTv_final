@@ -14,11 +14,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Description
@@ -38,6 +41,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +50,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -54,6 +61,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.launch
 
 private val DialogBackground = Color(0xFF101010)
 private val DialogSurface = Color(0xFF171717)
@@ -67,6 +75,8 @@ fun KiduyuTvTermsDialog(
     onAccepted: () -> Unit
 ) {
     val context = LocalContext.current
+    val scrollState = rememberScrollState()
+    val scrollScope = rememberCoroutineScope()
     var accepted by remember { mutableStateOf(false) }
     val agreementFocusRequester = remember { FocusRequester() }
 
@@ -88,16 +98,41 @@ fun KiduyuTvTermsDialog(
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.92f)
-                .widthIn(max = 840.dp)
+                .fillMaxWidth(0.86f)
+                .widthIn(max = 760.dp)
                 .border(1.dp, DialogBorder, RoundedCornerShape(22.dp)),
             shape = RoundedCornerShape(22.dp),
             color = DialogBackground,
             tonalElevation = 0.dp
         ) {
             Column(
-                modifier = Modifier.padding(horizontal = 32.dp, vertical = 28.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp)
+                modifier = Modifier
+                    .heightIn(max = 680.dp)
+                    .verticalScroll(scrollState)
+                    .onPreviewKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        when (event.key) {
+                            Key.DirectionDown -> {
+                                if (scrollState.canScrollForward) {
+                                    scrollScope.launch { scrollState.animateScrollBy(240f) }
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
+                            Key.DirectionUp -> {
+                                if (scrollState.canScrollBackward) {
+                                    scrollScope.launch { scrollState.animateScrollBy(-240f) }
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
+                            else -> false
+                        }
+                    }
+                    .padding(horizontal = 32.dp, vertical = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -105,17 +140,17 @@ fun KiduyuTvTermsDialog(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(70.dp)
-                            .clip(RoundedCornerShape(18.dp))
+                            .size(58.dp)
+                            .clip(RoundedCornerShape(16.dp))
                             .background(AccentPink.copy(alpha = 0.12f))
-                            .border(1.dp, AccentPink.copy(alpha = 0.65f), RoundedCornerShape(18.dp)),
+                            .border(1.dp, AccentPink.copy(alpha = 0.65f), RoundedCornerShape(16.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Outlined.Shield,
                             contentDescription = null,
                             tint = AccentPink,
-                            modifier = Modifier.size(38.dp)
+                            modifier = Modifier.size(32.dp)
                         )
                     }
                     Column {
@@ -138,7 +173,7 @@ fun KiduyuTvTermsDialog(
                 Text(
                     text = "Please review and accept our Terms of Service and Privacy Policy before continuing. kiduyuTv is designed with zero third-party tracking, ensuring your media library and streaming history remain strictly private to your server instance.",
                     color = Color(0xFFD0D0D0),
-                    style = MaterialTheme.typography.bodyLarge
+                    style = MaterialTheme.typography.bodyMedium
                 )
 
                 Column(
@@ -147,8 +182,8 @@ fun KiduyuTvTermsDialog(
                         .clip(RoundedCornerShape(16.dp))
                         .background(DialogSurface)
                         .border(1.dp, Color(0xFF2D2D2D), RoundedCornerShape(16.dp))
-                        .padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     FeatureRow(
                         icon = { Icon(Icons.Outlined.Lock, null, tint = AccentPink) },
@@ -164,7 +199,7 @@ fun KiduyuTvTermsDialog(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     PolicyButton(
                         modifier = Modifier
@@ -223,7 +258,7 @@ fun KiduyuTvTermsDialog(
                     enabled = accepted,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(64.dp)
+                        .height(52.dp)
                         .focusable(),
                     shape = RoundedCornerShape(18.dp),
                     colors = ButtonDefaults.buttonColors(
