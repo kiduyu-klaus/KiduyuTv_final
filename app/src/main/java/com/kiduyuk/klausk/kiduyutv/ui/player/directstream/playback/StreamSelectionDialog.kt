@@ -45,19 +45,23 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color as ComposeColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamItem
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.displayLanguage
@@ -166,6 +170,7 @@ class StreamSelectionDialog(
         val filterFocusRequester = remember { FocusRequester() }
         val listState = rememberLazyListState()
         val gridState = rememberLazyGridState()
+        val coroutineScope = rememberCoroutineScope()
         // Validation updates create fresh StreamItem lists while this dialog is
         // visible. Keep requesters stable for the same rows so an update does
         // not detach focus from the currently playing stream.
@@ -194,6 +199,19 @@ class StreamSelectionDialog(
                 firstStreamFocusRequester.requestFocus()
             } else {
                 closeFocusRequester.requestFocus()
+            }
+        }
+
+        val wrapToFirstStream = {
+            coroutineScope.launch {
+                if (isGridLayout) {
+                    gridState.scrollToItem(0)
+                } else {
+                    listState.scrollToItem(0)
+                }
+                withFrameNanos { }
+                withFrameNanos { }
+                streamFocusRequesters.firstOrNull()?.requestFocus()
             }
         }
 
@@ -257,7 +275,6 @@ class StreamSelectionDialog(
                         .fillMaxWidth()
                         .height(360.dp)
                         .padding(top = 14.dp)
-                        .focusProperties { down = closeFocusRequester }
                 ) {
                     if (filteredStreams.isEmpty()) {
                         Text(
@@ -282,6 +299,7 @@ class StreamSelectionDialog(
                                     active = entry.index == activeIndex,
                                     focusRequester = streamFocusRequesters[index],
                                     firstFocusRequester = if (index == 0) firstStreamFocusRequester else null,
+                                    wrapToFirst = if (index == filteredStreams.lastIndex) wrapToFirstStream else null,
                                     onClick = { onStreamSelected(entry.value) }
                                 )
                             }
@@ -301,6 +319,7 @@ class StreamSelectionDialog(
                                     active = entry.index == activeIndex,
                                     focusRequester = streamFocusRequesters[index],
                                     firstFocusRequester = if (index == 0) firstStreamFocusRequester else null,
+                                    wrapToFirst = if (index == filteredStreams.lastIndex) wrapToFirstStream else null,
                                     onClick = { onStreamSelected(entry.value) }
                                 )
                             }
@@ -353,6 +372,7 @@ class StreamSelectionDialog(
         active: Boolean,
         focusRequester: FocusRequester,
         firstFocusRequester: FocusRequester?,
+        wrapToFirst: (() -> Unit)?,
         onClick: () -> Unit
     ) {
         var focused by remember { mutableStateOf(false) }
@@ -388,6 +408,17 @@ class StreamSelectionDialog(
                 .focusRequester(focusRequester)
                 .then(if (firstFocusRequester != null) Modifier.focusRequester(firstFocusRequester) else Modifier)
                 .onFocusChanged { focused = it.isFocused }
+                .onPreviewKeyEvent { event ->
+                    if (wrapToFirst != null &&
+                        event.type == KeyEventType.KeyDown &&
+                        event.key == Key.DirectionDown
+                    ) {
+                        wrapToFirst()
+                        true
+                    } else {
+                        false
+                    }
+                }
                 .focusable()
                 .clickable(onClick = onClick)
                 .border(
