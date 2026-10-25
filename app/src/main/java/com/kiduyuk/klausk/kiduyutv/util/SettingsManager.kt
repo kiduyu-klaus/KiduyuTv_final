@@ -49,6 +49,19 @@ class SettingsManager(context: Context) {
         return preferences.getString(KEY_DEFAULT_DIRECT_STREAM_PROVIDER, AUTO) ?: AUTO
     }
 
+    /** Saves the playback engine selected for the native direct-stream player. */
+    fun saveDirectStreamPlayer(player: String) {
+        val safePlayer = player.takeIf { it == PLAYER_EXOPLAYER || it == PLAYER_LIBMPV }
+            ?: PLAYER_EXOPLAYER
+        preferences.edit().putString(KEY_DIRECT_STREAM_PLAYER, safePlayer).apply()
+    }
+
+    /** Returns the selected direct-stream playback engine. */
+    fun getDirectStreamPlayer(): String =
+        preferences.getString(KEY_DIRECT_STREAM_PLAYER, PLAYER_EXOPLAYER)
+            ?.takeIf { it == PLAYER_EXOPLAYER || it == PLAYER_LIBMPV }
+            ?: PLAYER_EXOPLAYER
+
     /** Reads the endpoint options this manager already has a context for. */
     private fun cachedEndpointOptions(): List<DirectStreamEndpoint> =
         getCachedDirectStreamEndpointOptions(appContext)
@@ -162,6 +175,7 @@ class SettingsManager(context: Context) {
         private const val PREFS_NAME = "app_settings"
         private const val KEY_DEFAULT_PROVIDER = "default_provider"
         private const val KEY_DEFAULT_DIRECT_STREAM_PROVIDER = "default_direct_stream_provider"
+        private const val KEY_DIRECT_STREAM_PLAYER = "direct_stream_player"
         private const val KEY_DIRECT_STREAM_ENDPOINT = "direct_stream_endpoint"
         private const val KEY_DIRECT_STREAM_ENDPOINT_OPTIONS = "direct_stream_endpoint_options"
         private const val KEY_DEVICE_ID = "device_id"
@@ -174,6 +188,8 @@ class SettingsManager(context: Context) {
 
         /** Sentinel value meaning "ask me each time" — no automatic selection. */
         const val AUTO = "Auto"
+        const val PLAYER_EXOPLAYER = "exoplayer"
+        const val PLAYER_LIBMPV = "libmpv"
 
         private const val ENDPOINT_DISCOVERY_URL = "https://sflatransport.com/api/getEndpoints"
 

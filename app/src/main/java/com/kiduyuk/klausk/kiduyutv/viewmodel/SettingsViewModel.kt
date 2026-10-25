@@ -109,6 +109,7 @@ class SettingsViewModel : ViewModel() {
                 it.copy(
                     defaultProvider = settingsManager.getDefaultProvider(),
                     defaultDirectStreamProvider = settingsManager.getDefaultDirectStreamProvider(),
+                    directStreamPlayer = settingsManager.getDirectStreamPlayer(),
                     directStreamEndpoint = settingsManager.getDirectStreamEndpoint()
                 )
             }
@@ -142,6 +143,13 @@ class SettingsViewModel : ViewModel() {
     fun setDefaultDirectStreamProvider(context: Context, provider: String) {
         SettingsManager(context).saveDefaultDirectStreamProvider(provider)
         _uiState.update { it.copy(defaultDirectStreamProvider = provider) }
+    }
+
+    /** Persist and update the native direct-stream playback engine preference. */
+    fun setDirectStreamPlayer(context: Context, player: String) {
+        val settings = SettingsManager(context)
+        settings.saveDirectStreamPlayer(player)
+        _uiState.update { it.copy(directStreamPlayer = settings.getDirectStreamPlayer()) }
     }
 
     /** Persist the provider backend used by the native direct-stream player. */
@@ -792,6 +800,8 @@ data class SettingsUiState(
     val defaultProvider: String = com.kiduyuk.klausk.kiduyutv.util.SettingsManager.AUTO,
     // Direct-stream default provider preference
     val defaultDirectStreamProvider: String = com.kiduyuk.klausk.kiduyutv.util.SettingsManager.AUTO,
+    // Native direct-stream playback engine preference
+    val directStreamPlayer: String = com.kiduyuk.klausk.kiduyutv.util.SettingsManager.PLAYER_EXOPLAYER,
     // Direct-stream backend preference
     val directStreamEndpoint: String = "",
     // Ads disabled setting

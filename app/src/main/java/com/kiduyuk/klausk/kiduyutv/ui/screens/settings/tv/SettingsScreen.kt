@@ -430,10 +430,14 @@ fun SettingsScreen(
                     PlaybackContent(
                         defaultProvider = uiState.defaultProvider,
                         defaultDirectStreamProvider = uiState.defaultDirectStreamProvider,
+                        directStreamPlayer = uiState.directStreamPlayer,
                         directStreamEndpoint = uiState.directStreamEndpoint,
                         onProviderSelect = { viewModel.setDefaultProvider(context, it) },
                         onDirectStreamProviderSelect = {
                             viewModel.setDefaultDirectStreamProvider(context, it)
+                        },
+                        onDirectStreamPlayerSelect = {
+                            viewModel.setDirectStreamPlayer(context, it)
                         },
                         onDirectStreamEndpointSelect = {
                             viewModel.setDirectStreamEndpoint(context, it)
@@ -1324,9 +1328,11 @@ private fun AppVersionContent(
 private fun PlaybackContent(
     defaultProvider: String,
     defaultDirectStreamProvider: String,
+    directStreamPlayer: String,
     directStreamEndpoint: String,
     onProviderSelect: (String) -> Unit,
     onDirectStreamProviderSelect: (String) -> Unit,
+    onDirectStreamPlayerSelect: (String) -> Unit,
     onDirectStreamEndpointSelect: (String) -> Unit
 ) {
     val context = LocalContext.current
@@ -1517,6 +1523,49 @@ private fun PlaybackContent(
                 },
                 colors = SwitchDefaults.colors(checkedTrackColor = PrimaryRed)
             )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        SettingsSectionLabel(text = "Player")
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(CardDark)
+                .padding(24.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "Choose the engine used by the native direct-stream player.",
+                    color = TextSecondary,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                listOf(
+                    SettingsManager.PLAYER_EXOPLAYER to "ExoPlayer",
+                    SettingsManager.PLAYER_LIBMPV to "libmpv"
+                ).chunked(2).forEach { rowPlayers ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        rowPlayers.forEach { (value, label) ->
+                            ProviderOptionItem(
+                                option = label,
+                                subtitle = if (value == SettingsManager.PLAYER_EXOPLAYER) {
+                                    "AndroidX Media3"
+                                } else {
+                                    "Native libmpv integration"
+                                },
+                                isSelected = value == directStreamPlayer,
+                                onClick = { onDirectStreamPlayerSelect(value) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
