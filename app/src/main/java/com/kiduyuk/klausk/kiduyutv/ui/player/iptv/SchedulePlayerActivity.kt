@@ -554,6 +554,18 @@ class SchedulePlayerActivity : ComponentActivity() {
         """.trimIndent()
     }
 
+    private fun withAutoplayParameter(streamUrl: String): String = runCatching {
+        val uri = Uri.parse(streamUrl)
+        if (uri.getQueryParameter("autoplay") != null) {
+            streamUrl
+        } else {
+            uri.buildUpon()
+                .appendQueryParameter("autoplay", "1")
+                .build()
+                .toString()
+        }
+    }.getOrDefault(streamUrl)
+
     private fun updateTopBar() {
         isTopBarVisible.value = true
         scheduleTopBarHide()

@@ -55,3 +55,6 @@ mpv-extracted/vulkan-1.dll
 /scripts
 ADS_IMPLEMENTATION_REVIEW_AND_IMPROVEMENT_GUIDE.md
 /.github/skills
+/.agents
+/.work
+/outputs
