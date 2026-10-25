@@ -91,6 +91,7 @@ class SchedulePlayerActivity : ComponentActivity() {
 
     private var isCursorDisabled = false
     private var currentIframeHtml: String? = null
+    private var currentDirectStreamUrl: String? = null
     private var channelName: String = "Channel"
     private var eventTitle: String = "Channel"
     private var channelId: String = ""
@@ -328,8 +329,17 @@ class SchedulePlayerActivity : ComponentActivity() {
             pendingStreamLoad = true
             return
         }
-        currentIframeHtml?.let { html ->
-            if (::webView.isInitialized) {
+        if (!::webView.isInitialized) return
+
+        if (hasDirectIframeUrls) {
+            // TIMST URLs are signed redirect endpoints. Keep them as the top-level
+            // WebView document so WebView preserves the redirect/page context.
+            currentDirectStreamUrl?.let { url ->
+                android.util.Log.i(TAG, "Loading direct stream URL: $url")
+                webView.loadUrl(withAutoplayParameter(url))
+            }
+        } else {
+            currentIframeHtml?.let { html ->
                 webView.loadDataWithBaseURL(
                     ScheduleApiService.BASE_URL,
                     html,
@@ -507,6 +517,7 @@ class SchedulePlayerActivity : ComponentActivity() {
         }
 
         if (playerOptions.isNotEmpty()) {
+            currentDirectStreamUrl = playerOptions[selectedPlayerIndex].url
             currentIframeHtml = generateIframeHtml(playerOptions[selectedPlayerIndex].url)
             loadCurrentStream()
         }
@@ -516,6 +527,7 @@ class SchedulePlayerActivity : ComponentActivity() {
 
     /** Generates the embedded player document used by direct sports streams. */
     private fun generateIframeHtml(streamUrl: String): String {
+        val autoplayUrl = withAutoplayParameter(streamUrl)
         return """
             <!DOCTYPE html>
             <html>
@@ -528,7 +540,7 @@ class SchedulePlayerActivity : ComponentActivity() {
                 </style>
             </head>
             <body>
-                <iframe src="$streamUrl"
+                <iframe src="$autoplayUrl"
                     width="100%"
                     height="100%"
                     frameborder="0"
@@ -972,6 +984,12 @@ class SchedulePlayerActivity : ComponentActivity() {
                     request: android.webkit.WebResourceRequest?
                 ): Boolean {
                     val uri = request?.url
+                    if (hasDirectIframeUrls) {
+                        // Direct sports feeds can redirect from a short-lived URL
+                        // to a signed /play/... page on another host. Keep that
+                        // redirect in the same top-level WebView document.
+                        return super.shouldOverrideUrlLoading(view, request)
+                    }
                     // All actual stream hosts load in child iframes. If an ad tries to
                     // replace the wrapper itself, keep playback in the trusted dlive.sx
                     // document and discard that top-level navigation.
@@ -1006,7 +1024,9 @@ class SchedulePlayerActivity : ComponentActivity() {
                     // Inject autoplay/unmute script into every HTML frame response,
                     // including cross-origin nested iframes.
                     val acceptHeader = headers?.get("Accept") ?: ""
-                    if (acceptHeader.contains("text/html")) {
+                    if (acceptHeader.contains("text/html") &&
+                        !(hasDirectIframeUrls && request?.isForMainFrame == true)
+                    ) {
                         val injected = tryInjectAutoplayScript(url, headers)
                         if (injected != null) return injected
                     }
@@ -1236,6 +1256,9 @@ class SchedulePlayerActivity : ComponentActivity() {
             }
             val player = playerOptions[index]
             currentIframeHtml = generateIframeHtml(player.url)
+            if (hasDirectIframeUrls) {
+                currentDirectStreamUrl = player.url
+            }
             loadCurrentStream()
             Toast.makeText(
                 this,
