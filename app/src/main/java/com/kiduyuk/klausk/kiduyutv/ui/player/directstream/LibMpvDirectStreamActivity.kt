@@ -42,6 +42,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.MegaPlaybackT
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamCatalog
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamResolver
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamSelectionDialog
+import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamValidator
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.VidsrcPlaybackToken
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.util.AuthManager
@@ -76,6 +77,7 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private var streamDialog: StreamSelectionDialog? = null
     private var trackDialog: AlertDialog? = null
     private var resolverJob: Job? = null
+    private var validationJob: Job? = null
     private var subtitleJob: Job? = null
     private var subtitleDialog: AlertDialog? = null
     private var wasPlaying = false
@@ -86,6 +88,7 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private var remoteSeekInProgress = false
     private var resumePositionMs = 0L
     private var lastShownPlaybackError: String? = null
+    private var lastLoggedSnapshotTrace: String? = null
     private var watchHistoryReady = false
     private var lastProgressPersistAt = 0L
     private var progressWriteJob: Job? = null
@@ -118,10 +121,20 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
             .load(normalizeArtworkUrl(intent.getStringExtra(DirectStreamActivity.EXTRA_BACKDROP_URL)))
             .into(binding.loadingBackdrop)
         binding.loadingArtwork.visibility = View.VISIBLE
+        Log.i(TAG, "onCreate: libmpv activity created; surface=${surfaceView.hashCode()} " +
+            "tmdbId=${intent.getIntExtra(DirectStreamActivity.EXTRA_TMDB_ID, 0)}")
         startInitialRoute()
         wireControls()
         lifecycleScope.launch {
             session.snapshot.collect { snapshot ->
+                val snapshotTrace = "loading=${snapshot.loading} buffering=${snapshot.buffering} " +
+                    "paused=${snapshot.paused} positionMs=${snapshot.positionMs} " +
+                    "durationMs=${snapshot.durationMs} tracks=${snapshot.tracks.size} " +
+                    "error=${snapshot.error ?: "<none>"}"
+                if (snapshotTrace != lastLoggedSnapshotTrace) {
+                    lastLoggedSnapshotTrace = snapshotTrace
+                    Log.i(TAG, "libmpv snapshot: $snapshotTrace")
+                }
                 durationMs = snapshot.durationMs.coerceAtLeast(0L)
                 if (activeStream != null && durationMs > 0L && System.currentTimeMillis() - lastProgressPersistAt >= 30_000L) {
                     lastProgressPersistAt = System.currentTimeMillis()
@@ -190,7 +203,9 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
             }
             if (captured != null) {
                 streams = listOf(captured)
+                Log.i(TAG, "initializeRoute: using sniffed stream ${streamSummary(captured)}")
                 beginPlayback(captured)
+                validateStreamsInBackground(streams)
                 return@launch
             }
             runCatching {
@@ -264,13 +279,17 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 hideProviderFetchProgress()
                 hideStreamFetchCount()
                 streams = result
-                Log.i("KiduyuLiteProvider", "libmpv resolver returned ${result.size} streams")
+                Log.i(TAG, "initializeRoute: resolver returned ${result.size} streams")
+                result.forEachIndexed { index, stream ->
+                    Log.i(TAG, "initializeRoute: stream[$index] ${streamSummary(stream)}")
+                }
                 result.firstOrNull()?.let(::beginPlayback)
                     ?: showError(getString(R.string.no_streams_dialog_message))
+                validateStreamsInBackground(result)
             }.onFailure { error ->
                 hideProviderFetchProgress()
                 hideStreamFetchCount()
-                Log.w("KiduyuLiteProvider", "libmpv stream resolution failed", error)
+                Log.i(TAG, "initializeRoute: stream resolution failed: ${error.message}", error)
                 showError(error.message ?: getString(R.string.streams_failed))
             }
         }
@@ -491,6 +510,11 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private fun beginPlayback(stream: StreamItem) {
         playbackGeneration++
         val position = if (activeStream == null) resumePositionMs else currentPosition()
+        Log.i(
+            TAG,
+            "beginPlayback: generation=$playbackGeneration positionMs=$position " +
+                "surfaceReady=$surfaceReady sessionReady=$sessionReady ${streamSummary(stream)}"
+        )
         activeStream = stream
         pendingStream = stream
         binding.playerStatus.visibility = View.GONE
@@ -500,14 +524,56 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
         binding.btnPlayerStreams.visibility = if (streams.size > 1) View.VISIBLE else View.GONE
         updateBottomFocusChain()
         if (surfaceReady && sessionReady) loadPending(position)
+        else Log.i(TAG, "beginPlayback: waiting for surface/session initialization")
+    }
+
+    /**
+     * Validate streams independently of playback so the picker can replace its
+     * initial Unverified badges with real probe results without delaying startup.
+     */
+    private fun validateStreamsInBackground(items: List<StreamItem>) {
+        if (items.isEmpty()) return
+        validationJob?.cancel()
+        Log.i(TAG, "validateStreamsInBackground: starting validation for ${items.size} streams")
+        validationJob = lifecycleScope.launch {
+            runCatching { StreamValidator.validateAll(items) }
+                .onSuccess { validated ->
+                    if (isFinishing || isDestroyed) return@onSuccess
+                    streams = validated.toList()
+                    streamDialog?.updateStreams(
+                        streams,
+                        activeIndex = streams.indexOfFirst { it === activeStream }.takeIf { it >= 0 }
+                    )
+                    val valid = validated.count { it.isValid && !it.isFailed }
+                    val checking = validated.count { it.isChecking }
+                    val failed = validated.count { it.isFailed }
+                    Log.i(
+                        TAG,
+                        "validateStreamsInBackground: completed total=${validated.size} " +
+                            "valid=$valid failed=$failed checking=$checking " +
+                            "statuses=${validated.joinToString { streamStatusSummary(it) }}"
+                    )
+                }
+                .onFailure { error ->
+                    Log.i(TAG, "validateStreamsInBackground: validation failed: ${error.message}", error)
+                }
+        }
     }
 
     private fun loadPending(position: Long = currentPosition(), generation: Int = playbackGeneration) {
-        val stream = pendingStream ?: return
+        val stream = pendingStream ?: run {
+            Log.i(TAG, "loadPending: no pending stream; generation=$generation")
+            return
+        }
         pendingStream = null
         val requestHeaders = playbackHeaders(stream)
         val refreshMega = MegaPlaybackToken.needsRefresh(stream)
         val refreshVidsrc = VidsrcPlaybackToken.needsRefresh(stream)
+        Log.i(
+            TAG,
+            "loadPending: generation=$generation positionMs=$position refreshMega=$refreshMega " +
+                "refreshVidsrc=$refreshVidsrc headers=${requestHeaders.keys} ${streamSummary(stream)}"
+        )
         if (!refreshMega && !refreshVidsrc) {
             loadResolvedStream(stream, requestHeaders, position, generation)
             return
@@ -522,10 +588,14 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
                     }
                 }
             }.onSuccess { refreshed ->
+                Log.i(TAG, "loadPending: token refresh succeeded generation=$generation ${streamSummary(refreshed)}")
                 if (generation == playbackGeneration) {
                     loadResolvedStream(refreshed, playbackHeaders(refreshed), position, generation)
+                } else {
+                    Log.i(TAG, "loadPending: ignoring refreshed stream from stale generation=$generation")
                 }
             }.onFailure { error ->
+                Log.i(TAG, "loadPending: token refresh failed generation=$generation: ${error.message}", error)
                 if (generation == playbackGeneration) {
                     showPlaybackError(
                         if (refreshVidsrc) "Could not prepare Vidsrc playback: ${error.message ?: "retry for a fresh token"}"
@@ -543,7 +613,25 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
         generation: Int = playbackGeneration
     ) {
         lifecycleScope.launch {
-            session.load(normalizePlaybackUrl(stream), headers, startPositionMs = position.coerceAtLeast(0L))
+            val playbackUrl = normalizePlaybackUrl(stream)
+            Log.i(
+                TAG,
+                "loadResolvedStream: calling session.load generation=$generation " +
+                    "positionMs=$position headers=${headers.keys} url=${safeUrl(playbackUrl)} ${streamSummary(stream)}"
+            )
+            runCatching {
+                session.load(playbackUrl, headers, startPositionMs = position.coerceAtLeast(0L))
+            }.onSuccess {
+                Log.i(TAG, "loadResolvedStream: session.load accepted generation=$generation")
+                // A previous pause state can survive a libmpv loadfile command.
+                // Explicitly resume so choosing a stream always starts playback.
+                session.setPaused(false)
+                Log.i(TAG, "loadResolvedStream: requested playback resume generation=$generation")
+            }.onFailure { error ->
+                Log.i(TAG, "loadResolvedStream: session.load failed generation=$generation: ${error.message}", error)
+                if (generation == playbackGeneration) showPlaybackError(error.message ?: "libmpv could not load stream")
+                return@launch
+            }
             if (stream.subtitles.isEmpty()) return@launch
             val (subtitlePairs, failedSubtitles) = withContext(Dispatchers.IO) {
                 prepareProviderSubtitles(stream.subtitles)
@@ -656,6 +744,8 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
     }
 
     private fun reloadStreams(startFromBeginning: Boolean = false) {
+        Log.i(TAG, "reloadStreams: startFromBeginning=$startFromBeginning currentGeneration=$playbackGeneration")
+        validationJob?.cancel()
         playbackGeneration++
         if (parseSniffedStream() != null) { Toast.makeText(this, R.string.no_streams_dialog_message, Toast.LENGTH_SHORT).show(); return }
         val resume = if (startFromBeginning) 0L else currentPosition()
@@ -717,9 +807,26 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
     }
 
     private fun showStreams() {
-        if (streams.isEmpty()) return
-        streamDialog = StreamSelectionDialog(this, streams, streams.indexOf(activeStream).takeIf { it >= 0 }) { selected -> beginPlayback(selected) }
+        if (streams.isEmpty()) {
+            Log.i(TAG, "showStreams: no streams available")
+            return
+        }
+        val activeIndex = streams.indexOfFirst { it === activeStream }.takeIf { it >= 0 }
+        Log.i(TAG, "showStreams: opening dialog total=${streams.size} activeIndex=$activeIndex")
+        streams.forEachIndexed { index, stream ->
+            Log.i(TAG, "showStreams: stream[$index] ${streamStatusSummary(stream)}")
+        }
+        streamDialog = StreamSelectionDialog(this, streams, activeIndex) { selected ->
+            val selectedIndex = streams.indexOfFirst { it === selected }.takeIf { it >= 0 }
+            Log.i(
+                TAG,
+                "showStreams: selected stream index=$selectedIndex " +
+                    "dialogShowing=${streamDialog?.isShowing == true} ${streamStatusSummary(selected)}"
+            )
+            beginPlayback(selected)
+        }
         streamDialog?.show()
+        Log.i(TAG, "showStreams: dialog shown=${streamDialog?.isShowing == true}")
     }
 
     private fun showTracks(subtitlesOnly: Boolean = false) {
@@ -808,6 +915,7 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     /** Constants shared by subtitle handling, remote seeking, and media controls. */
     companion object {
+        private const val TAG = "LibMpvDirectStream"
         private const val MAX_PROVIDER_SUBTITLE_BYTES = 20L * 1024L * 1024L
         private const val REAL_BROWSER_USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
@@ -954,14 +1062,19 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     override fun surfaceCreated(holder: SurfaceHolder) {
         surfaceReady = true
+        Log.i(TAG, "surfaceCreated: valid=${holder.surface?.isValid} sessionReady=$sessionReady")
         lifecycleScope.launch {
             runCatching { session.initialize(holder.surface) }
                 .onSuccess {
                     sessionReady = true
+                    Log.i(TAG, "surfaceCreated: libmpv session initialized")
                     session.setSurfaceSize(surfaceView.width, surfaceView.height)
                     pendingStream?.let { loadPending(if (activeStream == null) resumePositionMs else currentPosition()) }
                 }
-                .onFailure { showError(it.message ?: "Could not initialize libmpv") }
+                .onFailure {
+                    Log.i(TAG, "surfaceCreated: libmpv initialization failed: ${it.message}", it)
+                    showError(it.message ?: "Could not initialize libmpv")
+                }
         }
     }
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
@@ -969,6 +1082,7 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
     }
     override fun surfaceDestroyed(holder: SurfaceHolder) {
         surfaceReady = false
+        Log.i(TAG, "surfaceDestroyed: detaching libmpv surface")
         session.detachSurface()
     }
 
@@ -1028,7 +1142,9 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
     }
     override fun onResume() { super.onResume(); if (::session.isInitialized && wasPlaying) { wasPlaying = false; session.setPaused(false) } }
     override fun onDestroy() {
+        Log.i(TAG, "onDestroy: generation=$playbackGeneration active=${activeStream?.let(::streamStatusSummary)}")
         resolverJob?.cancel()
+        validationJob?.cancel()
         subtitleJob?.cancel()
         streamDialog?.dismiss()
         trackDialog?.dismiss()
@@ -1036,5 +1152,28 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
         if (::session.isInitialized) session.release()
         super.onDestroy()
     }
+
+    /** Compact diagnostic representation that avoids logging signed URL query tokens. */
+    private fun streamSummary(stream: StreamItem): String =
+        "provider=${stream.provider.ifBlank { "?" }} name=${stream.name.ifBlank { "?" }} " +
+            "quality=${stream.quality.ifBlank { "?" }} language=${stream.language.ifBlank { "?" }} " +
+            "url=${safeUrl(stream.url)}"
+
+    /** Include validation state and HTTP status in picker/playback diagnostics. */
+    private fun streamStatusSummary(stream: StreamItem): String =
+        "${streamSummary(stream)} valid=${stream.isValid} checking=${stream.isChecking} " +
+            "failed=${stream.isFailed} http=${stream.httpStatusCode ?: "?"}"
+
+    /** Redact signed query strings while retaining enough URL detail for Logcat diagnosis. */
+    private fun safeUrl(url: String): String = runCatching {
+        val uri = Uri.parse(url)
+        buildString {
+            append(uri.scheme.orEmpty())
+            append("://")
+            append(uri.host.orEmpty())
+            append(uri.path.orEmpty())
+            if (!uri.query.isNullOrBlank()) append("?[query]")
+        }
+    }.getOrDefault("<invalid-url>")
 
 }

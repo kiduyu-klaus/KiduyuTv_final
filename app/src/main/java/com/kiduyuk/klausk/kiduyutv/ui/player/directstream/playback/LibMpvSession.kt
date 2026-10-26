@@ -1,6 +1,7 @@
 package com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback
 
 import android.content.Context
+import android.util.Log
 import android.view.Surface
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -49,11 +50,13 @@ internal class LibMpvSession(context: Context) {
     val snapshot: StateFlow<MpvPlaybackSnapshot> = mutableSnapshot.asStateFlow()
 
     suspend fun initialize(surface: Surface) = withContext(nativeDispatcher) {
+        Log.i(TAG, "initialize: surfaceValid=${surface.isValid} existingHandle=${handle.get() != 0L}")
         nativeLoadFailure?.let { throw IllegalStateException("Could not load libmpv native libraries", it) }
         check(surface.isValid) { "Playback surface is not valid" }
         val existing = handle.get()
         if (existing != 0L) {
             check(nativeAttach(existing, surface)) { "libmpv could not reattach the Android video surface" }
+            Log.i(TAG, "initialize: reattached existing libmpv handle")
             return@withContext
         }
         val created = nativeCreate()
@@ -63,10 +66,14 @@ internal class LibMpvSession(context: Context) {
             "libmpv could not attach the Android video surface"
         }
         handle.set(created)
+        Log.i(TAG, "initialize: created and attached libmpv handle")
         poller = scope.launch {
             while (isActive && handle.get() == created) {
                 runCatching { mutableSnapshot.value = decodeSnapshot(nativeSnapshot(created)) }
-                    .onFailure { mutableSnapshot.value = mutableSnapshot.value.copy(error = it.message) }
+                    .onFailure {
+                        Log.i(TAG, "snapshot: native polling failed: ${it.message}", it)
+                        mutableSnapshot.value = mutableSnapshot.value.copy(error = it.message)
+                    }
                 delay(250)
             }
         }
@@ -92,6 +99,11 @@ internal class LibMpvSession(context: Context) {
         require(startPositionMs >= 0) { "startPositionMs must be non-negative" }
         val current = handle.get()
         check(current != 0L) { "libmpv is not initialized" }
+        Log.i(
+            TAG,
+            "load: handleReady=true startPositionMs=$startPositionMs headers=${headers.keys} " +
+                "subtitles=${subtitles.size} url=${safeUrl(url)}"
+        )
         mutableSnapshot.value = mutableSnapshot.value.copy(
             positionMs = startPositionMs,
             durationMs = 0L,
@@ -101,7 +113,9 @@ internal class LibMpvSession(context: Context) {
             error = null,
             tracks = emptyList()
         )
-        nativeLoad(current, url, headers, subtitles, startPositionMs)
+        runCatching { nativeLoad(current, url, headers, subtitles, startPositionMs) }
+            .onSuccess { Log.i(TAG, "load: nativeLoad returned successfully") }
+            .onFailure { Log.i(TAG, "load: nativeLoad threw ${it.message}", it); throw it }
     }
     fun togglePause() = submit { nativeCommand(it, arrayOf("cycle", "pause")) }
     fun setPaused(paused: Boolean) = submit { nativeCommand(it, arrayOf("set", "pause", if (paused) "yes" else "no")) }
@@ -181,10 +195,23 @@ internal class LibMpvSession(context: Context) {
     private external fun nativeRelease(handle: Long)
 
     companion object {
+        private const val TAG = "LibMpvSession"
         private val nativeLoadFailure: Throwable? = runCatching {
             System.loadLibrary("c++_shared")
             System.loadLibrary("mpv")
             System.loadLibrary("kiduyu_mpv")
         }.exceptionOrNull()
+
+        /** Redact signed query parameters while keeping the native load target diagnosable. */
+        private fun safeUrl(url: String): String = runCatching {
+            val uri = android.net.Uri.parse(url)
+            buildString {
+                append(uri.scheme.orEmpty())
+                append("://")
+                append(uri.host.orEmpty())
+                append(uri.path.orEmpty())
+                if (!uri.query.isNullOrBlank()) append("?[query]")
+            }
+        }.getOrDefault("<invalid-url>")
     }
 }
