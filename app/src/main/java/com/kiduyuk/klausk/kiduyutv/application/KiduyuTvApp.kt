@@ -9,7 +9,6 @@ import coil.ImageLoaderFactory
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import coil.request.CachePolicy
-import coil.util.DebugLogger
 import coil.decode.SvgDecoder
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.database.FirebaseDatabase
@@ -210,7 +209,6 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
             .memoryCachePolicy(CachePolicy.ENABLED)
             .diskCachePolicy(CachePolicy.ENABLED)
             .networkCachePolicy(CachePolicy.ENABLED)
-            .logger(DebugLogger())
             .build()
     }
 }

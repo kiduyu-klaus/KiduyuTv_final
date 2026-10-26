@@ -1,9 +1,17 @@
 package com.kiduyuk.klausk.kiduyutv.ui.player.directstream
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Intent
+import android.content.DialogInterface
+import android.content.res.ColorStateList
+import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.StateListDrawable
+import android.util.TypedValue
+import android.widget.Button
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.kiduyuk.klausk.kiduyutv.activity.mainactivity.MainActivity
+import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 
 /**
@@ -34,10 +42,7 @@ object DirectStreamProviderWarning {
             return false
         }
 
-        // Use the platform builder here. MobileDirectStreamActivity is a
-        // ComponentActivity using a Compose theme, which is not guaranteed to
-        // inherit Theme.AppCompat as required by MaterialAlertDialogBuilder.
-        val dialog = AlertDialog.Builder(activity)
+        val dialog = MaterialAlertDialogBuilder(activity)
             .setTitle("Set a default provider")
             .setMessage(
                 "Fetching from All Providers can take longer and this option will be " +
@@ -53,10 +58,74 @@ object DirectStreamProviderWarning {
             .create()
 
         dialog.setOnShowListener {
-            dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE)?.requestFocus()
+            listOf(
+                dialog.getButton(DialogInterface.BUTTON_NEGATIVE),
+                dialog.getButton(DialogInterface.BUTTON_POSITIVE)
+            ).forEach { button ->
+                button?.let(::styleActionButton)
+            }
+            dialog.getButton(DialogInterface.BUTTON_POSITIVE)?.requestFocus()
         }
         dialog.show()
         return true
+    }
+
+    private fun styleActionButton(button: Button) {
+        val context = button.context
+        val red = context.getColor(R.color.kiduyu_red)
+        val surface = context.getColor(R.color.direct_stream_surface_high)
+        val pressedRed = Color.rgb(178, 7, 16)
+        val radius = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            24f,
+            context.resources.displayMetrics
+        )
+        val strokeWidth = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            1f,
+            context.resources.displayMetrics
+        ).toInt()
+
+        fun background(fill: Int, stroke: Int) = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = radius
+            setColor(fill)
+            setStroke(strokeWidth, stroke)
+        }
+
+        button.backgroundTintList = null
+        button.background = StateListDrawable().apply {
+            addState(
+                intArrayOf(android.R.attr.state_focused),
+                background(red, red)
+            )
+            addState(
+                intArrayOf(android.R.attr.state_pressed),
+                background(pressedRed, pressedRed)
+            )
+            addState(
+                intArrayOf(),
+                background(Color.TRANSPARENT, surface)
+            )
+        }
+        button.setTextColor(
+            ColorStateList(
+                arrayOf(
+                    intArrayOf(android.R.attr.state_focused),
+                    intArrayOf(android.R.attr.state_pressed),
+                    intArrayOf()
+                ),
+                intArrayOf(Color.WHITE, Color.WHITE, red)
+            )
+        )
+        button.minHeight = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP,
+            48f,
+            context.resources.displayMetrics
+        ).toInt()
+        button.isFocusable = true
+        button.isFocusableInTouchMode = true
+        button.stateListAnimator = null
     }
 
     fun isAllProviders(provider: String?): Boolean {
