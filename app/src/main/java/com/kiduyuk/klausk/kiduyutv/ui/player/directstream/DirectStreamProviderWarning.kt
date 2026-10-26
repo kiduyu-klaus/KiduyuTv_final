@@ -1,8 +1,8 @@
 package com.kiduyuk.klausk.kiduyutv.ui.player.directstream
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.kiduyuk.klausk.kiduyutv.activity.mainactivity.MainActivity
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 
@@ -34,7 +34,10 @@ object DirectStreamProviderWarning {
             return false
         }
 
-        val dialog = MaterialAlertDialogBuilder(activity)
+        // Use the platform builder here. MobileDirectStreamActivity is a
+        // ComponentActivity using a Compose theme, which is not guaranteed to
+        // inherit Theme.AppCompat as required by MaterialAlertDialogBuilder.
+        val dialog = AlertDialog.Builder(activity)
             .setTitle("Set a default provider")
             .setMessage(
                 "Fetching from All Providers can take longer and this option will be " +
