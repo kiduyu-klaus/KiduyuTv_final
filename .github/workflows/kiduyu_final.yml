@@ -69,10 +69,10 @@ jobs:
           echo "Release tag: ${NEW_TAG}"
 
   # ══════════════════════════════════════════════════════════════════════
-  # BUILD APK — matrix over phone/tv flavors, runs in parallel
+  # BUILD ABI-SPLIT APKs — matrix over phone/tv flavors, runs in parallel
   # ══════════════════════════════════════════════════════════════════════
   build_apk:
-    name: Build ${{ matrix.flavor }} APK
+    name: Build ${{ matrix.flavor }} ABI APKs
     runs-on: ubuntu-latest
     needs: [prepare_release]
 
@@ -170,29 +170,68 @@ jobs:
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > kiduyutv_final
 
       # ── Release APK ──────────────────────────────────────────
-      - name: Build ${{ matrix.flavor }} Release APK
+      - name: Build ${{ matrix.flavor }} ABI-split Release APKs
         env:
           SUBDL_API_KEY: ${{ secrets.SUBDL_API_KEY }}
           OPENSUBTITLES_API_KEY: ${{ secrets.OPENSUBTITLES_API_KEY }}
           STREAM_API_TOKEN: ${{ secrets.STREAM_API_TOKEN }}
         run: ./gradlew assemble${{ matrix.flavor_task }}Release --build-cache --configuration-cache --parallel -x lint -x test
 
-      - name: Rename ${{ matrix.flavor }} Release APK
-        id: rename_release
+      - name: Rename ${{ matrix.flavor }} Release APKs by ABI
+        env:
+          FLAVOR: ${{ matrix.flavor }}
+          VERSION: ${{ needs.prepare_release.outputs.tag }}
+          BUILD_COUNT: ${{ needs.prepare_release.outputs.build_count }}
         run: |
-          VERSION=$(grep 'versionName' app/build.gradle | sed 's/.*"\(.*\)".*/\1/' | tr -d '[:space:]')
-          BUILD=${{ needs.prepare_release.outputs.build_count }}
-          APK=$(find app/build/outputs/apk/${{ matrix.flavor }}/release -name "*.apk" | head -1)
-          NEW_APK_NAME="KiduyuTV-${{ matrix.flavor }}-release-${VERSION}-build${BUILD}.apk"
-          NEW_APK_PATH="app/build/outputs/apk/${{ matrix.flavor }}/release/$NEW_APK_NAME"
-          mv "$APK" "$NEW_APK_PATH"
-          echo "apk_path=$NEW_APK_PATH" >> $GITHUB_OUTPUT
+          VERSION="${VERSION#v}"
+          APK_DIR="app/build/outputs/apk/${FLAVOR}/release"
+          METADATA="$APK_DIR/output-metadata.json"
+          test -f "$METADATA"
+
+          python3 - "$APK_DIR" "$FLAVOR" "$VERSION" "$BUILD_COUNT" <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          apk_dir = Path(sys.argv[1])
+          flavor, version, build = sys.argv[2:5]
+          metadata = json.loads((apk_dir / "output-metadata.json").read_text())
+          expected = {"arm64-v8a", "armeabi-v7a", "x86", "x86_64"}
+          seen = set()
+
+          for element in metadata.get("elements", []):
+              output_file = element.get("outputFile", "")
+              abi_values = [
+                  item["value"]
+                  for item in element.get("filters", [])
+                  if item.get("filterType") == "ABI"
+              ]
+              if len(abi_values) != 1:
+                  raise SystemExit(f"Expected one ABI filter for {output_file!r}")
+              abi = abi_values[0]
+              if abi not in expected or abi in seen:
+                  raise SystemExit(f"Unexpected or duplicate ABI output: {abi}")
+
+              source = apk_dir / Path(output_file).name
+              if not source.is_file():
+                  raise SystemExit(f"APK output not found: {source}")
+              target = apk_dir / f"KiduyuTV-{flavor}-release-{version}-build{build}-{abi}.apk"
+              os.replace(source, target)
+              print(f"Renamed {source} -> {target}")
+              seen.add(abi)
+
+          if seen != expected:
+              raise SystemExit(f"Expected APKs for {sorted(expected)}, got {sorted(seen)}")
+          PY
 
       - name: Upload ${{ matrix.flavor }} Release Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.flavor }}-release
-          path: ${{ steps.rename_release.outputs.apk_path }}
+          path: app/build/outputs/apk/${{ matrix.flavor }}/release/KiduyuTV-${{ matrix.flavor }}-release-*.apk
+          if-no-files-found: error
+          compression-level: 0
 
       # ═══════════════════════════════════════════════════════════════
       # RESTORE LOCAL GRADLE PROPERTIES (after build completes)
@@ -249,20 +288,19 @@ jobs:
             ### Downloads
 
             #### Android Devices
-            | Package | Platform |
-            |---------|----------|
-            | `KiduyuTV-phone-release-*.apk` | Android Phone / Tablet |
-            | `KiduyuTV-tv-release-*.apk`    | Android TV / Fire TV   |
+            Each phone and TV package is built as separate ABI APKs. Download **one APK** whose suffix matches the device ABI: `arm64-v8a`, `armeabi-v7a`, `x86`, or `x86_64`.
 
-            **Sideload via ADB (Phone):**
+            Check a connected device's primary ABI with `adb shell getprop ro.product.cpu.abi`.
+
+            **Sideload via ADB (Phone; replace `<abi>` with the device ABI):**
             ```bash
-            adb install KiduyuTV-phone-release-*.apk
+            adb install KiduyuTV-phone-release-<version>-build<run>-<abi>.apk
             ```
 
-            **Sideload via ADB (TV / Fire TV):**
+            **Sideload via ADB (TV / Fire TV; replace `<abi>` with the device ABI):**
             ```bash
             adb connect <device-ip>:5555
-            adb install KiduyuTV-tv-release-*.apk
+            adb install KiduyuTV-tv-release-<version>-build<run>-<abi>.apk
             ```
 
           files: |
