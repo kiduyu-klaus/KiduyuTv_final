@@ -806,6 +806,7 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     private data class SubtitleChoice(val label: String, val download: suspend () -> SubtitleItem)
 
+    /** Constants shared by subtitle handling, remote seeking, and media controls. */
     companion object {
         private const val MAX_PROVIDER_SUBTITLE_BYTES = 20L * 1024L * 1024L
         private const val REAL_BROWSER_USER_AGENT =
@@ -813,6 +814,10 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
         private const val HAKUNA_MATATA_USER_AGENT = "ExoPlayer/1.6.1"
         private const val DAHMER_MOVIES_REFERER = "https://a.111477.xyz/"
+        /** Number of SeekBar progress units moved by one remote D-pad step. */
+        private const val REMOTE_SEEK_PROGRESS_STEP = 10
+        /** Duration, in milliseconds, used by media rewind and fast-forward keys. */
+        private const val SEEK_STEP_MS = 30_000L
     }
 
     private fun showEpisodeJump() {
@@ -1032,8 +1037,4 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
         super.onDestroy()
     }
 
-    companion object {
-        private const val REMOTE_SEEK_PROGRESS_STEP = 10
-        private const val SEEK_STEP_MS = 30_000L
-    }
 }
