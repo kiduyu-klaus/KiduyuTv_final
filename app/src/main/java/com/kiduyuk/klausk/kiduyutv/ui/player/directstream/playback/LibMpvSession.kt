@@ -54,8 +54,6 @@ internal class LibMpvSession(context: Context) {
         val existing = handle.get()
         if (existing != 0L) {
             check(nativeAttach(existing, surface)) { "libmpv could not reattach the Android video surface" }
-            nativeCommand(existing, arrayOf("set", "vo", "gpu"))
-            nativeCommand(existing, arrayOf("set", "force-window", "yes"))
             return@withContext
         }
         val created = nativeCreate()
@@ -78,8 +76,6 @@ internal class LibMpvSession(context: Context) {
         val current = handle.get()
         if (current != 0L) scope.launch {
             if (handle.get() == current) {
-                nativeCommand(current, arrayOf("set", "vo", "null"))
-                nativeCommand(current, arrayOf("set", "force-window", "no"))
                 nativeDetach(current)
             }
         }
@@ -91,9 +87,11 @@ internal class LibMpvSession(context: Context) {
         }
     }
 
-    fun load(url: String, headers: Map<String, String>, subtitles: List<Pair<String, String>> = emptyList(), startPositionMs: Long = 0) {
+    suspend fun load(url: String, headers: Map<String, String>, subtitles: List<Pair<String, String>> = emptyList(), startPositionMs: Long = 0) = withContext(nativeDispatcher) {
         require(url.isNotBlank()) { "URL must not be blank" }
         require(startPositionMs >= 0) { "startPositionMs must be non-negative" }
+        val current = handle.get()
+        check(current != 0L) { "libmpv is not initialized" }
         mutableSnapshot.value = mutableSnapshot.value.copy(
             positionMs = startPositionMs,
             durationMs = 0L,
@@ -103,7 +101,7 @@ internal class LibMpvSession(context: Context) {
             error = null,
             tracks = emptyList()
         )
-        submit { nativeLoad(it, url, headers, subtitles, startPositionMs) }
+        nativeLoad(current, url, headers, subtitles, startPositionMs)
     }
     fun togglePause() = submit { nativeCommand(it, arrayOf("cycle", "pause")) }
     fun setPaused(paused: Boolean) = submit { nativeCommand(it, arrayOf("set", "pause", if (paused) "yes" else "no")) }

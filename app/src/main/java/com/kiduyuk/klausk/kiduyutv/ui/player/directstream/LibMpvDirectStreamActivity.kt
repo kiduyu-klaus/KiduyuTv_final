@@ -11,6 +11,12 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.SeekBar
 import android.widget.Toast
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.io.InputStream
+import java.security.MessageDigest
+import java.util.concurrent.TimeUnit
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
@@ -42,10 +48,13 @@ import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.tasks.await
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.json.JSONObject
 import org.json.JSONArray
 import java.util.Locale
@@ -62,6 +71,7 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private var pendingStream: StreamItem? = null
     private var streams: List<StreamItem> = emptyList()
     private var activeStream: StreamItem? = null
+    private var playbackGeneration = 0
     private var streamDialog: StreamSelectionDialog? = null
     private var trackDialog: AlertDialog? = null
     private var resolverJob: Job? = null
@@ -78,6 +88,14 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private var lastProgressPersistAt = 0L
     private var progressWriteJob: Job? = null
     private val aspectModes = listOf("auto", "16:9", "4:3", "21:9", "1:1")
+    private val subtitleHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .callTimeout(45, TimeUnit.SECONDS)
+            .followRedirects(true)
+            .build()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -379,6 +397,7 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
     }
 
     private fun beginPlayback(stream: StreamItem) {
+        playbackGeneration++
         val position = if (activeStream == null) resumePositionMs else currentPosition()
         activeStream = stream
         pendingStream = stream
@@ -390,14 +409,14 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
         if (surfaceReady && sessionReady) loadPending(position)
     }
 
-    private fun loadPending(position: Long = currentPosition()) {
+    private fun loadPending(position: Long = currentPosition(), generation: Int = playbackGeneration) {
         val stream = pendingStream ?: return
         pendingStream = null
         val requestHeaders = playbackHeaders(stream)
         val refreshMega = MegaPlaybackToken.needsRefresh(stream)
         val refreshVidsrc = VidsrcPlaybackToken.needsRefresh(stream)
         if (!refreshMega && !refreshVidsrc) {
-            loadResolvedStream(stream, requestHeaders, position)
+            loadResolvedStream(stream, requestHeaders, position, generation)
             return
         }
         lifecycleScope.launch {
@@ -410,22 +429,141 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
                     }
                 }
             }.onSuccess { refreshed ->
-                loadResolvedStream(refreshed, playbackHeaders(refreshed), position)
+                if (generation == playbackGeneration) {
+                    loadResolvedStream(refreshed, playbackHeaders(refreshed), position, generation)
+                }
             }.onFailure { error ->
-                showPlaybackError(
-                    if (refreshVidsrc) "Could not prepare Vidsrc playback: ${error.message ?: "retry for a fresh token"}"
-                    else "Could not prepare Mega playback: ${error.message ?: "retry for a fresh token"}"
-                )
+                if (generation == playbackGeneration) {
+                    showPlaybackError(
+                        if (refreshVidsrc) "Could not prepare Vidsrc playback: ${error.message ?: "retry for a fresh token"}"
+                        else "Could not prepare Mega playback: ${error.message ?: "retry for a fresh token"}"
+                    )
+                }
             }
         }
     }
 
-    private fun loadResolvedStream(stream: StreamItem, headers: Map<String, String>, position: Long) {
-        val subtitlePairs = stream.subtitles.map { it.url to (it.label ?: it.language ?: "Subtitle") }
-        session.load(normalizePlaybackUrl(stream), headers, subtitlePairs, position.coerceAtLeast(0L))
+    private fun loadResolvedStream(
+        stream: StreamItem,
+        headers: Map<String, String>,
+        position: Long,
+        generation: Int = playbackGeneration
+    ) {
+        lifecycleScope.launch {
+            session.load(normalizePlaybackUrl(stream), headers, startPositionMs = position.coerceAtLeast(0L))
+            if (stream.subtitles.isEmpty()) return@launch
+            val (subtitlePairs, failedSubtitles) = withContext(Dispatchers.IO) {
+                prepareProviderSubtitles(stream.subtitles)
+            }
+            if (generation != playbackGeneration || isFinishing || isDestroyed) return@launch
+            if (failedSubtitles > 0) {
+                Toast.makeText(
+                    this@LibMpvDirectStreamActivity,
+                    "${failedSubtitles} provider subtitle track(s) could not be loaded",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+            if (subtitlePairs.isEmpty()) return@launch
+            val loaded = withTimeoutOrNull(60_000L) {
+                session.snapshot.first { !it.loading || it.error != null }
+            } ?: return@launch
+            if (loaded.error != null || generation != playbackGeneration || isFinishing || isDestroyed) return@launch
+            subtitlePairs.forEach { (url, label) -> session.addSubtitle(url, label) }
+        }
+    }
+
+    /** Copy external subtitle tracks into a private local cache so libmpv does not
+     * need to reuse the media URL's headers for a subtitle host with different auth. */
+    private fun prepareProviderSubtitles(subtitles: List<SubtitleItem>): Pair<List<Pair<String, String>>, Int> {
+        if (subtitles.isEmpty()) return emptyList<Pair<String, String>>() to 0
+        val cache = File(cacheDir, "libmpv-subtitles").apply { mkdirs() }
+        var failures = 0
+        val prepared = subtitles.mapNotNull { subtitle ->
+            var outputFile: File? = null
+            runCatching {
+                val uri = Uri.parse(subtitle.url)
+                val extension = subtitleExtension(uri, subtitle.mimeType)
+                val keyMaterial = subtitle.url + "\n" + subtitle.headers.toSortedMap().entries.joinToString("\n") { "${it.key}:${it.value}" }
+                val digest = MessageDigest.getInstance("SHA-256")
+                    .digest(keyMaterial.toByteArray(Charsets.UTF_8))
+                    .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+                val destination = File(cache, "$digest.$extension")
+                outputFile = destination
+                if (!destination.isFile || destination.length() == 0L) {
+                    val temporary = File.createTempFile("subtitle-", ".$extension", cache)
+                    try {
+                        val input: InputStream? = when (uri.scheme?.lowercase(Locale.ROOT)) {
+                            "http", "https" -> {
+                                val request = Request.Builder().url(subtitle.url).apply {
+                                    subtitle.headers.forEach { (name, value) ->
+                                        require(name.isNotBlank() && !name.contains('\r') && !name.contains('\n')) { "Invalid subtitle header name" }
+                                        require(!value.contains('\r') && !value.contains('\n')) { "Invalid subtitle header value" }
+                                        header(name, value)
+                                    }
+                                }.build()
+                                subtitleHttpClient.newCall(request).execute().use { response ->
+                                    check(response.isSuccessful) { "Subtitle request returned HTTP ${response.code}" }
+                                    val body = checkNotNull(response.body) { "Subtitle response was empty" }
+                                    check(body.contentLength() <= MAX_PROVIDER_SUBTITLE_BYTES) { "Subtitle file is too large" }
+                                    copySubtitle(body.byteStream(), temporary)
+                                }
+                                null
+                            }
+                            "content" -> contentResolver.openInputStream(uri)
+                                ?: error("Could not open subtitle content")
+                            "file" -> uri.path?.let(::File)?.let(::FileInputStream)
+                                ?: error("Could not open subtitle file")
+                            else -> error("Unsupported subtitle URL scheme")
+                        }
+                        if (input != null) copySubtitle(input, temporary)
+                        check(temporary.isFile && temporary.length() > 0L) { "Subtitle file is empty" }
+                        if (!temporary.renameTo(destination)) {
+                            temporary.copyTo(destination, overwrite = true)
+                        }
+                    } finally {
+                        temporary.delete()
+                    }
+                }
+                check(destination.isFile && destination.length() > 0L) { "Subtitle file is empty" }
+                destination.toURI().toString() to (subtitle.label ?: subtitle.language ?: "Subtitle")
+            }.onFailure {
+                failures++
+                outputFile?.delete()
+            }.getOrNull()
+        }
+        return prepared to failures
+    }
+
+    private fun copySubtitle(input: InputStream, destination: File) {
+        input.use { source ->
+            FileOutputStream(destination).use { output ->
+                val buffer = ByteArray(16 * 1024)
+                var total = 0L
+                while (true) {
+                    val count = source.read(buffer)
+                    if (count < 0) break
+                    total += count
+                    check(total <= MAX_PROVIDER_SUBTITLE_BYTES) { "Subtitle file is too large" }
+                    output.write(buffer, 0, count)
+                }
+            }
+        }
+    }
+
+    private fun subtitleExtension(uri: Uri, mimeType: String): String {
+        val pathExtension = uri.lastPathSegment?.substringAfterLast('.', "")?.lowercase(Locale.ROOT)
+        if (pathExtension in setOf("srt", "vtt", "ass", "ssa", "sub", "sup")) return pathExtension
+        return when {
+            mimeType.contains("vtt", ignoreCase = true) -> "vtt"
+            mimeType.contains("ass", ignoreCase = true) -> "ass"
+            mimeType.contains("ssa", ignoreCase = true) -> "ssa"
+            mimeType.contains("subrip", ignoreCase = true) || mimeType.contains("srt", ignoreCase = true) -> "srt"
+            else -> "srt"
+        }
     }
 
     private fun reloadStreams(startFromBeginning: Boolean = false) {
+        playbackGeneration++
         if (parseSniffedStream() != null) { Toast.makeText(this, R.string.no_streams_dialog_message, Toast.LENGTH_SHORT).show(); return }
         val resume = if (startFromBeginning) 0L else currentPosition()
         persistWatchProgress(resume)
@@ -574,6 +712,10 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
     }
 
     private data class SubtitleChoice(val label: String, val download: suspend () -> SubtitleItem)
+
+    companion object {
+        private const val MAX_PROVIDER_SUBTITLE_BYTES = 20L * 1024L * 1024L
+    }
 
     private fun showEpisodeJump() {
         val currentSeason = intent.getIntExtra(DirectStreamActivity.EXTRA_SEASON, 1).coerceAtLeast(1)

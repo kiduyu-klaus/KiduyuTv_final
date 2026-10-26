@@ -2,6 +2,7 @@ package com.kiduyuk.klausk.kiduyutv.ui.player.directstream
 
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.view.ViewGroup
@@ -199,6 +200,11 @@ class MobileDirectStreamActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (SettingsManager(this).getDirectStreamPlayer() == SettingsManager.PLAYER_LIBMPV) {
+            startActivity(Intent(this, LibMpvDirectStreamActivity::class.java).putExtras(intent))
+            finish()
+            return
+        }
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR
         enterImmersiveFullscreen()
         settingsManager = SettingsManager(this)

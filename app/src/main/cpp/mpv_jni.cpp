@@ -66,7 +66,7 @@ Java_com_kiduyuk_klausk_kiduyutv_ui_player_directstream_playback_LibMpvSession_n
     if (!s->mpv) { delete s; return 0; }
     const char* opts[][2] = {{"vo","gpu"},{"gpu-context","android"},{"opengl-es","yes"},{"gpu-api","opengl"},{"ao","audiotrack"},
         {"input-default-bindings","no"},{"input-vo-keyboard","no"},{"terminal","no"},
-        {"force-window","no"},{"idle","once"},{"hwdec","auto-safe"},{"cache","yes"},
+        {"idle","once"},{"hwdec","auto-safe"},{"cache","yes"},
         {"demuxer-readahead-secs","20"},{"cache-secs","30"},{"keep-open","yes"}};
     for (const auto& o : opts) {
         if (mpv_set_option_string(s->mpv, o[0], o[1]) < 0) {
@@ -89,10 +89,9 @@ Java_com_kiduyuk_klausk_kiduyutv_ui_player_directstream_playback_LibMpvSession_n
     s->surface = e->NewGlobalRef(surface);
     if (!s->surface) return JNI_FALSE;
     // Follow mpv-android's Android VO lifecycle: set the Java Surface as `wid`
-    // after initialization, then force the window to be created.
+    // after initialization so the Android video output can bind to it.
     int64_t wid = static_cast<int64_t>(reinterpret_cast<intptr_t>(s->surface));
     int result = mpv_set_option(s->mpv, "wid", MPV_FORMAT_INT64, &wid);
-    if (result >= 0) result = mpv_set_property_string(s->mpv, "force-window", "yes");
     if (result < 0) {
         e->DeleteGlobalRef(s->surface);
         s->surface = nullptr;

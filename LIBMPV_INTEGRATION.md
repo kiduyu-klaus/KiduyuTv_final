@@ -9,11 +9,11 @@ KiduyuTV supports two selectable direct-stream backends. `exoplayer` continues t
 The Playback settings now persist a player choice using `SettingsManager`:
 
 - `exoplayer` — the existing Media3 implementation.
-- `libmpv` — routes new direct-stream launches to `LibMpvDirectStreamActivity` and the JNI-backed `LibMpvSession`.
+- `libmpv` — routes new direct-stream launches to `LibMpvDirectStreamActivity` and the JNI-backed `LibMpvSession`; an explicit launch of the phone-specific Media3 activity also forwards to this backend while preserving the original stream extras.
 
 `LibMpvDirectStreamActivity` reuses the existing `activity_direct_stream.xml` controls and overlays, while libmpv owns the video surface and playback. The JNI source is in `app/src/main/cpp`; Gradle's CMake integration builds the `kiduyu_mpv` bridge for each ABI split and links it to the checked-in `libmpv.so`. HTTP headers, token refresh for Mega/Vidsrc, saved Cloudflare cookies, provider subtitles, SubDL/OpenSubtitles downloads, seeking, pause, mute, aspect selection, native track selection, local/Firebase resume history, and Android TV media play/pause keys are wired. ExoPlayer remains the default and is not silently substituted if libmpv initialization fails; the libmpv activity reports the error.
 
-The bridge and activity have **not** been built or exercised on a device in this task (Gradle was intentionally not run). In particular, confirm native compilation, surface rendering, device decoder behavior, HTTP header acceptance, subtitle loading, and playback across the ABI/device matrix before shipping. The checked-in FFmpeg libraries do not export `av_jni_set_java_vm`/`av_jni_set_android_app_ctx`; Android hardware-decoder interoperability therefore remains unverified, and `hwdec=auto-safe` may fall back to software decoding.
+The bridge and activity have **not** been built or exercised on a device (Gradle was intentionally not run). In particular, confirm native compilation, surface rendering, device decoder behavior, HTTP header acceptance, subtitle loading, and playback across the ABI/device matrix before shipping. The checked-in FFmpeg libraries do not export `av_jni_set_java_vm`/`av_jni_set_android_app_ctx`; Android hardware-decoder interoperability therefore remains unverified, and `hwdec=auto-safe` may fall back to software decoding.
 
 ## Audited checked-in native payload (2026-10-26)
 
@@ -387,7 +387,7 @@ Prefer typed property and command APIs in the JNI layer. Do not construct shell 
 
 ## Headers, cookies, and subtitles
 
-`LibMpvDirectStreamActivity` normalizes provider headers and saved Cloudflare cookies into a structured `Map<String, String>`. The JNI bridge validates header names/values, escapes commas and backslashes for mpv's list option syntax, sets `http-header-fields`, and then issues `loadfile`. It does not log header values. Preloaded provider subtitles are queued until `MPV_EVENT_FILE_LOADED`; downloaded SubDL/OpenSubtitles files use the `sub-add` command at runtime. Provider-specific subtitle HTTP headers are not currently transferred independently from the stream's headers, so providers requiring separate subtitle credentials still need validation.
+`LibMpvDirectStreamActivity` normalizes provider headers and saved Cloudflare cookies into a structured `Map<String, String>`. The JNI bridge validates header names/values, escapes commas and backslashes for mpv's list option syntax, sets `http-header-fields`, and then issues `loadfile`. It does not log header values. Video loading starts immediately; optional provider subtitle tracks are fetched asynchronously to an app-private cache with each subtitle's own headers (independent of the media headers), then attached with `sub-add` after libmpv reports `MPV_EVENT_FILE_LOADED`. Content/file URIs are copied into the same cache so libmpv can open them directly. Cached provider subtitle files are limited to 20 MiB and failed/empty downloads are skipped without stopping video playback. Downloaded SubDL/OpenSubtitles files use the `sub-add` command at runtime. A playback-generation guard prevents late token-refresh or subtitle work from a previous stream choice from replacing the current selection.
 
 ## Observing progress and errors
 
