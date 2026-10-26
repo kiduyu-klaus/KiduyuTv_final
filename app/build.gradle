@@ -183,6 +183,7 @@ android {
         jniLibs {
             // Keep native libraries in standard, page-aligned APK entries.
             useLegacyPackaging = false
+            pickFirsts += ['**/libc++_shared.so']
         }
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'

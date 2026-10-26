@@ -58,3 +58,4 @@ ADS_IMPLEMENTATION_REVIEW_AND_IMPROVEMENT_GUIDE.md
 /.agents
 /.work
 /outputs
+/state
