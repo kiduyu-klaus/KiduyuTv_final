@@ -49,7 +49,6 @@ import com.skydoves.balloon.Balloon
 import com.skydoves.balloon.BalloonAnimation
 import com.skydoves.balloon.BalloonSizeSpec
 import com.kiduyuk.klausk.kiduyutv.data.local.database.DatabaseManager
-import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.data.model.Episode
 import com.kiduyuk.klausk.kiduyutv.data.model.SeasonDetail
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
@@ -705,11 +704,11 @@ class DirectStreamActivity : AppCompatActivity() {
 
     /** Gates initial playback before showing any provider warning or starting stream resolution. */
     private fun startInitialPlayback() {
-        if (BuildConfig.FLAVOR == "phone" && settingsManager.shouldShowDirectStreamAdPrompt()) {
+        if (settingsManager.shouldShowDirectStreamAdPrompt()) {
             showStreamAdPrompt()
-            return
+        } else {
+            continueInitialPlayback()
         }
-        continueInitialPlayback()
     }
 
     private fun showStreamAdPrompt() {

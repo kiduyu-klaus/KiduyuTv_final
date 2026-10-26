@@ -62,15 +62,15 @@ class SettingsManager(context: Context) {
             ?.takeIf { it == PLAYER_EXOPLAYER || it == PLAYER_LIBMPV }
             ?: PLAYER_EXOPLAYER
 
-    /** Returns true on every third direct-stream player opening. */
+    /** Shows the direct-stream ad prompt on the first opening, then every third opening. */
     @Synchronized
     fun shouldShowDirectStreamAdPrompt(): Boolean {
-        val nextOpen = (preferences.getInt(KEY_DIRECT_STREAM_OPEN_COUNT, 0).coerceAtLeast(0) % 3) + 1
-        val shouldShow = nextOpen == 3
+        val openingInCycle = preferences.getInt(KEY_DIRECT_STREAM_OPEN_CYCLE, 0)
+            .coerceIn(0, 2)
         preferences.edit()
-            .putInt(KEY_DIRECT_STREAM_OPEN_COUNT, if (shouldShow) 0 else nextOpen)
+            .putInt(KEY_DIRECT_STREAM_OPEN_CYCLE, (openingInCycle + 1) % 3)
             .apply()
-        return shouldShow
+        return openingInCycle == 0
     }
 
     /** Reads the endpoint options this manager already has a context for. */
@@ -187,7 +187,7 @@ class SettingsManager(context: Context) {
         private const val KEY_DEFAULT_PROVIDER = "default_provider"
         private const val KEY_DEFAULT_DIRECT_STREAM_PROVIDER = "default_direct_stream_provider"
         private const val KEY_DIRECT_STREAM_PLAYER = "direct_stream_player"
-        private const val KEY_DIRECT_STREAM_OPEN_COUNT = "direct_stream_open_count"
+        private const val KEY_DIRECT_STREAM_OPEN_CYCLE = "direct_stream_open_cycle"
         private const val KEY_DIRECT_STREAM_ENDPOINT = "direct_stream_endpoint"
         private const val KEY_DIRECT_STREAM_ENDPOINT_OPTIONS = "direct_stream_endpoint_options"
         private const val KEY_DEVICE_ID = "device_id"
