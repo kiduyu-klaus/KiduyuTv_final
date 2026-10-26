@@ -5,16 +5,25 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.OptIn
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.kiduyuk.klausk.kiduyutv.ui.components.BannerAdView
 import com.kiduyuk.klausk.kiduyutv.ui.player.webview.PlayerActivity
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.DirectStreamActivity
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.DirectStreamLauncher
@@ -54,7 +63,14 @@ fun MobileNavGraph(
     startDestination: String = Screen.Home.route,
     onRootBack: () -> Unit = {}
 ) {
-    NavHost(navController = navController, startDestination = startDestination) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        NavHost(
+            navController = navController,
+            startDestination = startDestination,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) {
         composable(Screen.Home.route) {
             MobileHomeScreen(
                 navController = navController,
@@ -932,5 +948,12 @@ fun MobileNavGraph(
                 showDirectStreamPrompt = !showStreamLinks.value
             )
         }
+        }
+        BannerAdView(
+            modifier = Modifier
+                .fillMaxWidth()
+                .wrapContentHeight()
+                .background(Color(0xFF141414))
+        )
     }
 }

@@ -29,6 +29,10 @@ import com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAd
 import com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAdLoadCallback
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.ui.components.BannerAdView
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,8 +44,12 @@ object AdManager {
     private const val TAG = "AdManager"
     @Volatile private var isInitialised = false
     private val isMobileAdsInitializeCalled = AtomicBoolean(false)
+    private val initializationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val nativeAdLoadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     @Volatile private var interstitialAd: InterstitialAd? = null
+    @Volatile private var isInterstitialLoading = false
     @Volatile private var rewardedAd: RewardedAd? = null
+    @Volatile private var isRewardedLoading = false
     @Volatile private var rewardedInterstitialAd: RewardedInterstitialAd? = null
     @Volatile private var isRewardedInterstitialLoading = false
     @Volatile private var appOpenAd: AppOpenAd? = null
@@ -76,7 +84,7 @@ object AdManager {
     // ── Initialisation ────────────────────────────────────────────────────
 
     /**
-     * Initialise the Mobile Ads SDK after UMP consent has resolved.
+     * Initialise the Mobile Ads SDK when UMP and app settings allow requests.
      * Safe to call multiple times — subsequent calls are no-ops.
      * Respects the ads disabled setting from SettingsManager.
      */
@@ -135,51 +143,81 @@ object AdManager {
 
         scheduleInitWatchdog()
 
-        MobileAds.initialize(context.applicationContext) { initStatus ->
-            val callbacks = synchronized(this) {
-                isInitialised = true
-                _isInitialisedState.value = true
-                pendingInitCallbacks.toList().also { pendingInitCallbacks.clear() }
+        val applicationContext = context.applicationContext
+        initializationScope.launch {
+            try {
+                // The Google samples initialize on a worker thread, then load ads
+                // on the main thread after initialization completes.
+                MobileAds.initialize(applicationContext) { initStatus ->
+                    mainHandler.post {
+                        completeInitialization(applicationContext, initStatus)
+                    }
+                }
+            } catch (error: Exception) {
+                mainHandler.post {
+                    val callbacks = synchronized(this@AdManager) {
+                        if (isInitialised) return@post
+                        isMobileAdsInitializeCalled.set(false)
+                        initWatchdog?.let(mainHandler::removeCallbacks)
+                        initWatchdog = null
+                        pendingInitCallbacks.toList().also { pendingInitCallbacks.clear() }
+                    }
+                    Log.e(TAG, "MobileAds initialization failed", error)
+                    callbacks.forEach { it.invoke() }
+                }
             }
-            val statuses = initStatus.adapterStatusMap.entries
-                .joinToString { "${it.key}: ${it.value.initializationState}" }
-            Log.i(TAG, "MobileAds initialised — $statuses")
-            val metaStatus = initStatus.adapterStatusMap.entries.firstOrNull { entry ->
-                entry.key.contains("facebook", ignoreCase = true) ||
-                    entry.key.contains("audience", ignoreCase = true)
-            }
-            if (metaStatus == null) {
-                Log.w(
-                    TAG,
-                    "Meta Audience Network adapter was not reported by Mobile Ads; " +
-                        "check the adapter dependency and AdMob mediation configuration"
-                )
-            } else {
-                Log.i(
-                    TAG,
-                    "Meta Audience Network adapter: ${metaStatus.value.initializationState} " +
-                        "(${metaStatus.value.description})"
-                )
-            }
-            // Pre-load interstitial immediately after init
-            preloadInterstitial(context)
-            if (BuildConfig.FLAVOR == "phone") {
-                preloadRewarded(context)
-            }
-            preloadRewardedInterstitial(context)
-            preloadAppOpen(context)
-            // Drain any banner load that was requested before init completed.
-            // The bottom-nav AndroidView factory may have already run while
-            // we were still initialising — replay it now so the banner appears.
-            val queuedBannerLoads = synchronized(this) {
-                pendingBannerLoads.toList().also { pendingBannerLoads.clear() }
-            }
-            if (queuedBannerLoads.isNotEmpty()) {
-                Log.i(TAG, "Replaying ${queuedBannerLoads.size} queued banner load(s) after init")
-                queuedBannerLoads.forEach { it.invoke() }
-            }
-            callbacks.forEach { it.invoke() }
         }
+    }
+
+    private fun completeInitialization(
+        context: Context,
+        initStatus: com.google.android.gms.ads.initialization.InitializationStatus
+    ) {
+        val callbacks = synchronized(this) {
+            if (isInitialised) return
+            isInitialised = true
+            _isInitialisedState.value = true
+            pendingInitCallbacks.toList().also { pendingInitCallbacks.clear() }
+        }
+        initWatchdog?.let(mainHandler::removeCallbacks)
+        initWatchdog = null
+
+        val statuses = initStatus.adapterStatusMap.entries
+            .joinToString { "${it.key}: ${it.value.initializationState}" }
+        Log.i(TAG, "MobileAds initialised — $statuses")
+        val metaStatus = initStatus.adapterStatusMap.entries.firstOrNull { entry ->
+            entry.key.contains("facebook", ignoreCase = true) ||
+                entry.key.contains("audience", ignoreCase = true)
+        }
+        if (metaStatus == null) {
+            Log.w(
+                TAG,
+                "Meta Audience Network adapter was not reported by Mobile Ads; " +
+                    "check the adapter dependency and AdMob mediation configuration"
+            )
+        } else {
+            Log.i(
+                TAG,
+                "Meta Audience Network adapter: ${metaStatus.value.initializationState} " +
+                    "(${metaStatus.value.description})"
+            )
+        }
+
+        preloadInterstitial(context)
+        if (BuildConfig.FLAVOR == "phone") {
+            preloadRewarded(context)
+        }
+        preloadRewardedInterstitial(context)
+        preloadAppOpen(context)
+
+        val queuedBannerLoads = synchronized(this) {
+            pendingBannerLoads.toList().also { pendingBannerLoads.clear() }
+        }
+        if (queuedBannerLoads.isNotEmpty()) {
+            Log.i(TAG, "Replaying ${queuedBannerLoads.size} queued banner load(s) after init")
+            queuedBannerLoads.forEach { it.invoke() }
+        }
+        callbacks.forEach { it.invoke() }
     }
 
     /**
@@ -198,6 +236,7 @@ object AdManager {
             synchronized(this) {
                 if (isInitialised) return@Runnable
                 isMobileAdsInitializeCalled.set(false)
+                initWatchdog = null
                 drained = pendingInitCallbacks.toList().also { pendingInitCallbacks.clear() }
             }
             Log.w(
@@ -257,10 +296,12 @@ object AdManager {
      */
     fun preloadInterstitial(context: Context) {
         if (!isInitialised) return
+        if (interstitialAd != null || isInterstitialLoading) return
         if (!shouldShowAds(context)) {
             Log.i(TAG, "Ads disabled - skipping interstitial preload")
             return
         }
+        isInterstitialLoading = true
         val unitId = if (BuildConfig.FLAVOR == "tv")
             AdUnitIds.TV_INTERSTITIAL
         else
@@ -270,10 +311,12 @@ object AdManager {
         InterstitialAd.load(context, unitId, adRequest, object : InterstitialAdLoadCallback() {
             override fun onAdLoaded(ad: InterstitialAd) {
                 interstitialAd = ad
+                isInterstitialLoading = false
                 Log.i(TAG, "Interstitial loaded")
             }
             override fun onAdFailedToLoad(error: LoadAdError) {
                 interstitialAd = null
+                isInterstitialLoading = false
                 Log.w(TAG, "Interstitial failed to load: ${error.message}")
                 logMetaMediationFailure("interstitial", error)
             }
@@ -304,6 +347,7 @@ object AdManager {
             preloadInterstitial(activity)
             return
         }
+        interstitialAd = null
         ad.fullScreenContentCallback = object : FullScreenContentCallback() {
             override fun onAdShowedFullScreenContent() {
                 FullscreenAdPolicy.recordInterstitialShown(activity)
@@ -342,19 +386,24 @@ object AdManager {
      */
     fun preloadRewarded(context: Context) {
         if (BuildConfig.FLAVOR != "phone") return
+        if (!isInitialised) return
+        if (rewardedAd != null || isRewardedLoading) return
         if (!shouldShowAds(context)) {
             Log.i(TAG, "Ads disabled - skipping rewarded preload")
             return
         }
+        isRewardedLoading = true
         val adRequest = AdRequest.Builder().build()
         RewardedAd.load(context, AdUnitIds.PHONE_REWARDED, adRequest,
             object : RewardedAdLoadCallback() {
                 override fun onAdLoaded(ad: RewardedAd) {
                     rewardedAd = ad
+                    isRewardedLoading = false
                     Log.i(TAG, "Rewarded ad loaded")
                 }
                 override fun onAdFailedToLoad(error: LoadAdError) {
                     rewardedAd = null
+                    isRewardedLoading = false
                     Log.w(TAG, "Rewarded ad failed: ${error.message}")
                     logMetaMediationFailure("rewarded", error)
                 }
@@ -383,6 +432,7 @@ object AdManager {
             preloadRewarded(activity)
             return
         }
+        rewardedAd = null
         ad.fullScreenContentCallback = object : FullScreenContentCallback() {
             override fun onAdShowedFullScreenContent() {
                 Log.i(TAG, "Rewarded ad shown")
@@ -479,6 +529,7 @@ object AdManager {
             return
         }
 
+        rewardedInterstitialAd = null
         ad.fullScreenContentCallback = object : FullScreenContentCallback() {
             override fun onAdDismissedFullScreenContent() {
                 Log.i(TAG, "Rewarded interstitial dismissed")
@@ -605,6 +656,7 @@ object AdManager {
         }
 
         appOpenShowing = true
+        appOpenAd = null
         ad.show(activity)
     }
 
@@ -641,36 +693,38 @@ object AdManager {
             AdUnitIds.PHONE_NATIVE
         }
 
-        val adLoader = AdLoader.Builder(context, unitId)
-            .forNativeAd { nativeAd ->
-                Log.i(TAG, "Native ad loaded")
-                onLoaded(nativeAd)
-            }
-            .withNativeAdOptions(
-                NativeAdOptions.Builder()
-                    .setVideoOptions(VideoOptions.Builder().setStartMuted(startMuted).build())
-                    .build()
-            )
-            .withAdListener(
-                object : AdListener() {
-                    override fun onAdFailedToLoad(error: LoadAdError) {
-                        Log.w(TAG, "Native ad failed to load: ${error.message}")
-                        logMetaMediationFailure("native", error)
-                        onFailed(error)
-                    }
-
-                    override fun onAdImpression() {
-                        Log.i(TAG, "Native ad impression")
-                    }
-
-                    override fun onAdClicked() {
-                        Log.i(TAG, "Native ad clicked")
-                    }
+        nativeAdLoadScope.launch {
+            val adLoader = AdLoader.Builder(context, unitId)
+                .forNativeAd { nativeAd ->
+                    Log.i(TAG, "Native ad loaded")
+                    onLoaded(nativeAd)
                 }
-            )
-            .build()
+                .withNativeAdOptions(
+                    NativeAdOptions.Builder()
+                        .setVideoOptions(VideoOptions.Builder().setStartMuted(startMuted).build())
+                        .build()
+                )
+                .withAdListener(
+                    object : AdListener() {
+                        override fun onAdFailedToLoad(error: LoadAdError) {
+                            Log.w(TAG, "Native ad failed to load: ${error.message}")
+                            logMetaMediationFailure("native", error)
+                            onFailed(error)
+                        }
 
-        adLoader.loadAd(AdRequest.Builder().build())
+                        override fun onAdImpression() {
+                            Log.i(TAG, "Native ad impression")
+                        }
+
+                        override fun onAdClicked() {
+                            Log.i(TAG, "Native ad clicked")
+                        }
+                    }
+                )
+                .build()
+
+            adLoader.loadAd(AdRequest.Builder().build())
+        }
     }
 
     /** Logs Meta's underlying mediation error without exposing request identifiers. */

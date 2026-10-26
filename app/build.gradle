@@ -122,7 +122,7 @@ android {
             resValue "string", "app_name", "KiduyuTV"
             manifestPlaceholders = [
                 wortiseAppId: wortiseAppId,
-                admobAppId: "ca-app-pub-3803477439180910~6736398964"
+                admobAppId: "ca-app-pub-3803477439180910~5828761260"
             ]
         }
         tv {
@@ -132,7 +132,7 @@ android {
             resValue "string", "app_name", "KiduyuTV"
             manifestPlaceholders = [
                 wortiseAppId: wortiseAppId,
-                admobAppId: "ca-app-pub-3803477439180910~6736398964"
+                admobAppId: "ca-app-pub-3803477439180910~5828761260"
             ]
         }
     }
@@ -350,13 +350,12 @@ dependencies {
     // ─────────────────────────────────────────────
     // Ads
     // ─────────────────────────────────────────────
-    implementation 'com.google.android.gms:play-services-ads:24.6.0'
-    // Meta Audience Network is bidding-only. This adapter version is the
-    // release verified against Google Mobile Ads 24.6.0 and FAN SDK 6.20.0.
-    implementation 'com.google.ads.mediation:facebook:6.20.0.1'
+    implementation 'com.google.android.gms:play-services-ads:25.5.0'
+    // Meta Audience Network is bidding-only; this adapter requires GMA 25.4.0.
+    implementation 'com.google.ads.mediation:facebook:6.22.0.1'
 
     // ── Consent SDK (both flavours, required for EEA users) ───────────────
-    implementation 'com.google.android.ump:user-messaging-platform:3.2.0'
+    implementation 'com.google.android.ump:user-messaging-platform:4.0.0'
 
     // ─────────────────────────────────────────────
     // Ads — Secondary Networks

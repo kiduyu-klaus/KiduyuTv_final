@@ -4,7 +4,6 @@ import android.app.Activity
 import android.app.Application
 import android.util.Log
 import androidx.multidex.MultiDexApplication
-import com.google.android.gms.ads.MobileAds
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
@@ -44,11 +43,6 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
-
-        // Initialize Google Mobile Ads at application startup, matching the
-        // reference sample. Individual ad requests remain gated by UMP consent
-        // and the user's ads-disabled setting through AdEligibility.
-        MobileAds.initialize(this)
 
         // Initialize Room database manager
         DatabaseManager.init(this)

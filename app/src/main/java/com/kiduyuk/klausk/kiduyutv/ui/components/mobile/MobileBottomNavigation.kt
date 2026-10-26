@@ -1,9 +1,6 @@
 package com.kiduyuk.klausk.kiduyutv.ui.components.mobile
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LiveTv
@@ -16,21 +13,15 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavController
-import com.kiduyuk.klausk.kiduyutv.BuildConfig
-import com.kiduyuk.klausk.kiduyutv.ui.components.BannerAdView
 import com.kiduyuk.klausk.kiduyutv.ui.navigation.Screen
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
 import com.kiduyuk.klausk.kiduyutv.ui.theme.SurfaceDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextSecondary
-import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 
 data class BottomNavItem(val route: String, val icon: ImageVector, val label: String)
 
@@ -86,23 +77,6 @@ fun MobileBottomNavigation(
                         unselectedTextColor = TextSecondary,
                         indicatorColor = SurfaceDark
                     )
-                )
-            }
-        }
-
-        // The banner is owned by the active phone destination rather than
-        // surviving navigation between bottom-nav screens. BannerAdView uses
-        // BannerFallbackDispatcher (Unity → Start.io → AdMob → Wortise).
-        val context = LocalContext.current
-        if (BuildConfig.FLAVOR == "phone" &&
-            !SettingsManager(context).isAdsDisabled()
-        ) {
-            key(currentRoute) {
-                BannerAdView(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentHeight()
-                        .background(Color(0xFF141414))
                 )
             }
         }

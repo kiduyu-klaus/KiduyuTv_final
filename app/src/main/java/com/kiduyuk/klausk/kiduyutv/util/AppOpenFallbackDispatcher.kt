@@ -3,7 +3,7 @@ package com.kiduyuk.klausk.kiduyutv.util
 import android.app.Activity
 import android.util.Log
 
-/** Selects one app-open provider at a time and preloads both for the next foreground. */
+/** Shows an available AdMob app-open ad and keeps its next request warm. */
 object AppOpenFallbackDispatcher {
     private const val TAG = "AppOpenFallbackDispatcher"
 

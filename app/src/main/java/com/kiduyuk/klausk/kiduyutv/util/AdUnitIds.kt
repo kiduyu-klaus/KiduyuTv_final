@@ -14,12 +14,12 @@ object AdUnitIds {
 
     // ── Phone Production ───────────────────────────────────────────────────
 
-    private const val DEFAULT_PHONE_ADAPTIVE_BANNER = "ca-app-pub-3803477439180910/9170990617"
-    private const val DEFAULT_PHONE_INTERSTITIAL_UNIT = "ca-app-pub-3803477439180910/5295324788"
-    private const val DEFAULT_PHONE_REWARDED_UNIT = "ca-app-pub-3803477439180910/3982243116"
-    private const val DEFAULT_PHONE_REWARDED_INTERSTITIAL_UNIT = "ca-app-pub-3803477439180910/1751398697"
-    private const val DEFAULT_PHONE_APP_OPEN_UNIT = "ca-app-pub-3803477439180910/9694976435"
-    private const val DEFAULT_PHONE_NATIVE_UNIT = "ca-app-pub-3803477439180910/5035465131"
+    private const val DEFAULT_PHONE_ADAPTIVE_BANNER = "ca-app-pub-3803477439180910/9156090198"
+    private const val DEFAULT_PHONE_INTERSTITIAL_UNIT = "ca-app-pub-3803477439180910/1494142468"
+    private const val DEFAULT_PHONE_REWARDED_UNIT = "ca-app-pub-3803477439180910/2627882854"
+    private const val DEFAULT_PHONE_REWARDED_INTERSTITIAL_UNIT = "ca-app-pub-3803477439180910/4969433175"
+    private const val DEFAULT_PHONE_APP_OPEN_UNIT = "ca-app-pub-3803477439180910/6941910262"
+    private const val DEFAULT_PHONE_NATIVE_UNIT = "ca-app-pub-3803477439180910/8717106494"
 
     // ── Google Sample Test IDs ─────────────────────────────────────────────
 

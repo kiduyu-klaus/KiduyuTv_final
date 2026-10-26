@@ -20,6 +20,7 @@ object ConsentManager {
 
     private const val TAG = "ConsentManager"
     @Volatile private var consentResolved = false
+    @Volatile private var consentInformation: ConsentInformation? = null
 
     fun interface OnConsentGatheringCompleteListener {
         fun consentGatheringComplete(error: FormError?)
@@ -48,9 +49,8 @@ object ConsentManager {
     }
 
     /**
-     * Requests the latest UMP consent information on every app launch, then
-     * follows the sample flow: check form availability, load the form, and
-     * show it only when UMP reports that consent is required.
+     * Requests fresh UMP consent information on every app launch and lets UMP
+     * load and show the consent form when required.
      */
     fun gatherConsent(
         activity: Activity,
@@ -60,69 +60,36 @@ object ConsentManager {
             .setTagForUnderAgeOfConsent(false)
             .build()
 
-        val consentInfo = UserMessagingPlatform.getConsentInformation(activity)
+        val consentInfo = getConsentInformation(activity)
 
         consentInfo.requestConsentInfoUpdate(
             activity,
             params,
             {
-                val consentStatusBeforeForm = consentInfo.consentStatus
+                val consentStatusAfterUpdate = consentInfo.consentStatus
                 Log.i(
                     TAG,
                     "Consent info updated: status=${consentInfo.consentStatus} " +
                         "formAvailable=${consentInfo.isConsentFormAvailable}"
                 )
 
-                fun complete(formError: FormError?) {
-                    // A successfully completed form flow means UMP handled the
-                    // decision. Ad requests still require canRequestAds().
-                    consentResolved = formError == null
+                UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity) { formError ->
+                    if (formError != null) {
+                        Log.w(TAG, "UMP consent form flow completed with error: ${formError.message}")
+                    }
+                    consentResolved = formError == null || consentInfo.canRequestAds()
                     Log.i(
                         TAG,
                         "Consent form flow completed: resolved=$consentResolved " +
-                            "canRequestAds=${canRequestAds(activity)}"
+                            "canRequestAds=${consentInfo.canRequestAds()}"
                     )
                     if (formError == null &&
-                        consentStatusBeforeForm == ConsentInformation.ConsentStatus.REQUIRED
+                        consentStatusAfterUpdate == ConsentInformation.ConsentStatus.REQUIRED
                     ) {
                         StartAppAdManager.recordConsentUpdate(activity)
                     }
                     onConsentGatheringCompleteListener.consentGatheringComplete(formError)
                 }
-
-                if (!consentInfo.isConsentFormAvailable) {
-                    Log.i(TAG, "No UMP consent form is available; continuing with stored UMP state")
-                    complete(null)
-                    return@requestConsentInfoUpdate
-                }
-
-                UserMessagingPlatform.loadConsentForm(
-                    activity,
-                    { consentForm ->
-                        if (consentInfo.consentStatus == ConsentInformation.ConsentStatus.REQUIRED) {
-                            Log.i(TAG, "UMP consent form loaded; showing required form")
-                            consentForm.show(activity) { formError ->
-                                if (formError != null) {
-                                    Log.w(TAG, "UMP consent form dismissed with error: ${formError.message}")
-                                }
-                                // Match the sample flow by loading the latest
-                                // form again on the next launch/consent cycle.
-                                complete(formError)
-                            }
-                        } else {
-                            Log.i(
-                                TAG,
-                                "UMP consent form loaded but status is ${consentInfo.consentStatus}; " +
-                                    "no form presentation needed"
-                            )
-                            complete(null)
-                        }
-                    },
-                    { formError ->
-                        Log.w(TAG, "UMP consent form failed to load: ${formError.message}")
-                        complete(formError)
-                    }
-                )
             },
             { formError ->
                 // UMP can report a transient update error even when its
@@ -131,7 +98,7 @@ object ConsentManager {
                 // temporarily unreachable). Trust UMP's authoritative
                 // canRequestAds() result instead of permanently suppressing
                 // all ads for the rest of this process.
-                val requestsAllowed = canRequestAds(activity)
+                val requestsAllowed = consentInfo.canRequestAds()
                 consentResolved = requestsAllowed
                 Log.w(TAG, "Consent info update failed: ${formError.message}")
                 Log.i(TAG, "Consent fallback: resolved=$consentResolved canRequestAds=$requestsAllowed")
@@ -175,7 +142,7 @@ object ConsentManager {
      */
     fun canRequestAds(context: Context): Boolean {
         return try {
-            val info = UserMessagingPlatform.getConsentInformation(context)
+            val info = getConsentInformation(context)
             info.canRequestAds()
         } catch (e: Exception) {
             Log.w(TAG, "Error checking consent status: ${e.message}")
@@ -188,7 +155,7 @@ object ConsentManager {
      */
     fun isPrivacyOptionsRequired(context: Context): Boolean {
         return try {
-            val info = UserMessagingPlatform.getConsentInformation(context)
+            val info = getConsentInformation(context)
             info.privacyOptionsRequirementStatus ==
                     ConsentInformation.PrivacyOptionsRequirementStatus.REQUIRED
         } catch (e: Exception) {
@@ -258,12 +225,21 @@ object ConsentManager {
      */
     fun resetConsent(context: Context) {
         try {
-            val info = UserMessagingPlatform.getConsentInformation(context)
+            val info = getConsentInformation(context)
             info.reset()
             consentResolved = false
             Log.i(TAG, "Consent reset")
         } catch (e: Exception) {
             Log.w(TAG, "Error resetting consent: ${e.message}")
+        }
+    }
+
+    private fun getConsentInformation(context: Context): ConsentInformation {
+        consentInformation?.let { return it }
+        return synchronized(this) {
+            consentInformation ?: UserMessagingPlatform.getConsentInformation(
+                context.applicationContext
+            ).also { consentInformation = it }
         }
     }
 
