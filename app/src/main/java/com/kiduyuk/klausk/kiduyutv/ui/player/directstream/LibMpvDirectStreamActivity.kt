@@ -11,6 +11,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.SeekBar
 import android.widget.Toast
+import android.util.Log
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -112,7 +113,9 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
         val playerIndex = binding.root.indexOfChild(binding.playerView).coerceAtLeast(0)
         binding.root.addView(surfaceView, playerIndex, binding.playerView.layoutParams)
         session = LibMpvSession(this)
-        Glide.with(this).load(intent.getStringExtra(DirectStreamActivity.EXTRA_BACKDROP_URL)).into(binding.loadingBackdrop)
+        Glide.with(this)
+            .load(normalizeArtworkUrl(intent.getStringExtra(DirectStreamActivity.EXTRA_BACKDROP_URL)))
+            .into(binding.loadingBackdrop)
         binding.loadingArtwork.visibility = View.VISIBLE
         startInitialRoute()
         wireControls()
@@ -174,7 +177,7 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
         resolverJob?.cancel()
         resolverJob = lifecycleScope.launch {
             showLoading()
-            binding.playerStatus.visibility = View.GONE
+            showStatus("Checking providers backend health", retry = false)
             if (!watchHistoryReady) {
                 val explicitResume = intent.getLongExtra(DirectStreamActivity.EXTRA_RESUME_POSITION_MS, -1L)
                     .takeIf { it >= 0L } ?: 0L
@@ -204,13 +207,70 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
                         season = season,
                         episode = episode,
                         provider = StreamCatalog.resolve(providerSelection),
-                        endpoint = settings.getDirectStreamEndpoint()
+                        endpoint = settings.getDirectStreamEndpoint(),
+                        onHealthCheckStart = {
+                            withContext(Dispatchers.Main) {
+                                showStatus("Checking providers backend health", retry = false)
+                            }
+                        },
+                        onHealthCheckPassed = {
+                            withContext(Dispatchers.Main) {
+                                showStatus("Backend health check passed", retry = false)
+                            }
+                        },
+                        onProviderDiscoveryStart = {
+                            withContext(Dispatchers.Main) {
+                                showStatus("Fetching providers", retry = false)
+                            }
+                        },
+                        onProviderStreamsStart = { totalProviders ->
+                            withContext(Dispatchers.Main) {
+                                showProviderFetchProgress()
+                                showStreamFetchCount()
+                                updateProviderFetchProgress(0, totalProviders)
+                                showStatus(
+                                    "Fetching streams from $totalProviders providers",
+                                    retry = false
+                                )
+                            }
+                        },
+                        onProviderProgress = { index, total, providerName ->
+                            withContext(Dispatchers.Main) {
+                                updateProviderFetchProgress(index, total)
+                                showStatus(
+                                    "Fetching streams · provider $index/$total completed: $providerName",
+                                    retry = false
+                                )
+                            }
+                        },
+                        onProviderRetry = { index, total, providerName ->
+                            withContext(Dispatchers.Main) {
+                                showStatus(
+                                    "Provider $index/$total enabled providers: $providerName\nretrying streams",
+                                    retry = false
+                                )
+                            }
+                        },
+                        onStreamProgress = { fetchedCount ->
+                            withContext(Dispatchers.Main) {
+                                updateStreamFetchCount(fetchedCount)
+                            }
+                        }
                     )
                 }
             }.onSuccess { result ->
+                hideProviderFetchProgress()
+                hideStreamFetchCount()
                 streams = result
-                result.firstOrNull()?.let(::beginPlayback) ?: showError(getString(R.string.no_streams_dialog_message))
-            }.onFailure { showError(it.message ?: getString(R.string.streams_failed)) }
+                Log.i("KiduyuLiteProvider", "libmpv resolver returned ${result.size} streams")
+                result.firstOrNull()?.let(::beginPlayback)
+                    ?: showError(getString(R.string.no_streams_dialog_message))
+            }.onFailure { error ->
+                hideProviderFetchProgress()
+                hideStreamFetchCount()
+                Log.w("KiduyuLiteProvider", "libmpv stream resolution failed", error)
+                showError(error.message ?: getString(R.string.streams_failed))
+            }
         }
     }
 
@@ -761,20 +821,68 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
         if (episode > 0) { intent.putExtra(DirectStreamActivity.EXTRA_EPISODE, episode); reloadStreams(startFromBeginning = true) }
     }
 
-    private fun showLoading() { binding.loadingArtwork.visibility = View.VISIBLE; binding.bufferingOverlay.visibility = View.GONE }
+    private fun showStatus(message: String, retry: Boolean) {
+        binding.playerStatus.text = message
+        binding.playerStatus.visibility = View.VISIBLE
+        binding.playerStatus.setOnClickListener {
+            if (retry) initializeRoute()
+        }
+    }
+
+    private fun showProviderFetchProgress() {
+        binding.providerFetchProgress.reset()
+        binding.providerFetchProgress.alpha = 1f
+        binding.providerFetchProgress.visibility = View.VISIBLE
+        binding.providerFetchProgress.setProviderProgress(completed = 0, total = 0)
+    }
+
+    private fun updateProviderFetchProgress(completed: Int, total: Int) {
+        if (binding.providerFetchProgress.visibility == View.VISIBLE) {
+            binding.providerFetchProgress.setProviderProgress(completed, total)
+        }
+    }
+
+    private fun showStreamFetchCount() {
+        binding.streamFetchCount.text = getString(R.string.stream_fetch_count, 0)
+        binding.streamFetchCount.alpha = 1f
+        binding.streamFetchCount.visibility = View.VISIBLE
+    }
+
+    private fun updateStreamFetchCount(fetchedCount: Int) {
+        if (binding.streamFetchCount.visibility == View.VISIBLE) {
+            binding.streamFetchCount.text = getString(
+                R.string.stream_fetch_count,
+                fetchedCount.coerceAtLeast(0)
+            )
+        }
+    }
+
+    private fun hideStreamFetchCount() {
+        binding.streamFetchCount.animate().cancel()
+        binding.streamFetchCount.visibility = View.GONE
+        binding.streamFetchCount.alpha = 1f
+    }
+
+    private fun hideProviderFetchProgress() {
+        binding.providerFetchProgress.animate().cancel()
+        binding.providerFetchProgress.visibility = View.GONE
+        binding.providerFetchProgress.alpha = 1f
+    }
+
+    private fun showLoading() {
+        binding.loadingArtwork.visibility = View.VISIBLE
+        binding.bufferingOverlay.visibility = View.GONE
+    }
+
     private fun showError(message: String) {
         binding.loadingArtwork.visibility = View.VISIBLE
-        binding.playerStatus.visibility = View.VISIBLE
-        binding.playerStatus.text = message
-        binding.playerStatus.setOnClickListener { reloadStreams() }
+        showStatus(message, retry = true)
     }
     private fun showPlaybackError(message: String) {
         if (message == lastShownPlaybackError) return
         lastShownPlaybackError = message
         binding.loadingArtwork.visibility = View.VISIBLE
-        binding.playerStatus.visibility = View.VISIBLE
-        binding.playerStatus.text = message
-        binding.playerStatus.setOnClickListener { reloadStreams() }
+        showStatus(message, retry = true)
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
@@ -798,6 +906,13 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
     }
 
     private fun currentPosition(): Long = session.snapshot.value.positionMs.coerceAtLeast(0L)
+
+    private fun normalizeArtworkUrl(path: String?): String? = when {
+        path.isNullOrBlank() -> null
+        path.startsWith("http://") || path.startsWith("https://") -> path
+        else -> "https://image.tmdb.org/t/p/original/${path.trimStart('/')}"
+    }
+
     private fun clock(ms: Long): String {
         val seconds = ms.coerceAtLeast(0L) / 1000L
         return if (seconds >= 3600) String.format(Locale.getDefault(), "%d:%02d:%02d", seconds / 3600, (seconds % 3600) / 60, seconds % 60)
