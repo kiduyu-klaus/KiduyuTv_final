@@ -200,8 +200,14 @@ class MobileDirectStreamActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (SettingsManager(this).getDirectStreamPlayer() == SettingsManager.PLAYER_LIBMPV) {
+        val configuredPlayer = SettingsManager(this).getDirectStreamPlayer()
+        if (configuredPlayer == SettingsManager.PLAYER_LIBMPV) {
             startActivity(Intent(this, LibMpvDirectStreamActivity::class.java).putExtras(intent))
+            finish()
+            return
+        }
+        if (configuredPlayer == SettingsManager.PLAYER_EXOPLAYER) {
+            startActivity(Intent(this, DirectStreamActivity::class.java).putExtras(intent))
             finish()
             return
         }
