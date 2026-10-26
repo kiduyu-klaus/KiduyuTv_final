@@ -23,6 +23,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 /**
@@ -49,6 +50,12 @@ object UpdateUtil {
     // Device type constants
     private const val DEVICE_TYPE_TV = "tv"
     private const val DEVICE_TYPE_PHONE = "phone"
+    private val RELEASE_APK_ABIS = listOf(
+        "arm64-v8a",
+        "armeabi-v7a",
+        "x86_64",
+        "x86"
+    )
     
     // OkHttpClient for network requests
     private val httpClient = OkHttpClient.Builder()
@@ -236,6 +243,30 @@ object UpdateUtil {
     }
 
     /**
+     * Uses the installed product flavor when it is available. This avoids relying
+     * on hardware heuristics when a TV build is running on non-TV hardware (or
+     * vice versa), while retaining those heuristics for non-flavored builds.
+     */
+    private fun getInstalledAppType(context: Context): String {
+        return BuildConfig.FLAVOR
+            .lowercase(Locale.ROOT)
+            .takeIf { it == DEVICE_TYPE_TV || it == DEVICE_TYPE_PHONE }
+            ?: getDeviceType(context)
+    }
+
+    /**
+     * Returns supported release ABIs in Android's preference order.
+     */
+    private fun getSupportedReleaseAbis(): List<String> {
+        return Build.SUPPORTED_ABIS
+            .asSequence()
+            .map { it.lowercase(Locale.ROOT) }
+            .filter { it in RELEASE_APK_ABIS }
+            .distinct()
+            .toList()
+    }
+
+    /**
      * Extracts the version string from an APK filename.
      * Example: "KiduyuTV-phone-release-1.1.76-phone-tv-build383.apk" -> "1.1.76"
      */
@@ -264,7 +295,7 @@ object UpdateUtil {
      * instead of just searching for patterns within the filename.
      */
     private fun matchesDeviceType(fileName: String, deviceType: String): Boolean {
-        val lowerName = fileName.lowercase()
+        val lowerName = fileName.lowercase(Locale.ROOT)
         
         // Check the prefix to determine device type
         // TV APK: "kiduyutv-tv-release-..."
@@ -277,20 +308,40 @@ object UpdateUtil {
     }
 
     /**
-     * Fetches the best APK info from GitHub releases based on device type.
-     * For TV devices: Selects APKs starting with "KiduyuTV-tv-release", picks highest build number.
-     * For Phone devices: Selects APKs starting with "KiduyuTV-phone-release", picks highest build number.
+     * Extracts the ABI suffix used by release assets, for example
+     * "KiduyuTV-tv-release-1.1.880-build1237-arm64-v8a.apk".
+     */
+    private fun extractAbiFromApkName(fileName: String): String? {
+        val lowerName = fileName.lowercase(Locale.ROOT)
+        return RELEASE_APK_ABIS.firstOrNull { abi ->
+            lowerName.endsWith("-$abi.apk")
+        }
+    }
+
+    /**
+     * Fetches the best APK info from GitHub releases based on the installed app
+     * flavor and the device's ABI preference order. A TV install therefore only
+     * receives TV APKs, a phone install only receives phone APKs, and neither
+     * install receives an APK for an unsupported CPU architecture.
      * 
      * Returns ApkInfo containing URL, filename, version, and build number.
      * 
      * APK naming convention:
-     * - TV: KiduyuTV-tv-release-X.X.X-phone-tv-buildYYY.apk
-     * - Phone: KiduyuTV-phone-release-X.X.X-phone-tv-buildYYY.apk
+     * - TV: KiduyuTV-tv-release-X.X.X-buildYYY-arm64-v8a.apk
+     * - Phone: KiduyuTV-phone-release-X.X.X-buildYYY-arm64-v8a.apk
      */
     suspend fun fetchBestApkInfo(context: Context): ApkInfo? = withContext(Dispatchers.IO) {
         try {
-            val deviceType = getDeviceType(context)
-            Log.i(TAG, "Fetching APK for device type: $deviceType")
+            val appType = getInstalledAppType(context)
+            val supportedAbis = getSupportedReleaseAbis()
+            if (supportedAbis.isEmpty()) {
+                Log.w(TAG, "No supported release ABI found in ${Build.SUPPORTED_ABIS.joinToString()}")
+                return@withContext null
+            }
+            Log.i(
+                TAG,
+                "Fetching APK for app type: $appType; ABI preference=${supportedAbis.joinToString()}"
+            )
 
             val request = Request.Builder()
                 .url(GITHUB_RELEASES_API_URL)
@@ -307,9 +358,6 @@ object UpdateUtil {
                 val jsonString = response.body?.string() ?: return@withContext null
                 val releases = JSONArray(jsonString)
 
-                var bestApkInfo: ApkInfo? = null
-                var bestBuildNumber = -1
-
                 // Iterate through releases to find the best APK
                 for (i in 0 until releases.length()) {
                     val release = releases.getJSONObject(i)
@@ -318,21 +366,34 @@ object UpdateUtil {
                     if (release.optBoolean("prerelease", false)) continue
 
                     val assets = release.getJSONArray("assets")
+                    var bestApkInfoForRelease: ApkInfo? = null
+                    var bestAbiRank = Int.MAX_VALUE
+                    var bestBuildNumber = -1
                     
                     for (j in 0 until assets.length()) {
                         val asset = assets.getJSONObject(j)
                         val name = asset.optString("name", "")
 
                         // Skip non-APK files and debug builds
-                        if (!name.lowercase().endsWith(".apk") ||
-                            name.lowercase().contains("debug") ||
-                            !name.lowercase().contains("release")) {
+                        val lowerName = name.lowercase(Locale.ROOT)
+                        if (!lowerName.endsWith(".apk") ||
+                            lowerName.contains("debug") ||
+                            !lowerName.contains("release")) {
                             continue
                         }
 
-                        // Check if APK matches the current device type by prefix
-                        if (!matchesDeviceType(name, deviceType)) {
-                            Log.i(TAG, "Skipping APK (device type mismatch): $name for device type: $deviceType")
+                        if (!matchesDeviceType(name, appType)) {
+                            Log.i(TAG, "Skipping APK (app type mismatch): $name for app type: $appType")
+                            continue
+                        }
+
+                        val abi = extractAbiFromApkName(name)
+                        val abiRank = abi?.let(supportedAbis::indexOf) ?: -1
+                        if (abiRank < 0) {
+                            Log.i(
+                                TAG,
+                                "Skipping APK (unsupported or missing ABI): $name; supported=${supportedAbis.joinToString()}"
+                            )
                             continue
                         }
 
@@ -340,14 +401,17 @@ object UpdateUtil {
                         val version = extractVersionFromApkName(name)
                         val buildNumber = extractBuildNumber(name)
 
-                        Log.i(TAG, "Found matching APK: $name, version: $version, build: $buildNumber")
+                        Log.i(TAG, "Found matching APK: $name, ABI: $abi, version: $version, build: $buildNumber")
 
-                        // Select the APK with the highest build number
-                        if (buildNumber > bestBuildNumber) {
-                            bestBuildNumber = buildNumber
+                        // Prefer the device's first supported ABI. Build number is
+                        // only a tie-breaker among assets with the same ABI.
+                        if (abiRank < bestAbiRank ||
+                            (abiRank == bestAbiRank && buildNumber > bestBuildNumber)) {
                             val apkUrl = asset.optString("browser_download_url", null)
                             if (apkUrl != null) {
-                                bestApkInfo = ApkInfo(
+                                bestAbiRank = abiRank
+                                bestBuildNumber = buildNumber
+                                bestApkInfoForRelease = ApkInfo(
                                     url = apkUrl,
                                     fileName = name,
                                     version = version,
@@ -360,13 +424,18 @@ object UpdateUtil {
 
                     // If we found a valid APK in this release, we're done
                     // (releases are ordered by date, so first match is likely the best)
-                    if (bestApkInfo != null && bestBuildNumber > 0) {
-                        Log.i(TAG, "Selected APK: ${bestApkInfo.fileName}, version=${bestApkInfo.version}, build=${bestApkInfo.buildNumber}")
-                        break
+                    if (bestApkInfoForRelease != null) {
+                        Log.i(
+                            TAG,
+                            "Selected APK: ${bestApkInfoForRelease.fileName}, " +
+                                "version=${bestApkInfoForRelease.version}, " +
+                                "build=${bestApkInfoForRelease.buildNumber}"
+                        )
+                        return@use bestApkInfoForRelease
                     }
                 }
 
-                bestApkInfo
+                null
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching best APK info", e)

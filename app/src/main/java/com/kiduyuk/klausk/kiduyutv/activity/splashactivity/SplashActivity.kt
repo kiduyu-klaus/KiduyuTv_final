@@ -288,7 +288,7 @@ class SplashActivity : ComponentActivity() {
                             update = update,
                             onDownload = {
                                 pendingUpdateDialog = null
-                                downloadUpdate(update)
+                                downloadUpdate()
                             },
                             onExit = {
                                 pendingUpdateDialog = null
@@ -713,38 +713,34 @@ class SplashActivity : ComponentActivity() {
         pendingUpdateDialog = update
     }
 
-    private fun downloadUpdate(update: FirebaseAppUpdate) {
-        val apkInfo = createFirebaseApkInfo(update)
-        val localFile = UpdateUtil.getLocalApkFile(this)
-        when {
-            UpdateUtil.isLocalApkValid(this, apkInfo) -> {
-                Log.i(TAG, "Valid cached Firebase APK found, skipping download")
-                showInstallPrompt(localFile, apkInfo)
+    private fun downloadUpdate() {
+        lifecycleScope.launch {
+            val apkInfo = UpdateUtil.fetchBestApkInfo(this@SplashActivity)
+            if (apkInfo == null) {
+                Log.e(TAG, "No release APK matches this app flavor and device ABI")
+                Toast.makeText(
+                    this@SplashActivity,
+                    "No compatible update APK is available for this device.",
+                    Toast.LENGTH_LONG
+                ).show()
+                return@launch
             }
-            else -> {
-                if (localFile.exists()) {
-                    localFile.delete()
-                    Log.i(TAG, "Deleted stale cached APK")
+
+            val localFile = UpdateUtil.getLocalApkFile(this@SplashActivity)
+            when {
+                UpdateUtil.isLocalApkValid(this@SplashActivity, apkInfo) -> {
+                    Log.i(TAG, "Valid cached compatible APK found, skipping download")
+                    showInstallPrompt(localFile, apkInfo)
                 }
-                downloadAndInstallApk(apkInfo)
+                else -> {
+                    if (localFile.exists()) {
+                        localFile.delete()
+                        Log.i(TAG, "Deleted stale cached APK")
+                    }
+                    downloadAndInstallApk(apkInfo)
+                }
             }
         }
-    }
-
-    private fun createFirebaseApkInfo(update: FirebaseAppUpdate): ApkInfo {
-        val fallbackVersion = update.version.ifBlank { "latest" }
-        val deviceType = if (UpdateUtil.isTvDevice(this)) "tv" else "phone"
-        val fileName = Uri.parse(update.downloadUrl).lastPathSegment
-            ?.takeIf { it.isNotBlank() }
-            ?: "KiduyuTV-$deviceType-update-$fallbackVersion.apk"
-
-        return ApkInfo(
-            url = update.downloadUrl,
-            fileName = fileName,
-            version = update.version.takeIf { it.isNotBlank() },
-            buildNumber = extractVersionCodeFromFileName(fileName),
-            sizeBytes = -1L
-        )
     }
 
     private fun downloadAndInstallApk(apkInfo: ApkInfo) {
