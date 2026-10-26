@@ -73,6 +73,13 @@ android {
         ]
     }
 
+    sourceSets {
+        main {
+            // Package the bundled libmpv/FFmpeg binaries from the conventional JNI directory.
+            jniLibs.srcDirs = ['src/main/jniLibs']
+        }
+    }
+
     signingConfigs {
         release {
             storeFile file("${rootDir}/kiduyutv_final")
