@@ -97,6 +97,9 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Set up Android SDK command-line tools
+        uses: android-actions/setup-android@v3
+
       - name: Install Android NDK and CMake for libmpv JNI
         run: |
           yes | sdkmanager --licenses >/dev/null
