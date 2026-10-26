@@ -551,7 +551,7 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
     }
 
     private fun subtitleExtension(uri: Uri, mimeType: String): String {
-        val pathExtension = uri.lastPathSegment?.substringAfterLast('.', "")?.lowercase(Locale.ROOT)
+        val pathExtension = uri.lastPathSegment?.substringAfterLast('.', "")?.lowercase(Locale.ROOT).orEmpty()
         if (pathExtension in setOf("srt", "vtt", "ass", "ssa", "sub", "sup")) return pathExtension
         return when {
             mimeType.contains("vtt", ignoreCase = true) -> "vtt"
@@ -635,7 +635,7 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
             if (subtitlesOnly) subtitle else true
         }
         if (tracks.isEmpty()) { Toast.makeText(this, R.string.track_none_available, Toast.LENGTH_SHORT).show(); return }
-        val labels = tracks.map { track -> "${if (track.selected) "✓ " else ""}${track.label.ifBlank { track.language.ifBlank { track.type } }}${if (track.external) " (external)" else ""}" }.toTypedArray()
+        val labels = tracks.map { track -> "${if (track.selected) "✓ " else ""}${track.label.ifBlank { track.language.orEmpty().ifBlank { track.type } }}${if (track.external) " (external)" else ""}" }.toTypedArray()
         trackDialog = MaterialAlertDialogBuilder(this).setTitle(if (subtitlesOnly) R.string.subdl_subtitles_cd else R.string.track_settings_cd)
             .setItems(labels) { _, which -> tracks.getOrNull(which)?.let { session.selectTrack(it.id, it.type) } }.create().also { it.show() }
     }
@@ -715,6 +715,11 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
     companion object {
         private const val MAX_PROVIDER_SUBTITLE_BYTES = 20L * 1024L * 1024L
+        private const val REAL_BROWSER_USER_AGENT =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+                "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+        private const val HAKUNA_MATATA_USER_AGENT = "ExoPlayer/1.6.1"
+        private const val DAHMER_MOVIES_REFERER = "https://a.111477.xyz/"
     }
 
     private fun showEpisodeJump() {
