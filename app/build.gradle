@@ -204,14 +204,19 @@ def requiredNativeLibraries = [
         'libswscale.so',
         'libc++_shared.so'
 ]
+def jniLibsRoot = layout.projectDirectory.dir('src/main/jniLibs').asFile
 tasks.register('verifyBundledNativeLibraries') {
-    inputs.files(nativeAbis.collectMany { abi ->
-        requiredNativeLibraries.collect { library -> file("src/main/jniLibs/${abi}/${library}") }
+    // Capture plain values (not script objects) so the task is configuration-cache safe.
+    def abis = nativeAbis.collect { it.toString() }
+    def libs = requiredNativeLibraries.collect { it.toString() }
+    def root = jniLibsRoot
+    inputs.files(abis.collectMany { abi ->
+        libs.collect { library -> new File(root, "${abi}/${library}") }
     })
     doLast {
-        nativeAbis.each { abi ->
-            requiredNativeLibraries.each { library ->
-                def nativeFile = file("src/main/jniLibs/${abi}/${library}")
+        abis.each { abi ->
+            libs.each { library ->
+                def nativeFile = new File(root, "${abi}/${library}")
                 if (!nativeFile.isFile() || nativeFile.length() == 0L) {
                     throw new GradleException("Missing native dependency for ${abi}: ${nativeFile}")
                 }
