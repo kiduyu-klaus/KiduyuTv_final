@@ -99,10 +99,11 @@ jobs:
 
       - name: Set up Android SDK command-line tools
         uses: android-actions/setup-android@v3
+        with:
+          packages: ''
 
       - name: Install Android NDK and CMake for libmpv JNI
         run: |
-          yes | sdkmanager --licenses >/dev/null
           sdkmanager "ndk;27.2.12479018" "cmake;3.22.1"
 
       # cache-read-only omitted: this workflow only runs on push to main,
