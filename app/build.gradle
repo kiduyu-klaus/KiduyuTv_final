@@ -61,9 +61,6 @@ android {
             useSupportLibrary true
         }
         multiDexEnabled = true
-        ndk {
-            abiFilters(*nativeAbis)
-        }
         externalNativeBuild {
             cmake {
                 cppFlags '-std=c++17'
