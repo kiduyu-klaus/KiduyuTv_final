@@ -1527,7 +1527,7 @@ private fun PlaybackContent(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        SettingsSectionLabel(text = "Player")
+        SettingsSectionLabel(text = "Playback Engine")
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1537,7 +1537,7 @@ private fun PlaybackContent(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = "Choose the engine used by the native direct-stream player.",
+                    text = "Choose the engine used for native direct-stream playback.",
                     color = TextSecondary,
                     fontSize = 14.sp,
                     modifier = Modifier.padding(bottom = 8.dp)

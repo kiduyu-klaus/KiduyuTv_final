@@ -1084,12 +1084,12 @@ fun MobileSettingsScreen(
             onDismissRequest = { showDirectStreamPlayerPicker = false },
             containerColor = CardDark,
             title = {
-                Text("Player", color = TextPrimary, fontWeight = FontWeight.Bold)
+                Text("Playback Engine", color = TextPrimary, fontWeight = FontWeight.Bold)
             },
             text = {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        "Choose the engine used by the native direct-stream player.",
+                        "Choose the engine used for native direct-stream playback.",
                         color = TextSecondary,
                         fontSize = 13.sp,
                         modifier = Modifier.padding(bottom = 12.dp)
