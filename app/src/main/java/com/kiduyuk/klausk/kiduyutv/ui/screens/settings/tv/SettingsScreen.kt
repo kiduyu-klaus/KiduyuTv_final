@@ -1635,7 +1635,8 @@ private fun PlaybackContent(
                 Text(
                     text = "Provider categories are loaded from the backend. Anime titles use " +
                             "Anime providers only; other titles use Movies & TV providers. " +
-                            "A default is used only when it matches the title category.",
+                            "A default is used only when it matches the title category. " +
+                            "All Providers will be removed in a future update, so choose one provider.",
                     color = TextSecondary,
                     fontSize = 14.sp,
                     lineHeight = 20.sp,

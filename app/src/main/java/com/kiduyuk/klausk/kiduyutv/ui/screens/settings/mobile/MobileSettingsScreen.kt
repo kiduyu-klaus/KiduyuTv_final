@@ -763,7 +763,7 @@ fun MobileSettingsScreen(
                     icon = Icons.Default.PlayCircle,
                     title = "Default Direct Stream Provider",
                     subtitle = if (uiState.defaultDirectStreamProvider == SettingsManager.AUTO) {
-                        "Uses compatible enabled providers for each title"
+                        "All Providers — choose one before this option is removed"
                     } else {
                         "${StreamCatalog.resolve(uiState.defaultDirectStreamProvider).displayName} " +
                             "(used only when compatible)"
