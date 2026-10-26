@@ -49,6 +49,7 @@ import com.skydoves.balloon.Balloon
 import com.skydoves.balloon.BalloonAnimation
 import com.skydoves.balloon.BalloonSizeSpec
 import com.kiduyuk.klausk.kiduyutv.data.local.database.DatabaseManager
+import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import com.kiduyuk.klausk.kiduyutv.data.model.Episode
 import com.kiduyuk.klausk.kiduyutv.data.model.SeasonDetail
 import com.kiduyuk.klausk.kiduyutv.data.repository.TmdbRepository
@@ -80,6 +81,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.MegaPlaybackT
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
 import com.kiduyuk.klausk.kiduyutv.util.AuthManager
 import com.kiduyuk.klausk.kiduyutv.util.QuitDialog
+import com.kiduyuk.klausk.kiduyutv.util.RewardedFallbackDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -126,6 +128,7 @@ class DirectStreamActivity : AppCompatActivity() {
     private var quitDialog: QuitDialog? = null
     private var cloudflareDialog: AlertDialog? = null
     private var playbackErrorDialog: AlertDialog? = null
+    private var streamAdPromptDialog: AlertDialog? = null
     private val playerTooltips = mutableMapOf<View, Balloon>()
     private var activePlayerTooltip: Balloon? = null
     private var cloudflareProbeJob: Job? = null
@@ -700,11 +703,44 @@ class DirectStreamActivity : AppCompatActivity() {
         startInitialPlayback()
     }
 
-    /**
-     * Show the all-provider migration warning before any provider request is
-     * started. Sniffed URLs are already resolved and must not show this prompt.
-     */
+    /** Gates initial playback before showing any provider warning or starting stream resolution. */
     private fun startInitialPlayback() {
+        if (BuildConfig.FLAVOR == "phone" && settingsManager.shouldShowDirectStreamAdPrompt()) {
+            showStreamAdPrompt()
+            return
+        }
+        continueInitialPlayback()
+    }
+
+    private fun showStreamAdPrompt() {
+        if (isFinishing || isDestroyed || streamAdPromptDialog?.isShowing == true) return
+
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle("Watch an ad to continue")
+            .setMessage("Watch a short ad to support KiduyuTV and continue to your stream.")
+            .setCancelable(false)
+            .setPositiveButton(android.R.string.ok) { currentDialog, _ ->
+                currentDialog.dismiss()
+                if (streamAdPromptDialog === currentDialog) streamAdPromptDialog = null
+                RewardedFallbackDispatcher.showInterstitial(
+                    activity = this,
+                    onRewarded = {},
+                    onDismissed = {
+                        runOnUiThread {
+                            if (!isFinishing && !isDestroyed) continueInitialPlayback()
+                        }
+                    }
+                )
+            }
+            .create()
+        streamAdPromptDialog = dialog
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.requestFocus()
+        }
+        dialog.show()
+    }
+
+    private fun continueInitialPlayback() {
         val sniffedUrl = intent.getStringExtra(EXTRA_SNIFFED_URL)
         if (sniffedUrl.isNullOrBlank() && DirectStreamProviderWarning.showIfNeeded(
                 activity = this,
@@ -3770,6 +3806,8 @@ class DirectStreamActivity : AppCompatActivity() {
         cloudflareDialog = null
         playbackErrorDialog?.takeIf { it.isShowing }?.dismiss()
         playbackErrorDialog = null
+        streamAdPromptDialog?.takeIf { it.isShowing }?.dismiss()
+        streamAdPromptDialog = null
         playerTooltips.values.forEach(Balloon::dismiss)
         playerTooltips.clear()
         activePlayerTooltip = null

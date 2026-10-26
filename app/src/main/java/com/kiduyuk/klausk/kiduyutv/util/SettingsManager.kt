@@ -62,6 +62,17 @@ class SettingsManager(context: Context) {
             ?.takeIf { it == PLAYER_EXOPLAYER || it == PLAYER_LIBMPV }
             ?: PLAYER_EXOPLAYER
 
+    /** Returns true on every third direct-stream player opening. */
+    @Synchronized
+    fun shouldShowDirectStreamAdPrompt(): Boolean {
+        val nextOpen = (preferences.getInt(KEY_DIRECT_STREAM_OPEN_COUNT, 0).coerceAtLeast(0) % 3) + 1
+        val shouldShow = nextOpen == 3
+        preferences.edit()
+            .putInt(KEY_DIRECT_STREAM_OPEN_COUNT, if (shouldShow) 0 else nextOpen)
+            .apply()
+        return shouldShow
+    }
+
     /** Reads the endpoint options this manager already has a context for. */
     private fun cachedEndpointOptions(): List<DirectStreamEndpoint> =
         getCachedDirectStreamEndpointOptions(appContext)
@@ -176,6 +187,7 @@ class SettingsManager(context: Context) {
         private const val KEY_DEFAULT_PROVIDER = "default_provider"
         private const val KEY_DEFAULT_DIRECT_STREAM_PROVIDER = "default_direct_stream_provider"
         private const val KEY_DIRECT_STREAM_PLAYER = "direct_stream_player"
+        private const val KEY_DIRECT_STREAM_OPEN_COUNT = "direct_stream_open_count"
         private const val KEY_DIRECT_STREAM_ENDPOINT = "direct_stream_endpoint"
         private const val KEY_DIRECT_STREAM_ENDPOINT_OPTIONS = "direct_stream_endpoint_options"
         private const val KEY_DEVICE_ID = "device_id"
