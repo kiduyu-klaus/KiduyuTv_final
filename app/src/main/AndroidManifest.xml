@@ -108,6 +108,14 @@
             android:theme="@style/Theme.KiduyuTv.DirectStreamPlayer" />
 
         <activity
+            android:name=".ui.player.directstream.LibMpvDirectStreamActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false"
+            android:hardwareAccelerated="true"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.KiduyuTv.DirectStreamPlayer" />
+
+        <activity
             android:name=".ui.player.directstream.MobileDirectStreamActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:exported="false"
