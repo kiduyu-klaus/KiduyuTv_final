@@ -114,7 +114,7 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
         session = LibMpvSession(this)
         Glide.with(this).load(intent.getStringExtra(DirectStreamActivity.EXTRA_BACKDROP_URL)).into(binding.loadingBackdrop)
         binding.loadingArtwork.visibility = View.VISIBLE
-        initializeRoute()
+        startInitialRoute()
         wireControls()
         lifecycleScope.launch {
             session.snapshot.collect { snapshot ->
@@ -139,6 +139,23 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
             override fun handleOnBackPressed() { finish() }
         })
         enterImmersive()
+    }
+
+    /**
+     * Confirm the legacy all-provider mode before resolving any providers.
+     * Sniffed streams are already resolved and should start immediately.
+     */
+    private fun startInitialRoute() {
+        val sniffedUrl = intent.getStringExtra(DirectStreamActivity.EXTRA_SNIFFED_URL)
+        if (sniffedUrl.isNullOrBlank() && DirectStreamProviderWarning.showIfNeeded(
+                activity = this,
+                intent = intent,
+                onContinue = ::initializeRoute
+            )
+        ) {
+            return
+        }
+        initializeRoute()
     }
 
     private fun initializeRoute() {
@@ -175,13 +192,18 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 withContext(Dispatchers.IO) {
                     val settings = SettingsManager(this@LibMpvDirectStreamActivity)
                     val requestedProvider = intent.getStringExtra(DirectStreamActivity.EXTRA_PROVIDER)
-                        ?.takeIf { it.isNotBlank() } ?: settings.getDefaultDirectStreamProvider()
+                    val configuredProvider = settings.getDefaultDirectStreamProvider()
+                    val providerSelection = if (!DirectStreamProviderWarning.isAllProviders(configuredProvider)) {
+                        configuredProvider
+                    } else {
+                        requestedProvider
+                    }
                     resolver.load(
                         type = type,
                         tmdbId = tmdbId,
                         season = season,
                         episode = episode,
-                        provider = StreamCatalog.resolve(requestedProvider),
+                        provider = StreamCatalog.resolve(providerSelection),
                         endpoint = settings.getDirectStreamEndpoint()
                     )
                 }

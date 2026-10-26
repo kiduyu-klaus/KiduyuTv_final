@@ -697,6 +697,23 @@ class DirectStreamActivity : AppCompatActivity() {
         // (or as soon as the player reports its first duration).
         fetchEpisodeDurationFromTmdb()
 
+        startInitialPlayback()
+    }
+
+    /**
+     * Show the all-provider migration warning before any provider request is
+     * started. Sniffed URLs are already resolved and must not show this prompt.
+     */
+    private fun startInitialPlayback() {
+        val sniffedUrl = intent.getStringExtra(EXTRA_SNIFFED_URL)
+        if (sniffedUrl.isNullOrBlank() && DirectStreamProviderWarning.showIfNeeded(
+                activity = this,
+                intent = intent,
+                onContinue = ::checkAndAddToWatchHistory
+            )
+        ) {
+            return
+        }
         checkAndAddToWatchHistory()
     }
 

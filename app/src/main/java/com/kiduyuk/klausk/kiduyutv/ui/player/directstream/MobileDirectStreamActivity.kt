@@ -219,10 +219,14 @@ class MobileDirectStreamActivity : ComponentActivity() {
         season = intent.getIntExtra(DirectStreamActivity.EXTRA_SEASON, 0).takeIf { it > 0 }
         episode = intent.getIntExtra(DirectStreamActivity.EXTRA_EPISODE, 0).takeIf { it > 0 }
         title = intent.getStringExtra(DirectStreamActivity.EXTRA_TITLE).orEmpty()
-        provider = StreamCatalog.resolve(
-            intent.getStringExtra(DirectStreamActivity.EXTRA_PROVIDER)
-                ?: settingsManager.getDefaultDirectStreamProvider()
-        )
+        val requestedProvider = intent.getStringExtra(DirectStreamActivity.EXTRA_PROVIDER)
+        val configuredProvider = settingsManager.getDefaultDirectStreamProvider()
+        val providerSelection = if (!DirectStreamProviderWarning.isAllProviders(configuredProvider)) {
+            configuredProvider
+        } else {
+            requestedProvider
+        }
+        provider = StreamCatalog.resolve(providerSelection)
 
         engine = PlayerEngine(this).apply {
             onError = { error ->
@@ -286,8 +290,25 @@ class MobileDirectStreamActivity : ComponentActivity() {
             parseSniffedStream()?.let { stream ->
                 streams = listOf(stream)
                 play(stream)
-            } ?: loadStreams()
+            } ?: startInitialStreamLoad()
         }
+    }
+
+    /**
+     * Confirm the legacy all-provider mode before the phone player starts
+     * resolving providers. A sniffed stream bypasses this because it does not
+     * fetch the provider catalog.
+     */
+    private fun startInitialStreamLoad() {
+        if (DirectStreamProviderWarning.showIfNeeded(
+                activity = this,
+                intent = intent,
+                onContinue = ::loadStreams
+            )
+        ) {
+            return
+        }
+        loadStreams()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
