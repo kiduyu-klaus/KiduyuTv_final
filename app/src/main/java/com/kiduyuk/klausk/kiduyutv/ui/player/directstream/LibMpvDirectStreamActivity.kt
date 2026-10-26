@@ -83,6 +83,7 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private var aspectIndex = 0
     private var durationMs = 0L
     private var seeking = false
+    private var remoteSeekInProgress = false
     private var resumePositionMs = 0L
     private var lastShownPlaybackError: String? = null
     private var watchHistoryReady = false
@@ -136,6 +137,7 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 if (!err.isNullOrBlank()) showPlaybackError(err) else lastShownPlaybackError = null
                 val hasChoices = snapshot.tracks.size > 1 || snapshot.tracks.any { it.type.equals("sub", true) || it.type.equals("subtitle", true) }
                 binding.btnPlayerTracks.visibility = if (hasChoices) View.VISIBLE else View.GONE
+                updateBottomFocusChain()
             }
         }
         onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
@@ -467,15 +469,23 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
         binding.btnEpisodes.setOnClickListener { showEpisodeJump() }
         binding.btnPreviousEpisode.setOnClickListener { changeEpisode(-1) }
         binding.btnNextEpisode.setOnClickListener { changeEpisode(1) }
-        binding.overlayControls.setOnClickListener { surfaceView.requestFocus() }
+        binding.overlayControls.setOnClickListener { binding.btnPlayPause.requestFocus() }
         binding.root.isFocusableInTouchMode = true
-        binding.root.requestFocus()
+        binding.seekBar.setOnKeyListener { _, keyCode, event ->
+            when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_LEFT -> handleSeekBarRemoteKey(event, -1)
+                KeyEvent.KEYCODE_DPAD_RIGHT -> handleSeekBarRemoteKey(event, 1)
+                else -> false
+            }
+        }
         val isSeries = intent.getStringExtra(DirectStreamActivity.EXTRA_TYPE) == DirectStreamActivity.TYPE_SERIES || intent.getBooleanExtra(DirectStreamActivity.EXTRA_IS_TV, false)
         if (isSeries) {
             binding.btnEpisodes.visibility = View.VISIBLE
             binding.btnPreviousEpisode.visibility = View.VISIBLE
             binding.btnNextEpisode.visibility = View.VISIBLE
         }
+        updateBottomFocusChain()
+        binding.btnPlayPause.post { binding.btnPlayPause.requestFocus() }
     }
 
     private fun beginPlayback(stream: StreamItem) {
@@ -488,6 +498,7 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
             .filter(String::isNotBlank).joinToString(" · ")
         binding.loadingArtwork.visibility = View.VISIBLE
         binding.btnPlayerStreams.visibility = if (streams.size > 1) View.VISIBLE else View.GONE
+        updateBottomFocusChain()
         if (surfaceReady && sessionReady) loadPending(position)
     }
 
@@ -874,6 +885,57 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
         binding.bufferingOverlay.visibility = View.GONE
     }
 
+    private fun updateBottomFocusChain() {
+        val controls = listOf(
+            binding.btnPreviousEpisode,
+            binding.btnFill,
+            binding.btnPlayerSubtitles,
+            binding.btnPlayerTracks,
+            binding.btnPlayerStreams,
+            binding.btnReloadStreams,
+            binding.btnVolume,
+            binding.btnNextEpisode,
+            binding.btnEpisodes
+        ).filter { it.visibility == View.VISIBLE && it.isFocusable }
+
+        controls.forEachIndexed { index, control ->
+            control.nextFocusLeftId = controls[(index - 1 + controls.size) % controls.size].id
+            control.nextFocusRightId = controls[(index + 1) % controls.size].id
+            control.nextFocusUpId = binding.btnPlayPause.id
+        }
+        binding.btnPlayPause.nextFocusDownId = binding.seekBar.id
+        binding.seekBar.nextFocusUpId = binding.btnPlayPause.id
+        binding.seekBar.nextFocusDownId = controls.firstOrNull()?.id ?: View.NO_ID
+    }
+
+    private fun handleSeekBarRemoteKey(event: KeyEvent, direction: Int): Boolean {
+        if (durationMs <= 0L) return true
+        return when (event.action) {
+            KeyEvent.ACTION_DOWN -> {
+                remoteSeekInProgress = true
+                seeking = true
+                val nextProgress = (
+                    binding.seekBar.progress + direction * REMOTE_SEEK_PROGRESS_STEP
+                ).coerceIn(0, binding.seekBar.max)
+                binding.seekBar.progress = nextProgress
+                binding.tvCurrentTime.text = clock(durationMs * nextProgress / 1000L)
+                true
+            }
+            KeyEvent.ACTION_UP -> {
+                completeRemoteSeek()
+                true
+            }
+            else -> true
+        }
+    }
+
+    private fun completeRemoteSeek() {
+        if (!remoteSeekInProgress) return
+        remoteSeekInProgress = false
+        session.seekTo(durationMs * binding.seekBar.progress / 1000L)
+        seeking = false
+    }
+
     private fun showError(message: String) {
         binding.loadingArtwork.visibility = View.VISIBLE
         showStatus(message, retry = true)
@@ -924,11 +986,31 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
     }
     override fun onWindowFocusChanged(hasFocus: Boolean) { super.onWindowFocusChanged(hasFocus); if (hasFocus) enterImmersive() }
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0 && ::session.isInitialized) {
-            when (event.keyCode) {
-                KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> { session.togglePause(); return true }
-                KeyEvent.KEYCODE_MEDIA_PLAY -> { session.setPaused(false); return true }
-                KeyEvent.KEYCODE_MEDIA_PAUSE -> { session.setPaused(true); return true }
+        if (!::session.isInitialized) return super.dispatchKeyEvent(event)
+        when (event.keyCode) {
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) session.togglePause()
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_PLAY -> {
+                if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) session.setPaused(false)
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_PAUSE -> {
+                if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) session.setPaused(true)
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) session.seekBy(-SEEK_STEP_MS)
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) session.seekBy(SEEK_STEP_MS)
+                return true
+            }
+            KeyEvent.KEYCODE_BACK, KeyEvent.KEYCODE_ESCAPE -> {
+                if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) finish()
+                return true
             }
         }
         return super.dispatchKeyEvent(event)
@@ -948,5 +1030,10 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
         subtitleDialog?.dismiss()
         if (::session.isInitialized) session.release()
         super.onDestroy()
+    }
+
+    companion object {
+        private const val REMOTE_SEEK_PROGRESS_STEP = 10
+        private const val SEEK_STEP_MS = 30_000L
     }
 }
