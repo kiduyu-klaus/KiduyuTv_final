@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.Application
 import android.util.Log
 import androidx.multidex.MultiDexApplication
+import com.google.android.gms.ads.MobileAds
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
@@ -43,6 +44,11 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+
+        // Initialize Google Mobile Ads at application startup, matching the
+        // reference sample. Individual ad requests remain gated by UMP consent
+        // and the user's ads-disabled setting through AdEligibility.
+        MobileAds.initialize(this)
 
         // Initialize Room database manager
         DatabaseManager.init(this)
@@ -107,7 +113,8 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
         // Initialize AndroidApp reference for singleton access
         AndroidApp.instance = this
 
-        // Ad SDKs are initialized from SplashActivity only after UMP consent resolves.
+        // App-open observation starts here, while actual ad requests remain
+        // consent-gated and are loaded after the SplashActivity consent flow.
         AppOpenAdObserver.install(this)
 
         // Register ActivityLifecycleCallback to track current Activity for dialog display

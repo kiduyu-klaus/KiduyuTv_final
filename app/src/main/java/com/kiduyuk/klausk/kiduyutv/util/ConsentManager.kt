@@ -49,7 +49,8 @@ object ConsentManager {
 
     /**
      * Requests the latest UMP consent information on every app launch, then
-     * loads and shows the consent form if Google UMP says it is required.
+     * follows the sample flow: check form availability, load the form, and
+     * show it only when UMP reports that consent is required.
      */
     fun gatherConsent(
         activity: Activity,
@@ -66,10 +67,15 @@ object ConsentManager {
             params,
             {
                 val consentStatusBeforeForm = consentInfo.consentStatus
-                UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity) { formError ->
-                    // A completed UMP flow may permit personalized or
-                    // non-personalized requests. A form/load error is not
-                    // permission to initialize an advertising SDK.
+                Log.i(
+                    TAG,
+                    "Consent info updated: status=${consentInfo.consentStatus} " +
+                        "formAvailable=${consentInfo.isConsentFormAvailable}"
+                )
+
+                fun complete(formError: FormError?) {
+                    // A successfully completed form flow means UMP handled the
+                    // decision. Ad requests still require canRequestAds().
                     consentResolved = formError == null
                     Log.i(
                         TAG,
@@ -83,6 +89,40 @@ object ConsentManager {
                     }
                     onConsentGatheringCompleteListener.consentGatheringComplete(formError)
                 }
+
+                if (!consentInfo.isConsentFormAvailable) {
+                    Log.i(TAG, "No UMP consent form is available; continuing with stored UMP state")
+                    complete(null)
+                    return@requestConsentInfoUpdate
+                }
+
+                UserMessagingPlatform.loadConsentForm(
+                    activity,
+                    { consentForm ->
+                        if (consentInfo.consentStatus == ConsentInformation.ConsentStatus.REQUIRED) {
+                            Log.i(TAG, "UMP consent form loaded; showing required form")
+                            consentForm.show(activity) { formError ->
+                                if (formError != null) {
+                                    Log.w(TAG, "UMP consent form dismissed with error: ${formError.message}")
+                                }
+                                // Match the sample flow by loading the latest
+                                // form again on the next launch/consent cycle.
+                                complete(formError)
+                            }
+                        } else {
+                            Log.i(
+                                TAG,
+                                "UMP consent form loaded but status is ${consentInfo.consentStatus}; " +
+                                    "no form presentation needed"
+                            )
+                            complete(null)
+                        }
+                    },
+                    { formError ->
+                        Log.w(TAG, "UMP consent form failed to load: ${formError.message}")
+                        complete(formError)
+                    }
+                )
             },
             { formError ->
                 // UMP can report a transient update error even when its
