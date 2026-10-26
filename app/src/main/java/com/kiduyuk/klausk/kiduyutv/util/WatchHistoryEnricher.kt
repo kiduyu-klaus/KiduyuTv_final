@@ -93,11 +93,11 @@ object WatchHistoryEnricher {
         val itemsNeedingDetails = DatabaseManager.getWatchHistoryItemsNeedingDetails()
 
         if (itemsNeedingDetails.isEmpty()) {
-            Log.i(TAG, "No watch history items need TMDB detail enrichment")
+            //Log.i(TAG, "No watch history items need TMDB detail enrichment")
             return 0
         }
 
-        Log.i(TAG, "Found ${itemsNeedingDetails.size} watch history items needing TMDB detail enrichment")
+        //Log.i(TAG, "Found ${itemsNeedingDetails.size} watch history items needing TMDB detail enrichment")
 
         var enrichedCount = 0
 
@@ -108,7 +108,7 @@ object WatchHistoryEnricher {
             }
         }
 
-        Log.i(TAG, "Successfully enriched $enrichedCount out of ${itemsNeedingDetails.size} items")
+        //Log.i(TAG, "Successfully enriched $enrichedCount out of ${itemsNeedingDetails.size} items")
         return enrichedCount
     }
 
@@ -133,11 +133,11 @@ object WatchHistoryEnricher {
             val allWatchHistory = DatabaseManager.getAllWatchHistoryItems()
 
             if (allWatchHistory.isEmpty()) {
-                Log.i(TAG, "No watch history items to refresh images for")
+                //Log.i(TAG, "No watch history items to refresh images for")
                 return 0
             }
 
-            Log.i(TAG, "Refreshing images for ${allWatchHistory.size} watch history items")
+            //Log.i(TAG, "Refreshing images for ${allWatchHistory.size} watch history items")
 
             var refreshedCount = 0
 
@@ -148,7 +148,7 @@ object WatchHistoryEnricher {
                 }
             }
 
-            Log.i(TAG, "Successfully refreshed images for $refreshedCount out of ${allWatchHistory.size} items")
+            //Log.i(TAG, "Successfully refreshed images for $refreshedCount out of ${allWatchHistory.size} items")
             refreshedCount
         } catch (e: Exception) {
             Log.e(TAG, "Error refreshing watch history images: ${e.message}")
@@ -186,9 +186,9 @@ object WatchHistoryEnricher {
                         voteAverage = entity.voteAverage,
                         releaseDate = entity.releaseDate
                     )
-                    Log.i(TAG, "Refreshed images for watch history item ${entity.id} (${entity.mediaType})")
+                    //Log.i(TAG, "Refreshed images for watch history item ${entity.id} (${entity.mediaType})")
                 } else {
-                    Log.i(TAG, "No image changes for watch history item ${entity.id} (${entity.mediaType})")
+                    //Log.i(TAG, "No image changes for watch history item ${entity.id} (${entity.mediaType})")
                 }
                 true
             } else {
@@ -266,7 +266,7 @@ object WatchHistoryEnricher {
                     releaseDate = updatedReleaseDate
                 )
 
-                Log.i(TAG, "Enriched watch history item ${entity.id} (${entity.mediaType})")
+                //Log.i(TAG, "Enriched watch history item ${entity.id} (${entity.mediaType})")
                 true
             } else {
                 Log.w(TAG, "Failed to fetch TMDB details for ${entity.id} (${entity.mediaType})")
@@ -420,22 +420,22 @@ object WatchHistoryEnricher {
         }
 
         if (itemsToEnrich.isEmpty()) {
-            Log.i(TAG, "No continue watching items need enrichment")
+            //Log.i(TAG, "No continue watching items need enrichment")
             return 0
         }
 
-        Log.i(TAG, "Found ${itemsToEnrich.size} continue watching items needing enrichment")
+        //Log.i(TAG, "Found ${itemsToEnrich.size} continue watching items needing enrichment")
 
         for (item in itemsToEnrich) {
             val mediaType = if (item.isTv) "tv" else "movie"
             val success = enrichSingleItem(context, item.id, mediaType)
             if (success) {
                 enrichedCount++
-                Log.i(TAG, "Enriched continue watching item: ${item.title} (${item.id})")
+                //Log.i(TAG, "Enriched continue watching item: ${item.title} (${item.id})")
             }
         }
 
-        Log.i(TAG, "Successfully enriched $enrichedCount out of ${itemsToEnrich.size} continue watching items")
+        //Log.i(TAG, "Successfully enriched $enrichedCount out of ${itemsToEnrich.size} continue watching items")
         return enrichedCount
     }
 }

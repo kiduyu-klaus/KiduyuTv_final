@@ -3,6 +3,7 @@
 // at tag v0.40.0. mpv's client.h is ISC-style licensed; see its copyright header.
 #include <jni.h>
 #include <mpv/client.h>
+#include <android/log.h>
 #include <atomic>
 #include <cmath>
 #include <clocale>
@@ -19,9 +20,18 @@ struct Session {
     jobject surface = nullptr;
     std::string error;
     bool fileLoaded = false;
+    bool videoOutputDisabled = false;
     std::vector<std::pair<std::string, std::string>> pendingSubtitles;
 };
+constexpr const char* kLogTag = "KiduyuMpv";
 Session* from(jlong p) { return reinterpret_cast<Session*>(static_cast<intptr_t>(p)); }
+void log_error(const char* operation, int result) {
+    __android_log_print(ANDROID_LOG_ERROR, kLogTag, "%s: %s", operation, mpv_error_string(result));
+}
+void throw_illegal_state(JNIEnv* e, const std::string& message) {
+    jclass exception = e->FindClass("java/lang/IllegalStateException");
+    if (exception) e->ThrowNew(exception, message.c_str());
+}
 std::string str(JNIEnv* e, jstring s) {
     if (!s) return {};
     const char* p = e->GetStringUTFChars(s, nullptr);
@@ -66,7 +76,7 @@ Java_com_kiduyuk_klausk_kiduyutv_ui_player_directstream_playback_LibMpvSession_n
     if (!s->mpv) { delete s; return 0; }
     const char* opts[][2] = {{"vo","gpu"},{"gpu-context","android"},{"opengl-es","yes"},{"gpu-api","opengl"},{"ao","audiotrack"},
         {"input-default-bindings","no"},{"input-vo-keyboard","no"},{"terminal","no"},
-        {"idle","once"},{"hwdec","auto-safe"},{"cache","yes"},
+        {"force-window","no"},{"idle","once"},{"hwdec","auto-safe"},{"cache","yes"},
         {"demuxer-readahead-secs","20"},{"cache-secs","30"},{"keep-open","yes"}};
     for (const auto& o : opts) {
         if (mpv_set_option_string(s->mpv, o[0], o[1]) < 0) {
@@ -85,27 +95,53 @@ Java_com_kiduyuk_klausk_kiduyutv_ui_player_directstream_playback_LibMpvSession_n
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_kiduyuk_klausk_kiduyutv_ui_player_directstream_playback_LibMpvSession_nativeAttach(JNIEnv* e, jobject, jlong p, jobject surface) {
     Session* s = from(p);
-    if (!s || !s->mpv || !surface || s->surface) return JNI_FALSE;
-    s->surface = e->NewGlobalRef(surface);
-    if (!s->surface) return JNI_FALSE;
-    // Follow mpv-android's Android VO lifecycle: set the Java Surface as `wid`
-    // after initialization so the Android video output can bind to it.
-    int64_t wid = static_cast<int64_t>(reinterpret_cast<intptr_t>(s->surface));
-    int result = mpv_set_option(s->mpv, "wid", MPV_FORMAT_INT64, &wid);
-    if (result < 0) {
-        e->DeleteGlobalRef(s->surface);
-        s->surface = nullptr;
+    if (!s || !s->mpv || !surface || s->surface) {
+        throw_illegal_state(e, "Invalid libmpv surface attachment state");
         return JNI_FALSE;
     }
+    jobject globalSurface = e->NewGlobalRef(surface);
+    if (!globalSurface) {
+        throw_illegal_state(e, "Could not retain the libmpv video surface");
+        return JNI_FALSE;
+    }
+    // Android's VO consumes the Java Surface through mpv's wid option.
+    int64_t wid = static_cast<int64_t>(reinterpret_cast<intptr_t>(globalSurface));
+    int result = mpv_set_option(s->mpv, "wid", MPV_FORMAT_INT64, &wid);
+    if (result < 0) {
+        e->DeleteGlobalRef(globalSurface);
+        throw_illegal_state(e, std::string("Could not attach libmpv surface: ") + mpv_error_string(result));
+        return JNI_FALSE;
+    }
+    result = mpv_set_option_string(s->mpv, "force-window", "yes");
+    if (result >= 0 && s->videoOutputDisabled)
+        result = mpv_set_option_string(s->mpv, "vo", "gpu");
+    if (result < 0) {
+        mpv_set_option_string(s->mpv, "force-window", "no");
+        int64_t emptyWid = 0;
+        mpv_set_option(s->mpv, "wid", MPV_FORMAT_INT64, &emptyWid);
+        e->DeleteGlobalRef(globalSurface);
+        throw_illegal_state(e, std::string("Could not enable libmpv video output: ") + mpv_error_string(result));
+        return JNI_FALSE;
+    }
+    s->surface = globalSurface;
+    s->videoOutputDisabled = false;
     return JNI_TRUE;
 }
 extern "C" JNIEXPORT void JNICALL
 Java_com_kiduyuk_klausk_kiduyutv_ui_player_directstream_playback_LibMpvSession_nativeDetach(JNIEnv* e, jobject, jlong p) {
     Session* s = from(p);
     if (!s || !s->mpv || !s->surface) return;
+    s->videoOutputDisabled = true;
+    int outputResult = mpv_set_option_string(s->mpv, "vo", "null");
+    if (outputResult < 0) log_error("Could not disable libmpv video output", outputResult);
+    int windowResult = mpv_set_option_string(s->mpv, "force-window", "no");
+    if (windowResult < 0) log_error("Could not disable libmpv force-window", windowResult);
     int64_t wid = 0;
     int result = mpv_set_option(s->mpv, "wid", MPV_FORMAT_INT64, &wid);
-    if (result < 0) s->error = std::string("Could not detach libmpv surface: ") + mpv_error_string(result);
+    if (result < 0) {
+        s->error = std::string("Could not detach libmpv surface: ") + mpv_error_string(result);
+        log_error("Could not clear libmpv wid", result);
+    }
     e->DeleteGlobalRef(s->surface);
     s->surface = nullptr;
 }

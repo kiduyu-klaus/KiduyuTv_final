@@ -61,9 +61,13 @@ internal class LibMpvSession(context: Context) {
         }
         val created = nativeCreate()
         check(created != 0L) { "libmpv initialization failed" }
-        check(nativeAttach(created, surface)) {
+        try {
+            check(nativeAttach(created, surface)) {
+                "libmpv could not attach the Android video surface"
+            }
+        } catch (error: RuntimeException) {
             nativeRelease(created)
-            "libmpv could not attach the Android video surface"
+            throw error
         }
         handle.set(created)
         Log.i(TAG, "initialize: created and attached libmpv handle")

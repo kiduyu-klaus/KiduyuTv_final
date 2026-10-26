@@ -348,8 +348,8 @@ Keep the JNI class/method names in sync with `mpv_jni.cpp` and preserved by R8. 
 
 KiduyuTV uses a dedicated `SurfaceView` inserted into the shared DirectStream layout. Its lifecycle follows the upstream `BaseMPVView` pattern:
 
-1. Creates and initializes the libmpv handle when the first valid surface is created.
-2. Attaches the Java Surface as mpv's `wid` and enables `force-window`.
+1. Creates and initializes the libmpv handle when the first valid surface is created, with `force-window=no` so the Android VO does not initialize without a surface.
+2. Attaches the Java Surface as mpv's `wid`, enables `force-window`, and restores `vo=gpu` when reattaching after a surface recreation.
 3. Updates `android-surface-size` from `surfaceChanged`.
 4. Sets `vo=null`, disables the force window, then clears `wid` and releases the JNI global Surface reference on `surfaceDestroyed`.
 5. Reattaches a recreated surface to the existing libmpv handle instead of initializing a second context.
@@ -359,7 +359,7 @@ A `SurfaceView` is the safer first implementation for Android TV and Fire TV bec
 
 ## Creating and configuring the mpv context
 
-`mpv_jni.cpp` sets options before `mpv_initialize()`: `vo=gpu`, `gpu-context=android`, `opengl-es=yes`, `gpu-api=opengl`, `ao=audiotrack`, input bindings off, `terminal=no`, `force-window=no`, `idle=once`, `hwdec=auto-safe`, cache enabled, and `keep-open=yes`. `nativeAttach()` then enables the window for the supplied surface. The exact hardware-decoding behavior still needs phone, Android TV, and Fire TV testing; the checked-in FFmpeg libraries do not export Android's `av_jni_set_*` helpers, so hardware interoperability has not been confirmed.
+`mpv_jni.cpp` sets options before `mpv_initialize()`: `vo=gpu`, `gpu-context=android`, `opengl-es=yes`, `gpu-api=opengl`, `ao=audiotrack`, input bindings off, `terminal=no`, `force-window=no`, `idle=once`, `hwdec=auto-safe`, cache enabled, and `keep-open=yes`. `nativeAttach()` sets `wid` and enables `force-window`; after surface destruction it disables `vo` before releasing the surface reference, and a recreated surface restores `vo=gpu`. The exact hardware-decoding behavior still needs phone, Android TV, and Fire TV testing; the checked-in FFmpeg libraries do not export Android's `av_jni_set_*` helpers, so hardware interoperability has not been confirmed.
 
 ## Loading a direct stream
 

@@ -44,8 +44,8 @@ fun MovieCard(
     modifier: Modifier = Modifier
 ) {
     // Logging for image loading debugging
-    Log.i("MovieCard", "MovieCard composed: ${movie.title} (id=${movie.id})")
-    Log.i("MovieCard", "posterPath=${movie.posterPath}, backdropPath=${movie.backdropPath}")
+    //Log.i("MovieCard", "MovieCard composed: ${movie.title} (id=${movie.id})")
+    //Log.i("MovieCard", "posterPath=${movie.posterPath}, backdropPath=${movie.backdropPath}")
 
     // Build the full image URL for logging
     val imageUrl = if (movie.posterPath != null) {
@@ -53,7 +53,7 @@ fun MovieCard(
     } else {
         null
     }
-    Log.i("MovieCard", "Loading poster image: $imageUrl")
+    //Log.i("MovieCard", "Loading poster image: $imageUrl")
 
     // Root container for the card
     Box(
@@ -74,7 +74,7 @@ fun MovieCard(
 
         // 🔹 Poster Image (fills entire card)
         if (movie.posterPath != null) {
-            Log.i("MovieCard", "Rendering AsyncImage for movie: ${movie.title}")
+            //Log.i("MovieCard", "Rendering AsyncImage for movie: ${movie.title}")
             AsyncImage(
                 model = imageUrl,
                 contentDescription = movie.title,
@@ -84,10 +84,10 @@ fun MovieCard(
                     Log.e("MovieCard", "AsyncImage error for ${movie.title}: ${errorState.result.toString()}")
                 },
                 onLoading = {
-                    Log.i("MovieCard", "AsyncImage loading for ${movie.title}")
+                    //Log.i("MovieCard", "AsyncImage loading for ${movie.title}")
                 },
                 onSuccess = { metadata ->
-                    Log.i("MovieCard", "AsyncImage loaded successfully for ${movie.title} from: ${metadata.result}")
+                    //Log.i("MovieCard", "AsyncImage loaded successfully for ${movie.title} from: ${metadata.result}")
                 }
             )
         } else {
@@ -139,8 +139,8 @@ fun TvShowCard(
     modifier: Modifier = Modifier
 ) {
     // Logging for image loading debugging
-    Log.i("TvShowCard", "TvShowCard composed: ${tvShow.name} (id=${tvShow.id})")
-    Log.i("TvShowCard", "posterPath=${tvShow.posterPath}, backdropPath=${tvShow.backdropPath}")
+    //Log.i("TvShowCard", "TvShowCard composed: ${tvShow.name} (id=${tvShow.id})")
+    //Log.i("TvShowCard", "posterPath=${tvShow.posterPath}, backdropPath=${tvShow.backdropPath}")
 
     // Build the full image URL for logging
     val imageUrl = if (tvShow.posterPath != null) {
@@ -148,7 +148,7 @@ fun TvShowCard(
     } else {
         null
     }
-    Log.i("TvShowCard", "Loading poster image: $imageUrl")
+    //Log.i("TvShowCard", "Loading poster image: $imageUrl")
 
     // Root container for the card
     Box(
@@ -169,7 +169,7 @@ fun TvShowCard(
 
         // 🔹 Poster Image
         if (tvShow.posterPath != null) {
-            Log.i("TvShowCard", "Rendering AsyncImage for TV show: ${tvShow.name}")
+            //Log.i("TvShowCard", "Rendering AsyncImage for TV show: ${tvShow.name}")
             AsyncImage(
                 model = imageUrl,
                 contentDescription = tvShow.name,
@@ -179,7 +179,7 @@ fun TvShowCard(
                     Log.e("TvShowCard", "AsyncImage error for ${tvShow.name}: ${errorState.result}")
                 },
                 onLoading = {
-                    Log.i("TvShowCard", "AsyncImage loading for ${tvShow.name}")
+                    //Log.i("TvShowCard", "AsyncImage loading for ${tvShow.name}")
                 },
                 onSuccess = { metadata ->
                     Log.i("TvShowCard", "AsyncImage loaded successfully for ${tvShow.name} from: ${metadata.result.dataSource}")
