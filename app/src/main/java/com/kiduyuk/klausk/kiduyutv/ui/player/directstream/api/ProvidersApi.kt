@@ -447,11 +447,6 @@ object ProvidersApi {
                             headerName.equals("Range", ignoreCase = true)
                     }
                 }
-                val hasMovieBoxCookieHeader =
-                    provider.equals("moviebox", ignoreCase = true) &&
-                        headers.any { (name, value) ->
-                            name.equals("Cookie", ignoreCase = true) && value.isNotBlank()
-                        }
                 if (provider.lowercase(Locale.ROOT) in PROVIDERS_WITHOUT_SOURCE_HEADERS) {
                     headers.keys.removeAll { headerName ->
                         headerName.equals("Origin", ignoreCase = true) ||
@@ -475,17 +470,6 @@ object ProvidersApi {
                 }
                 if (cookie.isNotBlank() && headers.keys.none { it.equals("Cookie", true) }) {
                     headers["Cookie"] = cookie
-                }
-                if (
-                    provider.equals("moviebox", ignoreCase = true) &&
-                    !hasMovieBoxCookieHeader
-                ) {
-                    Log.w(
-                        TAG,
-                        "Dropping MovieBox stream without a Cookie header " +
-                            "quality=${s.optString("quality", "?")}"
-                    )
-                    continue
                 }
                 val title = s.optString("title", s.optString("name", "Stream"))
                 val subtitles = parseSubtitles(
