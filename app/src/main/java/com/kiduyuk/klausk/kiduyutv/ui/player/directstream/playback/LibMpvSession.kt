@@ -94,7 +94,10 @@ internal class LibMpvSession(context: Context) {
 
     fun setSurfaceSize(width: Int, height: Int) {
         if (width > 0 && height > 0) submit {
-            nativeCommand(it, arrayOf("set", "android-surface-size", "${width}x$height"))
+            val result = nativeSetPropertyString(it, "android-surface-size", "${width}x$height")
+            if (result < 0) {
+                Log.w(TAG, "setSurfaceSize: libmpv rejected ${width}x$height (error=$result)")
+            }
         }
     }
 
@@ -193,6 +196,7 @@ internal class LibMpvSession(context: Context) {
     private external fun nativeCreate(): Long
     private external fun nativeAttach(handle: Long, surface: Surface): Boolean
     private external fun nativeDetach(handle: Long)
+    private external fun nativeSetPropertyString(handle: Long, name: String, value: String): Int
     private external fun nativeLoad(handle: Long, url: String, headers: Map<String, String>, subtitles: List<Pair<String, String>>, startPositionMs: Long)
     private external fun nativeCommand(handle: Long, args: Array<String>)
     private external fun nativeSnapshot(handle: Long): String

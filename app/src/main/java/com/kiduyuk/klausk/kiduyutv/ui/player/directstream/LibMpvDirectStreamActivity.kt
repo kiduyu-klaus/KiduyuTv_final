@@ -1149,6 +1149,7 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
         streamDialog?.dismiss()
         trackDialog?.dismiss()
         subtitleDialog?.dismiss()
+        surfaceView.holder.removeCallback(this)
         if (::session.isInitialized) session.release()
         super.onDestroy()
     }

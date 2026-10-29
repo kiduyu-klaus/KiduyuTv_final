@@ -57,6 +57,15 @@ int command(Session* s, const std::vector<std::string>& args) {
     if (result < 0) s->error = mpv_error_string(result);
     return result;
 }
+int set_property_string(Session* s, const char* name, const char* value) {
+    if (!s || !s->mpv) return MPV_ERROR_INVALID_PARAMETER;
+    int result = mpv_set_property_string(s->mpv, name, value);
+    if (result < 0) {
+        s->error = mpv_error_string(result);
+        log_error(name, result);
+    }
+    return result;
+}
 bool get_double(mpv_handle* h, const char* name, double* v) {
     return mpv_get_property(h, name, MPV_FORMAT_DOUBLE, v) >= 0;
 }
@@ -112,11 +121,11 @@ Java_com_kiduyuk_klausk_kiduyutv_ui_player_directstream_playback_LibMpvSession_n
         throw_illegal_state(e, std::string("Could not attach libmpv surface: ") + mpv_error_string(result));
         return JNI_FALSE;
     }
-    result = mpv_set_option_string(s->mpv, "force-window", "yes");
+    result = set_property_string(s, "force-window", "yes");
     if (result >= 0 && s->videoOutputDisabled)
-        result = mpv_set_option_string(s->mpv, "vo", "gpu");
+        result = set_property_string(s, "vo", "gpu");
     if (result < 0) {
-        mpv_set_option_string(s->mpv, "force-window", "no");
+        set_property_string(s, "force-window", "no");
         int64_t emptyWid = 0;
         mpv_set_option(s->mpv, "wid", MPV_FORMAT_INT64, &emptyWid);
         e->DeleteGlobalRef(globalSurface);
@@ -132,10 +141,8 @@ Java_com_kiduyuk_klausk_kiduyutv_ui_player_directstream_playback_LibMpvSession_n
     Session* s = from(p);
     if (!s || !s->mpv || !s->surface) return;
     s->videoOutputDisabled = true;
-    int outputResult = mpv_set_option_string(s->mpv, "vo", "null");
-    if (outputResult < 0) log_error("Could not disable libmpv video output", outputResult);
-    int windowResult = mpv_set_option_string(s->mpv, "force-window", "no");
-    if (windowResult < 0) log_error("Could not disable libmpv force-window", windowResult);
+    set_property_string(s, "vo", "null");
+    set_property_string(s, "force-window", "no");
     int64_t wid = 0;
     int result = mpv_set_option(s->mpv, "wid", MPV_FORMAT_INT64, &wid);
     if (result < 0) {
@@ -144,6 +151,15 @@ Java_com_kiduyuk_klausk_kiduyutv_ui_player_directstream_playback_LibMpvSession_n
     }
     e->DeleteGlobalRef(s->surface);
     s->surface = nullptr;
+}
+extern "C" JNIEXPORT jint JNICALL
+Java_com_kiduyuk_klausk_kiduyutv_ui_player_directstream_playback_LibMpvSession_nativeSetPropertyString(
+    JNIEnv* e, jobject, jlong p, jstring name, jstring value) {
+    Session* s = from(p);
+    if (!s || !s->mpv) return MPV_ERROR_INVALID_PARAMETER;
+    const std::string property = str(e, name);
+    const std::string propertyValue = str(e, value);
+    return set_property_string(s, property.c_str(), propertyValue.c_str());
 }
 extern "C" JNIEXPORT void JNICALL
 Java_com_kiduyuk_klausk_kiduyutv_ui_player_directstream_playback_LibMpvSession_nativeLoad(JNIEnv* e,jobject,jlong p,jstring url,jobject headers,jobject subtitles,jlong start) {
