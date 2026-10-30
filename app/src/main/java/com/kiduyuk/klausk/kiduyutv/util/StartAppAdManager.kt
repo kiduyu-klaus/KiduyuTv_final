@@ -67,6 +67,9 @@ object StartAppAdManager {
         }
         try {
             // Code initialization is intentionally delayed until UMP resolves.
+            // TEMPORARY QA MODE: Start.io test ads are enabled for all build types.
+            // Remove this call before returning to live monetization.
+            StartAppSDK.setTestAdsEnabled(true)
             // The final false disables return ads so AdMob and Start.io cannot
             // stack full-screen ads when the app returns to the foreground.
             StartAppSDK.init(
