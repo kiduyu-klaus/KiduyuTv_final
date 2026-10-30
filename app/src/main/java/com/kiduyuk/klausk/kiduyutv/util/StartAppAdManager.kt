@@ -167,10 +167,21 @@ object StartAppAdManager {
     }
 
     private fun bannerListener(format: BannerFormat) = object : BannerListener {
-        override fun onReceiveAd(view: View) = Log.i(TAG, "Start.io $format received")
-        override fun onFailedToReceiveAd(view: View) = Log.w(TAG, "Start.io $format failed after creation")
-        override fun onClick(view: View) = Log.i(TAG, "Start.io $format clicked")
-        override fun onImpression(view: View) = Log.i(TAG, "Start.io $format impression")
+        override fun onReceiveAd(view: View) {
+            Log.i(TAG, "Start.io $format received")
+        }
+
+        override fun onFailedToReceiveAd(view: View) {
+            Log.w(TAG, "Start.io $format failed after creation")
+        }
+
+        override fun onClick(view: View) {
+            Log.i(TAG, "Start.io $format clicked")
+        }
+
+        override fun onImpression(view: View) {
+            Log.i(TAG, "Start.io $format impression")
+        }
     }
 
     fun showInterstitial(activity: Activity, onDismissed: () -> Unit = {}, onUnavailable: () -> Unit = {}) {
