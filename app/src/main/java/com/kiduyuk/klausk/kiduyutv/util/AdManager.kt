@@ -45,7 +45,7 @@ object AdManager {
     @Volatile private var isInitialised = false
     private val isMobileAdsInitializeCalled = AtomicBoolean(false)
     private val initializationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val nativeAdLoadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val nativeAdLoadScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     @Volatile private var interstitialAd: InterstitialAd? = null
     @Volatile private var isInterstitialLoading = false
     @Volatile private var rewardedAd: RewardedAd? = null
@@ -616,6 +616,7 @@ object AdManager {
 
         if (appOpenShowing) {
             Log.i(TAG, "App open ad is already showing")
+            onShowAdComplete()
             return
         }
 
@@ -645,6 +646,7 @@ object AdManager {
             }
 
             override fun onAdShowedFullScreenContent() {
+                FullscreenAdPolicy.recordAppOpenShown(activity)
                 Log.i(TAG, "App open ad shown")
             }
 
@@ -669,7 +671,7 @@ object AdManager {
     private fun wasAppOpenLoadTimeLessThanNHoursAgo(numHours: Long): Boolean {
         val dateDifference = Date().time - appOpenLoadTime
         val millisecondsPerHour = 3_600_000L
-        return dateDifference < millisecondsPerHour * numHours
+        return dateDifference >= 0L && dateDifference < millisecondsPerHour * numHours
     }
 
     // ── Native Advanced ───────────────────────────────────────────────────
@@ -780,14 +782,17 @@ object AdManager {
      * Loads a prepared AdView only after Mobile Ads and mediation adapters are
      * initialized. A disposed banner is ignored when a queued request is replayed.
      */
-    fun loadBannerAdView(adView: AdView) {
+    fun loadBannerAdView(adView: AdView, onSkipped: () -> Unit = {}) {
         if (!shouldShowAds(adView.context)) {
             Log.i(TAG, "Ads disabled - skipping AdMob banner request")
+            mainHandler.post { onSkipped() }
             return
         }
         runWhenInitialized {
             if (adView.parent != null && shouldShowAds(adView.context)) {
                 adView.loadAd(AdRequest.Builder().build())
+            } else if (!shouldShowAds(adView.context)) {
+                onSkipped()
             }
         }
     }

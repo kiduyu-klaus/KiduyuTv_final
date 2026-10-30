@@ -97,6 +97,7 @@ fun BannerAdView(modifier: Modifier = Modifier) {
     // composition (not on every recomposition).
     DisposableEffect(Unit) {
         onDispose {
+            containerRef.value?.let { BannerFallbackDispatcher.cancel(it) }
             UnityAdManager.destroyBanner()
             WortiseAdManager.destroyBanner()
             containerRef.value?.removeAllViews()

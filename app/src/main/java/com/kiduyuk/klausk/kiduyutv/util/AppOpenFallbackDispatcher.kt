@@ -12,6 +12,11 @@ object AppOpenFallbackDispatcher {
             onComplete()
             return
         }
+        if (!FullscreenAdPolicy.canShowAppOpen(activity)) {
+            Log.i(TAG, "App-open fallback: suppressed by fullscreen cooldown")
+            onComplete()
+            return
+        }
 
         when {
             AdManager.isAppOpenReady -> {

@@ -3,6 +3,8 @@ package com.kiduyuk.klausk.kiduyutv.util
 import android.app.Activity
 import android.content.Context
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
@@ -18,6 +20,7 @@ import com.startapp.sdk.adsbase.adlisteners.AdEventListener
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * StartApp (Start.io) Ad Manager — singleton.
@@ -26,11 +29,13 @@ import kotlinx.coroutines.flow.asStateFlow
  * All public methods are safe to call even if the SDK failed to initialise:
  * they simply no-op and invoke the callback so the app flow continues.
  *
- * Interstitial frequency is guarded by [FullscreenAdPolicy] (3 min globally).
+ * Interstitial frequency is guarded by [FullscreenAdPolicy] (2 min globally).
  */
 object StartAppAdManager {
 
     private const val TAG = "StartAppAdManager"
+    private const val FULLSCREEN_LOAD_TIMEOUT_MS = 8_000L
+    private val mainHandler = Handler(Looper.getMainLooper())
     private const val CONSENT_PREFERENCES = "startapp_consent"
     private const val CONSENT_TIMESTAMP_KEY = "consent_timestamp"
     private const val IAB_US_PRIVACY_KEY = "IABUSPrivacy_String"
@@ -99,7 +104,7 @@ object StartAppAdManager {
                 context,
                 "pas",
                 consentTimestamp,
-                ConsentManager.canShowPersonalizedAds(context)
+                ConsentManager.canShowStartIoPersonalizedAds(context)
             )
             applyUsPrivacyString(context)
         } catch (e: Exception) {
@@ -152,6 +157,10 @@ object StartAppAdManager {
     }
 
     private fun shouldShowAds(context: Context): Boolean = AdEligibility.canRequestAds(context)
+
+    private fun runOnMain(action: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) action() else mainHandler.post { action() }
+    }
 
     // ── Banner ────────────────────────────────────────────────────────────
 
@@ -234,41 +243,69 @@ object StartAppAdManager {
             return
         }
 
+        val loadPending = AtomicBoolean(true)
+        val showOutcomeSettled = AtomicBoolean(false)
+        val loadTimeout = Runnable {
+            if (loadPending.compareAndSet(true, false)) {
+                Log.w(TAG, "StartApp interstitial load timed out")
+                onUnavailable()
+            }
+        }
         try {
             val startAppAd = StartAppAd(activity)
+            mainHandler.postDelayed(loadTimeout, FULLSCREEN_LOAD_TIMEOUT_MS)
             startAppAd.loadAd(object : AdEventListener {
                 override fun onReceiveAd(ad: Ad) {
-                    Log.i(TAG, "StartApp interstitial loaded")
-                    startAppAd.showAd(object : AdDisplayListener {
-                        override fun adDisplayed(ad: Ad?) {
-                            Log.i(TAG, "StartApp interstitial displayed")
-                            FullscreenAdPolicy.recordInterstitialShown(activity)
+                    if (!loadPending.compareAndSet(true, false)) return
+                    mainHandler.removeCallbacks(loadTimeout)
+                    runOnMain {
+                        if (activity.isFinishing) {
+                            if (showOutcomeSettled.compareAndSet(false, true)) onUnavailable()
+                            return@runOnMain
                         }
+                        Log.i(TAG, "StartApp interstitial loaded")
+                        try {
+                            startAppAd.showAd(object : AdDisplayListener {
+                            override fun adDisplayed(ad: Ad?) {
+                                Log.i(TAG, "StartApp interstitial displayed")
+                                FullscreenAdPolicy.recordInterstitialShown(activity)
+                            }
 
-                        override fun adHidden(ad: Ad?) {
-                            Log.i(TAG, "StartApp interstitial hidden")
-                            onDismissed()
-                        }
+                            override fun adHidden(ad: Ad?) {
+                                Log.i(TAG, "StartApp interstitial hidden")
+                                if (showOutcomeSettled.compareAndSet(false, true)) onDismissed()
+                            }
 
-                        override fun adClicked(ad: Ad?) {
-                            Log.i(TAG, "StartApp interstitial clicked")
-                        }
+                            override fun adClicked(ad: Ad?) {
+                                Log.i(TAG, "StartApp interstitial clicked")
+                            }
 
-                        override fun adNotDisplayed(ad: Ad?) {
-                            Log.w(TAG, "StartApp interstitial not displayed")
-                            onUnavailable()
+                            override fun adNotDisplayed(ad: Ad?) {
+                                Log.w(TAG, "StartApp interstitial not displayed")
+                                if (showOutcomeSettled.compareAndSet(false, true)) onUnavailable()
+                            }
+                            })
+                        } catch (e: Exception) {
+                            Log.w(TAG, "StartApp interstitial show threw", e)
+                            if (showOutcomeSettled.compareAndSet(false, true)) onUnavailable()
                         }
-                    })
+                    }
                 }
 
                 override fun onFailedToReceiveAd(ad: Ad?) {
-                    Log.w(TAG, "StartApp interstitial failed to load")
-                    onUnavailable()
+                    if (loadPending.compareAndSet(true, false)) {
+                        mainHandler.removeCallbacks(loadTimeout)
+                        Log.w(TAG, "StartApp interstitial failed to load")
+                        runOnMain(onUnavailable)
+                    }
                 }
             })
         } catch (e: Exception) {
             Log.e(TAG, "Failed to show StartApp interstitial", e)
-            onUnavailable()
+            if (loadPending.compareAndSet(true, false)) {
+                mainHandler.removeCallbacks(loadTimeout)
+                runOnMain(onUnavailable)
+            }
         }
     }
 
@@ -294,47 +331,84 @@ object StartAppAdManager {
             onUnavailable?.invoke() ?: onDismissed()
             return
         }
+        val loadPending = AtomicBoolean(true)
+        val showOutcomeSettled = AtomicBoolean(false)
+        val rewardDelivered = AtomicBoolean(false)
+        val loadTimeout = Runnable {
+            if (loadPending.compareAndSet(true, false)) {
+                Log.w(TAG, "StartApp rewarded load timed out")
+                runOnMain { onUnavailable?.invoke() ?: onDismissed() }
+            }
+        }
         try {
             val rewardedVideo = StartAppAd(activity)
+            mainHandler.postDelayed(loadTimeout, FULLSCREEN_LOAD_TIMEOUT_MS)
             rewardedVideo.setVideoListener(object : VideoListener {
                 override fun onVideoCompleted() {
                     Log.i(TAG, "StartApp rewarded video completed")
-                    onRewarded()
+                    if (!showOutcomeSettled.get() && rewardDelivered.compareAndSet(false, true)) {
+                        runOnMain { if (!showOutcomeSettled.get()) onRewarded() }
+                    }
                 }
             })
             // FIX: Added the explicit AdMode.REWARDED_VIDEO constraint parameter
             rewardedVideo.loadAd(StartAppAd.AdMode.REWARDED_VIDEO, object : AdEventListener {
                 override fun onReceiveAd(ad: Ad) {
-                    Log.i(TAG, "StartApp rewarded loaded")
-                    rewardedVideo.showAd(object : AdDisplayListener {
-                        override fun adDisplayed(ad: Ad?) {
-                            Log.i(TAG, "StartApp rewarded displayed")
+                    if (!loadPending.compareAndSet(true, false)) return
+                    mainHandler.removeCallbacks(loadTimeout)
+                    runOnMain {
+                        if (activity.isFinishing) {
+                            if (showOutcomeSettled.compareAndSet(false, true)) {
+                                onUnavailable?.invoke() ?: onDismissed()
+                            }
+                            return@runOnMain
                         }
+                        Log.i(TAG, "StartApp rewarded loaded")
+                        try {
+                            rewardedVideo.showAd(object : AdDisplayListener {
+                            override fun adDisplayed(ad: Ad?) {
+                                Log.i(TAG, "StartApp rewarded displayed")
+                            }
 
-                        override fun adHidden(ad: Ad?) {
-                            Log.i(TAG, "StartApp rewarded hidden")
-                            onDismissed()
-                        }
+                            override fun adHidden(ad: Ad?) {
+                                Log.i(TAG, "StartApp rewarded hidden")
+                                if (showOutcomeSettled.compareAndSet(false, true)) onDismissed()
+                            }
 
-                        override fun adClicked(ad: Ad?) {
-                            Log.i(TAG, "StartApp rewarded clicked")
-                        }
+                            override fun adClicked(ad: Ad?) {
+                                Log.i(TAG, "StartApp rewarded clicked")
+                            }
 
-                        override fun adNotDisplayed(ad: Ad?) {
-                            Log.w(TAG, "StartApp rewarded not displayed")
-                            onUnavailable?.invoke() ?: onDismissed()
+                            override fun adNotDisplayed(ad: Ad?) {
+                                Log.w(TAG, "StartApp rewarded not displayed")
+                                if (showOutcomeSettled.compareAndSet(false, true)) {
+                                    onUnavailable?.invoke() ?: onDismissed()
+                                }
+                            }
+                            })
+                        } catch (e: Exception) {
+                            Log.w(TAG, "StartApp rewarded show threw", e)
+                            if (showOutcomeSettled.compareAndSet(false, true)) {
+                                onUnavailable?.invoke() ?: onDismissed()
+                            }
                         }
-                    })
+                    }
                 }
 
                 override fun onFailedToReceiveAd(ad: Ad?) {
-                    Log.w(TAG, "StartApp rewarded failed")
-                    onUnavailable?.invoke() ?: onDismissed()
+                    if (loadPending.compareAndSet(true, false)) {
+                        mainHandler.removeCallbacks(loadTimeout)
+                        Log.w(TAG, "StartApp rewarded failed")
+                        runOnMain { onUnavailable?.invoke() ?: onDismissed() }
+                    }
                 }
             })
         } catch (e: Exception) {
             Log.e(TAG, "Failed to show StartApp rewarded", e)
-            onUnavailable?.invoke() ?: onDismissed()
+            if (loadPending.compareAndSet(true, false)) {
+                mainHandler.removeCallbacks(loadTimeout)
+                runOnMain { onUnavailable?.invoke() ?: onDismissed() }
+            }
         }
     }
 

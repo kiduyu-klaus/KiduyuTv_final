@@ -13,12 +13,16 @@ import com.google.android.ump.UserMessagingPlatform
  * Manages GDPR consent using Google's User Messaging Platform (UMP).
  * Required for EEA users before showing ads.
  *
- * After UMP resolves, consent is propagated to all secondary ad networks
- * (StartApp, Unity Ads, Wortise) so they also respect the user's choice.
+ * After UMP resolves, Start.io receives its documented `pas` personalization
+ * flag. Unity Ads reads UMP's IAB TCF string when Unity is enabled as a vendor
+ * in the published UMP message.
  */
 object ConsentManager {
 
     private const val TAG = "ConsentManager"
+    // Current IAB GVL v3 entry (vendor-list version 183, 2026-10-29).
+    // Keep this aligned with Start.io's registered TCF vendor entry.
+    private const val START_IO_TCF_VENDOR_ID = 1216
     @Volatile private var consentResolved = false
     @Volatile private var consentInformation: ConsentInformation? = null
 
@@ -30,8 +34,8 @@ object ConsentManager {
      * Requests the latest consent information and shows a consent form if required.
      * Call from SplashActivity before initializing any ad SDK.
      *
-     * After the user dismisses the form (or if no form is required), consent
-     * flags are forwarded to StartApp, Unity Ads, and Wortise automatically.
+     * After the user dismisses the form (or if no form is required), Start.io's
+     * personalization flag is refreshed; Unity reads the stored TCF string.
      *
      * @param activity The calling Activity (needed to show the form).
      * @param onComplete Fires when consent has been handled — initialize ad SDKs here.
@@ -110,27 +114,22 @@ object ConsentManager {
     fun hasResolvedConsent(): Boolean = consentResolved
 
     /**
-     * Forwards the UMP consent decision to supported secondary networks.
-     * This should be called **after** UMP has resolved so each SDK knows
-     * whether it may use personal data for ad targeting.
+     * Refreshes Start.io's explicit personalization flag after UMP resolves.
+     * Unity Ads consumes the stored IAB TCF string directly.
      *
-     * Note on SDK API compatibility:
-     * - StartApp receives consent during SDK initialization in StartAppAdManager.
-     * - Unity Ads receives the applicable GDPR opt-in signal through its Privacy API.
-     * - Wortise's SDK consent flow is requested after SDK initialization and
-     *   before its ad units are loaded.
+     * Wortise is inactive in the current app configuration and retains its own
+     * consent flow if it is enabled in a future release.
      */
     private fun propagateConsentToAllNetworks(context: Context) {
-        val unityOptInConsent = unityGdprOptInConsent(context)
-        Log.i(TAG, "Propagating consent to all networks: unityGdprOptIn=$unityOptInConsent")
+        Log.i(TAG, "Propagating consent to networks using UMP's stored privacy signals")
 
         // ── StartApp ──────────────────────────────────────────────────────
         // Applied explicitly rather than left to SDK initialisation, so a consent
         // change reaches a Start.io SDK that is already running.
         StartAppAdManager.applyConsent(context)
 
-        // ── Unity Ads ─────────────────────────────────────────────────────
-        UnityAdManager.updateUserConsent(unityOptInConsent)
+        // Unity Ads 4.21 consumes the IAB TCF string from a TCF-compliant CMP.
+        // Do not reduce UMP's purpose/vendor choices to a single userConsent bit.
 
         // ── Wortise ───────────────────────────────────────────────────────
         // Wortise runs its own consent CMP after SDK initialization.
@@ -191,31 +190,38 @@ object ConsentManager {
     }
 
     /**
-     * Checks if personalized ads are allowed based on UMP consent.
+     * Start.io's `pas` flag is true only when UMP records both the relevant
+     * TCF purposes and Start.io's own vendor consent. Missing consent data
+     * fails closed for personalization while ad requests remain eligible.
      */
-    fun canShowPersonalizedAds(context: Context): Boolean =
-        unityGdprOptInConsent(context) == true
-
-    private fun unityGdprOptInConsent(context: Context): Boolean? {
+    fun canShowStartIoPersonalizedAds(context: Context): Boolean {
         return try {
             val preferences = context.getSharedPreferences(
                 "${context.packageName}_preferences",
                 Context.MODE_PRIVATE
             )
-            if (preferences.all["IABTCF_gdprApplies"]?.toString() != "1") {
-                return null
+            when (preferences.all["IABTCF_gdprApplies"]?.toString()) {
+                // Start.io's own guidance requires this flag for GDPR-covered users.
+                // Outside GDPR, no affirmative consent flag is required by that guidance.
+                "0" -> return true
+                "1" -> Unit
+                else -> return false
             }
-            val purposeConsents = preferences.all["IABTCF_PurposeConsents"]?.toString()
-            // Purposes 1, 3, and 4 cover storage/access and personalized ad creation/selection.
-            val consentGranted = purposeConsents?.let {
-                it.getOrNull(0) == '1' && it.getOrNull(2) == '1' && it.getOrNull(3) == '1'
-            } ?: false
-            if (!consentGranted) {
-                Log.i(TAG, "Unity GDPR opt-in not present in UMP TCF purpose consents")
+
+            val all = preferences.all
+            val purposeConsents = all["IABTCF_PurposeConsents"]?.toString().orEmpty()
+            val vendorConsents = all["IABTCF_VendorConsents"]?.toString().orEmpty()
+            val purposesAllowed = listOf(1, 3, 4).all { purposeId ->
+                purposeConsents.getOrNull(purposeId - 1) == '1'
             }
-            consentGranted
+            val startIoVendorAllowed = vendorConsents.getOrNull(START_IO_TCF_VENDOR_ID - 1) == '1'
+            val personalized = purposesAllowed && startIoVendorAllowed
+            if (!personalized) {
+                Log.i(TAG, "Start.io personalization denied by UMP purpose/vendor consent")
+            }
+            personalized
         } catch (e: Exception) {
-            Log.w(TAG, "Unable to read Unity GDPR opt-in from UMP consent state", e)
+            Log.w(TAG, "Unable to read Start.io TCF consent from UMP state", e)
             false
         }
     }

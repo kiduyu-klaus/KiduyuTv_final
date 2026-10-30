@@ -2,6 +2,9 @@ package com.kiduyuk.klausk.kiduyutv.util
 
 import android.app.Activity
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.view.ViewGroup
 import com.kiduyuk.klausk.kiduyutv.BuildConfig
@@ -33,12 +36,14 @@ import java.util.concurrent.atomic.AtomicInteger
  * Safe to call even if the SDK failed to initialise: methods no-op and
  * invoke callbacks so the app flow continues.
  *
- * Interstitial frequency is guarded by [FullscreenAdPolicy] (3 min globally).
+ * Interstitial frequency is guarded by [FullscreenAdPolicy] (2 min globally).
  */
 @OptIn(UnityAdsExperimental::class)
 object UnityAdManager {
 
     private const val TAG = "UnityAdManager"
+    private const val BANNER_INITIALIZATION_TIMEOUT_MS = 2_500L
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     private val gameId: String
         get() = BuildConfig.UNITY_ADS_GAME_ID
@@ -57,7 +62,6 @@ object UnityAdManager {
     private val interstitialShowing = AtomicBoolean(false)
     private val rewardedShowing = AtomicBoolean(false)
     private val bannerGeneration = AtomicInteger(0)
-    @Volatile private var pendingUserConsent: Boolean? = null
 
     @Volatile
     var isInitialised = false
@@ -79,26 +83,6 @@ object UnityAdManager {
         get() = rewardedAd != null
 
     private fun shouldShowAds(context: Context): Boolean = AdEligibility.canRequestAds(context)
-
-    /**
-     * Applies UMP's opt-in signal once Unity is initialized, or retains it until initialization.
-     * A null value means no opt-in framework applies and no Unity signal should be sent.
-     */
-    fun updateUserConsent(userConsent: Boolean?) {
-        pendingUserConsent = userConsent
-        if (isInitialised) applyPendingUserConsent()
-    }
-
-    private fun applyPendingUserConsent() {
-        pendingUserConsent?.let { consent ->
-            try {
-                UnityAds.userConsent = consent
-                Log.i(TAG, "Unity opt-in consent updated: $consent")
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to update Unity opt-in consent", e)
-            }
-        }
-    }
 
     /**
      * Initialize and pre-load Unity Ads after the app's consent flow completes.
@@ -133,7 +117,6 @@ object UnityAdManager {
                     initializationInProgress.set(false)
                     isInitialised = true
                     Log.i(TAG, "Unity Ads initialized")
-                    applyPendingUserConsent()
                     loadFullscreenPlacements()
                 } else {
                     initializationInProgress.set(false)
@@ -224,36 +207,78 @@ object UnityAdManager {
     fun loadBanner(
         activity: Activity,
         container: ViewGroup,
-        onFailed: () -> Unit = {}
+        onFailed: () -> Unit = {},
+        onLoaded: () -> Unit = {}
     ) {
-        if (!shouldShowAds(activity)) return
-        if (!isInitialised) {
-            Log.w(TAG, "Unity banner skipped - SDK not initialized")
-            preloadAds(activity)
-            onFailed()
-            return
-        }
-        try {
-            destroyBanner()
-            container.removeAllViews()
-            val generation = bannerGeneration.get()
-            val fallbackStarted = AtomicBoolean(false)
-            fun failBanner(stage: String, error: UnityAdsError? = null) {
-                // Banner callbacks can arrive after navigation or after a new
-                // request has replaced this one. Never remove the newer banner
-                // or start a stale fallback chain in that case.
-                if (generation != bannerGeneration.get() ||
-                    !fallbackStarted.compareAndSet(false, true)
-                ) {
-                    return
-                }
-                Log.w(TAG, "Unity banner $stage: $error")
-                // The Unity guide expects the host to own the loaded View. Once
-                // it cannot be shown, release that view before the fallback
-                // network places its own banner in the same container.
-                destroyBanner()
+        if (!shouldShowAds(activity)) {
+            runOnMain {
+                container.removeAllViews()
                 onFailed()
             }
+            return
+        }
+
+        val generation = bannerGeneration.incrementAndGet()
+        runOnMain {
+            if (generation != bannerGeneration.get()) return@runOnMain
+            clearCurrentBanner()
+            container.removeAllViews()
+
+            if (isInitialised) {
+                loadBannerNow(activity, container, onFailed, onLoaded, generation)
+                return@runOnMain
+            }
+
+            Log.i(TAG, "Unity SDK is initializing; waiting briefly before banner fallback")
+            preloadAds(activity)
+            val deadline = SystemClock.uptimeMillis() + BANNER_INITIALIZATION_TIMEOUT_MS
+            val waitForInitialization = object : Runnable {
+                override fun run() {
+                    if (generation != bannerGeneration.get()) return
+                    if (!shouldShowAds(activity)) {
+                        failPendingBanner(container, onFailed, generation)
+                        return
+                    }
+                    if (isInitialised) {
+                        loadBannerNow(activity, container, onFailed, onLoaded, generation)
+                        return
+                    }
+                    if (SystemClock.uptimeMillis() >= deadline) {
+                        Log.w(TAG, "Unity initialization timed out for banner; advancing fallback")
+                        failPendingBanner(container, onFailed, generation)
+                        return
+                    }
+                    mainHandler.postDelayed(this, 100L)
+                }
+            }
+            mainHandler.post(waitForInitialization)
+        }
+    }
+
+    private fun loadBannerNow(
+        activity: Activity,
+        container: ViewGroup,
+        onFailed: () -> Unit,
+        onLoaded: () -> Unit,
+        generation: Int
+    ) {
+        if (generation != bannerGeneration.get()) return
+        val fallbackStarted = AtomicBoolean(false)
+        fun failBanner(stage: String, error: UnityAdsError? = null) {
+            runOnMain {
+                // A callback from an old request must not remove or replace a newer
+                // banner, and each current request advances fallback at most once.
+                if (generation != bannerGeneration.get() ||
+                    !fallbackStarted.compareAndSet(false, true)
+                ) return@runOnMain
+                Log.w(TAG, "Unity banner $stage: $error")
+                clearCurrentBanner()
+                container.removeAllViews()
+                onFailed()
+            }
+        }
+
+        try {
             val showListener = object : BannerShowListener {
                 override fun onImpression(ad: BannerAd) {
                     Log.i(TAG, "Unity banner impression")
@@ -271,13 +296,9 @@ object UnityAdManager {
                 bannerPlacementId,
                 BannerSize(320, 50),
                 showListener
-            )
-                .build()
+            ).build()
             BannerAd.load(config, object : LoadListener<BannerAd> {
                 override fun onAdLoaded(ad: BannerAd?, error: UnityAdsError?) {
-                    // Unity reports the result through both arguments. Follow
-                    // the SDK contract: a load only succeeds when error is null
-                    // and an ad instance is supplied.
                     if (error != null || ad == null) {
                         failBanner("failed to load", error)
                         return
@@ -287,11 +308,19 @@ object UnityAdManager {
                         failBanner("loaded without a view")
                         return
                     }
-                    container.post {
-                        if (generation != bannerGeneration.get()) return@post
-                        currentBannerAd = ad
+                    mainHandler.post {
+                        if (generation != bannerGeneration.get()) {
+                            (adView.parent as? ViewGroup)?.removeView(adView)
+                            return@post
+                        }
+                        if (!shouldShowAds(activity)) {
+                            failBanner("request no longer eligible")
+                            return@post
+                        }
+                        clearCurrentBanner()
                         (adView.parent as? ViewGroup)?.removeView(adView)
                         container.removeAllViews()
+                        currentBannerAd = ad
                         container.addView(
                             adView,
                             ViewGroup.LayoutParams(
@@ -300,13 +329,35 @@ object UnityAdManager {
                             )
                         )
                         Log.i(TAG, "Unity banner loaded")
+                        onLoaded()
                     }
                 }
             })
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load Unity banner", e)
-            onFailed()
+            failBanner("request threw")
         }
+    }
+
+    private fun failPendingBanner(
+        container: ViewGroup,
+        onFailed: () -> Unit,
+        generation: Int
+    ) {
+        if (generation != bannerGeneration.get()) return
+        container.removeAllViews()
+        onFailed()
+    }
+
+    private fun clearCurrentBanner() {
+        currentBannerAd?.view?.let { bannerView ->
+            (bannerView.parent as? ViewGroup)?.removeView(bannerView)
+        }
+        currentBannerAd = null
+    }
+
+    private fun runOnMain(action: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) action() else mainHandler.post { action() }
     }
 
     /**
@@ -314,11 +365,10 @@ object UnityAdManager {
      * Call when the banner is no longer needed (e.g. Composable disposal).
      */
     fun destroyBanner() {
-        bannerGeneration.incrementAndGet()
-        currentBannerAd?.view?.let { bannerView ->
-            (bannerView.parent as? ViewGroup)?.removeView(bannerView)
+        val generation = bannerGeneration.incrementAndGet()
+        runOnMain {
+            if (bannerGeneration.get() == generation) clearCurrentBanner()
         }
-        currentBannerAd = null
     }
 
     // ── Interstitial ──────────────────────────────────────────────────────
