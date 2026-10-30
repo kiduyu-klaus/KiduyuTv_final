@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit
 object LiveSportsRepository {
     private const val PPV_API_URL = "https://api.ppv.st/api/streams"
     private const val PPV_FOOTBALL_CATEGORY_ID = "34"
-    private const val TIMST_API_URL = "https://timst.top/api/live-upcoming"
+    private const val TIMST_API_URL = "https://tim-streams.com/api/live-upcoming"
     private const val MIN_VALID_TIMESTAMP_SECONDS = 1_000_000_000L
     private const val USER_AGENT =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
