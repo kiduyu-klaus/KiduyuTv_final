@@ -705,13 +705,13 @@ class DirectStreamActivity : AppCompatActivity() {
     /** Gates initial playback before showing any provider warning or starting stream resolution. */
     private fun startInitialPlayback() {
         if (settingsManager.shouldShowDirectStreamAdPrompt()) {
-            showStreamAdPrompt()
+            showStreamAdPrompt(::continueInitialPlayback)
         } else {
             continueInitialPlayback()
         }
     }
 
-    private fun showStreamAdPrompt() {
+    private fun showStreamAdPrompt(onContinue: () -> Unit) {
         if (isFinishing || isDestroyed || streamAdPromptDialog?.isShowing == true) return
 
         val dialog = MaterialAlertDialogBuilder(this)
@@ -726,7 +726,7 @@ class DirectStreamActivity : AppCompatActivity() {
                     onRewarded = {},
                     onDismissed = {
                         runOnUiThread {
-                            if (!isFinishing && !isDestroyed) continueInitialPlayback()
+                            if (!isFinishing && !isDestroyed) onContinue()
                         }
                     }
                 )
@@ -1474,9 +1474,21 @@ class DirectStreamActivity : AppCompatActivity() {
             it.season == currentSeason && it.episode == currentEpisode
         }
         if (preloaded != null) {
-            preloadedNextEpisode = null
-            nextEpisodePreloadJob = null
-            loadAndPlayPreloaded(preloaded.streams, currentProvider)
+            val playPreloaded = {
+                preloadedNextEpisode = null
+                nextEpisodePreloadJob = null
+                loadAndPlayPreloaded(preloaded.streams, currentProvider)
+            }
+            if (settingsManager.shouldShowDirectStreamAdPrompt()) {
+                Log.i(
+                    TAG,
+                    "Third direct-stream opening reached while using preloaded TV streams; " +
+                        "showing ad prompt before playback"
+                )
+                showStreamAdPrompt(playPreloaded)
+            } else {
+                playPreloaded()
+            }
         } else {
             loadAndPlay(
                 currentMediaType,
