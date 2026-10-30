@@ -397,7 +397,7 @@ fun SettingsScreen(
                         },
                         onSupportKiduyuTvClick = {
                             (context as? Activity)?.let { activity ->
-                                RewardedFallbackDispatcher.showInterstitial(
+                                RewardedFallbackDispatcher.show(
                                     activity = activity,
                                     onRewarded = {
                                         Toast.makeText(

@@ -204,9 +204,7 @@ object AdManager {
         }
 
         preloadInterstitial(context)
-        if (BuildConfig.FLAVOR == "phone") {
-            preloadRewarded(context)
-        }
+        preloadRewarded(context)
         preloadRewardedInterstitial(context)
         preloadAppOpen(context)
 
@@ -378,14 +376,13 @@ object AdManager {
         ad.show(activity)
     }
 
-    // ── Rewarded (phone only) ─────────────────────────────────────────────
+    // ── Rewarded ──────────────────────────────────────────────────────────
 
     /**
      * Pre-loads a rewarded ad in the background.
      * Respects the ads disabled setting from SettingsManager.
      */
     fun preloadRewarded(context: Context) {
-        if (BuildConfig.FLAVOR != "phone") return
         if (!isInitialised) return
         if (rewardedAd != null || isRewardedLoading) return
         if (!shouldShowAds(context)) {
@@ -394,7 +391,12 @@ object AdManager {
         }
         isRewardedLoading = true
         val adRequest = AdRequest.Builder().build()
-        RewardedAd.load(context, AdUnitIds.PHONE_REWARDED, adRequest,
+        val unitId = if (BuildConfig.FLAVOR == "tv") {
+            AdUnitIds.TV_REWARDED
+        } else {
+            AdUnitIds.PHONE_REWARDED
+        }
+        RewardedAd.load(context, unitId, adRequest,
             object : RewardedAdLoadCallback() {
                 override fun onAdLoaded(ad: RewardedAd) {
                     rewardedAd = ad
