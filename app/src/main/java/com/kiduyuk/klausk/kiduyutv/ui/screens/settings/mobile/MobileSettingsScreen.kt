@@ -154,19 +154,12 @@ fun MobileSettingsScreen(
     val myList by MyListManager.myList.collectAsState()
     var showProviderPicker by remember { mutableStateOf(false) }
     var showDirectProviderPicker by remember { mutableStateOf(false) }
-    var showDirectStreamPlayerPicker by remember { mutableStateOf(false) }
-    var showLibmpvDisabledDialog by remember { mutableStateOf(false) }
     var showDirectStreamEndpointPicker by remember { mutableStateOf(false) }
     var directProviderOptions by remember { mutableStateOf<List<StreamProviderChoice>>(emptyList()) }
     var endpointOptions by remember {
         mutableStateOf(SettingsManager.getCachedDirectStreamEndpointOptions(context))
     }
     val settingsManager = remember(context) { SettingsManager(context) }
-    LaunchedEffect(uiState.directStreamPlayer) {
-        if (uiState.directStreamPlayer == SettingsManager.PLAYER_LIBMPV) {
-            viewModel.setDirectStreamPlayer(context, SettingsManager.PLAYER_EXOPLAYER)
-        }
-    }
 
     LaunchedEffect(Unit) {
         directProviderOptions = runCatching {
@@ -750,16 +743,6 @@ fun MobileSettingsScreen(
                     }
                 )
                 SettingsItem(
-                    icon = Icons.Default.PlayCircle,
-                    title = "Player",
-                    subtitle = if (uiState.directStreamPlayer == SettingsManager.PLAYER_LIBMPV) {
-                        "libmpv"
-                    } else {
-                        "ExoPlayer"
-                    },
-                    onClick = { showDirectStreamPlayerPicker = true }
-                )
-                SettingsItem(
                     icon = Icons.Default.Public,
                     title = "Endpoint URL",
                     subtitle = SettingsManager.endpointDisplayName(uiState.directStreamEndpoint),
@@ -1075,107 +1058,6 @@ fun MobileSettingsScreen(
             confirmButton = {
                 TextButton(onClick = { showDirectStreamEndpointPicker = false }) {
                     Text("Done", color = PrimaryRed)
-                }
-            }
-        )
-    }
-
-    // ── Native direct-stream player picker ────────────────────────────────────
-    if (showDirectStreamPlayerPicker) {
-        val playerOptions = listOf(
-            SettingsManager.PLAYER_EXOPLAYER to "ExoPlayer",
-            SettingsManager.PLAYER_LIBMPV to "libmpv"
-        )
-        AlertDialog(
-            onDismissRequest = { showDirectStreamPlayerPicker = false },
-            containerColor = CardDark,
-            title = {
-                Text("Playback Engine", color = TextPrimary, fontWeight = FontWeight.Bold)
-            },
-            text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        "Choose the engine used for native direct-stream playback.",
-                        color = TextSecondary,
-                        fontSize = 13.sp,
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-                    playerOptions.forEach { (value, label) ->
-                        val isSelected = value == uiState.directStreamPlayer
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable {
-                                    if (value == SettingsManager.PLAYER_LIBMPV) {
-                                        showLibmpvDisabledDialog = true
-                                    } else {
-                                        viewModel.setDirectStreamPlayer(context, value)
-                                        showDirectStreamPlayerPicker = false
-                                    }
-                                }
-                                .padding(vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = isSelected,
-                                onClick = {
-                                    if (value == SettingsManager.PLAYER_LIBMPV) {
-                                        showLibmpvDisabledDialog = true
-                                    } else {
-                                        viewModel.setDirectStreamPlayer(context, value)
-                                        showDirectStreamPlayerPicker = false
-                                    }
-                                },
-                                colors = RadioButtonDefaults.colors(
-                                    selectedColor = PrimaryRed,
-                                    unselectedColor = TextSecondary
-                                )
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Column {
-                                Text(
-                                    label,
-                                    color = if (isSelected) TextPrimary else TextSecondary,
-                                    fontSize = 15.sp,
-                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
-                                )
-                                Text(
-                                    if (value == SettingsManager.PLAYER_EXOPLAYER) {
-                                        "AndroidX Media3"
-                                    } else {
-                                        "Disabled temporarily"
-                                    },
-                                    color = TextTertiary,
-                                    fontSize = 12.sp
-                                )
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showDirectStreamPlayerPicker = false }) {
-                    Text("Done", color = PrimaryRed)
-                }
-            }
-        )
-    }
-
-    if (showLibmpvDisabledDialog) {
-        AlertDialog(
-            onDismissRequest = { showLibmpvDisabledDialog = false },
-            containerColor = CardDark,
-            title = { Text("libmpv unavailable", color = TextPrimary) },
-            text = {
-                Text(
-                    "Libmpv is buggy and is disabled for now.",
-                    color = TextSecondary
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { showLibmpvDisabledDialog = false }) {
-                    Text("OK", color = PrimaryRed)
                 }
             }
         )

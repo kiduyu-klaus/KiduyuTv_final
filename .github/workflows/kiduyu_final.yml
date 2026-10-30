@@ -102,9 +102,6 @@ jobs:
         with:
           packages: ''
 
-      - name: Install Android NDK and CMake for libmpv JNI
-        run: |
-          sdkmanager "ndk;27.2.12479018" "cmake;3.22.1"
 
       # cache-read-only omitted: this workflow only runs on push to main,
       # so setup-gradle's default (write cache on default branch) already

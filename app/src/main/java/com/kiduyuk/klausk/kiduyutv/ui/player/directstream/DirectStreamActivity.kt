@@ -3874,15 +3874,7 @@ class DirectStreamActivity : AppCompatActivity() {
             voteAverage: Double = 0.0,
             releaseDate: String? = null
         ): Intent {
-            val playerActivity = if (
-                com.kiduyuk.klausk.kiduyutv.util.SettingsManager(context).getDirectStreamPlayer() ==
-                com.kiduyuk.klausk.kiduyutv.util.SettingsManager.PLAYER_LIBMPV
-            ) {
-                LibMpvDirectStreamActivity::class.java
-            } else {
-                DirectStreamActivity::class.java
-            }
-            return Intent(context, playerActivity).apply {
+            return Intent(context, DirectStreamActivity::class.java).apply {
             putExtra(EXTRA_TMDB_ID, tmdbId)
             putExtra(EXTRA_IMDB_ID, imdbId)
             putExtra(EXTRA_TYPE, if (isTv) TYPE_SERIES else TYPE_MOVIE)

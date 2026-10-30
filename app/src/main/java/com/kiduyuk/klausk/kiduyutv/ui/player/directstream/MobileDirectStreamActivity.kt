@@ -201,17 +201,6 @@ class MobileDirectStreamActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val configuredPlayer = SettingsManager(this).getDirectStreamPlayer()
-        if (configuredPlayer == SettingsManager.PLAYER_LIBMPV) {
-            startActivity(Intent(this, LibMpvDirectStreamActivity::class.java).putExtras(intent))
-            finish()
-            return
-        }
-        if (configuredPlayer == SettingsManager.PLAYER_EXOPLAYER) {
-            startActivity(Intent(this, DirectStreamActivity::class.java).putExtras(intent))
-            finish()
-            return
-        }
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR
         enterImmersiveFullscreen()
         settingsManager = SettingsManager(this)

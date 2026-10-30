@@ -44,13 +44,11 @@ def escapedUnityRewardedPlacementId = unityRewardedPlacementId.replace("\\", "\\
 def escapedUnityBannerPlacementId = unityBannerPlacementId.replace("\\", "\\\\").replace("\"", "\\\"")
 def wortiseAppId = "e3b208f6-4b47-45d1-8842-5eb647581cb5"
 def roomVersion = '2.8.5'
-def nativeAbis = ['arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64']
 
 android {
     namespace 'com.kiduyuk.klausk.kiduyutv'
 
     compileSdk 36
-    ndkVersion '27.2.12479018'
 
     defaultConfig {
         applicationId "com.kiduyuk.klausk.kiduyutv"
@@ -64,12 +62,6 @@ android {
             useSupportLibrary true
         }
         multiDexEnabled = true
-        externalNativeBuild {
-            cmake {
-                cppFlags '-std=c++17'
-                arguments '-DANDROID_STL=c++_shared'
-            }
-        }
         buildConfigField "String", "SUBDL_API_KEY", "\"${escapedSubdlApiKey}\""
         buildConfigField "String", "OPENSUBTITLES_API_KEY", "\"${escapedOpenSubtitlesApiKey}\""
         buildConfigField "String", "STREAM_API_TOKEN", "\"${escapedStreamApiToken}\""
@@ -83,29 +75,6 @@ android {
         manifestPlaceholders = [
             wortiseAppId: wortiseAppId
         ]
-    }
-
-    sourceSets {
-        main {
-            // Package libmpv, FFmpeg, and the matching libc++ shared runtime per ABI.
-            jniLibs.srcDirs = ['src/main/jniLibs']
-        }
-    }
-
-    externalNativeBuild {
-        cmake {
-            path file('src/main/cpp/CMakeLists.txt')
-            version '3.22.1'
-        }
-    }
-
-    splits {
-        abi {
-            enable true
-            reset()
-            include(*nativeAbis)
-            universalApk false
-        }
     }
 
     signingConfigs {
@@ -189,11 +158,6 @@ android {
     }
 
     packaging {
-        jniLibs {
-            // Keep native libraries in standard, page-aligned APK entries.
-            useLegacyPackaging = false
-            pickFirsts += ['**/libc++_shared.so']
-        }
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
         }
@@ -201,42 +165,6 @@ android {
     }
 }
 
-// Fail early if an ABI split would be emitted without any required native
-// dependency. This does not replace ELF/runtime testing on real Android devices.
-def requiredNativeLibraries = [
-        'libmpv.so',
-        'libavcodec.so',
-        'libavdevice.so',
-        'libavfilter.so',
-        'libavformat.so',
-        'libavutil.so',
-        'libswresample.so',
-        'libswscale.so',
-        'libc++_shared.so'
-]
-def jniLibsRoot = layout.projectDirectory.dir('src/main/jniLibs').asFile
-tasks.register('verifyBundledNativeLibraries') {
-    // Capture plain values (not script objects) so the task is configuration-cache safe.
-    def abis = nativeAbis.collect { it.toString() }
-    def libs = requiredNativeLibraries.collect { it.toString() }
-    def root = jniLibsRoot
-    inputs.files(abis.collectMany { abi ->
-        libs.collect { library -> new File(root, "${abi}/${library}") }
-    })
-    doLast {
-        abis.each { abi ->
-            libs.each { library ->
-                def nativeFile = new File(root, "${abi}/${library}")
-                if (!nativeFile.isFile() || nativeFile.length() == 0L) {
-                    throw new GradleException("Missing native dependency for ${abi}: ${nativeFile}")
-                }
-            }
-        }
-    }
-}
-tasks.named('preBuild').configure {
-    dependsOn tasks.named('verifyBundledNativeLibraries')
-}
 
 dependencies {
 

@@ -187,20 +187,6 @@
 -keepattributes Exceptions
 
 ##############################################
-# 🧩 LIBMPV JNI
-##############################################
-
-# R8 does not package or shrink the .so files; Gradle packages them from jniLibs.
-# Preserve native method declarations and their names for JNI symbol lookup.
--keep class com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.LibMpvSession { *; }
--keepclasseswithmembers,includedescriptorclasses class * {
-    native <methods>;
-}
-
-# Methods called from native code by name/signature need explicit keep rules on
-# their wrapper class when the JNI bridge is added; R8 cannot infer those lookups.
-
-##############################################
 # 🚫 OPTIONAL OPTIMIZATION CONTROL
 ##############################################
 

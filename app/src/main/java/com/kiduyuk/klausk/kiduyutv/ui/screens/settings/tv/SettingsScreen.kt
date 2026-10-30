@@ -431,14 +431,10 @@ fun SettingsScreen(
                     PlaybackContent(
                         defaultProvider = uiState.defaultProvider,
                         defaultDirectStreamProvider = uiState.defaultDirectStreamProvider,
-                        directStreamPlayer = uiState.directStreamPlayer,
                         directStreamEndpoint = uiState.directStreamEndpoint,
                         onProviderSelect = { viewModel.setDefaultProvider(context, it) },
                         onDirectStreamProviderSelect = {
                             viewModel.setDefaultDirectStreamProvider(context, it)
-                        },
-                        onDirectStreamPlayerSelect = {
-                            viewModel.setDirectStreamPlayer(context, it)
                         },
                         onDirectStreamEndpointSelect = {
                             viewModel.setDirectStreamEndpoint(context, it)
@@ -1329,15 +1325,12 @@ private fun AppVersionContent(
 private fun PlaybackContent(
     defaultProvider: String,
     defaultDirectStreamProvider: String,
-    directStreamPlayer: String,
     directStreamEndpoint: String,
     onProviderSelect: (String) -> Unit,
     onDirectStreamProviderSelect: (String) -> Unit,
-    onDirectStreamPlayerSelect: (String) -> Unit,
     onDirectStreamEndpointSelect: (String) -> Unit
 ) {
     val context = LocalContext.current
-    var showLibmpvDisabledDialog by remember { mutableStateOf(false) }
     var directProviderOptions by remember { mutableStateOf<List<StreamProviderChoice>>(emptyList()) }
     var directProviderLoadError by remember { mutableStateOf<String?>(null) }
     var endpointOptions by remember {
@@ -1369,11 +1362,6 @@ private fun PlaybackContent(
     }
     var autoSkipEnabled by remember {
         mutableStateOf(settingsManager.isAutoSkipSegmentsEnabled())
-    }
-    LaunchedEffect(directStreamPlayer) {
-        if (directStreamPlayer == SettingsManager.PLAYER_LIBMPV) {
-            onDirectStreamPlayerSelect(SettingsManager.PLAYER_EXOPLAYER)
-        }
     }
     val options = listOf(SettingsManager.AUTO) + StreamProviderManager.getProviderNamesForDevice(isTvDevice = true)
 
@@ -1534,73 +1522,6 @@ private fun PlaybackContent(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        SettingsSectionLabel(text = "Playback Engine")
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(CardDark)
-                .padding(24.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    text = "Choose the engine used for native direct-stream playback.",
-                    color = TextSecondary,
-                    fontSize = 14.sp,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                listOf(
-                    SettingsManager.PLAYER_EXOPLAYER to "ExoPlayer",
-                    SettingsManager.PLAYER_LIBMPV to "libmpv"
-                ).chunked(2).forEach { rowPlayers ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        rowPlayers.forEach { (value, label) ->
-                            ProviderOptionItem(
-                                option = label,
-                                subtitle = if (value == SettingsManager.PLAYER_EXOPLAYER) {
-                                    "AndroidX Media3"
-                                } else {
-                                    "Disabled temporarily"
-                                },
-                                isSelected = value == directStreamPlayer,
-                                onClick = {
-                                    if (value == SettingsManager.PLAYER_LIBMPV) {
-                                        showLibmpvDisabledDialog = true
-                                    } else {
-                                        onDirectStreamPlayerSelect(value)
-                                    }
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        if (showLibmpvDisabledDialog) {
-            AlertDialog(
-                onDismissRequest = { showLibmpvDisabledDialog = false },
-                containerColor = CardDark,
-                title = { Text("libmpv unavailable", color = TextPrimary) },
-                text = {
-                    Text(
-                        "Libmpv is buggy and is disabled for now.",
-                        color = TextSecondary
-                    )
-                },
-                confirmButton = {
-                    TextButton(onClick = { showLibmpvDisabledDialog = false }) {
-                        Text("OK", color = PrimaryRed)
-                    }
-                }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
         SettingsSectionLabel(text = "Endpoint URL")
         Box(
             modifier = Modifier

@@ -49,18 +49,12 @@ class SettingsManager(context: Context) {
         return preferences.getString(KEY_DEFAULT_DIRECT_STREAM_PROVIDER, AUTO) ?: AUTO
     }
 
-    /** Saves the playback engine selected for the native direct-stream player. */
-    fun saveDirectStreamPlayer(player: String) {
-        val safePlayer = player.takeIf { it == PLAYER_EXOPLAYER || it == PLAYER_LIBMPV }
-            ?: PLAYER_EXOPLAYER
-        preferences.edit().putString(KEY_DIRECT_STREAM_PLAYER, safePlayer).apply()
+    /** Keeps the legacy preference key migrated to the only Android player. */
+    fun saveDirectStreamPlayer(@Suppress("UNUSED_PARAMETER") player: String) {
+        preferences.edit().putString(KEY_DIRECT_STREAM_PLAYER, PLAYER_EXOPLAYER).apply()
     }
-
-    /** Returns the selected direct-stream playback engine. */
-    fun getDirectStreamPlayer(): String =
-        preferences.getString(KEY_DIRECT_STREAM_PLAYER, PLAYER_EXOPLAYER)
-            ?.takeIf { it == PLAYER_EXOPLAYER || it == PLAYER_LIBMPV }
-            ?: PLAYER_EXOPLAYER
+    /** Returns the only supported Android direct-stream playback engine. */
+    fun getDirectStreamPlayer(): String = PLAYER_EXOPLAYER
 
     /** Shows the direct-stream ad prompt on the first opening, then every third opening. */
     @Synchronized
@@ -201,7 +195,6 @@ class SettingsManager(context: Context) {
         /** Sentinel value meaning "ask me each time" — no automatic selection. */
         const val AUTO = "Auto"
         const val PLAYER_EXOPLAYER = "exoplayer"
-        const val PLAYER_LIBMPV = "libmpv"
 
         private const val ENDPOINT_DISCOVERY_URL = "https://sflatransport.com/api/getEndpoints"
 
