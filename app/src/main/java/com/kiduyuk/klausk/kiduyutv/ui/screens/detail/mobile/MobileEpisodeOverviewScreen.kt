@@ -145,6 +145,7 @@ private fun MobileEpisodeOverviewContent(
     backdropPath: String?,
     genres: List<String>,
     networks: List<String>,
+    nextEpisode: NextEpisode?,
     crew: List<CrewMember>,
     cast: List<CastMember>,
     onBackClick: () -> Unit,
