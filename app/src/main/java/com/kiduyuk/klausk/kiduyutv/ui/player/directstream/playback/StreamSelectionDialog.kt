@@ -395,6 +395,7 @@ class StreamSelectionDialog(
         val status = when {
             isVidsrc || (stream.isValid && !stream.isFailed) -> context.getString(R.string.stream_ok)
             stream.isChecking -> context.getString(R.string.stream_checking)
+            !stream.hasBeenValidated -> context.getString(R.string.stream_checking)
             !stream.isFailed -> context.getString(R.string.stream_unverified)
             else -> stream.httpStatusCode?.let { "HTTP $it" }
                 ?: context.getString(R.string.stream_failed)
@@ -402,6 +403,7 @@ class StreamSelectionDialog(
         val statusColor = when {
             isVidsrc || (stream.isValid && !stream.isFailed) -> ComposeColor(0xFF2E7D32)
             stream.isChecking -> ComposeColor(0xFF8A6D1D)
+            !stream.hasBeenValidated -> ComposeColor(0xFF8A6D1D)
             !stream.isFailed -> ComposeColor(0xFF6B7280)
             else -> ComposeColor(0xFF9B2C2C)
         }

@@ -51,14 +51,17 @@ data class StreamItem(
     /** Anime-provider ending interval, normalized to milliseconds. */
     val outro: StreamSegment? = null,
     /**
-     * Mutable validation status. Set to `true` after a successful HEAD/Range
-     * probe confirms the upstream is reachable and returns 2xx. The
+     * Mutable validation status. Set to `true` after a successful media probe
+     * confirms the upstream is reachable; HLS validation checks both the
+     * playlist and its first media segment. The
      * `StreamSelectionDialog` reads this flag to render the "stream ok"
      * badge for working sources.
      */
     var isValid: Boolean = false,
     /** `true` while a background validity check is in progress for this stream. */
     var isChecking: Boolean = false,
+    /** `true` after at least one validation attempt has completed for this stream. */
+    var hasBeenValidated: Boolean = false,
     /**
      * Set to `true` only when a successful probe returns a clearly non-media
      * document body, such as an HTML or JSON error page. Generic or incomplete

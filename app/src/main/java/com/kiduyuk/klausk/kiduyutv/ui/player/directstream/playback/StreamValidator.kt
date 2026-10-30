@@ -7,6 +7,8 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
@@ -98,6 +100,7 @@ object StreamValidator {
                                 stream.isValid = true
                                 stream.isFailed = false
                                 stream.isChecking = false
+                                stream.hasBeenValidated = true
                                 return@async
                             }
                             val ok = probe(stream)
@@ -122,7 +125,10 @@ object StreamValidator {
             } catch (error: Throwable) {
                 Log.w(TAG, "validateAll failed: ${error.message}")
             } finally {
-                streams.forEach { it.isChecking = false }
+                streams.forEach {
+                    it.isChecking = false
+                    it.hasBeenValidated = true
+                }
             }
             // Provider/CDN probe results are advisory. Do not silently remove
             // a backend-returned source: signed URLs can reject a preliminary
@@ -131,11 +137,10 @@ object StreamValidator {
         }
 
     /**
-     * Run a single probe against [stream]. The probe first tries a HEAD
-     * request (cheap: no body transfer), but HEAD is advisory only: CDNs may
-     * reject HEAD while allowing the actual media request. Any HEAD response
-     * that does not positively identify the stream therefore falls back to a
-     * tiny Range GET so we test the request Media3 will actually make.
+     * Run a single probe against [stream]. HLS streams use a GET-first
+     * playlist-and-segment check because signed CDNs frequently reject HEAD or
+     * return headers that do not describe the actual media. Other streams use
+     * HEAD followed by a small Range GET.
      *
      * The most recent HTTP response code is written back to
      * [StreamItem.httpStatusCode] so callers can distinguish 403 (Cloudflare
@@ -152,6 +157,7 @@ object StreamValidator {
             stream.httpStatusCode = -1
             return false
         }
+        if (isHlsCandidate(stream)) return probeHls(stream)
         val isFebboxFid = stream.provider.trim().equals("Febbox FID", ignoreCase = true) ||
             stream.name.trim().equals("Febbox FID", ignoreCase = true)
         val isVidsrc = stream.provider.trim().equals("Vidsrc", ignoreCase = true) ||
@@ -208,6 +214,7 @@ object StreamValidator {
             client.newCall(getRequest).execute().use { response ->
                 stream.httpStatusCode = response.code
                 if (!response.isSuccessful) {
+                    stream.isFailed = true
                     Log.w(
                         TAG,
                         "Range-GET ${stream.url} -> HTTP ${response.code}"
@@ -269,6 +276,105 @@ object StreamValidator {
                 true
             }
         }.getOrDefault(false)
+    }
+
+    private fun isHlsCandidate(stream: StreamItem): Boolean {
+        val value = stream.url.lowercase()
+        return stream.type.equals("hls", ignoreCase = true) ||
+            stream.mimeType.equals("application/vnd.apple.mpegurl", ignoreCase = true) ||
+            stream.mimeType.equals("application/x-mpegurl", ignoreCase = true) ||
+            value.contains(".m3u8") ||
+            value.contains("/m3u8-proxy") ||
+            value.contains("/m3u8_proxy")
+    }
+
+    /**
+     * Validate HLS the same way playback consumes it: fetch the playlist, then
+     * fetch its first variant or media segment with the provider headers.
+     */
+    private fun probeHls(stream: StreamItem): Boolean {
+        val url = stream.url.toHttpUrlOrNull() ?: return false
+        return probeHlsManifest(url, stream.headers, depth = 0, stream = stream)
+    }
+
+    private fun probeHlsManifest(
+        url: HttpUrl,
+        headers: Map<String, String>,
+        depth: Int,
+        stream: StreamItem
+    ): Boolean {
+        val request = Request.Builder().url(url).get().apply {
+            headers.forEach { (key, value) -> runCatching { header(key, value) } }
+        }.build()
+        return runCatching {
+            client.newCall(request).execute().use { response ->
+                stream.httpStatusCode = response.code
+                if (!response.isSuccessful) {
+                    stream.isFailed = true
+                    Log.w(TAG, "HLS playlist ${url.host} -> HTTP ${response.code}")
+                    return@use false
+                }
+                val body = response.body?.string().orEmpty()
+                if (!body.trimStart('\uFEFF', ' ', '\t', '\r', '\n')
+                        .startsWith("#EXTM3U")
+                ) {
+                    stream.isFailed = true
+                    Log.w(TAG, "HLS response was not an M3U8 playlist for ${stream.url}")
+                    return@use false
+                }
+                val firstEntry = body.lineSequence()
+                    .map(String::trim)
+                    .firstOrNull { it.isNotEmpty() && !it.startsWith("#") }
+                    ?: run {
+                        stream.isFailed = true
+                        return@use false
+                    }
+                val nextUrl = url.resolve(firstEntry) ?: return@use false
+                val nestedPlaylist = firstEntry.contains(".m3u8", ignoreCase = true) ||
+                    body.contains("#EXT-X-STREAM-INF", ignoreCase = true)
+                if (nestedPlaylist && depth < 2) {
+                    probeHlsManifest(nextUrl, headers, depth + 1, stream)
+                } else {
+                    probeHlsSegment(nextUrl, headers, stream)
+                }
+            }
+        }.getOrElse {
+            Log.w(TAG, "HLS probe failed for ${stream.url}: ${it.message}")
+            false
+        }
+    }
+
+    private fun probeHlsSegment(
+        url: HttpUrl,
+        headers: Map<String, String>,
+        stream: StreamItem
+    ): Boolean {
+        val request = Request.Builder()
+            .url(url)
+            .get()
+            .header("Range", "bytes=0-${RANGE_FALLBACK_BYTES.toInt() - 1}")
+            .apply { headers.forEach { (key, value) -> runCatching { header(key, value) } } }
+            .build()
+        return runCatching {
+            client.newCall(request).execute().use { response ->
+                stream.httpStatusCode = response.code
+                if (!response.isSuccessful) {
+                    stream.isFailed = true
+                    return@use false
+                }
+                if (response.peekBody(64 * 1024L).bytes().isEmpty()) {
+                    stream.isFailed = true
+                    return@use false
+                }
+                stream.isFailed = false
+                stream.isValid = true
+                Log.i(TAG, "HLS playlist and first segment validated for ${stream.url}")
+                true
+            }
+        }.getOrElse {
+            Log.w(TAG, "HLS segment probe failed for ${url.host}: ${it.message}")
+            false
+        }
     }
 
     /**
