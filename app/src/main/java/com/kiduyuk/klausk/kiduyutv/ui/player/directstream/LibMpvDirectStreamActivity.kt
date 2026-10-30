@@ -757,7 +757,9 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
     }
 
     private fun playbackHeaders(stream: StreamItem): Map<String, String> {
-        if (stream.provider.equals("Cinejoy", ignoreCase = true)) {
+        if (stream.provider.equals("Cinejoy", ignoreCase = true) ||
+            stream.provider.equals("CineJoyTV", ignoreCase = true)
+        ) {
             // Nebula rejects cookies and provider-specific headers; keep only
             // the browser identity and Cinejoy playlist Referer.
             return stream.headers.filterKeys { key ->

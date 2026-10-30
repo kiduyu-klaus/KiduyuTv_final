@@ -528,7 +528,9 @@ object ProvidersApi {
         rawUrl: String,
         sourceHeaders: Map<String, String>
     ): CinejoyStream? {
-        if (!provider.equals("Cinejoy", ignoreCase = true)) return null
+        if (!provider.equals("Cinejoy", ignoreCase = true) &&
+            !provider.equals("CineJoyTV", ignoreCase = true)
+        ) return null
 
         val uri = runCatching { Uri.parse(rawUrl) }.getOrNull() ?: return null
         val host = uri.host.orEmpty()
