@@ -155,12 +155,18 @@ fun MobileSettingsScreen(
     var showProviderPicker by remember { mutableStateOf(false) }
     var showDirectProviderPicker by remember { mutableStateOf(false) }
     var showDirectStreamPlayerPicker by remember { mutableStateOf(false) }
+    var showLibmpvDisabledDialog by remember { mutableStateOf(false) }
     var showDirectStreamEndpointPicker by remember { mutableStateOf(false) }
     var directProviderOptions by remember { mutableStateOf<List<StreamProviderChoice>>(emptyList()) }
     var endpointOptions by remember {
         mutableStateOf(SettingsManager.getCachedDirectStreamEndpointOptions(context))
     }
     val settingsManager = remember(context) { SettingsManager(context) }
+    LaunchedEffect(uiState.directStreamPlayer) {
+        if (uiState.directStreamPlayer == SettingsManager.PLAYER_LIBMPV) {
+            viewModel.setDirectStreamPlayer(context, SettingsManager.PLAYER_EXOPLAYER)
+        }
+    }
 
     LaunchedEffect(Unit) {
         directProviderOptions = runCatching {
@@ -1101,8 +1107,12 @@ fun MobileSettingsScreen(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable {
-                                    viewModel.setDirectStreamPlayer(context, value)
-                                    showDirectStreamPlayerPicker = false
+                                    if (value == SettingsManager.PLAYER_LIBMPV) {
+                                        showLibmpvDisabledDialog = true
+                                    } else {
+                                        viewModel.setDirectStreamPlayer(context, value)
+                                        showDirectStreamPlayerPicker = false
+                                    }
                                 }
                                 .padding(vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -1110,8 +1120,12 @@ fun MobileSettingsScreen(
                             RadioButton(
                                 selected = isSelected,
                                 onClick = {
-                                    viewModel.setDirectStreamPlayer(context, value)
-                                    showDirectStreamPlayerPicker = false
+                                    if (value == SettingsManager.PLAYER_LIBMPV) {
+                                        showLibmpvDisabledDialog = true
+                                    } else {
+                                        viewModel.setDirectStreamPlayer(context, value)
+                                        showDirectStreamPlayerPicker = false
+                                    }
                                 },
                                 colors = RadioButtonDefaults.colors(
                                     selectedColor = PrimaryRed,
@@ -1130,7 +1144,7 @@ fun MobileSettingsScreen(
                                     if (value == SettingsManager.PLAYER_EXOPLAYER) {
                                         "AndroidX Media3"
                                     } else {
-                                        "Native libmpv integration"
+                                        "Disabled temporarily"
                                     },
                                     color = TextTertiary,
                                     fontSize = 12.sp
@@ -1143,6 +1157,25 @@ fun MobileSettingsScreen(
             confirmButton = {
                 TextButton(onClick = { showDirectStreamPlayerPicker = false }) {
                     Text("Done", color = PrimaryRed)
+                }
+            }
+        )
+    }
+
+    if (showLibmpvDisabledDialog) {
+        AlertDialog(
+            onDismissRequest = { showLibmpvDisabledDialog = false },
+            containerColor = CardDark,
+            title = { Text("libmpv unavailable", color = TextPrimary) },
+            text = {
+                Text(
+                    "Libmpv is buggy and is disabled for now.",
+                    color = TextSecondary
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showLibmpvDisabledDialog = false }) {
+                    Text("OK", color = PrimaryRed)
                 }
             }
         )

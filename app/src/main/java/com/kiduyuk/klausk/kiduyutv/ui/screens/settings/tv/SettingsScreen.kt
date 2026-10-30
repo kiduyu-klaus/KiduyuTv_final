@@ -55,6 +55,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -1336,6 +1337,7 @@ private fun PlaybackContent(
     onDirectStreamEndpointSelect: (String) -> Unit
 ) {
     val context = LocalContext.current
+    var showLibmpvDisabledDialog by remember { mutableStateOf(false) }
     var directProviderOptions by remember { mutableStateOf<List<StreamProviderChoice>>(emptyList()) }
     var directProviderLoadError by remember { mutableStateOf<String?>(null) }
     var endpointOptions by remember {
@@ -1367,6 +1369,11 @@ private fun PlaybackContent(
     }
     var autoSkipEnabled by remember {
         mutableStateOf(settingsManager.isAutoSkipSegmentsEnabled())
+    }
+    LaunchedEffect(directStreamPlayer) {
+        if (directStreamPlayer == SettingsManager.PLAYER_LIBMPV) {
+            onDirectStreamPlayerSelect(SettingsManager.PLAYER_EXOPLAYER)
+        }
     }
     val options = listOf(SettingsManager.AUTO) + StreamProviderManager.getProviderNamesForDevice(isTvDevice = true)
 
@@ -1556,16 +1563,41 @@ private fun PlaybackContent(
                                 subtitle = if (value == SettingsManager.PLAYER_EXOPLAYER) {
                                     "AndroidX Media3"
                                 } else {
-                                    "Native libmpv integration"
+                                    "Disabled temporarily"
                                 },
                                 isSelected = value == directStreamPlayer,
-                                onClick = { onDirectStreamPlayerSelect(value) },
+                                onClick = {
+                                    if (value == SettingsManager.PLAYER_LIBMPV) {
+                                        showLibmpvDisabledDialog = true
+                                    } else {
+                                        onDirectStreamPlayerSelect(value)
+                                    }
+                                },
                                 modifier = Modifier.weight(1f)
                             )
                         }
                     }
                 }
             }
+        }
+
+        if (showLibmpvDisabledDialog) {
+            AlertDialog(
+                onDismissRequest = { showLibmpvDisabledDialog = false },
+                containerColor = CardDark,
+                title = { Text("libmpv unavailable", color = TextPrimary) },
+                text = {
+                    Text(
+                        "Libmpv is buggy and is disabled for now.",
+                        color = TextSecondary
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = { showLibmpvDisabledDialog = false }) {
+                        Text("OK", color = PrimaryRed)
+                    }
+                }
+            )
         }
 
         Spacer(modifier = Modifier.height(24.dp))
