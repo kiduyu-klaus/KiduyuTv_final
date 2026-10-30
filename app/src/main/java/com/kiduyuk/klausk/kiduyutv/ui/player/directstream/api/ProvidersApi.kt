@@ -425,18 +425,24 @@ object ProvidersApi {
                     h.keys().forEach { k -> map[k] = h.optString(k) }
                     map
                 } ?: linkedMapOf()
+                val cinejoy = normalizeCinejoyStream(provider, url, headers)
+                val normalizedUrl = cinejoy?.url ?: url
+                if (cinejoy != null) {
+                    headers.clear()
+                    headers.putAll(cinejoy.headers)
+                }
                 if (provider.equals("vidlink", ignoreCase = true) &&
-                    !hasVidlinkSignature(url, headers)
+                    !hasVidlinkSignature(normalizedUrl, headers)
                 ) {
                     Log.w(
                         TAG,
                         "Dropping unsigned Vidlink stream " +
                             "quality=${s.optString("quality", "?")} " +
-                            "host=${runCatching { Uri.parse(url).host }.getOrNull() ?: "?"}"
+                            "host=${runCatching { Uri.parse(normalizedUrl).host }.getOrNull() ?: "?"}"
                     )
                     continue
                 }
-                if (isGoogleusercontentHost(url)) {
+                if (isGoogleusercontentHost(normalizedUrl)) {
                     // These are controlled by OkHttp/Media3. Forwarding
                     // provider-supplied values can break signed direct-file
                     // requests, range seeking, or connection reuse.
@@ -455,6 +461,7 @@ object ProvidersApi {
                     }
                 }
                 val cookie = when {
+                    cinejoy != null -> ""
                     s.optJSONObject("cookies") != null -> {
                         val cookies = s.getJSONObject("cookies")
                         buildList {
@@ -481,7 +488,7 @@ object ProvidersApi {
                     StreamItem(
                         title = title,
                         name = s.optString("name"),
-                        url = UrlUtils.normalize(url),
+                        url = UrlUtils.normalize(normalizedUrl),
                         quality = s.optString("quality", "Auto"),
                         language = extractStreamLanguage(s, provider, title),
                         provider = provider,
@@ -504,6 +511,53 @@ object ProvidersApi {
             }
         }
         return StreamResponse(tmdbId, imdbId, items)
+    }
+
+    private data class CinejoyStream(
+        val url: String,
+        val headers: Map<String, String>
+    )
+
+    /**
+     * Cinejoy wraps the actual Nebula HLS URL in the playlist endpoint's
+     * `url` query parameter. Nebula expects only a browser User-Agent and a
+     * Cinejoy playlist Referer.
+     */
+    private fun normalizeCinejoyStream(
+        provider: String,
+        rawUrl: String,
+        sourceHeaders: Map<String, String>
+    ): CinejoyStream? {
+        if (!provider.equals("Cinejoy", ignoreCase = true)) return null
+
+        val uri = runCatching { Uri.parse(rawUrl) }.getOrNull() ?: return null
+        val host = uri.host.orEmpty()
+        val isCinejoyPlaylist = host.equals(CINEJOY_HOST, ignoreCase = true)
+        val isNebulaStream = host.equals(NEBULA_HOST, ignoreCase = true)
+        if (!isCinejoyPlaylist && !isNebulaStream) return null
+
+        val resolvedUrl = if (isCinejoyPlaylist) {
+            uri.getQueryParameter("url")
+                ?.trim()
+                ?.takeIf { it.startsWith("http://", ignoreCase = true) || it.startsWith("https://", ignoreCase = true) }
+                ?: return null
+        } else {
+            rawUrl
+        }
+        val referer = if (isCinejoyPlaylist) rawUrl else "$CINEJOY_PLAYLIST_PREFIX${Uri.encode(rawUrl)}"
+        val userAgent = sourceHeaders.entries
+            .firstOrNull { it.key.equals("User-Agent", ignoreCase = true) }
+            ?.value
+            ?.takeIf { it.isNotBlank() }
+            ?: CINEJOY_USER_AGENT
+
+        return CinejoyStream(
+            url = resolvedUrl,
+            headers = linkedMapOf(
+                "User-Agent" to userAgent,
+                "Referer" to referer
+            )
+        )
     }
 
     /** Convert anime intro/outro offsets from seconds to validated milliseconds. */
@@ -658,6 +712,12 @@ object ProvidersApi {
     private const val HLS_MIME_TYPE = "application/vnd.apple.mpegurl"
     private const val MATROSKA_MIME_TYPE = "video/x-matroska"
     private const val GOOGLE_DOWNLOADS_HOST = "video-downloads.googleusercontent.com"
+    private const val CINEJOY_HOST = "cinejoy-phi.vercel.app"
+    private const val NEBULA_HOST = "nebula.bright67.online"
+    private const val CINEJOY_PLAYLIST_PREFIX = "https://cinejoy-phi.vercel.app/api/playlist?url="
+    private const val CINEJOY_USER_AGENT =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+            "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
     private const val CLOUDFLARE_STREAM_WORKER_HOST =
         "cloudflare-stream-worker.muigakiduyu1995.workers.dev"
     private val ANIME_ORIGINAL_LANGUAGES = setOf("ja", "zh", "ko")

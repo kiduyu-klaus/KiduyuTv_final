@@ -91,6 +91,15 @@ class PlayerEngine(context: Context) {
     )
 
     private fun playbackHeaders(stream: StreamItem): Map<String, String> {
+        if (stream.provider.equals("Cinejoy", ignoreCase = true)) {
+            // Cinejoy/Nebula accepts only the browser identity and the
+            // Cinejoy playlist Referer. Do not attach cookies captured for a
+            // previous Cloudflare or WebView request.
+            return stream.headers.filterKeys { key ->
+                key.equals("User-Agent", ignoreCase = true) ||
+                    key.equals("Referer", ignoreCase = true)
+            }
+        }
         val headers = if (stream.provider.equals("DahmerMovies", ignoreCase = true)) {
             // Preserve the complete captured WebView request context for the
             // resolved download, including request-specific headers.

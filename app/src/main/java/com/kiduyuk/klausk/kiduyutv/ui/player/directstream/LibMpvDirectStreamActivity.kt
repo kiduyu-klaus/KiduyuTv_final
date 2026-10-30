@@ -757,6 +757,14 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
     }
 
     private fun playbackHeaders(stream: StreamItem): Map<String, String> {
+        if (stream.provider.equals("Cinejoy", ignoreCase = true)) {
+            // Nebula rejects cookies and provider-specific headers; keep only
+            // the browser identity and Cinejoy playlist Referer.
+            return stream.headers.filterKeys { key ->
+                key.equals("User-Agent", ignoreCase = true) ||
+                    key.equals("Referer", ignoreCase = true)
+            }
+        }
         val result = linkedMapOf<String, String>()
         if (stream.provider.equals("DahmerMovies", ignoreCase = true)) {
             result["User-Agent"] = REAL_BROWSER_USER_AGENT
