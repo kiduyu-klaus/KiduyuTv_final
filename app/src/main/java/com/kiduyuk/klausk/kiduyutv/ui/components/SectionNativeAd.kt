@@ -20,8 +20,8 @@ import androidx.compose.ui.unit.dp
  * Native in-feed placement shared by TV and mobile catalog screens.
  *
  * TV callers opt into a focusable placement so the ad participates in
- * Android TV D-pad navigation. Wortise is preferred; AdMob is used if the
- * Wortise native request fails.
+ * Android TV D-pad navigation. Start.io and AdMob are alternated per
+ * placement, with the other network used if the first request fails.
  */
 @Composable
 fun SectionNativeAd(

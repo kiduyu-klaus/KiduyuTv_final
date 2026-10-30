@@ -20,6 +20,9 @@ def streamApiToken = providers.gradleProperty("STREAM_API_TOKEN")
         .getOrElse("")
 def escapedStreamApiToken = streamApiToken.replace("\\", "\\\\").replace("\"", "\\\"")
 def startIoAppId = "207814611"
+def startIoTestAds = providers.gradleProperty("START_IO_TEST_ADS")
+        .orElse(providers.environmentVariable("START_IO_TEST_ADS"))
+        .getOrElse("false")
 def unityAdsGameId = providers.gradleProperty("UNITY_ADS_GAME_ID")
         .orElse(providers.environmentVariable("UNITY_ADS_GAME_ID"))
         .getOrElse("6186149")
@@ -71,6 +74,7 @@ android {
         buildConfigField "String", "OPENSUBTITLES_API_KEY", "\"${escapedOpenSubtitlesApiKey}\""
         buildConfigField "String", "STREAM_API_TOKEN", "\"${escapedStreamApiToken}\""
         buildConfigField "String", "START_IO_APP_ID", "\"${startIoAppId}\""
+        buildConfigField "boolean", "START_IO_TEST_ADS", "${startIoTestAds.toBoolean()}"
         buildConfigField "String", "UNITY_ADS_GAME_ID", "\"${escapedUnityAdsGameId}\""
         buildConfigField "boolean", "UNITY_ADS_TEST_MODE", "${unityAdsTestMode.toBoolean()}"
         buildConfigField "String", "UNITY_ADS_INTERSTITIAL_ID", "\"${escapedUnityInterstitialPlacementId}\""

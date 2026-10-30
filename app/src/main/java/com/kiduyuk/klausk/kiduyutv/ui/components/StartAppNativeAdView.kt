@@ -90,6 +90,8 @@ fun StartAppNativeAdView(
         val preferences = NativeAdPreferences().apply {
             setAdsNumber(1)
             setAutoBitmapDownload(true)
+            // The documented 150x150 primary image size used by the sample.
+            setPrimaryImageSize(2)
         }
         nativeAdLoader.loadAd(preferences, object : AdEventListener {
             override fun onReceiveAd(ad: Ad) {

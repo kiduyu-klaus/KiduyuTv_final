@@ -13,8 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.kiduyuk.klausk.kiduyutv.util.AdFallbackDispatcher
 import com.kiduyuk.klausk.kiduyutv.util.AdEligibility
+import com.kiduyuk.klausk.kiduyutv.util.StartAppAdManager
 
 /**
  * StartApp banner ad wrapped for Jetpack Compose.
@@ -58,7 +58,7 @@ fun StartAppBannerAdView(
                     ViewGroup.LayoutParams.WRAP_CONTENT
                 )
                 containerRef.value = this
-                AdFallbackDispatcher.loadBanner(activity, this, AdFallbackDispatcher.BannerNetwork.STARTAPP)
+                StartAppAdManager.loadBanner(activity, this)
             }
         }
     )
