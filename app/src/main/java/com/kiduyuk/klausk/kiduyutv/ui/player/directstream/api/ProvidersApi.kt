@@ -388,6 +388,12 @@ object ProvidersApi {
                 val url = s.optString("url").takeIf { it.isNotBlank() } ?: continue
                 val provider = s.optString("provider", "")
                     .ifBlank { json.optString("provider", "") }
+                if (provider.equals("netmirror", ignoreCase = true) &&
+                    url.contains("tv.imgcdn.kim", ignoreCase = true)
+                ) {
+                    Log.i(TAG, "Dropping Netmirror stream from blocked imgcdn host")
+                    continue
+                }
                 val isVidsrc = provider.equals("vidsrc", ignoreCase = true)
                 val type = s.optString("type", "")
                 val isVixsrcHls = provider.equals("vixsrc", ignoreCase = true) &&
