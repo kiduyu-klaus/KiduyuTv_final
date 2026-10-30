@@ -23,6 +23,7 @@ import com.kiduyuk.klausk.kiduyutv.util.AuthManager
 import com.kiduyuk.klausk.kiduyutv.util.FirebaseManager
 import com.kiduyuk.klausk.kiduyutv.util.LogcatManager
 import com.kiduyuk.klausk.kiduyutv.util.NotificationHelper
+import com.kiduyuk.klausk.kiduyutv.util.RecommendationScheduler
 import com.kiduyuk.klausk.kiduyutv.util.SettingsManager
 import com.kiduyuk.klausk.kiduyutv.util.TraktAuthManager
 import kotlinx.coroutines.CoroutineScope
@@ -54,6 +55,9 @@ class KiduyuTvApp : MultiDexApplication(), ImageLoaderFactory {
 
         // Initialize notification channels
         NotificationHelper.createNotificationChannel(this)
+        // Refresh Android TV / Google TV / Fire TV home recommendations in the
+        // background. The scheduler is a no-op on ordinary phone devices.
+        RecommendationScheduler.enqueueRefresh(this)
 
         // Keep the direct-stream backend list server-driven and warm its cache
         // before a player or Settings screen needs to render the options.
