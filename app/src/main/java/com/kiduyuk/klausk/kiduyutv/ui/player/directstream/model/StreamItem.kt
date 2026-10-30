@@ -116,3 +116,18 @@ fun normalizeStreamLanguage(value: String?): String {
 
 /** Returns the best user-facing language label for a provider stream. */
 fun StreamItem.displayLanguage(): String = normalizeStreamLanguage(language)
+
+/** Returns true for streams that must remain visible for DahmerMovies retry flows. */
+fun StreamItem.isDahmerMoviesStream(): Boolean =
+    provider.contains("dahmermovies", ignoreCase = true) ||
+        name.contains("dahmermovies", ignoreCase = true) ||
+        title.contains("dahmermovies", ignoreCase = true) ||
+        url.contains("dahmermovies", ignoreCase = true)
+
+/** Returns true only after validation or playback has confirmed the stream unusable. */
+fun StreamItem.isConfirmedUnplayable(): Boolean =
+    isFailed || (hasBeenValidated && !isValid) || (httpStatusCode ?: 0) >= 400
+
+/** Hide confirmed bad sources from pickers, except DahmerMovies sources. */
+fun StreamItem.shouldHideFromStreamPicker(): Boolean =
+    isConfirmedUnplayable() && !isDahmerMoviesStream()

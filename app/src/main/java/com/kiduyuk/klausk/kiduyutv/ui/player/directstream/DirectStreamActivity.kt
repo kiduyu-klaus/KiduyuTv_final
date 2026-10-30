@@ -60,6 +60,7 @@ import com.kiduyuk.klausk.kiduyutv.activity.mainactivity.MainActivity
 import com.kiduyuk.klausk.kiduyutv.databinding.ActivityDirectStreamBinding
 import com.kiduyuk.klausk.kiduyutv.ui.player.cloudflareBypass.CloudflareBypassActivity
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamItem
+import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.shouldHideFromStreamPicker
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamSegment
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.SubtitleItem
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.OpenSubtitlesClient
@@ -1691,7 +1692,7 @@ class DirectStreamActivity : AppCompatActivity() {
      */
     private fun streamSelectionIndex(active: StreamItem?): Int? {
         val activeStreamId = active?.streamId ?: return null
-        val selectableStreams = availableStreams.filterNot { it.httpStatusCode == HTTP_NOT_FOUND }
+        val selectableStreams = availableStreams.filterNot { it.shouldHideFromStreamPicker() }
         return selectableStreams
             .indexOfFirst { it.streamId == activeStreamId }
             .takeIf { it >= 0 }

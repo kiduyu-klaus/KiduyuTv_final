@@ -95,6 +95,7 @@ import androidx.media3.ui.PlayerView
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.ProvidersBackendUnavailableException
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamItem
+import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.shouldHideFromStreamPicker
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.PlayerEngine
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamCatalog
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.playback.StreamProviderChoice
@@ -860,7 +861,7 @@ private fun MobileDirectStreamPlayer(
 
     if (state.isStreamDialogVisible) {
         MobileStreamSelectionDialog(
-            streams = streams.filterNot { it.httpStatusCode == 404 },
+            streams = streams.filterNot { it.shouldHideFromStreamPicker() },
             activeStream = activeStream,
             onSelect = onStreamSelected,
             onDismiss = onDismissStreamDialog

@@ -68,6 +68,7 @@ import kotlinx.coroutines.launch
 import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamItem
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.displayLanguage
+import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.shouldHideFromStreamPicker
 import com.kiduyuk.klausk.kiduyutv.ui.theme.BackgroundDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.CardDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.DarkRed
@@ -133,14 +134,14 @@ class StreamSelectionDialog(
         activeIndex: Int? = activeIndexState.value
     ) {
         if (!isShowing) return
-        // Keep probe-rejected sources selectable when possible, but hide
-        // streams that have been confirmed as HTTP 404 / file-not-found.
+        // Hide confirmed failed/unplayable sources while retaining DahmerMovies
+        // rows so their browser-based retry flow remains available.
         streamsState.value = visibleStreams(updated)
         activeIndexState.value = activeIndex
     }
 
     private fun visibleStreams(streams: List<StreamItem>): List<StreamItem> =
-        streams.filterNot { it.httpStatusCode == HTTP_NOT_FOUND }
+        streams.filterNot { it.shouldHideFromStreamPicker() }
 
     private fun selectStream(stream: StreamItem) {
         activeIndexState.value = streamsState.value.indexOfFirst { it === stream }
@@ -528,8 +529,4 @@ class StreamSelectionDialog(
         return stream.streamId
     }
 
-    companion object {
-        private const val HTTP_NOT_FOUND = 404
-
-    }
 }

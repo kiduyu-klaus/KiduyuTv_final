@@ -32,6 +32,7 @@ import com.kiduyuk.klausk.kiduyutv.R
 import com.kiduyuk.klausk.kiduyutv.activity.mainactivity.MainActivity
 import com.kiduyuk.klausk.kiduyutv.databinding.ActivityDirectStreamBinding
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.StreamItem
+import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.shouldHideFromStreamPicker
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model.SubtitleItem
 import com.kiduyuk.klausk.kiduyutv.ui.player.cloudflareBypass.CloudflareBypassActivity
 import com.kiduyuk.klausk.kiduyutv.ui.player.directstream.api.HttpCookieStore
@@ -542,7 +543,9 @@ class LibMpvDirectStreamActivity : AppCompatActivity(), SurfaceHolder.Callback {
                     streams = validated.toList()
                     streamDialog?.updateStreams(
                         streams,
-                        activeIndex = streams.indexOfFirst { it === activeStream }.takeIf { it >= 0 }
+                        activeIndex = streams.filterNot { it.shouldHideFromStreamPicker() }
+                            .indexOfFirst { it === activeStream }
+                            .takeIf { it >= 0 }
                     )
                     val valid = validated.count { it.isValid && !it.isFailed }
                     val checking = validated.count { it.isChecking }
