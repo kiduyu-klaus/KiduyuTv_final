@@ -44,6 +44,7 @@ def escapedUnityRewardedPlacementId = unityRewardedPlacementId.replace("\\", "\\
 def escapedUnityBannerPlacementId = unityBannerPlacementId.replace("\\", "\\\\").replace("\"", "\\\"")
 def wortiseAppId = "e3b208f6-4b47-45d1-8842-5eb647581cb5"
 def roomVersion = '2.8.5'
+def nativeAbis = ['arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64']
 
 android {
     namespace 'com.kiduyuk.klausk.kiduyutv'
@@ -75,6 +76,16 @@ android {
         manifestPlaceholders = [
             wortiseAppId: wortiseAppId
         ]
+    }
+
+    // Produce one APK per supported device ABI.
+    splits {
+        abi {
+            enable true
+            reset()
+            include(*nativeAbis)
+            universalApk false
+        }
     }
 
     signingConfigs {
