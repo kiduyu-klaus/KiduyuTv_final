@@ -520,7 +520,10 @@ class StreamSelectionDialog(
     private enum class LanguageFilter { ALL, ENGLISH, HINDI }
 
     private fun streamKey(index: Int, stream: StreamItem): String {
-        return "$index|${stream.provider}|${stream.quality}|${stream.type}|${stream.url}"
+        // The URL is not unique: separate provider rows can legitimately point
+        // to the same resource. Use the model identity so LazyColumn/Grid and
+        // the active "Playing" badge always refer to the clicked row.
+        return stream.streamId
     }
 
     companion object {

@@ -1,6 +1,7 @@
 package com.kiduyuk.klausk.kiduyutv.ui.player.directstream.model
 
 import java.util.Locale
+import java.util.UUID
 
 /**
  * One stream returned by the kiduyuTv_providers server.
@@ -11,6 +12,13 @@ import java.util.Locale
  * this at the DataSource level.
  */
 data class StreamItem(
+    /**
+     * Stable identity for this returned stream instance. It deliberately does
+     * not use [url], because providers can return different rows with the same
+     * URL; Kotlin `copy()` also preserves this value during validation and
+     * playback-state updates.
+     */
+    val streamId: String = UUID.randomUUID().toString(),
     /** Detailed backend label. Used only when [name] is missing. */
     val title: String,
     /** Preferred stream-picker label, e.g. `"Vidfast vRapid"`. */

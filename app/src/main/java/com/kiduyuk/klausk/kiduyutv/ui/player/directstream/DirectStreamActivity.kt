@@ -328,7 +328,7 @@ class DirectStreamActivity : AppCompatActivity() {
         // Replace the gated entry as well as the active stream so opening the
         // stream selector later reuses the resolved worker download URL.
         availableStreams = availableStreams.map { candidate ->
-            if (candidate.url == stream.url) retryStream else candidate
+            if (candidate.streamId == stream.streamId) retryStream else candidate
         }
         streamDialog?.updateStreams(
             availableStreams,
@@ -1686,14 +1686,14 @@ class DirectStreamActivity : AppCompatActivity() {
     /**
      * Finds the active item in the selector by stream identity rather than
      * object identity. Stream validation and subtitle/token refreshes create
-     * copied [StreamItem] instances, so `===` loses the active row. Prefer the
-     * URL, then use presentation metadata when a refreshed URL has a new token.
+     * copied [StreamItem] instances, so `===` loses the active row. The model
+     * identity survives those copies and distinguishes duplicate URLs.
      */
     private fun streamSelectionIndex(active: StreamItem?): Int? {
-        val activeUrl = active?.url ?: return null
+        val activeStreamId = active?.streamId ?: return null
         val selectableStreams = availableStreams.filterNot { it.httpStatusCode == HTTP_NOT_FOUND }
         return selectableStreams
-            .indexOfFirst { it.url == activeUrl }
+            .indexOfFirst { it.streamId == activeStreamId }
             .takeIf { it >= 0 }
             ?: selectableStreams.indexOfFirst { candidate ->
                 candidate.provider.equals(active.provider, ignoreCase = true) &&
@@ -1720,7 +1720,7 @@ class DirectStreamActivity : AppCompatActivity() {
         )
         if (streamSelectionIndex(stream) != null) activeStream = failed
         availableStreams = availableStreams.map { candidate ->
-            if (candidate.url == stream.url) {
+            if (candidate.streamId == stream.streamId) {
                 candidate.copy(
                     isValid = false,
                     isChecking = false,
@@ -1891,7 +1891,7 @@ class DirectStreamActivity : AppCompatActivity() {
         )
         activeStream = updatedStream
         availableStreams = availableStreams.map { candidate ->
-            if (candidate.url == stream.url) {
+            if (candidate.streamId == stream.streamId) {
                 candidate.copy(
                     subtitles = (candidate.subtitles + subtitle).distinctBy { it.url }
                 )
@@ -1915,10 +1915,9 @@ class DirectStreamActivity : AppCompatActivity() {
     }
 
     private fun switchStream(stream: StreamItem) {
-        if (
-            stream.url == activeStream?.url &&
-            (stream.name.isBlank() || stream.name == activeStream?.name)
-        ) return
+        // Compare the stable row identity, not URL/name. Two selectable rows
+        // may share both values but still represent different stream choices.
+        if (stream.streamId == activeStream?.streamId) return
         val positionMs = engine.player.currentPosition.coerceAtLeast(0L)
         Log.i(
             PROVIDER_TAG,
@@ -1963,18 +1962,19 @@ class DirectStreamActivity : AppCompatActivity() {
                 return@launch
             }
 
+            // Preserve the selected row identity across the provider refresh;
+            // the refreshed URL is new, but it is still the same picker row.
+            val refreshedStream = refreshed.copy(streamId = stream.streamId)
+
             availableStreams = availableStreams.map { candidate ->
-                if (
-                    candidate.provider.equals("vidlink", ignoreCase = true) &&
-                    candidate.quality.equals(stream.quality, ignoreCase = true)
-                ) refreshed else candidate
+                if (candidate.streamId == stream.streamId) refreshedStream else candidate
             }
             streamDialog?.updateStreams(
                 availableStreams,
-                activeIndex = streamSelectionIndex(refreshed)
+                activeIndex = streamSelectionIndex(refreshedStream)
             )
-            activeStream = refreshed
-            startStreamPlayback(refreshed, positionMs)
+            activeStream = refreshedStream
+            startStreamPlayback(refreshedStream, positionMs)
         }
     }
 
@@ -2029,9 +2029,9 @@ class DirectStreamActivity : AppCompatActivity() {
         // the same recovery path as manually changing streams and avoids
         // presenting a recoverable audio-output error to the user.
         if (code == "5001" && availableStreams.size > 1) {
-            val failedUrl = activeStream?.url
+            val failedStreamId = activeStream?.streamId
             val fallback = availableStreams
-                .filter { it.url != failedUrl }
+                .filter { it.streamId != failedStreamId }
                 .sortedByDescending { qualityRank(it.quality) }
                 .firstOrNull()
             if (fallback != null) {
@@ -2074,7 +2074,7 @@ class DirectStreamActivity : AppCompatActivity() {
                     markStreamPlaybackFailed(active, statusCode)
                 }
                 if (statusCode == HTTP_NOT_FOUND && isFileNotFoundPlaybackError(code)) {
-                    availableStreams = availableStreams.filterNot { it.url == active.url }
+                    availableStreams = availableStreams.filterNot { it.streamId == active.streamId }
                     playbackErrorDialog?.dismiss()
                     activeStream = null
                     streamDialog?.updateStreams(
@@ -2455,7 +2455,7 @@ class DirectStreamActivity : AppCompatActivity() {
         val current = activeStream ?: return
         val wasMarkedFailed = current.isFailed || !current.isValid ||
             availableStreams.any { candidate ->
-                candidate.url == current.url && (candidate.isFailed || !candidate.isValid)
+                candidate.streamId == current.streamId && (candidate.isFailed || !candidate.isValid)
             }
         val playable = current.copy(
             isValid = true,
@@ -2465,7 +2465,7 @@ class DirectStreamActivity : AppCompatActivity() {
         )
         activeStream = playable
         availableStreams = availableStreams.map { candidate ->
-            if (candidate.url == current.url) {
+            if (candidate.streamId == current.streamId) {
                 candidate.copy(
                     isValid = true,
                     isChecking = false,
@@ -2972,7 +2972,7 @@ class DirectStreamActivity : AppCompatActivity() {
      */
     private fun skipToNextAvailableStream() {
         val candidates = availableStreams
-            .filter { it.url != activeStream?.url }
+            .filter { it.streamId != activeStream?.streamId }
             .sortedByDescending { qualityRank(it.quality) }
         val next = candidates.firstOrNull()
         if (next == null) {
