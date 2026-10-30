@@ -476,6 +476,22 @@ fun NavGraph(
                             episode = backStackEntry.arguments?.getInt("episode") ?: 1
                         )
                     )
+                },
+                onNextEpisode = { nextSeason, nextEpisode ->
+                    val nextTvId = backStackEntry.arguments?.getInt("tvId") ?: 0
+                    if (nextTvId > 0) {
+                        navController.navigate(
+                            Screen.EpisodeOverview.createRoute(
+                                tvId = nextTvId,
+                                season = nextSeason,
+                                episode = nextEpisode,
+                                tvShowName = backStackEntry.arguments?.getString("tvShowName") ?: ""
+                            )
+                        ) {
+                            popUpTo(backStackEntry.destination.id) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
                 }
             )
         }

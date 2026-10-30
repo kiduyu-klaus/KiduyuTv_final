@@ -17,9 +17,15 @@ data class EpisodeOverviewUiState(
     val isLoading: Boolean = true,
     val episode: Episode? = null,
     val tvShow: TvShowDetail? = null,
+    val nextEpisode: NextEpisode? = null,
     val cast: List<CastMember> = emptyList(),
     val writingAndProductionCrew: List<CrewMember> = emptyList(),
     val error: String? = null
+)
+
+data class NextEpisode(
+    val seasonNumber: Int,
+    val episodeNumber: Int
 )
 
 class EpisodeOverviewViewModel : ViewModel() {
@@ -37,6 +43,9 @@ class EpisodeOverviewViewModel : ViewModel() {
                 val showDeferred = async { repository.getTvShowDetail(tvId) }
                 val episode = episodeDeferred.await().getOrElse { throw it }
                 val tvShow = showDeferred.await().getOrNull()
+                val nextEpisode = tvShow?.let {
+                    findNextEpisode(tvId, seasonNumber, episodeNumber, it)
+                }
                 val crewJobs = listOf(
                     "Screenplay", "Writer", "Story", "Director", "Series Director",
                     "Co-Director", "Producer", "Executive Producer", "Co-Producer",
@@ -53,6 +62,7 @@ class EpisodeOverviewViewModel : ViewModel() {
                     isLoading = false,
                     episode = episode,
                     tvShow = tvShow,
+                    nextEpisode = nextEpisode,
                     cast = cast,
                     writingAndProductionCrew = crew
                 )
@@ -63,5 +73,41 @@ class EpisodeOverviewViewModel : ViewModel() {
                 )
             }
         }
+    }
+
+    private suspend fun findNextEpisode(
+        tvId: Int,
+        seasonNumber: Int,
+        episodeNumber: Int,
+        tvShow: TvShowDetail
+    ): NextEpisode? {
+        val currentSeason = repository.getSeasonDetail(tvId, seasonNumber).getOrNull()
+        currentSeason?.episodes
+            ?.filter { it.episodeNumber > episodeNumber }
+            ?.minByOrNull { it.episodeNumber }
+            ?.let { episode ->
+                return NextEpisode(seasonNumber, episode.episodeNumber)
+            }
+
+        // The current episode is the season finale. Look for the first
+        // available episode in the next numbered season, skipping specials
+        // and seasons that have no episodes.
+        val nextSeasonNumbers = tvShow.seasons.orEmpty()
+            .asSequence()
+            .map { it.seasonNumber }
+            .filter { it > seasonNumber }
+            .distinct()
+            .sorted()
+
+        for (nextSeasonNumber in nextSeasonNumbers) {
+            val nextSeason = repository.getSeasonDetail(tvId, nextSeasonNumber).getOrNull()
+            val firstEpisode = nextSeason?.episodes
+                ?.filter { it.episodeNumber > 0 }
+                ?.minByOrNull { it.episodeNumber }
+            if (firstEpisode != null) {
+                return NextEpisode(nextSeasonNumber, firstEpisode.episodeNumber)
+            }
+        }
+        return null
     }
 }

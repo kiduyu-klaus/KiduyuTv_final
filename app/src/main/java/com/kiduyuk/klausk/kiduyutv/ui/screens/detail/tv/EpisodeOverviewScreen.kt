@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -59,6 +60,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.GenrePill
 import com.kiduyuk.klausk.kiduyutv.ui.theme.PrimaryRed
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextSecondary
+import com.kiduyuk.klausk.kiduyutv.viewmodel.NextEpisode
 import com.kiduyuk.klausk.kiduyutv.viewmodel.EpisodeOverviewViewModel
 
 @Composable
@@ -72,6 +74,7 @@ fun EpisodeOverviewScreen(
     onCastClick: (CastMember) -> Unit,
     onCrewClick: (CrewMember) -> Unit,
     onImagesClick: () -> Unit,
+    onNextEpisode: (Int, Int) -> Unit,
     viewModel: EpisodeOverviewViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -94,6 +97,7 @@ fun EpisodeOverviewScreen(
                 backdropPath = state.tvShow?.backdropPath,
                 genres = state.tvShow?.genres.orEmpty().map { it.name },
                 networks = state.tvShow?.networks.orEmpty().map { it.name },
+                nextEpisode = state.nextEpisode,
                 crew = state.writingAndProductionCrew,
                 cast = state.cast,
                 onBackClick = onBackClick,
@@ -115,7 +119,8 @@ fun EpisodeOverviewScreen(
                 },
                 onCastClick = onCastClick,
                 onCrewClick = onCrewClick,
-                onImagesClick = onImagesClick
+                onImagesClick = onImagesClick,
+                onNextEpisode = onNextEpisode
             )
             else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(state.error ?: "Episode details unavailable", color = TextSecondary)
@@ -131,13 +136,15 @@ private fun EpisodeOverviewContent(
     backdropPath: String?,
     genres: List<String>,
     networks: List<String>,
+    nextEpisode: NextEpisode?,
     crew: List<CrewMember>,
     cast: List<CastMember>,
     onBackClick: () -> Unit,
     onPlayClick: () -> Unit,
     onCastClick: (CastMember) -> Unit,
     onCrewClick: (CrewMember) -> Unit,
-    onImagesClick: () -> Unit
+    onImagesClick: () -> Unit,
+    onNextEpisode: (Int, Int) -> Unit
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 25.dp)) {
         item {
@@ -239,6 +246,24 @@ private fun EpisodeOverviewContent(
                         Icon(Icons.Default.Image, "Posters", modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text("Posters")
+                    }
+                    nextEpisode?.let { next ->
+                        val nextInteractionSource = remember { MutableInteractionSource() }
+                        val isNextFocused by nextInteractionSource.collectIsFocusedAsState()
+                        Button(
+                            onClick = { onNextEpisode(next.seasonNumber, next.episodeNumber) },
+                            interactionSource = nextInteractionSource,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isNextFocused) Color.Cyan else Color(0xFF3A3A3A),
+                                contentColor = if (isNextFocused) Color.Black else Color.White
+                            ),
+                            shape = RoundedCornerShape(5.dp),
+                            contentPadding = PaddingValues(horizontal = 15.dp, vertical = 10.dp)
+                        ) {
+                            Icon(Icons.Default.SkipNext, "Next episode", modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Next Episode")
+                        }
                     }
                 }
             }

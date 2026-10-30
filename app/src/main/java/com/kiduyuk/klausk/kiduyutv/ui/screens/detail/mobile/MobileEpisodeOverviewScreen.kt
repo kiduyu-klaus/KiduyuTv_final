@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -71,6 +72,7 @@ import com.kiduyuk.klausk.kiduyutv.ui.theme.SurfaceDark
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextPrimary
 import com.kiduyuk.klausk.kiduyutv.ui.theme.TextSecondary
 import com.kiduyuk.klausk.kiduyutv.viewmodel.EpisodeOverviewViewModel
+import com.kiduyuk.klausk.kiduyutv.viewmodel.NextEpisode
 
 @Composable
 fun MobileEpisodeOverviewScreen(
@@ -83,6 +85,7 @@ fun MobileEpisodeOverviewScreen(
     onCastClick: (CastMember) -> Unit,
     onCrewClick: (CrewMember) -> Unit,
     onImagesClick: () -> Unit,
+    onNextEpisode: (Int, Int) -> Unit,
     viewModel: EpisodeOverviewViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -101,6 +104,7 @@ fun MobileEpisodeOverviewScreen(
                 backdropPath = state.tvShow?.backdropPath,
                 genres = state.tvShow?.genres.orEmpty().map { it.name },
                 networks = state.tvShow?.networks.orEmpty().map { it.name },
+                nextEpisode = state.nextEpisode,
                 crew = state.writingAndProductionCrew,
                 cast = state.cast,
                 onBackClick = handleBackClick,
@@ -122,7 +126,8 @@ fun MobileEpisodeOverviewScreen(
                 },
                 onCastClick = onCastClick,
                 onCrewClick = onCrewClick,
-                onImagesClick = onImagesClick
+                onImagesClick = onImagesClick,
+                onNextEpisode = onNextEpisode
             )
             else -> Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
                 Card(colors = CardDefaults.cardColors(containerColor = SurfaceDark), shape = RoundedCornerShape(18.dp)) {
@@ -146,7 +151,8 @@ private fun MobileEpisodeOverviewContent(
     onPlayClick: () -> Unit,
     onCastClick: (CastMember) -> Unit,
     onCrewClick: (CrewMember) -> Unit,
-    onImagesClick: () -> Unit
+    onImagesClick: () -> Unit,
+    onNextEpisode: (Int, Int) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -194,6 +200,17 @@ private fun MobileEpisodeOverviewContent(
                             Icon(Icons.Default.Image, null, modifier = Modifier.size(19.dp))
                             Spacer(Modifier.width(6.dp))
                             Text("Images")
+                        }
+                        nextEpisode?.let { next ->
+                            MobileActionButton(
+                                onClick = { onNextEpisode(next.seasonNumber, next.episodeNumber) },
+                                primary = false,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.SkipNext, null, modifier = Modifier.size(19.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Next Episode", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
                         }
                     }
                     Text(
