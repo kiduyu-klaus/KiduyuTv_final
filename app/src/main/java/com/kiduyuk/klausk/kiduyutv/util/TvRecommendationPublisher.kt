@@ -79,7 +79,17 @@ object TvRecommendationPublisher {
         if (items.isEmpty()) return@withContext false
 
         when {
-            isAmazonDevice() -> publishFireRecommendations(context, items)
+            isAmazonDevice() -> {
+                // Fire TV receives both surfaces: Preview Channel programs on
+                // API 26+ and recommendation-style notifications enriched
+                // with Amazon-specific metadata. Older Fire TV versions keep
+                // the notification path because Preview Channels are not
+                // available before Android O.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    publishPreviewChannel(context, items)
+                }
+                publishFireRecommendations(context, items)
+            }
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.O -> publishPreviewChannel(context, items)
             else -> publishLegacyRecommendations(context, items)
         }

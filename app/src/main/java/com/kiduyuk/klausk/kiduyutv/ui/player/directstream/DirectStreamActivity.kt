@@ -215,6 +215,9 @@ class DirectStreamActivity : AppCompatActivity() {
     private var skipSegmentsFetchJob: Job? = null
     private var autoSkipCountdownJob: Job? = null
     private var currentAutoSkipSegment: SkipSegment? = null
+    private var nextEpisodeCountdownJob: Job? = null
+    private var nextEpisodeCountdownKey: String? = null
+    private var nextEpisodeCountdownTriggeredKey: String? = null
     private var nextEpisodePreloadJob: Job? = null
     private var preloadedNextEpisode: PreloadedEpisode? = null
 
@@ -379,6 +382,7 @@ class DirectStreamActivity : AppCompatActivity() {
                         0
                     }
                 maybePreloadNextEpisode(duration, currentPosition)
+                maybeStartNextEpisodeCountdown(duration, currentPosition)
                 binding.btnPlayPause.setIconResource(
                     if (engine.player.isPlaying) R.drawable.ic_pause else R.drawable.ic_play
                 )
@@ -441,6 +445,97 @@ class DirectStreamActivity : AppCompatActivity() {
                     "Could not preload next episode S${season}E$nextEpisode: ${error.message}"
                 )
             }
+        }
+    }
+
+    /**
+     * Starts the automatic next-episode countdown during the final 90 seconds
+     * of a TV episode. It uses the existing countdown TextView, but keeps a
+     * separate Job and episode key so it cannot continue after an episode
+     * switch or a seek away from the end of the episode.
+     */
+    private fun maybeStartNextEpisodeCountdown(durationMs: Long, positionMs: Long) {
+        if (currentMediaType != TYPE_SERIES || currentTmdbId <= 0) {
+            cancelNextEpisodeCountdown()
+            return
+        }
+        val effectiveDuration = durationMs.takeIf { it > 0L }
+            ?: cachedEpisodeDurationMs
+            ?: run {
+                cancelNextEpisodeCountdown()
+                return
+            }
+        val remainingMs = effectiveDuration - positionMs
+        val episodeKey = "$currentTmdbId|${currentSeason ?: 0}|${currentEpisode ?: 0}"
+        if (
+            !engine.player.isPlaying ||
+            remainingMs !in 1L..NEXT_EPISODE_COUNTDOWN_TRIGGER_MS ||
+            nextEpisodeCountdownTriggeredKey == episodeKey
+        ) {
+            cancelNextEpisodeCountdown()
+            return
+        }
+        if (
+            nextEpisodeCountdownJob?.isActive == true &&
+            nextEpisodeCountdownKey == episodeKey
+        ) {
+            return
+        }
+
+        cancelNextEpisodeCountdown()
+        // The episode transition prompt takes priority over an intro/outro
+        // prompt because it is tied to an imminent source replacement.
+        cancelAutoSkipCountdown()
+        nextEpisodeCountdownKey = episodeKey
+        nextEpisodeCountdownJob = lifecycleScope.launch {
+            try {
+                binding.tvAutoSkipCountdown.visibility = View.VISIBLE
+                for (seconds in NEXT_EPISODE_COUNTDOWN_SECONDS downTo 1) {
+                    if (
+                        nextEpisodeCountdownKey != episodeKey ||
+                        !engine.player.isPlaying ||
+                        isFinishing ||
+                        isDestroyed
+                    ) {
+                        return@launch
+                    }
+                    binding.tvAutoSkipCountdown.text =
+                        "Starting next episode in $seconds..."
+                    delay(1_000L)
+                }
+                if (
+                    nextEpisodeCountdownKey == episodeKey &&
+                    engine.player.isPlaying &&
+                    currentMediaType == TYPE_SERIES
+                ) {
+                    Log.i(
+                        PROVIDER_TAG,
+                        "Next-episode countdown finished for $episodeKey; loading next episode"
+                    )
+                    nextEpisodeCountdownTriggeredKey = episodeKey
+                    nextEpisodeCountdownJob = null
+                    nextEpisodeCountdownKey = null
+                    binding.tvAutoSkipCountdown.visibility = View.GONE
+                    loadNextEpisodeOrSeason()
+                }
+            } finally {
+                if (nextEpisodeCountdownKey == episodeKey) {
+                    nextEpisodeCountdownJob = null
+                    nextEpisodeCountdownKey = null
+                    if (autoSkipCountdownJob?.isActive != true) {
+                        binding.tvAutoSkipCountdown.visibility = View.GONE
+                    }
+                }
+            }
+        }
+    }
+
+    private fun cancelNextEpisodeCountdown() {
+        nextEpisodeCountdownJob?.cancel()
+        nextEpisodeCountdownJob = null
+        nextEpisodeCountdownKey = null
+        if (autoSkipCountdownJob?.isActive != true) {
+            binding.tvAutoSkipCountdown.visibility = View.GONE
         }
     }
 
@@ -550,6 +645,7 @@ class DirectStreamActivity : AppCompatActivity() {
                         startWatchProgressUpdates()
                     }
                     Player.STATE_ENDED -> {
+                        cancelNextEpisodeCountdown()
                         isPlaybackBuffering = false
                         hideBufferingOverlay()
                         binding.btnPlayPause.visibility = View.VISIBLE
@@ -1040,6 +1136,7 @@ class DirectStreamActivity : AppCompatActivity() {
     }
 
     private fun loadEpisodeInPlace(season: Int, episode: Int, delta: Int) {
+        cancelNextEpisodeCountdown()
         // Save the episode being left before changing the identity fields used
         // by persistence. The old reset helper erased its resume position.
         persistWatchProgress()
@@ -1323,6 +1420,11 @@ class DirectStreamActivity : AppCompatActivity() {
     }
 
     private fun updateSkipButton() {
+        if (nextEpisodeCountdownJob?.isActive == true) {
+            cancelAutoSkipCountdown()
+            hideSkipButton()
+            return
+        }
         val segments = activeSkipSegments() ?: run {
             binding.seekBar.clearHighlights()
             return
@@ -1449,7 +1551,9 @@ class DirectStreamActivity : AppCompatActivity() {
         autoSkipCountdownJob?.cancel()
         autoSkipCountdownJob = null
         currentAutoSkipSegment = null
-        binding.tvAutoSkipCountdown.visibility = View.GONE
+        if (nextEpisodeCountdownJob?.isActive != true) {
+            binding.tvAutoSkipCountdown.visibility = View.GONE
+        }
     }
 
     private fun onSkipClicked() {
@@ -3778,6 +3882,7 @@ class DirectStreamActivity : AppCompatActivity() {
 
     override fun onStop() {
         stopWatchProgressUpdates()
+        cancelNextEpisodeCountdown()
         if (::engine.isInitialized && !restartingForReload) {
             persistWatchProgress()
             engine.pause()
@@ -3787,6 +3892,7 @@ class DirectStreamActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         cancelAutoSkipCountdown()
+        cancelNextEpisodeCountdown()
         streamJob?.cancel()
         nextEpisodePreloadJob?.cancel()
         nextEpisodePreloadJob = null
@@ -3836,6 +3942,8 @@ class DirectStreamActivity : AppCompatActivity() {
         private const val HTTP_NOT_FOUND = 404
         private const val SKIP_DURATION_POLL_INTERVAL_MS = 100L
         private const val NEXT_EPISODE_PRELOAD_WINDOW_MS = 5 * 60 * 1000L
+        private const val NEXT_EPISODE_COUNTDOWN_TRIGGER_MS = 90_000L
+        private const val NEXT_EPISODE_COUNTDOWN_SECONDS = 5
 
         const val EXTRA_TYPE = "MEDIA_TYPE"
         const val EXTRA_IS_TV = "IS_TV"
