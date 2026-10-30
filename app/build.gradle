@@ -138,8 +138,15 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Keep QA/debug installs on Unity test inventory; production releases
+            // continue using the explicit property, defaulting to live mode.
+            buildConfigField "boolean", "UNITY_ADS_TEST_MODE", "true"
+        }
+
         release {
             signingConfig signingConfigs.release
+            buildConfigField "boolean", "UNITY_ADS_TEST_MODE", "true"
 
             // ✅ ENABLE R8
             minifyEnabled true
