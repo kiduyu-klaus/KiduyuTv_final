@@ -25,7 +25,9 @@ data class StreamItem(
     val name: String = "",
     /** Direct HTTPS URL to the upstream HLS playlist or progressive file. */
     val url: String,
-    /** Quality hint, e.g. `"1080p"`, `"720p"`, `"Auto"`. */
+    /** Original CDN AES key URL for providers whose manifest proxy breaks relative key URIs. */
+    val hlsKeyUrl: String? = null,
+    /** Quality hint, e.g. "1080p", "720p", "Auto". */
     val quality: String,
     /** Optional audio/subtitle language or variant label supplied by a provider. */
     val language: String = "",

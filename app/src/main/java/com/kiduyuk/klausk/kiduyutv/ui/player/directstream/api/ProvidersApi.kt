@@ -495,6 +495,12 @@ object ProvidersApi {
                         title = title,
                         name = s.optString("name"),
                         url = UrlUtils.normalize(normalizedUrl),
+                        hlsKeyUrl = s.optString("hlsKeyUrl")
+                            .ifBlank { s.optString("keyUrl") }
+                            .takeIf {
+                                it.startsWith("http://", ignoreCase = true) ||
+                                    it.startsWith("https://", ignoreCase = true)
+                            },
                         quality = s.optString("quality", "Auto"),
                         language = extractStreamLanguage(s, provider, title),
                         provider = provider,

@@ -86,16 +86,40 @@ class PlayerEngine(context: Context) {
             .setAllowCrossProtocolRedirects(true)
             .setDefaultRequestProperties(safeHeaders)
         val streamFactory = DefaultDataSource.Factory(appContext, httpFactory)
+        val hlsKeyUrl = stream.hlsKeyUrl ?: inferFlixcloudKeyUrl(stream.url)
         val subtitleHeaders = subtitles
             .filter { it.url.isNotBlank() && it.headers.isNotEmpty() }
             .associate { subtitle ->
                 subtitle.url to mergeHeaders(safeHeaders, subtitle.headers)
             }
-        return if (subtitleHeaders.isEmpty()) {
+        return if (subtitleHeaders.isEmpty() && hlsKeyUrl.isNullOrBlank()) {
             streamFactory
         } else {
-            SubtitleHeaderDataSourceFactory(streamFactory, subtitleHeaders)
+            PlaybackDataSourceFactory(streamFactory, subtitleHeaders, hlsKeyUrl)
         }
+    }
+
+    /**
+     * FlixCloud's manifest proxy returns a child playlist with
+     * `URI="key.bin"`, which Media3 would resolve under enc-dec.app and receive
+     * a 404. The provider supplies the original key URL; this fallback keeps
+     * already-cached/provider responses playable as well.
+     */
+    private fun inferFlixcloudKeyUrl(streamUrl: String): String? {
+        val proxyUri = runCatching { Uri.parse(streamUrl) }.getOrNull() ?: return null
+        if (!proxyUri.host.equals("enc-dec.app", ignoreCase = true) ||
+            !proxyUri.path.orEmpty().endsWith("/parse-flixcloud")
+        ) return null
+        val original = proxyUri.getQueryParameter("url") ?: return null
+        val originalUri = runCatching { Uri.parse(original) }.getOrNull() ?: return null
+        if (!originalUri.host.orEmpty().endsWith("flixcloud.cc", ignoreCase = true)) return null
+        val directory = originalUri.path.orEmpty().substringBeforeLast('/', "")
+        if (directory.isBlank()) return null
+        return originalUri.buildUpon()
+            .clearQuery()
+            .path("$directory/key.bin")
+            .build()
+            .toString()
     }
 
     private fun mergeHeaders(
@@ -117,19 +141,27 @@ class PlayerEngine(context: Context) {
      * AnimeOnsen, whose subtitle endpoint uses a different Authorization
      * header from its DASH manifest.
      */
-    private class SubtitleHeaderDataSourceFactory(
+    private class PlaybackDataSourceFactory(
         private val upstreamFactory: DataSource.Factory,
-        private val headersByUrl: Map<String, Map<String, String>>
+        private val headersByUrl: Map<String, Map<String, String>>,
+        private val hlsKeyUrl: String?
     ) : DataSource.Factory {
         override fun createDataSource(): DataSource {
             val upstream = upstreamFactory.createDataSource()
             return object : DataSource by upstream {
                 override fun open(dataSpec: DataSpec): Long {
+                    val isBrokenFlixcloudKey = dataSpec.uri.host.equals("enc-dec.app", ignoreCase = true) &&
+                        dataSpec.uri.path.orEmpty().endsWith("/key.bin")
+                    val requestSpec = if (isBrokenFlixcloudKey && !hlsKeyUrl.isNullOrBlank()) {
+                        dataSpec.withUri(Uri.parse(hlsKeyUrl))
+                    } else {
+                        dataSpec
+                    }
                     val headers = headersByUrl[dataSpec.uri.toString()]
                     val resolvedSpec = if (headers.isNullOrEmpty()) {
-                        dataSpec
+                        requestSpec
                     } else {
-                        dataSpec.withRequestHeaders(headers)
+                        requestSpec.withRequestHeaders(headers)
                     }
                     return upstream.open(resolvedSpec)
                 }
