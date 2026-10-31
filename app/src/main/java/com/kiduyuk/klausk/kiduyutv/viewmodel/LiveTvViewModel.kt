@@ -240,6 +240,7 @@ class LiveTvViewModel : ViewModel() {
         if (saved.none { it.id == event.id && it.source == event.source }) {
             saved.add(0, event)
             saveFavoriteLiveSports(saved)
+            appContext?.let { com.kiduyuk.klausk.kiduyutv.util.FirebaseSyncManager.syncMyChannelsNow(it) }
         }
     }
 
@@ -308,6 +309,7 @@ class LiveTvViewModel : ViewModel() {
             )
         )
         saveScrapedChannels(saved)
+        appContext?.let { com.kiduyuk.klausk.kiduyutv.util.FirebaseSyncManager.syncMyChannelsNow(it) }
     }
 
     fun isScrapedChannel(channel: IptvChannel): Boolean {
@@ -373,6 +375,7 @@ class LiveTvViewModel : ViewModel() {
                 
                 // Save to SharedPreferences
                 saveFavoriteChannels(localFavorites)
+                appContext?.let { com.kiduyuk.klausk.kiduyutv.util.FirebaseSyncManager.syncMyChannelsNow(it) }
                 
                 // Get Firebase favorites
                 val firebaseFavorites = com.kiduyuk.klausk.kiduyutv.util.FirebaseManager.getSavedChannelsOnce()
@@ -440,6 +443,7 @@ class LiveTvViewModel : ViewModel() {
                 
                 // Save updated list to SharedPreferences
                 saveFavoriteChannels(localFavorites)
+                appContext?.let { com.kiduyuk.klausk.kiduyutv.util.FirebaseSyncManager.syncMyChannelsNow(it) }
                 
                 // Remove from Firebase
                 val key = Base64.encodeToString(channel.url.toByteArray(), Base64.NO_WRAP)

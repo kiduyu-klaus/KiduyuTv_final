@@ -55,6 +55,7 @@ object FirebaseManager {
         const val SAVED_COMPANIES = "savedCompanies"
         const val SAVED_NETWORKS = "savedNetworks"
         const val SAVED_CASTS = "savedCasts"
+        const val MY_CHANNELS = "myChannels"
         const val WATCH_HISTORY = "watchHistory"
         const val PREFERENCES = "preferences"
         const val DEFAULT_PROVIDER = "defaultProvider"
@@ -638,6 +639,26 @@ object FirebaseManager {
 
         ref.addValueEventListener(listener)
         awaitClose { ref.removeEventListener(listener) }
+    }
+
+    /** Read the complete My Channels snapshot containing IPTV, scraped, and Live Sports tabs. */
+    suspend fun getMyChannelsOnce(): Map<String, Any>? {
+        return try {
+            database.getReference("${getCurrentUserPath()}/${Nodes.MY_CHANNELS}")
+                .get()
+                .await()
+                .value as? Map<String, Any>
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching My Channels", e)
+            null
+        }
+    }
+
+    /** Atomically replace the complete My Channels snapshot. */
+    suspend fun replaceMyChannels(snapshot: Map<String, Any?>) {
+        database.getReference("${getCurrentUserPath()}/${Nodes.MY_CHANNELS}")
+            .setValue(snapshot)
+            .await()
     }
     
     // ─────────────────────────────────────────────────────────────────────────────

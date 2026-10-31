@@ -61,7 +61,7 @@ object FirebaseSyncManager {
     val syncMessage: StateFlow<String> = _syncMessage.asStateFlow()
     
     // Total steps for progress calculation
-    private val TOTAL_SYNC_STEPS = 7 // MyList, Companies, Networks, Casts, WatchHistory, FavoriteChannels, DefaultProvider
+    private val TOTAL_SYNC_STEPS = 8 // MyList, Companies, Networks, Casts, WatchHistory, FavoriteChannels, MyChannels, DefaultProvider
     
     // Active listeners for cleanup
     private val activeListeners = mutableListOf<com.google.firebase.database.Query>()
@@ -235,9 +235,14 @@ object FirebaseSyncManager {
                 _syncProgress.value = 6
                 syncFavoriteChannels(forceRefresh)
                 
-                // Step 7: Sync Default Provider
-                _syncMessage.value = "Syncing Preferences..."
+                // Step 7: Sync all three My Channels tabs
+                _syncMessage.value = "Syncing My Channels..."
                 _syncProgress.value = 7
+                syncMyChannels()
+
+                // Step 8: Sync Default Provider
+                _syncMessage.value = "Syncing Preferences..."
+                _syncProgress.value = 8
                 syncDefaultProvider()
                 
                 // Calculate total items synced
@@ -246,7 +251,8 @@ object FirebaseSyncManager {
                 val networksCount = getFirebaseNetworksCount()
                 val castsCount = getFirebaseCastsCount()
                 val favoriteChannelsCount = getFirebaseFavoriteChannelsCount()
-                val totalItems = myListCount + companiesCount + networksCount + castsCount + favoriteChannelsCount
+                val myChannelsCount = getFirebaseMyChannelsCount()
+                val totalItems = myListCount + companiesCount + networksCount + castsCount + favoriteChannelsCount + myChannelsCount
                 
                 _syncProgress.value = TOTAL_SYNC_STEPS
                 _syncMessage.value = "Sync complete!"
@@ -668,6 +674,20 @@ object FirebaseSyncManager {
         }
     }
     
+    /** Reconcile all three My Channels tabs under the dedicated myChannels node. */
+    private suspend fun syncMyChannels() {
+        try {
+            MyChannelsSyncManager.sync(applicationContext ?: return)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error syncing My Channels", e)
+        }
+    }
+
+    /** Best-effort immediate sync used after a local My Channels mutation. */
+    fun syncMyChannelsNow(context: Context) {
+        MyChannelsSyncManager.syncNow(context)
+    }
+
     /**
      * Upload the merged favorites list to Firebase.
      * This ensures:
@@ -783,6 +803,17 @@ object FirebaseSyncManager {
         return try {
             val data = FirebaseManager.getSavedChannelsOnce()
             data?.size ?: 0
+        } catch (e: Exception) {
+            0
+        }
+    }
+
+    /** Get the total number of items across IPTV, scraped, and Live Sports tabs. */
+    private suspend fun getFirebaseMyChannelsCount(): Int {
+        return try {
+            FirebaseManager.getMyChannelsOnce()?.values?.sumOf { value ->
+                (value as? Map<*, *>)?.size ?: 0
+            } ?: 0
         } catch (e: Exception) {
             0
         }
