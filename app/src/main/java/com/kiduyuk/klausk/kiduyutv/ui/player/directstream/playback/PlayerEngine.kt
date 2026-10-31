@@ -14,6 +14,8 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.HttpDataSource
@@ -55,7 +57,10 @@ class PlayerEngine(context: Context) {
      * because each stream may carry different headers.
      */
 
-    private fun buildDataSourceFactory(stream: StreamItem): DefaultDataSource.Factory {
+    private fun buildDataSourceFactory(
+        stream: StreamItem,
+        subtitles: List<SubtitleItem> = emptyList()
+    ): DataSource.Factory {
         // Detect and replace obviously fake User-Agent strings before the
         // factory is built. Anti-bot CDNs (Cloudflare, Akamai, DataDome)
         // 403 any UA that claims a browser version newer than the latest
@@ -80,7 +85,56 @@ class PlayerEngine(context: Context) {
             .setReadTimeoutMs(HTTP_READ_TIMEOUT_MS)
             .setAllowCrossProtocolRedirects(true)
             .setDefaultRequestProperties(safeHeaders)
-        return DefaultDataSource.Factory(appContext, httpFactory)
+        val streamFactory = DefaultDataSource.Factory(appContext, httpFactory)
+        val subtitleHeaders = subtitles
+            .filter { it.url.isNotBlank() && it.headers.isNotEmpty() }
+            .associate { subtitle ->
+                subtitle.url to mergeHeaders(safeHeaders, subtitle.headers)
+            }
+        return if (subtitleHeaders.isEmpty()) {
+            streamFactory
+        } else {
+            SubtitleHeaderDataSourceFactory(streamFactory, subtitleHeaders)
+        }
+    }
+
+    private fun mergeHeaders(
+        base: Map<String, String>,
+        overrides: Map<String, String>
+    ): Map<String, String> {
+        val merged = LinkedHashMap(base)
+        overrides.forEach { (name, value) ->
+            if (name.isBlank() || value.isBlank()) return@forEach
+            merged.keys.firstOrNull { it.equals(name, ignoreCase = true) }?.let { merged.remove(it) }
+            merged[name] = value
+        }
+        return merged
+    }
+
+    /**
+     * Resolves request headers by subtitle URI while leaving the video request
+     * on the stream headers. This is required for providers such as
+     * AnimeOnsen, whose subtitle endpoint uses a different Authorization
+     * header from its DASH manifest.
+     */
+    private class SubtitleHeaderDataSourceFactory(
+        private val upstreamFactory: DataSource.Factory,
+        private val headersByUrl: Map<String, Map<String, String>>
+    ) : DataSource.Factory {
+        override fun createDataSource(): DataSource {
+            val upstream = upstreamFactory.createDataSource()
+            return object : DataSource by upstream {
+                override fun open(dataSpec: DataSpec): Long {
+                    val headers = headersByUrl[dataSpec.uri.toString()]
+                    val resolvedSpec = if (headers.isNullOrEmpty()) {
+                        dataSpec
+                    } else {
+                        dataSpec.withRequestHeaders(headers)
+                    }
+                    return upstream.open(resolvedSpec)
+                }
+            }
+        }
     }
 
     /** Browser defaults used when DahmerMovies did not capture a value. */
@@ -231,7 +285,7 @@ class PlayerEngine(context: Context) {
         subtitles: List<SubtitleItem>
     ): MediaSource {
         val uri = Uri.parse(stream.url)
-        val dataSourceFactory = buildDataSourceFactory(stream)
+        val dataSourceFactory = buildDataSourceFactory(stream, subtitles)
         val validSubtitles = subtitles.filter { subtitle ->
             subtitle.url.isNotBlank() && subtitle.mimeType.isNotBlank() &&
                 (subtitle.url.startsWith("http://", ignoreCase = true) ||
@@ -239,12 +293,12 @@ class PlayerEngine(context: Context) {
                     subtitle.url.startsWith("file://", ignoreCase = true))
         }
 
-        // Media3 sideloaded SRT/VTT tracks use SubtitleConfiguration and
+        // Media3 sideloaded SRT/VTT/SSA tracks use SubtitleConfiguration and
         // DefaultMediaSourceFactory. This keeps VTT on the supported Media3
         // subtitle decoder path instead of the legacy text-sample path.
         //
-        // The stream data source carries the provider's Origin, Referer,
-        // User-Agent, and Cookie for subtitle requests as well.
+        // The datasource wrapper preserves stream headers and overlays each
+        // subtitle's own headers when its URI is opened.
         if (validSubtitles.isNotEmpty()) {
             val subtitleConfigurations = validSubtitles.mapIndexed { index, subtitle ->
                 MediaItem.SubtitleConfiguration.Builder(Uri.parse(subtitle.url))

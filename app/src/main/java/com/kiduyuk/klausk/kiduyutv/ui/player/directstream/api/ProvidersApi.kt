@@ -653,8 +653,9 @@ object ProvidersApi {
      * Normalizes the subtitle shapes emitted by the provider plugins. MovieBox
      * currently returns `{ url, name, language, headers }`, while other
      * providers may use `file`, `label`, `lang`, `format`, or `mimeType`.
-     * Media3 can reliably side-load SRT and WebVTT, so discard unsupported
-     * formats rather than adding a track that fails only after playback starts.
+     * Media3 can side-load WebVTT, SRT, and SSA/ASS text tracks. Preserve the
+     * provider MIME metadata because some subtitle URLs are signed and have no
+     * useful file extension.
      */
     private fun parseSubtitles(array: org.json.JSONArray?): List<SubtitleItem> = buildList {
         if (array == null) return@buildList
@@ -713,6 +714,8 @@ object ProvidersApi {
             value.contains("vtt") || path.endsWith(".vtt") -> "text/vtt"
             value.contains("srt") || value.contains("subrip") || path.endsWith(".srt") ->
                 "application/x-subrip"
+            value.contains("ssa") || value.contains("ass") ||
+                path.endsWith(".ssa") || path.endsWith(".ass") -> "text/x-ssa"
             else -> null
         }
     }
