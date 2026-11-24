@@ -19,11 +19,13 @@
     <string name="others_also_watched">Others Also Watched</string>
     <string name="streams_loading">Loading streams…</string>
     <string name="stream_fetch_count">Streams fetched: %1$d</string>
+    <string name="providers_without_streams">No streams from: %1$s</string>
     <string name="wait_a_moment">Wait a moment</string>
     <string name="buffering_animation">Loading</string>
     <string name="streams_empty">No streams returned by the server.</string>
     <string name="no_streams_dialog_title">No streams found</string>
     <string name="no_streams_dialog_message">No playable streams were found for this media. Would you like to try again or exit the player?</string>
+    <string name="no_streams_provider_list">Providers with no streams: %1$s</string>
     <string name="no_streams_retry">Retry</string>
     <string name="no_streams_try_all_providers">Try all providers</string>
     <string name="no_streams_exit">Exit</string>

@@ -135,6 +135,8 @@ class DirectStreamActivity : AppCompatActivity() {
     private var subtitleJob: Job? = null
     private var availableStreams: List<StreamItem> = emptyList()
     private var activeStream: StreamItem? = null
+    /** Providers that completed without returning a playable stream. */
+    private val providersWithoutStreams = linkedSetOf<String>()
     /** Tracks supplied by the currently selected provider stream. */
     private var providerSubtitles: List<SubtitleItem> = emptyList()
     /** Tracks explicitly added by the viewer, such as a downloaded SubDL file. */
@@ -2306,6 +2308,8 @@ class DirectStreamActivity : AppCompatActivity() {
         backendDownDialog = null
         availableStreams = emptyList()
         activeStream = null
+        providersWithoutStreams.clear()
+        hideProvidersWithoutStreams()
         providerSkipSegments = null
         providerSubtitles = emptyList()
         supplementalSubtitles = emptyList()
@@ -2355,6 +2359,14 @@ class DirectStreamActivity : AppCompatActivity() {
                             )
                         }
                     },
+                    onProviderFinished = { _, _, providerName, streamCount, failed ->
+                        withContext(Dispatchers.Main) {
+                            if (failed || streamCount == 0) {
+                                providersWithoutStreams.add(providerName)
+                                updateProvidersWithoutStreams()
+                            }
+                        }
+                    },
                     onProviderRetry = { index, total, providerName ->
                         withContext(Dispatchers.Main) {
                             showStatus(
@@ -2373,6 +2385,7 @@ class DirectStreamActivity : AppCompatActivity() {
             result.onSuccess { items ->
                 hideProviderFetchProgress()
                 hideStreamFetchCount()
+                hideProvidersWithoutStreams()
                 Log.i(PROVIDER_TAG, "loadAndPlay received ${items.size} streams for provider=${provider.displayName}")
                 if (items.isEmpty()) {
                     Log.w(PROVIDER_TAG, "Empty stream list for provider=${provider.displayName}")
@@ -2390,6 +2403,7 @@ class DirectStreamActivity : AppCompatActivity() {
             }.onFailure { error ->
                 hideProviderFetchProgress()
                 hideStreamFetchCount()
+                hideProvidersWithoutStreams()
                 Log.w(TAG, "Stream fetch failed: ${error.message}")
                 Log.w(PROVIDER_TAG, "Stream fetch failed for provider=${provider.displayName}: ${error.message}")
                 if (error is ProvidersBackendUnavailableException) {
@@ -2440,9 +2454,17 @@ class DirectStreamActivity : AppCompatActivity() {
         } else {
             R.string.no_streams_retry
         }
+        val providerMessage = providersWithoutStreams
+            .takeIf { it.isNotEmpty() }
+            ?.joinToString(", ")
+            ?.let { getString(R.string.no_streams_provider_list, it) }
+        val dialogMessage = listOfNotNull(
+            getString(R.string.no_streams_dialog_message),
+            providerMessage
+        ).joinToString("\n\n")
         val dialog = AlertDialog.Builder(this)
             .setTitle(R.string.no_streams_dialog_title)
-            .setMessage(R.string.no_streams_dialog_message)
+            .setMessage(dialogMessage)
             .setCancelable(false)
             .setPositiveButton(retryLabel) { currentDialog, _ ->
                 currentDialog.dismiss()
@@ -2465,6 +2487,25 @@ class DirectStreamActivity : AppCompatActivity() {
         }
         noStreamsDialog = dialog
         dialog.show()
+    }
+
+    /** Shows the names of providers that completed with no stream while the
+     * aggregate provider fetch is still running. */
+    private fun updateProvidersWithoutStreams() {
+        if (providersWithoutStreams.isEmpty()) {
+            hideProvidersWithoutStreams()
+            return
+        }
+        binding.providersWithoutStreams.text = getString(
+            R.string.providers_without_streams,
+            providersWithoutStreams.joinToString(", ")
+        )
+        binding.providersWithoutStreams.visibility = View.VISIBLE
+    }
+
+    private fun hideProvidersWithoutStreams() {
+        binding.providersWithoutStreams.animate().cancel()
+        binding.providersWithoutStreams.visibility = View.GONE
     }
 
     /**

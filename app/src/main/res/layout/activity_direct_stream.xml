@@ -543,6 +543,26 @@
         android:visibility="gone" />
 
     <TextView
+        android:id="@+id/providersWithoutStreams"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginStart="24dp"
+        android:layout_marginTop="78dp"
+        android:layout_marginEnd="24dp"
+        android:background="@drawable/bg_direct_stream_status"
+        android:elevation="16dp"
+        android:gravity="center"
+        android:maxLines="3"
+        android:paddingStart="18dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="18dp"
+        android:paddingBottom="8dp"
+        android:textColor="@android:color/white"
+        android:textSize="14sp"
+        android:visibility="gone" />
+
+    <TextView
         android:id="@+id/playerStatus"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
