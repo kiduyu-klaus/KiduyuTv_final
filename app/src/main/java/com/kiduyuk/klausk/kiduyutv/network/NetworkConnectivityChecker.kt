@@ -1,5 +1,6 @@
 package com.kiduyuk.klausk.kiduyutv.network
 
+import android.app.Activity
 import android.app.Application
 import android.content.Context
 import android.net.ConnectivityManager
@@ -106,6 +107,34 @@ object NetworkConnectivityChecker {
      */
     fun onDialogDismissed() {
         isDialogShowingForCurrentBlockState = false
+    }
+
+    /**
+     * Shows the blocking DNS dialog on the supplied foreground Activity.
+     *
+     * Dialog windows belong to the Activity that created them. When the splash
+     * Activity is replaced by MainActivity, its dialog is therefore destroyed.
+     * This handoff method lets each foreground Activity re-attach the dialog
+     * while the detected blocking state remains active.
+     */
+    fun showAdBlockingDnsDialogIfNeeded(activity: Activity) {
+        if (!networkDiagnostics.value.isUsingCustomDns ||
+            activity.isFinishing ||
+            activity.isDestroyed
+        ) {
+            return
+        }
+
+        // A dialog from a previous Activity cannot be reused after navigation.
+        if (NetworkStateDialog.isShowing()) return
+
+        isDialogShowingForCurrentBlockState = true
+        try {
+            NetworkStateDialog.showAdBlockingDnsDialog(activity)
+        } catch (error: Exception) {
+            isDialogShowingForCurrentBlockState = false
+            Log.w(TAG, "Failed to attach the ad-blocking DNS dialog", error)
+        }
     }
 
     fun startMonitoring(context: Context) {
@@ -479,17 +508,9 @@ object NetworkConnectivityChecker {
                     if (!isDialogShowingForCurrentBlockState) {
                         withContext(Dispatchers.Main) {
                             val activityContext = AndroidApp.getCurrentActivity()
-                            
-                            // Context Verification Layer (Bypasses WindowManager Token Exceptions)
-                            if (activityContext != null && !activityContext.isFinishing && !activityContext.isDestroyed) {
-                                try {
-                                    Log.i(TAG, "Ad-blocking DNS detected behaviorally. Displaying UI Dialog Frame safely.")
-                                    isDialogShowingForCurrentBlockState = true
-                                    NetworkStateDialog.showAdBlockingDnsDialog(activityContext)
-                                } catch (e: Exception) {
-                                    Log.w(TAG, "Failed initializing interface alert anchor window: ${e.message}")
-                                    isDialogShowingForCurrentBlockState = false
-                                }
+                            if (activityContext != null) {
+                                Log.i(TAG, "Ad-blocking DNS detected behaviorally. Displaying UI Dialog Frame safely.")
+                                showAdBlockingDnsDialogIfNeeded(activityContext)
                             }
                         }
                     }

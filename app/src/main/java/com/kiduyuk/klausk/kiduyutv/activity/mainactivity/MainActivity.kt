@@ -54,6 +54,15 @@ class MainActivity : ComponentActivity() {
         if (!allGranted) {
             showPermissionDeniedDialog()
         }
+    )
+
+    /**
+     * Re-attaches the DNS-block warning after SplashActivity is replaced.
+     * Dialog windows are Activity-owned, while the detection state is global.
+     */
+    override fun onResume() {
+        super.onResume()
+        NetworkConnectivityChecker.showAdBlockingDnsDialogIfNeeded(this)
     }
 
     @androidx.media3.common.util.UnstableApi

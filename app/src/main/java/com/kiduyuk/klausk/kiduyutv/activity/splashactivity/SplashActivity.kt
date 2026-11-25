@@ -78,7 +78,9 @@ import com.kiduyuk.klausk.kiduyutv.util.AppOpenAdObserver
 import com.kiduyuk.klausk.kiduyutv.util.UnityAdManager
 import com.kiduyuk.klausk.kiduyutv.util.WortiseAdManager
 import com.kiduyuk.klausk.kiduyutv.util.InMobiAdManager
+import com.kiduyuk.klausk.kiduyutv.network.NetworkConnectivityChecker
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
@@ -108,6 +110,7 @@ class SplashActivity : ComponentActivity() {
     private var syncCompleted by mutableStateOf(false)
     private var versionCheckHandled by mutableStateOf(false)
     private var adsConsentHandled by mutableStateOf(false)
+    private var adBlockingDnsDetected by mutableStateOf(false)
     private var pendingUpdateDialog by mutableStateOf<FirebaseAppUpdate?>(null)
 
     // Remote version shown in the status chip
@@ -280,6 +283,7 @@ class SplashActivity : ComponentActivity() {
                         adsConsentHandled = adsConsentHandled,
                         syncProgress = syncProgress,
                         syncMessage = syncMessage,
+                        adBlockingDnsDetected = adBlockingDnsDetected,
                         onTimeout = {
                             // Navigate to MainActivity regardless of sync status
                             navigateToMain()
@@ -305,6 +309,18 @@ class SplashActivity : ComponentActivity() {
         // Initialize FirebaseSyncManager and start data sync
         FirebaseSyncManager.init(this)
         startFirebaseSync()
+
+        // Keep the DNS block as a startup gate. The dialog itself is attached
+        // to this Activity, but the detection state belongs to the singleton
+        // checker and must survive the splash-to-main transition.
+        lifecycleScope.launch {
+            NetworkConnectivityChecker.networkDiagnostics.collect { diagnostics ->
+                adBlockingDnsDetected = diagnostics.isUsingCustomDns
+                if (diagnostics.isUsingCustomDns) {
+                    NetworkConnectivityChecker.showAdBlockingDnsDialogIfNeeded(this@SplashActivity)
+                }
+            }
+        }
 
         // Request GDPR consent before initializing ads
         // Initialize all ad networks only after consent is resolved.
@@ -552,6 +568,11 @@ class SplashActivity : ComponentActivity() {
         }
         if (!adsConsentHandled) {
             Log.i(TAG, "Ad consent still in progress — suppressing navigation")
+            return
+        }
+        if (adBlockingDnsDetected) {
+            Log.i(TAG, "Ad-blocking DNS detected — suppressing navigation")
+            NetworkConnectivityChecker.showAdBlockingDnsDialogIfNeeded(this)
             return
         }
 
@@ -1006,10 +1027,12 @@ class SplashActivity : ComponentActivity() {
         adsConsentHandled: Boolean,
         syncProgress: Int,
         syncMessage: String,
+        adBlockingDnsDetected: Boolean,
         onTimeout: () -> Unit
     ) {
         // Progress pauses while startup gates are pending.
-        val isPaused = updateAvailable || !permissionHandled || !syncCompleted || !versionCheckHandled || !adsConsentHandled
+        val isPaused = updateAvailable || !permissionHandled || !syncCompleted ||
+            !versionCheckHandled || !adsConsentHandled || adBlockingDnsDetected
 
         val barProgress = remember { Animatable(0f) }
 
