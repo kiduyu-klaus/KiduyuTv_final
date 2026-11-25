@@ -43,9 +43,9 @@ object InMobiAdManager {
     @Volatile private var pendingRewardedUnavailable: (() -> Unit)? = null
 
     val isInterstitialReady: Boolean
-        get() = isInitialised && interstitial?.isReady == true
+        get() = isInitialised && interstitial?.isReady() == true
     val isRewardedReady: Boolean
-        get() = isInitialised && rewarded?.isReady == true
+        get() = isInitialised && rewarded?.isReady() == true
 
     fun preloadAds(context: Context) {
         runOnMain {
@@ -91,7 +91,7 @@ object InMobiAdManager {
     }
 
     private fun loadInterstitial() {
-        if (!isInitialised || interstitial?.isReady == true ||
+        if (!isInitialised || interstitial?.isReady() == true ||
             !interstitialLoadStarted.compareAndSet(false, true)) return
         try {
             val ad = interstitial ?: InMobiInterstitial(
@@ -107,7 +107,7 @@ object InMobiAdManager {
     }
 
     private fun loadRewarded() {
-        if (!isInitialised || rewarded?.isReady == true ||
+        if (!isInitialised || rewarded?.isReady() == true ||
             !rewardedLoadStarted.compareAndSet(false, true)) return
         try {
             val ad = rewarded ?: InMobiInterstitial(

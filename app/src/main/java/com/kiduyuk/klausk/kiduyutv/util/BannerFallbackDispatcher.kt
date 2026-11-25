@@ -102,6 +102,24 @@ object BannerFallbackDispatcher {
             }, PROVIDER_TIMEOUT_MS)
         }
 
+        fun loadInMobi() {
+            if (!isCurrent(INMOBI_STAGE) || stopIfIneligible(INMOBI_STAGE)) return
+            Log.i(TAG, "Banner fallback: InMobi")
+            mainHandler.postDelayed({
+                if (move(INMOBI_STAGE, ADMOB_STAGE)) {
+                    Log.w(TAG, "InMobi banner timed out; advancing to AdMob")
+                    container.removeAllViews()
+                    loadAdMob()
+                }
+            }, PROVIDER_TIMEOUT_MS)
+            InMobiAdManager.loadBanner(
+                activity = activity,
+                container = container,
+                onLoaded = { onMain { finish(INMOBI_STAGE, "inmobi", "loaded") } },
+                onFailed = { onMain { if (move(INMOBI_STAGE, ADMOB_STAGE)) loadAdMob() } }
+            )
+        }
+
         fun loadStartIo() {
             if (!isCurrent(START_IO_STAGE) || stopIfIneligible(START_IO_STAGE)) return
             Log.i(TAG, "Banner fallback: Start.io")
@@ -123,24 +141,6 @@ object BannerFallbackDispatcher {
                         if (move(START_IO_STAGE, INMOBI_STAGE)) loadInMobi()
                     }
                 }
-            )
-        }
-
-        fun loadInMobi() {
-            if (!isCurrent(INMOBI_STAGE) || stopIfIneligible(INMOBI_STAGE)) return
-            Log.i(TAG, "Banner fallback: InMobi")
-            mainHandler.postDelayed({
-                if (move(INMOBI_STAGE, ADMOB_STAGE)) {
-                    Log.w(TAG, "InMobi banner timed out; advancing to AdMob")
-                    container.removeAllViews()
-                    loadAdMob()
-                }
-            }, PROVIDER_TIMEOUT_MS)
-            InMobiAdManager.loadBanner(
-                activity = activity,
-                container = container,
-                onLoaded = { onMain { finish(INMOBI_STAGE, "inmobi", "loaded") } },
-                onFailed = { onMain { if (move(INMOBI_STAGE, ADMOB_STAGE)) loadAdMob() } }
             )
         }
 

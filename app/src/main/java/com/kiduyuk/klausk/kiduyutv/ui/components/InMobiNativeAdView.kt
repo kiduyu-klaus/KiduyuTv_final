@@ -113,20 +113,19 @@ private fun bindNativeView(root: FrameLayout, ad: InMobiNative) {
     views.advertiser.text = ad.getAdvertiserName().orEmpty()
     views.cta.text = ad.getCtaText().orEmpty()
     views.rating.rating = ad.getAdRating()
-    ad.getAdIcon()?.getUrl()?.let { iconUrl: String ->
+    ad.getAdIcon()?.url?.let { iconUrl: String ->
         Glide.with(views.icon).load(iconUrl).into(views.icon)
     }
     views.cta.setOnClickListener { ad.takeAction() }
     root.setOnClickListener { ad.takeAction() }
-    val trackingData = InMobiNativeViewData(
-        root,
-        views.title,
-        views.description,
-        views.icon,
-        views.cta,
-        views.rating,
-        views.advertiser,
-        emptyList()
-    )
+    val trackingData = InMobiNativeViewData.Builder(root)
+        .setTitleView(views.title)
+        .setDescriptionView(views.description)
+        .setIconView(views.icon)
+        .setCTAView(views.cta)
+        .setRatingView(views.rating)
+        .setAdvertiserView(views.advertiser)
+        .setExtraViews(emptyList())
+        .build()
     ad.registerViewForTracking(trackingData)
 }
