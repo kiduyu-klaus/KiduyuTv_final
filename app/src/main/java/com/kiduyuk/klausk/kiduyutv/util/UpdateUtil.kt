@@ -233,6 +233,31 @@ object UpdateUtil {
     }
 
     /**
+     * Determines whether the device is an Amazon Fire TV device.
+     *
+     * Fire TV devices do not consistently expose Google Play Services, so ad
+     * initialization uses this narrower check when selecting secondary ad
+     * network eligibility. The Amazon feature flag is preferred, with the
+     * manufacturer and AFT model checks retained for older Fire OS releases.
+     */
+    fun isFireTvDevice(context: Context): Boolean {
+        val packageManager = context.packageManager
+        val hasFireTvFeature = packageManager.hasSystemFeature("amazon.hardware.fire_tv")
+        val manufacturer = Build.MANUFACTURER
+        val model = Build.MODEL
+        val isAmazonDevice = manufacturer.equals("Amazon", ignoreCase = true)
+        val hasFireTvModel = model.startsWith("AFT", ignoreCase = true)
+
+        val isFireTv = hasFireTvFeature || (isAmazonDevice && hasFireTvModel)
+        Log.i(
+            TAG,
+            "Fire TV detection: feature=$hasFireTvFeature, " +
+                "manufacturer=$manufacturer, model=$model, result=$isFireTv"
+        )
+        return isFireTv
+    }
+
+    /**
      * Determines the appropriate device type string for APK matching.
      * Returns "tv" for TV devices, "phone" for mobile devices.
      */
