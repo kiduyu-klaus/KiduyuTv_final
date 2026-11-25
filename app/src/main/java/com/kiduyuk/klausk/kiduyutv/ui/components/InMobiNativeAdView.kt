@@ -108,12 +108,12 @@ private const val WRAP = -2
 
 private fun bindNativeView(root: FrameLayout, ad: InMobiNative) {
     val views = root.tag as NativeViews
-    views.title.text = ad.adTitle.orEmpty()
-    views.description.text = ad.adDescription.orEmpty()
-    views.advertiser.text = ad.advertiserName.orEmpty()
-    views.cta.text = ad.ctaText.orEmpty()
-    views.rating.rating = ad.adRating
-    ad.adIcon?.url?.let { iconUrl ->
+    views.title.text = ad.getAdTitle().orEmpty()
+    views.description.text = ad.getAdDescription().orEmpty()
+    views.advertiser.text = ad.getAdvertiserName().orEmpty()
+    views.cta.text = ad.getCtaText().orEmpty()
+    views.rating.rating = ad.getAdRating()
+    ad.getAdIcon()?.getUrl()?.let { iconUrl: String ->
         Glide.with(views.icon).load(iconUrl).into(views.icon)
     }
     views.cta.setOnClickListener { ad.takeAction() }
