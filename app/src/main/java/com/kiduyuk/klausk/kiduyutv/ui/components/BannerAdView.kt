@@ -27,6 +27,7 @@ import com.kiduyuk.klausk.kiduyutv.util.AdEligibility
 import com.kiduyuk.klausk.kiduyutv.util.AdManager
 import com.kiduyuk.klausk.kiduyutv.util.BannerFallbackDispatcher
 import com.kiduyuk.klausk.kiduyutv.util.AdUnitIds
+import com.kiduyuk.klausk.kiduyutv.util.InMobiAdManager
 import com.kiduyuk.klausk.kiduyutv.util.UnityAdManager
 import com.kiduyuk.klausk.kiduyutv.util.WortiseAdManager
 
@@ -100,6 +101,7 @@ fun BannerAdView(modifier: Modifier = Modifier) {
             containerRef.value?.let { BannerFallbackDispatcher.cancel(it) }
             UnityAdManager.destroyBanner()
             WortiseAdManager.destroyBanner()
+            InMobiAdManager.destroyBanner()
             containerRef.value?.removeAllViews()
             containerRef.value = null
             adView.destroy()

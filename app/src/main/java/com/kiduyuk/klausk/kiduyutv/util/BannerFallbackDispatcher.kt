@@ -108,6 +108,7 @@ object BannerFallbackDispatcher {
             mainHandler.postDelayed({
                 if (move(INMOBI_STAGE, ADMOB_STAGE)) {
                     Log.w(TAG, "InMobi banner timed out; advancing to AdMob")
+                    InMobiAdManager.destroyBanner()
                     container.removeAllViews()
                     loadAdMob()
                 }
@@ -116,7 +117,14 @@ object BannerFallbackDispatcher {
                 activity = activity,
                 container = container,
                 onLoaded = { onMain { finish(INMOBI_STAGE, "inmobi", "loaded") } },
-                onFailed = { onMain { if (move(INMOBI_STAGE, ADMOB_STAGE)) loadAdMob() } }
+                onFailed = {
+                    onMain {
+                        if (move(INMOBI_STAGE, ADMOB_STAGE)) {
+                            InMobiAdManager.destroyBanner()
+                            loadAdMob()
+                        }
+                    }
+                }
             )
         }
 

@@ -8,6 +8,8 @@ import com.google.android.ump.ConsentInformation
 import com.google.android.ump.ConsentRequestParameters
 import com.google.android.ump.FormError
 import com.google.android.ump.UserMessagingPlatform
+import com.inmobi.sdk.InMobiSdk
+import org.json.JSONObject
 
 /**
  * Manages GDPR consent using Google's User Messaging Platform (UMP).
@@ -131,6 +133,10 @@ object ConsentManager {
         // Unity Ads 4.21 consumes the IAB TCF string from a TCF-compliant CMP.
         // Do not reduce UMP's purpose/vendor choices to a single userConsent bit.
 
+        // InMobi 11.5.x requires the publisher to pass GDPR consent at
+        // initialization and when the user changes privacy options.
+        InMobiAdManager.updateConsent(context)
+
         // ── Wortise ───────────────────────────────────────────────────────
         // Wortise runs its own consent CMP after SDK initialization.
         Log.i(TAG, "Wortise consent is requested after SDK initialization.")
@@ -146,6 +152,31 @@ object ConsentManager {
         } catch (e: Exception) {
             Log.w(TAG, "Error checking consent status: ${e.message}")
             false
+        }
+    }
+
+    /** Builds the GDPR object required by InMobiSdk.init/updateGDPRConsent. */
+    fun getInMobiConsentObject(context: Context): JSONObject? {
+        return try {
+            val preferences = context.getSharedPreferences(
+                "${context.packageName}_preferences",
+                Context.MODE_PRIVATE
+            )
+            val gdprApplies = preferences.all["IABTCF_gdprApplies"]?.toString()
+                ?: return null
+            val consent = JSONObject()
+                .put(InMobiSdk.IM_GDPR_CONSENT_GDPR_APPLIES, gdprApplies)
+            val tcString = preferences.all["IABTCF_TCString"]?.toString().orEmpty()
+            if (tcString.isNotBlank()) {
+                consent.put(InMobiSdk.IM_GDPR_CONSENT_IAB, tcString)
+                consent.put(InMobiSdk.IM_GDPR_CONSENT_AVAILABLE, true)
+            } else {
+                consent.put(InMobiSdk.IM_GDPR_CONSENT_AVAILABLE, false)
+            }
+            consent
+        } catch (error: Exception) {
+            Log.w(TAG, "Unable to build InMobi GDPR consent object", error)
+            null
         }
     }
 

@@ -19,6 +19,10 @@ def streamApiToken = providers.gradleProperty("STREAM_API_TOKEN")
         .orElse(providers.environmentVariable("STREAM_API_TOKEN"))
         .getOrElse("")
 def escapedStreamApiToken = streamApiToken.replace("\\", "\\\\").replace("\"", "\\\"")
+def inmobiAccountId = providers.gradleProperty("INMOBI_ACCOUNT_ID")
+        .orElse(providers.environmentVariable("INMOBI_ACCOUNT_ID"))
+        .getOrElse("")
+def escapedInmobiAccountId = inmobiAccountId.replace("\\", "\\\\").replace("\"", "\\\"")
 def startIoAppId = "207814611"
 def startIoTestAds = providers.gradleProperty("START_IO_TEST_ADS")
         .orElse(providers.environmentVariable("START_IO_TEST_ADS"))
@@ -66,6 +70,7 @@ android {
         buildConfigField "String", "SUBDL_API_KEY", "\"${escapedSubdlApiKey}\""
         buildConfigField "String", "OPENSUBTITLES_API_KEY", "\"${escapedOpenSubtitlesApiKey}\""
         buildConfigField "String", "STREAM_API_TOKEN", "\"${escapedStreamApiToken}\""
+        buildConfigField "String", "INMOBI_ACCOUNT_ID", "\"${escapedInmobiAccountId}\""
         buildConfigField "String", "START_IO_APP_ID", "\"${startIoAppId}\""
         buildConfigField "boolean", "START_IO_TEST_ADS", "${startIoTestAds.toBoolean()}"
         buildConfigField "String", "UNITY_ADS_GAME_ID", "\"${escapedUnityAdsGameId}\""
@@ -192,9 +197,9 @@ dependencies {
     implementation 'androidx.recyclerview:recyclerview:1.3.2'
     implementation 'androidx.tvprovider:tvprovider:1.0.0'
     implementation 'androidx.work:work-runtime-ktx:2.10.0'
-    // InMobi Android SDK 11.5.0; current SDK supports API 21+ and this app
+    // InMobi Android SDK 11.5.1; current SDK supports API 21+ and this app
     // retains its existing API 24 minimum.
-    implementation 'com.inmobi.monetization:inmobi-ads-kotlin:11.5.0'
+    implementation 'com.inmobi.monetization:inmobi-ads-kotlin:11.5.1'
     // Native EasyList-compatible filtering for WebView requests, cosmetic rules,
     // and scriptlet injection. The legacy AdvancedAdBlocker remains as fallback.
     implementation('com.github.Edsuns.AdblockAndroid:ad-filter:0.9.1') {

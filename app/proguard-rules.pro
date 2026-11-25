@@ -2,6 +2,11 @@
 # 📢 GOOGLE ADS / ADMOB
 ##############################################
 
+# InMobi 11.5.1 ships these consumer rules; keep them explicit here as well
+# because this app enables R8 and uses listener/native APIs reflectively.
+-keep class com.inmobi.** { *; }
+-dontwarn com.inmobi.**
+
 # Google Mobile Ads SDK
 -keep class com.google.android.gms.ads.** { *; }
 -keep class com.google.ads.** { *; }

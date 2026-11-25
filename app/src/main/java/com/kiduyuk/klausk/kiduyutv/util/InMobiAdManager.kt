@@ -6,41 +6,51 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.ViewGroup
+import com.inmobi.ads.InMobiAdRequestStatus
 import com.inmobi.ads.InMobiBanner
 import com.inmobi.ads.InMobiInterstitial
 import com.inmobi.ads.InMobiNative
-import com.inmobi.ads.InMobiAdRequestStatus
 import com.inmobi.ads.listeners.BannerAdEventListener
 import com.inmobi.ads.listeners.InterstitialAdEventListener
 import com.inmobi.ads.listeners.NativeAdEventListener
 import com.inmobi.sdk.InMobiSdk
 import com.inmobi.sdk.SdkInitializationListener
+import com.kiduyuk.klausk.kiduyutv.BuildConfig
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 /** Centralized, consent-gated InMobi integration. All SDK calls are serialized on the main thread. */
 object InMobiAdManager {
     private const val TAG = "InMobiAdManager"
-    private const val APP_KEY = "10000259716"
+    private val accountId: String
+        get() = BuildConfig.INMOBI_ACCOUNT_ID.trim()
+
     const val INTERSTITIAL_PLACEMENT = 10000893847L
     const val BANNER_PLACEMENT = 10000893848L
     const val REWARDED_PLACEMENT = 10000893849L
     const val NATIVE_PLACEMENT = 10000893850L
     private const val BANNER_REFRESH_SECONDS = 60
+
     private val mainHandler = Handler(Looper.getMainLooper())
     private val initializationStarted = AtomicBoolean(false)
     private val interstitialLoadStarted = AtomicBoolean(false)
     private val rewardedLoadStarted = AtomicBoolean(false)
+    private val bannerRequestId = AtomicLong(0L)
+
     @Volatile var isInitialised = false
         private set
     @Volatile private var interstitial: InMobiInterstitial? = null
     @Volatile private var rewarded: InMobiInterstitial? = null
     @Volatile private var banner: InMobiBanner? = null
     @Volatile private var appContext: Context? = null
-    @Volatile private var pendingInterstitialDismissed: (() -> Unit)? = null
-    @Volatile private var pendingInterstitialUnavailable: (() -> Unit)? = null
-    @Volatile private var pendingRewarded: (() -> Unit)? = null
-    @Volatile private var pendingRewardedDismissed: (() -> Unit)? = null
-    @Volatile private var pendingRewardedUnavailable: (() -> Unit)? = null
+
+    // All accesses happen on the main thread. The nullable callbacks also act as
+    // the guard that prevents overlapping InMobi fullscreen shows.
+    private var pendingInterstitialDismissed: (() -> Unit)? = null
+    private var pendingInterstitialUnavailable: (() -> Unit)? = null
+    private var pendingRewarded: (() -> Unit)? = null
+    private var pendingRewardedDismissed: (() -> Unit)? = null
+    private var pendingRewardedUnavailable: (() -> Unit)? = null
 
     val isInterstitialReady: Boolean
         get() = isInitialised && interstitial?.isReady() == true
@@ -54,34 +64,49 @@ object InMobiAdManager {
                 return@runOnMain
             }
             appContext = context.applicationContext
-            if (!isInitialised) {
-                initialize(context.applicationContext)
-            } else {
-                preloadFullscreenAds()
-            }
+            if (!isInitialised) initialize(context.applicationContext) else preloadFullscreenAds()
         }
     }
 
     fun retryInitIfEligible(context: Context) = preloadAds(context)
 
     private fun initialize(context: Context) {
+        if (accountId.length !in 32..36) {
+            Log.e(TAG, "Invalid InMobi account ID: expected 32-36 characters; configure INMOBI_ACCOUNT_ID")
+            return
+        }
         if (!initializationStarted.compareAndSet(false, true)) return
         try {
-            InMobiSdk.init(context, APP_KEY, null, SdkInitializationListener { error ->
+            val consent = ConsentManager.getInMobiConsentObject(context)
+            InMobiSdk.init(context, accountId, consent, SdkInitializationListener { error ->
                 runOnMain {
                     if (error == null) {
                         isInitialised = true
                         Log.i(TAG, "InMobi initialized: ${InMobiSdk.getVersion()}")
                         preloadFullscreenAds()
                     } else {
+                        isInitialised = false
                         initializationStarted.set(false)
                         Log.w(TAG, "InMobi initialization failed: $error")
                     }
                 }
             })
         } catch (error: Exception) {
+            isInitialised = false
             initializationStarted.set(false)
             Log.e(TAG, "InMobi initialization threw", error)
+        }
+    }
+
+    /** Updates the SDK after UMP privacy options are changed in an existing process. */
+    fun updateConsent(context: Context) {
+        runOnMain {
+            if (!isInitialised) return@runOnMain
+            try {
+                ConsentManager.getInMobiConsentObject(context)?.let(InMobiSdk::updateGDPRConsent)
+            } catch (error: Exception) {
+                Log.w(TAG, "Unable to update InMobi GDPR consent", error)
+            }
         }
     }
 
@@ -92,10 +117,15 @@ object InMobiAdManager {
 
     private fun loadInterstitial() {
         if (!isInitialised || interstitial?.isReady() == true ||
-            !interstitialLoadStarted.compareAndSet(false, true)) return
+            !interstitialLoadStarted.compareAndSet(false, true)
+        ) return
         try {
+            val context = appContext ?: run {
+                interstitialLoadStarted.set(false)
+                return
+            }
             val ad = interstitial ?: InMobiInterstitial(
-                appContext ?: return,
+                context,
                 INTERSTITIAL_PLACEMENT,
                 interstitialListener(false)
             ).also { interstitial = it }
@@ -108,10 +138,15 @@ object InMobiAdManager {
 
     private fun loadRewarded() {
         if (!isInitialised || rewarded?.isReady() == true ||
-            !rewardedLoadStarted.compareAndSet(false, true)) return
+            !rewardedLoadStarted.compareAndSet(false, true)
+        ) return
         try {
+            val context = appContext ?: run {
+                rewardedLoadStarted.set(false)
+                return
+            }
             val ad = rewarded ?: InMobiInterstitial(
-                appContext ?: return,
+                context,
                 REWARDED_PLACEMENT,
                 interstitialListener(true)
             ).also { rewarded = it }
@@ -127,35 +162,61 @@ object InMobiAdManager {
             if (isRewarded) rewardedLoadStarted.set(false) else interstitialLoadStarted.set(false)
             Log.i(TAG, "InMobi ${if (isRewarded) "rewarded" else "interstitial"} loaded")
         }
+
         override fun onAdLoadFailed(ad: InMobiInterstitial, status: InMobiAdRequestStatus) {
             if (isRewarded) rewardedLoadStarted.set(false) else interstitialLoadStarted.set(false)
             Log.w(TAG, "InMobi ${if (isRewarded) "rewarded" else "interstitial"} failed: ${status.message}")
         }
+
         override fun onAdDisplayFailed(ad: InMobiInterstitial) {
             Log.w(TAG, "InMobi ${if (isRewarded) "rewarded" else "interstitial"} display failed")
-            if (isRewarded) pendingRewardedUnavailable?.invoke()
-            else pendingInterstitialUnavailable?.invoke()
-            reloadAfterFullscreen(isRewarded)
-        }
-        override fun onAdDismissed(ad: InMobiInterstitial) {
             if (isRewarded) {
-                pendingRewardedDismissed?.invoke()
-                pendingRewarded = null
-                pendingRewardedDismissed = null
-                pendingRewardedUnavailable = null
+                val unavailable = pendingRewardedUnavailable
+                clearRewardedCallbacks()
+                unavailable?.invoke()
             } else {
-                pendingInterstitialDismissed?.invoke()
-                pendingInterstitialDismissed = null
-                pendingInterstitialUnavailable = null
+                val unavailable = pendingInterstitialUnavailable
+                clearInterstitialCallbacks()
+                unavailable?.invoke()
             }
             reloadAfterFullscreen(isRewarded)
         }
-        override fun onRewardsUnlocked(ad: InMobiInterstitial, rewards: Map<Any, Any>) {
-            if (isRewarded) pendingRewarded?.invoke()
+
+        override fun onAdDismissed(ad: InMobiInterstitial) {
+            if (isRewarded) {
+                val dismissed = pendingRewardedDismissed
+                clearRewardedCallbacks()
+                dismissed?.invoke()
+            } else {
+                val dismissed = pendingInterstitialDismissed
+                clearInterstitialCallbacks()
+                dismissed?.invoke()
+            }
+            reloadAfterFullscreen(isRewarded)
         }
+
+        override fun onRewardsUnlocked(ad: InMobiInterstitial, rewards: Map<Any, Any>) {
+            if (isRewarded) {
+                val reward = pendingRewarded
+                pendingRewarded = null
+                reward?.invoke()
+            }
+        }
+
         override fun onAdDisplayed(ad: InMobiInterstitial, info: com.inmobi.ads.AdMetaInfo) {
             Log.i(TAG, "InMobi ${if (isRewarded) "rewarded" else "interstitial"} displayed")
         }
+    }
+
+    private fun clearInterstitialCallbacks() {
+        pendingInterstitialDismissed = null
+        pendingInterstitialUnavailable = null
+    }
+
+    private fun clearRewardedCallbacks() {
+        pendingRewarded = null
+        pendingRewardedDismissed = null
+        pendingRewardedUnavailable = null
     }
 
     private fun reloadAfterFullscreen(isRewarded: Boolean) {
@@ -172,9 +233,15 @@ object InMobiAdManager {
         }
     }
 
-    fun showInterstitial(activity: Activity, onDismissed: () -> Unit = {}, onUnavailable: () -> Unit = {}) {
+    fun showInterstitial(
+        activity: Activity,
+        onDismissed: () -> Unit = {},
+        onUnavailable: () -> Unit = {}
+    ) {
         runOnMain {
-            if (!isInterstitialReady || activity.isFinishing || activity.isDestroyed) {
+            if (!isInterstitialReady || activity.isFinishing || activity.isDestroyed ||
+                pendingInterstitialDismissed != null || pendingRewardedDismissed != null
+            ) {
                 onUnavailable()
                 return@runOnMain
             }
@@ -184,8 +251,7 @@ object InMobiAdManager {
                 interstitial?.show(activity)
                 FullscreenAdPolicy.recordInterstitialShown(activity)
             } catch (error: Exception) {
-                pendingInterstitialDismissed = null
-                pendingInterstitialUnavailable = null
+                clearInterstitialCallbacks()
                 Log.w(TAG, "InMobi interstitial show failed", error)
                 reloadAfterFullscreen(false)
                 onUnavailable()
@@ -193,9 +259,16 @@ object InMobiAdManager {
         }
     }
 
-    fun showRewarded(activity: Activity, onRewarded: () -> Unit = {}, onDismissed: () -> Unit = {}, onUnavailable: () -> Unit = {}) {
+    fun showRewarded(
+        activity: Activity,
+        onRewarded: () -> Unit = {},
+        onDismissed: () -> Unit = {},
+        onUnavailable: () -> Unit = {}
+    ) {
         runOnMain {
-            if (!isRewardedReady || activity.isFinishing || activity.isDestroyed) {
+            if (!isRewardedReady || activity.isFinishing || activity.isDestroyed ||
+                pendingInterstitialDismissed != null || pendingRewardedDismissed != null
+            ) {
                 onUnavailable()
                 return@runOnMain
             }
@@ -206,9 +279,7 @@ object InMobiAdManager {
                 rewarded?.show(activity)
                 FullscreenAdPolicy.recordInterstitialShown(activity)
             } catch (error: Exception) {
-                pendingRewarded = null
-                pendingRewardedDismissed = null
-                pendingRewardedUnavailable = null
+                clearRewardedCallbacks()
                 Log.w(TAG, "InMobi rewarded show failed", error)
                 reloadAfterFullscreen(true)
                 onUnavailable()
@@ -228,27 +299,46 @@ object InMobiAdManager {
                 return@runOnMain
             }
             destroyBanner()
+            val requestId = bannerRequestId.incrementAndGet()
+            val completed = AtomicBoolean(false)
+            fun isCurrent(ad: InMobiBanner? = null): Boolean =
+                bannerRequestId.get() == requestId && (ad == null || banner === ad)
+            fun failOnce() {
+                if (completed.compareAndSet(false, true) && isCurrent()) onFailed()
+            }
             val ad = try {
                 InMobiBanner(activity, BANNER_PLACEMENT).apply {
                     setEnableAutoRefresh(true)
                     setRefreshInterval(BANNER_REFRESH_SECONDS)
                     setListener(object : BannerAdEventListener() {
-                        override fun onAdLoadSucceeded(ad: InMobiBanner, info: com.inmobi.ads.AdMetaInfo) {
+                        override fun onAdLoadSucceeded(
+                            ad: InMobiBanner,
+                            info: com.inmobi.ads.AdMetaInfo
+                        ) {
+                            if (!isCurrent(ad)) return
                             Log.i(TAG, "InMobi banner loaded")
-                            onLoaded()
+                            if (completed.compareAndSet(false, true)) onLoaded()
                         }
-                        override fun onAdLoadFailed(ad: InMobiBanner, status: InMobiAdRequestStatus) {
+
+                        override fun onAdLoadFailed(
+                            ad: InMobiBanner,
+                            status: InMobiAdRequestStatus
+                        ) {
+                            if (!isCurrent(ad)) return
                             Log.w(TAG, "InMobi banner failed: ${status.message}")
-                            onFailed()
+                            failOnce()
                         }
+
                         override fun onAdImpression(ad: InMobiBanner) {
-                            AdEventReporter.report("banner", "banner", "inmobi", "impression")
+                            if (isCurrent(ad)) {
+                                AdEventReporter.report("banner", "banner", "inmobi", "impression")
+                            }
                         }
                     })
                 }
             } catch (error: Exception) {
                 Log.w(TAG, "InMobi banner construction failed", error)
-                onFailed()
+                failOnce()
                 return@runOnMain
             }
             banner = ad
@@ -260,45 +350,100 @@ object InMobiAdManager {
             } catch (error: Exception) {
                 Log.w(TAG, "InMobi banner load failed", error)
                 destroyBanner()
-                onFailed()
+                if (completed.compareAndSet(false, true)) onFailed()
             }
         }
     }
 
     fun destroyBanner() {
         runOnMain {
-            try { banner?.destroy() } catch (error: Exception) { Log.w(TAG, "InMobi banner destroy failed", error) }
-            banner?.let { (it.parent as? ViewGroup)?.removeView(it) }
+            bannerRequestId.incrementAndGet()
+            val oldBanner = banner
             banner = null
+            try { oldBanner?.destroy() } catch (error: Exception) {
+                Log.w(TAG, "InMobi banner destroy failed", error)
+            }
+            oldBanner?.let { (it.parent as? ViewGroup)?.removeView(it) }
         }
     }
 
-    fun loadNative(context: Context, onLoaded: (InMobiNative) -> Unit, onFailed: () -> Unit) {
+    class NativeLoadRequest internal constructor {
+        private val cancelled = AtomicBoolean(false)
+        @Volatile internal var loadedAd: InMobiNative? = null
+
+        internal fun cancel() {
+            if (!cancelled.compareAndSet(false, true)) return
+            val ad = loadedAd
+            loadedAd = null
+            ad?.let { InMobiAdManager.destroyNative(it) }
+        }
+
+        internal fun isCancelled(): Boolean = cancelled.get()
+    }
+
+    fun loadNative(
+        context: Context,
+        onLoaded: (InMobiNative) -> Unit,
+        onFailed: () -> Unit
+    ): NativeLoadRequest {
+        val request = NativeLoadRequest()
         runOnMain {
+            if (request.isCancelled()) return@runOnMain
             if (!AdEligibility.canRequestAds(context) || !isInitialised) {
                 onFailed()
                 return@runOnMain
             }
             try {
-                val ad = InMobiNative(context.applicationContext, NATIVE_PLACEMENT, object : NativeAdEventListener() {
-                    override fun onAdLoadSucceeded(ad: InMobiNative, info: com.inmobi.ads.AdMetaInfo) {
-                        onLoaded(ad)
+                val ad = InMobiNative(
+                    context.applicationContext,
+                    NATIVE_PLACEMENT,
+                    object : NativeAdEventListener() {
+                        override fun onAdLoadSucceeded(
+                            ad: InMobiNative,
+                            info: com.inmobi.ads.AdMetaInfo
+                        ) {
+                            request.loadedAd = ad
+                            if (request.isCancelled()) destroyNative(ad) else onLoaded(ad)
+                        }
+
+                        override fun onAdLoadFailed(
+                            ad: InMobiNative,
+                            status: InMobiAdRequestStatus
+                        ) {
+                            if (!request.isCancelled()) {
+                                Log.w(TAG, "InMobi native failed: ${status.message}")
+                                onFailed()
+                            }
+                        }
+
+                        override fun onAdImpression(ad: InMobiNative) {
+                            if (!request.isCancelled()) {
+                                AdEventReporter.report("native", "native", "inmobi", "impression")
+                            }
+                        }
                     }
-                    override fun onAdLoadFailed(ad: InMobiNative, status: InMobiAdRequestStatus) {
-                        Log.w(TAG, "InMobi native failed: ${status.message}")
-                        onFailed()
-                    }
-                })
-                ad.load()
+                )
+                request.loadedAd = ad
+                if (request.isCancelled()) destroyNative(ad) else ad.load()
             } catch (error: Exception) {
-                Log.w(TAG, "InMobi native load failed", error)
-                onFailed()
+                if (!request.isCancelled()) {
+                    Log.w(TAG, "InMobi native load failed", error)
+                    onFailed()
+                }
             }
         }
+        return request
     }
 
     fun destroyNative(ad: InMobiNative?) {
-        try { ad?.unTrackViews(); ad?.destroy() } catch (error: Exception) { Log.w(TAG, "InMobi native destroy failed", error) }
+        runOnMain {
+            try {
+                ad?.unTrackViews()
+                ad?.destroy()
+            } catch (error: Exception) {
+                Log.w(TAG, "InMobi native destroy failed", error)
+            }
+        }
     }
 
     private fun runOnMain(action: () -> Unit) {

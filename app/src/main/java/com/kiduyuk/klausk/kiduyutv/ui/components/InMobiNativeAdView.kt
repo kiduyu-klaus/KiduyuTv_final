@@ -20,13 +20,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.viewinterop.AndroidView
+import com.bumptech.glide.Glide
 import com.inmobi.ads.InMobiNative
 import com.inmobi.media.ads.nativeAd.InMobiNativeViewData
-import com.bumptech.glide.Glide
 import com.kiduyuk.klausk.kiduyutv.util.AdEligibility
 import com.kiduyuk.klausk.kiduyutv.util.InMobiAdManager
 
-/** Current InMobi native API wrapper with explicit view tracking and cleanup. */
+/** Compose bridge for an InMobi native ad with one-time SDK view registration. */
 @Composable
 fun InMobiNativeAdView(
     modifier: Modifier = Modifier,
@@ -35,28 +35,37 @@ fun InMobiNativeAdView(
     val context = LocalContext.current
     val preview = LocalInspectionMode.current
     var ad by remember { mutableStateOf<InMobiNative?>(null) }
+    var request by remember { mutableStateOf<InMobiAdManager.NativeLoadRequest?>(null) }
+
     if (preview || !AdEligibility.canRequestAds(context)) {
         Box(modifier = modifier)
         return
     }
+
     LaunchedEffect(Unit) {
-        InMobiAdManager.loadNative(
+        request = InMobiAdManager.loadNative(
             context = context,
             onLoaded = { loaded -> ad = loaded },
             onFailed = onLoadFailed
         )
     }
+
     DisposableEffect(Unit) {
         onDispose {
-            InMobiAdManager.destroyNative(ad)
+            request?.cancel()
+            request = null
             ad = null
         }
     }
+
     ad?.let { loaded ->
         AndroidView(
             modifier = modifier,
-            factory = { viewContext -> createNativeView(viewContext, loaded) },
-            update = { root -> bindNativeView(root, loaded) }
+            factory = { viewContext ->
+                createNativeView(viewContext, loaded).also { root ->
+                    bindNativeView(root, loaded)
+                }
+            }
         )
     }
 }
@@ -72,9 +81,12 @@ private data class NativeViews(
 )
 
 private fun createNativeView(context: android.content.Context, ad: InMobiNative): FrameLayout {
+    val density = context.resources.displayMetrics.density
+    fun dp(value: Int): Int = kotlin.math.round(value * density).toInt()
+
     val root = FrameLayout(context).apply {
-        setBackgroundColor(Color.WHITE)
-        setPadding(20, 14, 20, 14)
+        setBackgroundColor(Color.TRANSPARENT)
+        setPadding(dp(20), dp(14), dp(20), dp(14))
         isClickable = true
         isFocusable = true
     }
@@ -83,10 +95,10 @@ private fun createNativeView(context: android.content.Context, ad: InMobiNative)
         gravity = Gravity.CENTER_VERTICAL
     }
     val icon = ImageView(context)
-    row.addView(icon, LinearLayout.LayoutParams(96, 96))
+    row.addView(icon, LinearLayout.LayoutParams(dp(96), dp(96)))
     val textColumn = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
-        setPadding(16, 0, 16, 0)
+        setPadding(dp(16), 0, dp(16), 0)
     }
     val title = TextView(context)
     val description = TextView(context)
@@ -113,11 +125,15 @@ private fun bindNativeView(root: FrameLayout, ad: InMobiNative) {
     views.advertiser.text = ad.getAdvertiserName().orEmpty()
     views.cta.text = ad.getCtaText().orEmpty()
     views.rating.rating = ad.getAdRating()
-    ad.getAdIcon()?.url?.let { iconUrl: String ->
+    ad.getAdIcon()?.url?.let { iconUrl ->
         Glide.with(views.icon).load(iconUrl).into(views.icon)
     }
     views.cta.setOnClickListener { ad.takeAction() }
     root.setOnClickListener { ad.takeAction() }
+
+    // InMobi 11.5.x documents registerViewForTracking as the one registration
+    // point and unTrackViews as its lifecycle counterpart. This function is
+    // called only from AndroidView.factory, never from recomposition/update.
     val trackingData = InMobiNativeViewData.Builder(root)
         .setTitleView(views.title)
         .setDescriptionView(views.description)
