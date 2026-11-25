@@ -308,6 +308,13 @@ class SplashActivity : ComponentActivity() {
         // Request GDPR consent before initializing ads
         // Initialize all ad networks only after consent is resolved.
         ConsentManager.requestConsent(this) {
+            Log.i(
+                TAG,
+                "Ad startup: fireTv=${UpdateUtil.isFireTvDevice(this@SplashActivity)}, " +
+                    "tv=${UpdateUtil.isTvDevice(this@SplashActivity)}, " +
+                    "ump=${ConsentManager.canRequestAds(this@SplashActivity)}, " +
+                    "secondary=${AdEligibility.canRequestSecondaryAds(this@SplashActivity)}"
+            )
             StartAppAdManager.preloadAds(this@SplashActivity)
             UnityAdManager.preloadAds(this@SplashActivity)
             InMobiAdManager.preloadAds(this@SplashActivity)

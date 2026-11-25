@@ -26,6 +26,7 @@ object ConsentManager {
     // Keep this aligned with Start.io's registered TCF vendor entry.
     private const val START_IO_TCF_VENDOR_ID = 1216
     @Volatile private var consentResolved = false
+    @Volatile private var consentFlowCompleted = false
     @Volatile private var consentInformation: ConsentInformation? = null
 
     fun interface OnConsentGatheringCompleteListener {
@@ -84,6 +85,7 @@ object ConsentManager {
                         Log.w(TAG, "UMP consent form flow completed with error: ${formError.message}")
                     }
                     consentResolved = formError == null || consentInfo.canRequestAds()
+                    consentFlowCompleted = true
                     Log.i(
                         TAG,
                         "Consent form flow completed: resolved=$consentResolved " +
@@ -106,6 +108,7 @@ object ConsentManager {
                 // all ads for the rest of this process.
                 val requestsAllowed = consentInfo.canRequestAds()
                 consentResolved = requestsAllowed
+                consentFlowCompleted = true
                 Log.w(TAG, "Consent info update failed: ${formError.message}")
                 Log.i(TAG, "Consent fallback: resolved=$consentResolved canRequestAds=$requestsAllowed")
                 onConsentGatheringCompleteListener.consentGatheringComplete(formError)
@@ -114,6 +117,9 @@ object ConsentManager {
     }
 
     fun hasResolvedConsent(): Boolean = consentResolved
+
+    /** True after UMP has completed its update/form decision for this process. */
+    fun hasCompletedConsentFlow(): Boolean = consentFlowCompleted
 
     /**
      * Refreshes Start.io's explicit personalization flag after UMP resolves.

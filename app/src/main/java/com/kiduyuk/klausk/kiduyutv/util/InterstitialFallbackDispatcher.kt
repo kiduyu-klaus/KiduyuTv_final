@@ -28,6 +28,18 @@ object InterstitialFallbackDispatcher {
     }
 
     private fun showOnMain(activity: Activity, placement: Placement, onDismissed: () -> Unit) {
+        if (placement == Placement.CONTENT_TRANSITION &&
+            !FullscreenAdPolicy.shouldRequestContentTransition()
+        ) {
+            AdEventReporter.report(
+                placement.name,
+                "interstitial",
+                "none",
+                "suppressed_transition_debounce"
+            )
+            onDismissed()
+            return
+        }
         if (!FullscreenAdPolicy.tryBeginRequest()) {
             AdEventReporter.report(
                 placement.name,

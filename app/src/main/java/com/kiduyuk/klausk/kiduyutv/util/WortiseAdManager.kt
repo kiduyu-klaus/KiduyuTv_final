@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Safe to call even if the SDK failed to initialise: methods no-op and
  * invoke callbacks so the app flow continues.
  *
- * Interstitial frequency is guarded by [FullscreenAdPolicy] (3 min globally).
+ * Fullscreen frequency is guarded by [FullscreenAdPolicy] (2 min globally).
  *
  * Uses the app's configured Wortise placements for both phone and TV variants.
  */

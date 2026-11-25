@@ -59,7 +59,7 @@ object InMobiAdManager {
 
     fun preloadAds(context: Context) {
         runOnMain {
-            if (!AdEligibility.canRequestAds(context)) {
+            if (!AdEligibility.canRequestSecondaryAds(context)) {
                 Log.i(TAG, "Consent does not permit InMobi requests")
                 return@runOnMain
             }
@@ -301,7 +301,7 @@ object InMobiAdManager {
         onFailed: () -> Unit = {}
     ) {
         runOnMain {
-            if (!AdEligibility.canRequestAds(activity) || !isInitialised || activity.isFinishing) {
+            if (!AdEligibility.canRequestSecondaryAds(activity) || !isInitialised || activity.isFinishing) {
                 onFailed()
                 return@runOnMain
             }
@@ -396,7 +396,7 @@ object InMobiAdManager {
         val request = NativeLoadRequest()
         runOnMain {
             if (request.isCancelled()) return@runOnMain
-            if (!AdEligibility.canRequestAds(context) || !isInitialised) {
+            if (!AdEligibility.canRequestSecondaryAds(context) || !isInitialised) {
                 onFailed()
                 return@runOnMain
             }

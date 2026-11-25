@@ -28,7 +28,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 /** Start.io manager using the SDK 5.3.1 initialization and inline-ad APIs. */
 object StartAppAdManager {
     private const val TAG = "StartAppAdManager"
-    private const val FULLSCREEN_LOAD_TIMEOUT_MS = 8_000L
+    // Do not block player/navigation transitions for a long network timeout.
+    private const val FULLSCREEN_LOAD_TIMEOUT_MS = 2_500L
     private val mainHandler = Handler(Looper.getMainLooper())
     private const val CONSENT_PREFERENCES = "startapp_consent"
     private const val CONSENT_TIMESTAMP_KEY = "consent_timestamp"
@@ -103,7 +104,7 @@ object StartAppAdManager {
         } else applyConsent(context)
     }
 
-    private fun shouldShowAds(context: Context) = AdEligibility.canRequestAds(context)
+    private fun shouldShowAds(context: Context) = AdEligibility.canRequestSecondaryAds(context)
 
     private fun runOnMain(action: () -> Unit) {
         if (Looper.myLooper() == Looper.getMainLooper()) action() else mainHandler.post(action)

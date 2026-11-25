@@ -82,7 +82,7 @@ object UnityAdManager {
     val isRewardedReady: Boolean
         get() = rewardedAd != null
 
-    private fun shouldShowAds(context: Context): Boolean = AdEligibility.canRequestAds(context)
+    private fun shouldShowAds(context: Context): Boolean = AdEligibility.canRequestSecondaryAds(context)
 
     /**
      * Initialize and pre-load Unity Ads after the app's consent flow completes.
