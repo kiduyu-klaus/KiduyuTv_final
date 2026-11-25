@@ -133,8 +133,9 @@ object ConsentManager {
         // Unity Ads 4.21 consumes the IAB TCF string from a TCF-compliant CMP.
         // Do not reduce UMP's purpose/vendor choices to a single userConsent bit.
 
-        // InMobi 11.5.x requires the publisher to pass GDPR consent at
-        // initialization and when the user changes privacy options.
+        // InMobi 11.5.x automatically reads UMP's TCF/GPP CMP signals at
+        // initialization; update the in-memory GDPR signal when privacy options
+        // change during the same process.
         InMobiAdManager.updateConsent(context)
 
         // ── Wortise ───────────────────────────────────────────────────────

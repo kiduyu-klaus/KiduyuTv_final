@@ -77,8 +77,9 @@ object InMobiAdManager {
         }
         if (!initializationStarted.compareAndSet(false, true)) return
         try {
-            val consent = ConsentManager.getInMobiConsentObject(context)
-            InMobiSdk.init(context, accountId, consent, object : SdkInitializationListener {
+            // SDK 10.7.5+ automatically reads TCF/GPP signals from an integrated CMP.
+            // UMP has already resolved before this method is reached.
+            InMobiSdk.init(context, accountId, null, object : SdkInitializationListener {
                 override fun onInitializationComplete(error: java.lang.Error?) {
                     runOnMain {
                         if (error == null) {

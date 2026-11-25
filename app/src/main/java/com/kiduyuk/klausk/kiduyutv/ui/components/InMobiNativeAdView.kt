@@ -128,9 +128,6 @@ private fun bindNativeView(root: FrameLayout, ad: InMobiNative) {
     ad.getAdIcon()?.url?.let { iconUrl ->
         Glide.with(views.icon).load(iconUrl).into(views.icon)
     }
-    views.cta.setOnClickListener { ad.takeAction() }
-    root.setOnClickListener { ad.takeAction() }
-
     // InMobi 11.5.x documents registerViewForTracking as the one registration
     // point and unTrackViews as its lifecycle counterpart. This function is
     // called only from AndroidView.factory, never from recomposition/update.
