@@ -207,6 +207,8 @@ object InMobiAdManager {
         }
 
         override fun onAdDisplayed(ad: InMobiInterstitial, info: com.inmobi.ads.AdMetaInfo) {
+            // Record only after InMobi confirms that the fullscreen ad was displayed.
+            FullscreenAdPolicy.recordFullscreenShown(appContext ?: return)
             Log.i(TAG, "InMobi ${if (isRewarded) "rewarded" else "interstitial"} displayed")
         }
     }
@@ -242,7 +244,8 @@ object InMobiAdManager {
         onUnavailable: () -> Unit = {}
     ) {
         runOnMain {
-            if (!isInterstitialReady || activity.isFinishing || activity.isDestroyed ||
+            if (!FullscreenAdPolicy.canShowFullscreen(activity) ||
+                !isInterstitialReady || activity.isFinishing || activity.isDestroyed ||
                 pendingInterstitialDismissed != null || pendingRewardedDismissed != null
             ) {
                 onUnavailable()
@@ -251,8 +254,8 @@ object InMobiAdManager {
             try {
                 pendingInterstitialDismissed = onDismissed
                 pendingInterstitialUnavailable = onUnavailable
+                // The cooldown is recorded from onAdDisplayed, not before show().
                 interstitial?.show(activity)
-                FullscreenAdPolicy.recordInterstitialShown(activity)
             } catch (error: Exception) {
                 clearInterstitialCallbacks()
                 Log.w(TAG, "InMobi interstitial show failed", error)
@@ -269,7 +272,8 @@ object InMobiAdManager {
         onUnavailable: () -> Unit = {}
     ) {
         runOnMain {
-            if (!isRewardedReady || activity.isFinishing || activity.isDestroyed ||
+            if (!FullscreenAdPolicy.canShowFullscreen(activity) ||
+                !isRewardedReady || activity.isFinishing || activity.isDestroyed ||
                 pendingInterstitialDismissed != null || pendingRewardedDismissed != null
             ) {
                 onUnavailable()
@@ -279,8 +283,8 @@ object InMobiAdManager {
                 pendingRewarded = onRewarded
                 pendingRewardedDismissed = onDismissed
                 pendingRewardedUnavailable = onUnavailable
+                // The cooldown is recorded from onAdDisplayed, not before show().
                 rewarded?.show(activity)
-                FullscreenAdPolicy.recordInterstitialShown(activity)
             } catch (error: Exception) {
                 clearRewardedCallbacks()
                 Log.w(TAG, "InMobi rewarded show failed", error)

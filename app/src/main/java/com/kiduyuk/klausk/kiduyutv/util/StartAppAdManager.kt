@@ -203,7 +203,7 @@ object StartAppAdManager {
                         if (activity.isFinishing) { if (settled.compareAndSet(false, true)) onUnavailable(); return@runOnMain }
                         try {
                             ad.showAd(object : AdDisplayListener {
-                                override fun adDisplayed(ad: Ad?) = FullscreenAdPolicy.recordInterstitialShown(activity)
+                                override fun adDisplayed(ad: Ad?) = FullscreenAdPolicy.recordFullscreenShown(activity)
                                 override fun adHidden(ad: Ad?) { if (settled.compareAndSet(false, true)) onDismissed() }
                                 override fun adClicked(ad: Ad?) = Unit
                                 override fun adNotDisplayed(ad: Ad?) { if (settled.compareAndSet(false, true)) onUnavailable() }
@@ -226,6 +226,11 @@ object StartAppAdManager {
 
     fun showRewarded(activity: Activity, onRewarded: () -> Unit = {}, onDismissed: () -> Unit = {}, onUnavailable: (() -> Unit)? = null) {
         if (!shouldShowAds(activity)) { onDismissed(); return }
+        if (!FullscreenAdPolicy.canShowFullscreen(activity)) {
+            Log.i(TAG, "Start.io rewarded skipped - fullscreen cooldown is active")
+            onDismissed()
+            return
+        }
         if (!isInitialised) preloadAds(activity)
         if (!isInitialised) { onUnavailable?.invoke() ?: onDismissed(); return }
         val pending = AtomicBoolean(true)
@@ -248,7 +253,9 @@ object StartAppAdManager {
                         if (activity.isFinishing) { if (settled.compareAndSet(false, true)) onUnavailable?.invoke() ?: onDismissed(); return@runOnMain }
                         try {
                             ad.showAd(object : AdDisplayListener {
-                                override fun adDisplayed(ad: Ad?) = Unit
+                                override fun adDisplayed(ad: Ad?) {
+                                    FullscreenAdPolicy.recordFullscreenShown(activity)
+                                }
                                 override fun adHidden(ad: Ad?) { if (settled.compareAndSet(false, true)) onDismissed() }
                                 override fun adClicked(ad: Ad?) = Unit
                                 override fun adNotDisplayed(ad: Ad?) { if (settled.compareAndSet(false, true)) onUnavailable?.invoke() ?: onDismissed() }

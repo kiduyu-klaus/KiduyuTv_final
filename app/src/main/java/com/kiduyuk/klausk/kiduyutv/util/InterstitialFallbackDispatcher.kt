@@ -28,7 +28,21 @@ object InterstitialFallbackDispatcher {
     }
 
     private fun showOnMain(activity: Activity, placement: Placement, onDismissed: () -> Unit) {
-        val complete = once(onDismissed)
+        if (!FullscreenAdPolicy.tryBeginRequest()) {
+            AdEventReporter.report(
+                placement.name,
+                "interstitial",
+                "none",
+                "suppressed_request_in_progress"
+            )
+            onDismissed()
+            return
+        }
+        // Every terminal path releases the process-level request guard exactly once.
+        val complete = once {
+            FullscreenAdPolicy.endRequest()
+            onDismissed()
+        }
         val fallbackStarted = AtomicBoolean(false)
         if (!AdEligibility.canRequestAds(activity)) {
             AdEventReporter.report(placement.name, "interstitial", "none", "suppressed_ineligible")

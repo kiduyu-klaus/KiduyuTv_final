@@ -418,6 +418,8 @@ object UnityAdManager {
                 ShowConfiguration.Builder().build(),
                 object : InterstitialShowListener {
                     override fun onStarted(ad: InterstitialAd) {
+                        // Unity confirms the fullscreen display at onStarted.
+                        FullscreenAdPolicy.recordFullscreenShown(activity)
                         Log.i(TAG, "Unity interstitial started")
                     }
 
@@ -427,7 +429,6 @@ object UnityAdManager {
 
                     override fun onCompleted(ad: InterstitialAd, state: ShowFinishState) {
                         Log.i(TAG, "Unity interstitial complete: $state")
-                        FullscreenAdPolicy.recordInterstitialShown(activity)
                         interstitialShowing.set(false)
                         requestInterstitial()
                         onDismissed()
@@ -466,6 +467,11 @@ object UnityAdManager {
             onDismissed()
             return
         }
+        if (!FullscreenAdPolicy.canShowFullscreen(activity)) {
+            Log.i(TAG, "Unity rewarded skipped - fullscreen cooldown is active")
+            onDismissed()
+            return
+        }
         if (!isInitialised) {
             Log.i(TAG, "Unity rewarded skipped - SDK not initialized")
             onUnavailable?.invoke() ?: onDismissed()
@@ -495,6 +501,7 @@ object UnityAdManager {
                 ShowConfiguration.Builder().build(),
                 object : RewardedShowListener {
                     override fun onStarted(ad: RewardedAd) {
+                        FullscreenAdPolicy.recordFullscreenShown(activity)
                         Log.i(TAG, "Unity rewarded ad started")
                     }
 

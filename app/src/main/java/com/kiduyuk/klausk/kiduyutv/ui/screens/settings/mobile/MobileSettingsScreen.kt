@@ -850,7 +850,7 @@ fun MobileSettingsScreen(
                         subtitle = "Support us by watching a short ad",
                         onClick = {
                             if (activity != null) {
-                                RewardedFallbackDispatcher.showInterstitial(
+                                RewardedFallbackDispatcher.showRewardedInterstitial(
                                     activity = activity,
                                     onRewarded = {
                                         Toast.makeText(context, "Thank you for your support!", Toast.LENGTH_SHORT).show()

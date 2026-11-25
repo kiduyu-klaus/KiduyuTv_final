@@ -380,7 +380,7 @@ object WortiseAdManager {
 
             override fun onInterstitialShown(ad: InterstitialAd) {
                 Log.i(TAG, "Wortise interstitial shown")
-                activity?.let(FullscreenAdPolicy::recordInterstitialShown)
+                activity?.let(FullscreenAdPolicy::recordFullscreenShown)
             }
 
             override fun onInterstitialImpression(ad: InterstitialAd) {
@@ -425,6 +425,11 @@ object WortiseAdManager {
         onDismissed: () -> Unit = {}
     ) {
         if (!shouldShowAds(activity)) {
+            onDismissed()
+            return
+        }
+        if (!FullscreenAdPolicy.canShowFullscreen(activity)) {
+            Log.i(TAG, "Wortise rewarded skipped - fullscreen cooldown is active")
             onDismissed()
             return
         }
@@ -489,6 +494,8 @@ object WortiseAdManager {
             }
 
             override fun onRewardedImpression(ad: RewardedAd) {
+                // Record the cooldown only after Wortise reports an impression.
+                appContext?.let(FullscreenAdPolicy::recordFullscreenShown)
                 Log.i(TAG, "Wortise rewarded impression")
             }
 
@@ -533,6 +540,11 @@ object WortiseAdManager {
      */
     fun showAppOpenIfAvailable(activity: Activity) {
         if (!shouldShowAds(activity)) return
+        if (!FullscreenAdPolicy.canShowFullscreen(activity)) {
+            Log.i(TAG, "Wortise app open skipped - fullscreen cooldown is active")
+            loadAppOpenAd(activity)
+            return
+        }
         if (!isInitialised || !WortiseSdk.isInitialized) {
             loadAppOpenAd(activity)
             return
@@ -588,6 +600,7 @@ object WortiseAdManager {
 
             override fun onAppOpenShown(ad: AppOpenAd) {
                 isAppOpenShowing = true
+                FullscreenAdPolicy.recordFullscreenShown(appContext ?: return)
                 Log.i(TAG, "Wortise app open shown")
             }
 

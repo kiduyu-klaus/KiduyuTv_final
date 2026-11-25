@@ -22,7 +22,7 @@ object RewardedFallbackDispatcher {
         }
     }
 
-    fun showInterstitial(
+    fun showRewardedInterstitial(
         activity: Activity,
         onRewarded: () -> Unit,
         onDismissed: () -> Unit
@@ -67,6 +67,11 @@ object RewardedFallbackDispatcher {
 
         if (!AdEligibility.canRequestAds(activity)) {
             AdEventReporter.report("reward_unlock", format, "none", "suppressed_ineligible")
+            finish()
+            return
+        }
+        if (!FullscreenAdPolicy.canShowFullscreen(activity)) {
+            AdEventReporter.report("reward_unlock", format, "none", "suppressed_cooldown")
             finish()
             return
         }

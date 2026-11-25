@@ -348,7 +348,7 @@ object AdManager {
         interstitialAd = null
         ad.fullScreenContentCallback = object : FullScreenContentCallback() {
             override fun onAdShowedFullScreenContent() {
-                FullscreenAdPolicy.recordInterstitialShown(activity)
+                FullscreenAdPolicy.recordFullscreenShown(activity)
                 Log.i(TAG, "Interstitial shown")
             }
 
@@ -427,6 +427,11 @@ object AdManager {
             onDismissed()
             return
         }
+        if (!FullscreenAdPolicy.canShowFullscreen(activity)) {
+            Log.i(TAG, "Rewarded ad skipped - fullscreen cooldown is active")
+            onDismissed()
+            return
+        }
         val ad = rewardedAd
         if (ad == null) {
             Log.i(TAG, "No rewarded ad ready")
@@ -437,6 +442,7 @@ object AdManager {
         rewardedAd = null
         ad.fullScreenContentCallback = object : FullScreenContentCallback() {
             override fun onAdShowedFullScreenContent() {
+                FullscreenAdPolicy.recordFullscreenShown(activity)
                 Log.i(TAG, "Rewarded ad shown")
             }
 
@@ -522,6 +528,11 @@ object AdManager {
             onDismissed()
             return
         }
+        if (!FullscreenAdPolicy.canShowFullscreen(activity)) {
+            Log.i(TAG, "Rewarded interstitial skipped - fullscreen cooldown is active")
+            onDismissed()
+            return
+        }
 
         val ad = rewardedInterstitialAd
         if (ad == null) {
@@ -548,6 +559,7 @@ object AdManager {
             }
 
             override fun onAdShowedFullScreenContent() {
+                FullscreenAdPolicy.recordFullscreenShown(activity)
                 Log.i(TAG, "Rewarded interstitial shown")
             }
 
@@ -646,7 +658,7 @@ object AdManager {
             }
 
             override fun onAdShowedFullScreenContent() {
-                FullscreenAdPolicy.recordAppOpenShown(activity)
+                FullscreenAdPolicy.recordFullscreenShown(activity)
                 Log.i(TAG, "App open ad shown")
             }
 

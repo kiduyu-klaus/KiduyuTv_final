@@ -815,12 +815,12 @@ class DirectStreamActivity : AppCompatActivity() {
 
         val dialog = MaterialAlertDialogBuilder(this)
             .setTitle("Watch an ad to continue")
-            .setMessage("Watch a short ad to support KiduyuTV and continue to your stream.")
+            .setMessage("Watch a short fullscreen ad to support KiduyuTV and continue to your stream.")
             .setCancelable(false)
             .setPositiveButton(android.R.string.ok) { currentDialog, _ ->
                 currentDialog.dismiss()
                 if (streamAdPromptDialog === currentDialog) streamAdPromptDialog = null
-                RewardedFallbackDispatcher.showInterstitial(
+                RewardedFallbackDispatcher.showRewardedInterstitial(
                     activity = this,
                     onRewarded = {},
                     onDismissed = {

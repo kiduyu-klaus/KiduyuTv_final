@@ -56,7 +56,7 @@ object AdFallbackDispatcher {
         activity: Activity,
         onRewarded: () -> Unit,
         onDismissed: () -> Unit
-    ) = RewardedFallbackDispatcher.showInterstitial(activity, onRewarded, onDismissed)
+    ) = RewardedFallbackDispatcher.showRewardedInterstitial(activity, onRewarded, onDismissed)
 
     private fun AdPlacement.toDedicatedPlacement(): InterstitialFallbackDispatcher.Placement =
         when (this) {
