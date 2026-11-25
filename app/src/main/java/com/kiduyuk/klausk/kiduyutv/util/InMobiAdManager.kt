@@ -78,16 +78,18 @@ object InMobiAdManager {
         if (!initializationStarted.compareAndSet(false, true)) return
         try {
             val consent = ConsentManager.getInMobiConsentObject(context)
-            InMobiSdk.init(context, accountId, consent, SdkInitializationListener { error ->
-                runOnMain {
-                    if (error == null) {
-                        isInitialised = true
-                        Log.i(TAG, "InMobi initialized: ${InMobiSdk.getVersion()}")
-                        preloadFullscreenAds()
-                    } else {
-                        isInitialised = false
-                        initializationStarted.set(false)
-                        Log.w(TAG, "InMobi initialization failed: $error")
+            InMobiSdk.init(context, accountId, consent, object : SdkInitializationListener {
+                override fun onInitializationComplete(error: java.lang.Error?) {
+                    runOnMain {
+                        if (error == null) {
+                            isInitialised = true
+                            Log.i(TAG, "InMobi initialized: ${InMobiSdk.getVersion()}")
+                            preloadFullscreenAds()
+                        } else {
+                            isInitialised = false
+                            initializationStarted.set(false)
+                            Log.w(TAG, "InMobi initialization failed: $error")
+                        }
                     }
                 }
             })
@@ -367,7 +369,7 @@ object InMobiAdManager {
         }
     }
 
-    class NativeLoadRequest internal constructor {
+    class NativeLoadRequest internal constructor() {
         private val cancelled = AtomicBoolean(false)
         @Volatile internal var loadedAd: InMobiNative? = null
 
