@@ -133,6 +133,22 @@ object RewardedFallbackDispatcher {
             )
         }
 
+        fun showInMobiOrFallback() {
+            if (format == "rewarded" && InMobiAdManager.isRewardedReady) {
+                Log.i(TAG, "$format fallback: InMobi")
+                AdEventReporter.report("reward_unlock", format, "inmobi", "show_requested")
+                InMobiAdManager.showRewarded(
+                    activity = activity,
+                    onRewarded = deliverReward,
+                    onDismissed = finish,
+                    onUnavailable = { mainHandler.post { showAdMobOrFallback() } }
+                )
+            } else {
+                InMobiAdManager.preloadAds(activity)
+                showAdMobOrFallback()
+            }
+        }
+
         fun showStartIoOrFallback() {
             if (activity.isFinishing || !AdEligibility.canRequestAds(activity)) {
                 finish()
@@ -143,7 +159,7 @@ object RewardedFallbackDispatcher {
                 activity = activity,
                 onRewarded = deliverReward,
                 onDismissed = finish,
-                onUnavailable = { mainHandler.post { showAdMobOrFallback() } }
+                onUnavailable = { mainHandler.post { showInMobiOrFallback() } }
             )
         }
 

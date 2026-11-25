@@ -91,13 +91,28 @@ object InterstitialFallbackDispatcher {
             )
         }
 
+        fun showInMobiOrFallback() {
+            if (InMobiAdManager.isInterstitialReady) {
+                Log.i(TAG, "Interstitial fallback: InMobi")
+                AdEventReporter.report(placement.name, "interstitial", "inmobi", "show_requested")
+                InMobiAdManager.showInterstitial(
+                    activity = activity,
+                    onDismissed = complete,
+                    onUnavailable = { mainHandler.post { showAdMobOrFinish() } }
+                )
+            } else {
+                InMobiAdManager.preloadAds(activity)
+                showAdMobOrFinish()
+            }
+        }
+
         fun showStartIoOrFallback() {
             Log.i(TAG, "Interstitial fallback: Start.io")
             AdEventReporter.report(placement.name, "interstitial", "startio", "show_requested")
             StartAppAdManager.showInterstitial(
                 activity = activity,
                 onDismissed = complete,
-                onUnavailable = { mainHandler.post { showAdMobOrFinish() } }
+                onUnavailable = { mainHandler.post { showInMobiOrFallback() } }
             )
         }
 

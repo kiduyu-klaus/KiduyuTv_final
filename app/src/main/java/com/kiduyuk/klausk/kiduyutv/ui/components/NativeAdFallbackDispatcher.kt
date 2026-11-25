@@ -24,6 +24,7 @@ object NativeAdFallbackDispatcher {
     private val nextNetwork = AtomicInteger(0)
     private val networks = listOf(
         NativeAdNetwork.START_IO,
+        NativeAdNetwork.INMOBI,
         NativeAdNetwork.ADMOB
     )
 
@@ -56,6 +57,11 @@ object NativeAdFallbackDispatcher {
                     onLoadFailed = ::onLoadFailed
                 )
 
+                NativeAdNetwork.INMOBI -> InMobiNativeAdView(
+                    modifier = modifier,
+                    onLoadFailed = ::onLoadFailed
+                )
+
                 NativeAdNetwork.ADMOB -> AdMobNativeAdView(
                     modifier = modifier,
                     onLoadFailed = ::onLoadFailed
@@ -72,6 +78,7 @@ object NativeAdFallbackDispatcher {
 
     private enum class NativeAdNetwork(val displayName: String) {
         START_IO("Start.io"),
+        INMOBI("InMobi"),
         ADMOB("AdMob")
     }
 }

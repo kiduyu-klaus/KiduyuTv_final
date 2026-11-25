@@ -181,6 +181,7 @@ object ConsentManager {
             // now rather than waiting for the next process foreground.
             AdManager.retryInitIfEligible(activity)
             StartAppAdManager.retryInitIfEligible(activity)
+            InMobiAdManager.retryInitIfEligible(activity)
             if (canRequestAds(activity)) {
                 UnityAdManager.preloadAds(activity)
                 // Wortise retry is temporarily disabled.

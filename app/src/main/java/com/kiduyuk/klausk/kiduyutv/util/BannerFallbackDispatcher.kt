@@ -18,9 +18,10 @@ object BannerFallbackDispatcher {
     private const val PROVIDER_TIMEOUT_MS = 5_000L
     private const val UNITY_STAGE = 0
     private const val START_IO_STAGE = 1
-    private const val ADMOB_STAGE = 2
-    private const val COMPLETE_STAGE = 3
-    private const val UNITY_LOADED_STAGE = 4
+    private const val INMOBI_STAGE = 2
+    private const val ADMOB_STAGE = 3
+    private const val COMPLETE_STAGE = 4
+    private const val UNITY_LOADED_STAGE = 5
     private val mainHandler = Handler(Looper.getMainLooper())
     private val activeRequests = WeakHashMap<ViewGroup, AtomicInteger>()
 
@@ -105,10 +106,10 @@ object BannerFallbackDispatcher {
             if (!isCurrent(START_IO_STAGE) || stopIfIneligible(START_IO_STAGE)) return
             Log.i(TAG, "Banner fallback: Start.io")
             mainHandler.postDelayed({
-                if (move(START_IO_STAGE, ADMOB_STAGE)) {
-                    Log.w(TAG, "Start.io banner timed out; advancing to AdMob")
+                if (move(START_IO_STAGE, INMOBI_STAGE)) {
+                    Log.w(TAG, "Start.io banner timed out; advancing to InMobi")
                     container.removeAllViews()
-                    loadAdMob()
+                    loadInMobi()
                 }
             }, PROVIDER_TIMEOUT_MS)
             StartAppAdManager.loadBanner(
@@ -119,9 +120,27 @@ object BannerFallbackDispatcher {
                 },
                 onFailed = {
                     onMain {
-                        if (move(START_IO_STAGE, ADMOB_STAGE)) loadAdMob()
+                        if (move(START_IO_STAGE, INMOBI_STAGE)) loadInMobi()
                     }
                 }
+            )
+        }
+
+        fun loadInMobi() {
+            if (!isCurrent(INMOBI_STAGE) || stopIfIneligible(INMOBI_STAGE)) return
+            Log.i(TAG, "Banner fallback: InMobi")
+            mainHandler.postDelayed({
+                if (move(INMOBI_STAGE, ADMOB_STAGE)) {
+                    Log.w(TAG, "InMobi banner timed out; advancing to AdMob")
+                    container.removeAllViews()
+                    loadAdMob()
+                }
+            }, PROVIDER_TIMEOUT_MS)
+            InMobiAdManager.loadBanner(
+                activity = activity,
+                container = container,
+                onLoaded = { onMain { finish(INMOBI_STAGE, "inmobi", "loaded") } },
+                onFailed = { onMain { if (move(INMOBI_STAGE, ADMOB_STAGE)) loadAdMob() } }
             )
         }
 

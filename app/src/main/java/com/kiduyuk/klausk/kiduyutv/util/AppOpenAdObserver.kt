@@ -63,6 +63,7 @@ class AppOpenAdObserver private constructor(private val application: Application
         // anything else so the next ad request has a live SDK behind it.
         AdManager.retryInitIfEligible(application)
         StartAppAdManager.retryInitIfEligible(application)
+        InMobiAdManager.retryInitIfEligible(application)
         // Wortise retry is temporarily disabled.
         if (externalActivityInProgress) {
             Log.i(TAG, "Skipping app-open ad while returning from system activity")

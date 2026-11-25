@@ -76,6 +76,7 @@ import com.kiduyuk.klausk.kiduyutv.util.AdManager
 import com.kiduyuk.klausk.kiduyutv.util.AppOpenAdObserver
 import com.kiduyuk.klausk.kiduyutv.util.UnityAdManager
 import com.kiduyuk.klausk.kiduyutv.util.WortiseAdManager
+import com.kiduyuk.klausk.kiduyutv.util.InMobiAdManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -309,6 +310,7 @@ class SplashActivity : ComponentActivity() {
         ConsentManager.requestConsent(this) {
             StartAppAdManager.preloadAds(this@SplashActivity)
             UnityAdManager.preloadAds(this@SplashActivity)
+            InMobiAdManager.preloadAds(this@SplashActivity)
             // WortiseAdManager.preloadAds(this@SplashActivity) // Temporarily disabled.
             // Match the Google sample: wait for the SDK before considering
             // consent handling complete, so ad placements can load afterward.
@@ -321,6 +323,7 @@ class SplashActivity : ComponentActivity() {
         // consent from a previous session already permits ad requests.
         if (ConsentManager.canRequestAds(this)) {
             AdManager.initAndAwait(this@SplashActivity) {}
+            InMobiAdManager.preloadAds(this@SplashActivity)
         }
 
         checkForUpdatesFromFirebase()

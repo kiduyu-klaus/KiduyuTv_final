@@ -161,9 +161,6 @@ android {
         buildConfig true
         viewBinding true
     }
-    kotlin {
-        jvmToolchain(17)
-    }
     lintOptions {
         abortOnError false
     }
@@ -195,6 +192,9 @@ dependencies {
     implementation 'androidx.recyclerview:recyclerview:1.3.2'
     implementation 'androidx.tvprovider:tvprovider:1.0.0'
     implementation 'androidx.work:work-runtime-ktx:2.10.0'
+    // InMobi Android SDK 11.5.0; current SDK supports API 21+ and this app
+    // retains its existing API 24 minimum.
+    implementation 'com.inmobi.monetization:inmobi-ads-kotlin:11.5.0'
     // Native EasyList-compatible filtering for WebView requests, cosmetic rules,
     // and scriptlet injection. The legacy AdvancedAdBlocker remains as fallback.
     implementation('com.github.Edsuns.AdblockAndroid:ad-filter:0.9.1') {
